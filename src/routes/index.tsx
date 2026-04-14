@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { ArrowLeftRight } from 'lucide-react'
 import DebugBar from '../components/DebugBar'
 import InputPanel from '../components/InputPanel'
 import ModeToggle from '../components/ModeToggle'
@@ -54,16 +53,6 @@ function Translator() {
     textareaRef.current?.focus()
   }, [setInput, reset])
 
-  const swap = useCallback(() => {
-    if (source === 'auto') return
-    const mainText = getMainText(live) ?? ''
-    setSource(target)
-    setTarget(source)
-    if (mainText) setInput(mainText)
-    reset()
-    setTimeout(() => textareaRef.current?.focus(), 0)
-  }, [source, target, live, setInput, setSource, setTarget, reset])
-
   useTranslatorShortcuts({
     hasInput: Boolean(input),
     live,
@@ -72,7 +61,6 @@ function Translator() {
       const text = getMainText(live)
       if (text) void navigator.clipboard.writeText(text)
     },
-    onSwap: swap,
     onFocusInput: () => {
       textareaRef.current?.focus()
       textareaRef.current?.select()
@@ -86,7 +74,7 @@ function Translator() {
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-accent" />
           <h1 className="text-sm font-semibold tracking-tight text-ink">
-            neotranslate
+            Translater
           </h1>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2 sm:gap-3">
@@ -103,6 +91,7 @@ function Translator() {
           setSource={setSource}
           intent={intent}
           live={live}
+          streaming={streaming}
           error={error}
           onSubmit={() => void run()}
           onClear={clearInput}
@@ -111,20 +100,6 @@ function Translator() {
             textareaRef.current?.focus()
           }}
         />
-
-        <div className="flex items-center justify-center border-b border-border bg-panel/40 py-1.5 md:absolute md:left-1/2 md:top-1/2 md:z-10 md:-translate-x-1/2 md:-translate-y-1/2 md:border-0 md:bg-transparent md:py-0">
-          <button
-            type="button"
-            onClick={swap}
-            disabled={source === 'auto'}
-            title="Swap languages  ⌘/"
-            aria-label="Swap languages"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-border bg-panel px-3 text-xs text-ink-soft shadow-sm transition hover:border-accent/60 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 md:h-10 md:w-10 md:gap-0 md:px-0 md:text-sm"
-          >
-            <ArrowLeftRight size={14} className="shrink-0" />
-            <span className="md:hidden">Swap</span>
-          </button>
-        </div>
 
         <OutputPanel
           target={target}
@@ -158,9 +133,6 @@ function ShortcutHints() {
       </span>
       <span>
         <kbd className="kbd">⌘↵</kbd> force
-      </span>
-      <span>
-        <kbd className="kbd">⌘/</kbd> swap
       </span>
       <span>
         <kbd className="kbd">⌘K</kbd> focus input

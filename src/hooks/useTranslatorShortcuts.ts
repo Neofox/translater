@@ -6,19 +6,14 @@ type Args = {
   live: LiveResult | null
   onForce: () => void
   onCopy: () => void
-  onSwap: () => void
   onFocusInput: () => void
   onClear: () => void
 }
 
-// Global keyboard shortcuts. Deps are intentionally omitted: each handler is
-// expected to read current state via closure at call-time, and the listener
-// itself is idempotent.
 export function useTranslatorShortcuts({
   hasInput,
   onForce,
   onCopy,
-  onSwap,
   onFocusInput,
   onClear,
 }: Args) {
@@ -31,9 +26,6 @@ export function useTranslatorShortcuts({
       } else if (meta && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
         e.preventDefault()
         onCopy()
-      } else if (meta && e.key === '/') {
-        e.preventDefault()
-        onSwap()
       } else if (meta && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault()
         onFocusInput()
@@ -44,5 +36,5 @@ export function useTranslatorShortcuts({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasInput, onForce, onCopy, onSwap, onFocusInput, onClear])
+  }, [hasInput, onForce, onCopy, onFocusInput, onClear])
 }

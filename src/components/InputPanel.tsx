@@ -13,6 +13,7 @@ type Props = {
   setSource: (next: LangCode) => void
   intent: Intent
   live: LiveResult | null
+  streaming: boolean
   error: string | null
   onSubmit: () => void
   onClear: () => void
@@ -28,6 +29,7 @@ const InputPanel = forwardRef<HTMLTextAreaElement, Props>(
       setSource,
       intent,
       live,
+      streaming,
       error,
       onSubmit,
       onClear,
@@ -35,9 +37,11 @@ const InputPanel = forwardRef<HTMLTextAreaElement, Props>(
     },
     ref,
   ) {
+    const hasMeta = !error && live?.intent === 'word'
+
     return (
-      <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
-        <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
+      <section className="flex min-h-0 flex-col overflow-y-auto border-b border-border md:border-b-0 md:border-r scrollbar-thin">
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
           <LanguageSelect value={source} onChange={setSource} includeAuto />
           <div className="flex items-center gap-2">
             <span className="text-xs text-ink-dim">
@@ -67,11 +71,15 @@ const InputPanel = forwardRef<HTMLTextAreaElement, Props>(
             }
           }}
           placeholder="Type or paste text…"
-          className="min-h-[7rem] w-full flex-1 resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:min-h-[40%] sm:px-6 sm:py-4 sm:text-xl"
+          className={`min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl ${hasMeta ? 'max-h-[12rem]' : 'flex-1'}`}
           spellCheck={false}
         />
         {!error && live?.intent === 'word' && (
-          <WordSourceMeta result={live.partial} onLookup={onLookup} />
+          <WordSourceMeta
+            result={live.partial}
+            streaming={streaming}
+            onLookup={onLookup}
+          />
         )}
       </section>
     )

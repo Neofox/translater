@@ -16,7 +16,7 @@ function openrouterProvider() {
     extraHeaders: {
       'HTTP-Referer':
         process.env.OPENROUTER_SITE_URL ?? 'http://localhost:3000',
-      'X-Title': 'neotranslate',
+      'X-Title': 'translater',
     } as Record<string, string>,
   }
 }
@@ -59,6 +59,6 @@ if (typeof process !== 'undefined') {
     ? `${PROVIDER.apiKey.slice(0, 7)}...${PROVIDER.apiKey.slice(-4)}`
     : '(no key)'
   console.log(
-    `[neotranslate] provider=${PROVIDER.name} model=${PROVIDER.model} baseURL=${PROVIDER.baseURL ?? '(default)'} key=${tag}`,
+    `[translater] provider=${PROVIDER.name} model=${PROVIDER.model} baseURL=${PROVIDER.baseURL ?? '(default)'} key=${tag}`,
   )
 }
