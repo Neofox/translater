@@ -16,7 +16,9 @@ type Props = {
 }
 
 export default function WordView({ result, mode, streaming }: Props) {
-  const alternatives = result.alternativeTranslations ?? []
+  const all = result.alternativeTranslations ?? []
+  const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
+
   return (
     <div className="flex h-full flex-col gap-5 overflow-y-auto p-6 scrollbar-thin">
       <div>
@@ -40,7 +42,7 @@ export default function WordView({ result, mode, streaming }: Props) {
         )}
       </div>
 
-      {alternatives.length > 0 && (
+      {(settled.length > 0 || (streaming && all.length > 0)) && (
         <div>
           <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-dim">
             Alternative translations
@@ -49,10 +51,11 @@ export default function WordView({ result, mode, streaming }: Props) {
             </span>
           </p>
           <ul className="space-y-2">
-            {alternatives.map((alt, i) => (
+            {settled.map((alt, i) => (
               <li
                 key={i}
-                className="group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3"
+                className="animate-settle group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-2">
@@ -77,6 +80,14 @@ export default function WordView({ result, mode, streaming }: Props) {
                 )}
               </li>
             ))}
+            {streaming && all.length > settled.length && (
+              <li className="flex items-start gap-3 rounded-lg border border-border bg-panel px-4 py-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-ink-dim/10" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-ink-dim/10" />
+                </div>
+              </li>
+            )}
           </ul>
         </div>
       )}

@@ -7,7 +7,9 @@ type Props = {
 }
 
 export default function SentenceView({ result, streaming }: Props) {
-  const alternatives = result.alternatives ?? []
+  const all = result.alternatives ?? []
+  const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
+
   return (
     <div className="flex h-full flex-col gap-5 overflow-y-auto p-6 scrollbar-thin">
       <div>
@@ -30,7 +32,7 @@ export default function SentenceView({ result, streaming }: Props) {
       </div>
 
       {result.formalityNote && (
-        <div className="rounded-lg border border-border bg-panel px-4 py-3 text-sm text-ink-soft">
+        <div className="animate-settle rounded-lg border border-border bg-panel px-4 py-3 text-sm text-ink-soft">
           <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
             Context
           </span>
@@ -38,16 +40,17 @@ export default function SentenceView({ result, streaming }: Props) {
         </div>
       )}
 
-      {alternatives.length > 0 && (
+      {(settled.length > 0 || (streaming && all.length > 0)) && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-dim">
             Alternatives
           </p>
           <ul className="space-y-2">
-            {alternatives.map((alt, i) => (
+            {settled.map((alt, i) => (
               <li
                 key={i}
-                className="group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3"
+                className="animate-settle group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="min-w-0 flex-1">
                   <p className="whitespace-pre-wrap text-base text-ink">
@@ -64,6 +67,14 @@ export default function SentenceView({ result, streaming }: Props) {
                 )}
               </li>
             ))}
+            {streaming && all.length > settled.length && (
+              <li className="flex items-start gap-3 rounded-lg border border-border bg-panel px-4 py-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-ink-dim/10" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-ink-dim/10" />
+                </div>
+              </li>
+            )}
           </ul>
         </div>
       )}

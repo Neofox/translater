@@ -58,6 +58,21 @@ button {
   background: transparent;
 }
 
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-settle {
+  animation: settle-in 0.3s ease-out both;
+}
+
 .kbd {
   display: inline-block;
   min-width: 1.4em;
