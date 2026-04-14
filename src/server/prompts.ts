@@ -65,15 +65,15 @@ const SENTENCE_FEWSHOT = {
   assistant: JSON.stringify({
     main: '오늘 어떻게 지내요?',
     rationale:
-      'Casual 해요체 — a natural peer-level greeting without being overly formal.',
+      '해요체 with 어떻게 (how) gives a warm, natural greeting. Korean doesn\'t distinguish "how are you" from "how are you doing" — 어떻게 지내요 covers both without the stiff feel of formal 잘 지내십니까.',
     alternatives: [
       {
         text: '오늘 잘 지내?',
-        note: 'More informal 반말 — use only with close friends.',
+        note: '반말 drops the 요 politeness marker entirely. Using 반말 signals you consider the listener a close equal — saying this to someone older or higher-status would come across as rude.',
       },
       {
         text: '오늘 잘 지내세요?',
-        note: 'Slightly more polite, works with acquaintances or coworkers.',
+        note: "The 시 honorific infix in 지내시다 elevates the listener — common when speaking to someone slightly above you in age or rank, like a senior coworker or a friend's parent.",
       },
     ],
     formalityNote: '',
@@ -92,7 +92,9 @@ export function sentencePrompt(args: {
     `You are a translator. Translate from ${langName(source)} to ${langName(target)}.`,
     toneGuidance(mode),
     kr ? koreanRegisterGuidance(mode) : '',
-    'Return ONE primary translation in `main`, plus 2-4 concise alternatives (unless the source is unambiguous, then 0). Each alternative should differ in a meaningful way (register, phrasing, idiom choice).',
+    'Return ONE primary translation in `main`, plus 2-6 concise alternatives (unless the source is unambiguous, then 0). Each alternative should differ in a meaningful way (register, phrasing, idiom choice).',
+    'The `rationale` should highlight interesting linguistic or cultural nuances — wordplay, double meanings, idioms, slang origins, ambiguity resolved. Avoid generic tone descriptions like "casual" or "informal" without further insight.',
+    'Each alternative `note` should be insightful — explain wordplay, double meanings, slang origins, cultural connotations, or nuance that a literal translation would miss. Avoid generic register descriptions like "casual" or "informal" without further context.',
     'PRESERVE FORMATTING: keep the exact line-break and paragraph structure of the source in `main` and in every alternative. If the source has three lines separated by `\\n`, the translation must also have three lines separated by `\\n` at the corresponding positions. Do not collapse multi-line input into a single run-on sentence. Keep leading/trailing emoticons, punctuation, and whitespace as-is.',
     kr && target === 'ko' && mode !== 'friends'
       ? 'Populate `formalityNote` (in English) only when the listener-speaker relationship would materially change the translation (e.g., to a boss vs. to a friend). Otherwise empty string.'

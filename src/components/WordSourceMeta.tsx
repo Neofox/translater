@@ -64,7 +64,7 @@ export default function WordSourceMeta({ result, onLookup }: Props) {
             Primary meaning
           </p>
           <p className="text-ink">{primary.definition}</p>
-          {primary.register.length > 0 && (
+          {primary.register?.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1.5">
               {primary.register.map((r) => (
                 <span
@@ -76,7 +76,7 @@ export default function WordSourceMeta({ result, onLookup }: Props) {
               ))}
             </div>
           )}
-          {primary.examples.length > 0 && (
+          {primary.examples?.length > 0 && (
             <ul className="mt-2 space-y-1 pl-4">
               {primary.examples.map((ex, i) => (
                 <li
@@ -101,7 +101,7 @@ export default function WordSourceMeta({ result, onLookup }: Props) {
               <li key={`same-${i}`} className="text-ink">
                 <span className="mr-2 text-ink-dim">{i + 2}.</span>
                 {s.definition}
-                {s.examples.length > 0 && (
+                {s.examples?.length > 0 && (
                   <ul className="mt-1 space-y-0.5 pl-4">
                     {s.examples.map((ex, j) => (
                       <li

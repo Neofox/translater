@@ -5,7 +5,7 @@ export const SentenceResult = z.object({
   rationale: z
     .string()
     .describe(
-      'One short English sentence explaining the chosen translation (register, idiom handling, ambiguity resolved). ALWAYS in English.',
+      'One English sentence explaining the chosen translation — highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions. ALWAYS in English.',
     ),
   alternatives: z
     .array(
@@ -13,12 +13,14 @@ export const SentenceResult = z.object({
         text: z.string(),
         note: z
           .string()
-          .describe('Short English note on why this alternative differs.'),
+          .describe(
+            'Insightful English note — explain wordplay, double meanings, slang origins, cultural connotations, or nuance that a literal translation would miss. Avoid generic register descriptions like "casual" or "informal" without further insight.',
+          ),
       }),
     )
-    .max(5)
+    .max(7)
     .describe(
-      '0-4 alternative phrasings. Leave empty if the source is unambiguous.',
+      '0-6 alternative phrasings. Leave empty if the source is unambiguous.',
     ),
   formalityNote: z
     .string()

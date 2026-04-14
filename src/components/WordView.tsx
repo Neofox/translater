@@ -57,7 +57,7 @@ export default function WordView({ result, mode, streaming }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-2">
                     <p className="text-base text-ink">{alt.text}</p>
-                    {alt.register.map((r) => (
+                    {alt.register?.map((r) => (
                       <span
                         key={r}
                         className="rounded bg-bg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-dim"
