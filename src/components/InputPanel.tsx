@@ -23,7 +23,7 @@ export default function InputPanel() {
   } = useTranslatorContext()
 
   return (
-    <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
+    <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12">
       <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
         <div className="flex flex-wrap items-center gap-2">
           <LanguageSelect

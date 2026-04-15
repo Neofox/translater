@@ -21,7 +21,7 @@ export default function OutputPanel() {
   const copyText = mainText(live)
 
   return (
-    <section className="flex min-h-0 flex-col">
+    <section className="flex min-h-0 flex-col xl:p-6 2xl:p-12">
       <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft">
         <div className="flex flex-wrap items-center gap-2">
           <LanguageSelect

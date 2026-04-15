@@ -16,10 +16,14 @@ export const Route = createRootRoute({
       { name: 'color-scheme', content: 'dark' },
       { name: 'theme-color', content: '#0f1118' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
-      { name: 'apple-mobile-web-app-title', content: 'translater' },
-      { title: 'translater' },
+      { name: 'apple-mobile-web-app-title', content: 'Translater' },
+      { title: 'Translater' },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'alternate icon', href: '/favicon.ico' },
+    ],
   }),
   shellComponent: RootDocument,
 })
