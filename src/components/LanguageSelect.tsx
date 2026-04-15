@@ -1,5 +1,6 @@
 import { LANGUAGES } from '../lib/languages'
 import type { LangCode } from '../lib/languages'
+import Select from './ui/Select'
 
 type Props = {
   value: LangCode
@@ -14,18 +15,16 @@ export default function LanguageSelect({
   includeAuto = false,
   'aria-label': ariaLabel,
 }: Props) {
+  const options = LANGUAGES.filter((l) => includeAuto || l.code !== 'auto').map(
+    (l) => ({ value: l.code, label: l.label, searchLabel: l.promptName }),
+  )
+
   return (
-    <select
+    <Select
       value={value}
-      onChange={(e) => onChange(e.target.value as LangCode)}
+      onChange={onChange}
+      options={options}
       aria-label={ariaLabel}
-      className="cursor-pointer rounded-md border border-border/70 bg-panel/40 px-2.5 py-1.5 text-sm font-medium text-ink transition hover:border-accent/60 hover:bg-panel focus:border-accent focus:bg-panel focus:outline-none"
-    >
-      {LANGUAGES.filter((l) => includeAuto || l.code !== 'auto').map((l) => (
-        <option key={l.code} value={l.code} className="bg-panel text-ink">
-          {l.label}
-        </option>
-      ))}
-    </select>
+    />
   )
 }

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 type Tone = 'neutral' | 'accent' | 'warm'
 type Size = 'sm' | 'md'
@@ -7,6 +7,7 @@ type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
   tone?: Tone
   size?: Size
   children: ReactNode
+  ref?: Ref<HTMLButtonElement>
 }
 
 const toneClass: Record<Tone, string> = {
@@ -25,10 +26,12 @@ export default function Pill({
   size = 'sm',
   className = '',
   children,
+  ref,
   ...rest
 }: Props) {
   return (
     <button
+      ref={ref}
       type="button"
       {...rest}
       className={`inline-flex items-center rounded-md border border-border bg-panel text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}

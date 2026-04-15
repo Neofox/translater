@@ -15,6 +15,7 @@
     "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.19",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-router": "latest",

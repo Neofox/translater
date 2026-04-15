@@ -1,0 +1,172 @@
+import { useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import {
+  FloatingFocusManager,
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  size,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useListNavigation,
+  useRole,
+  useTypeahead,
+} from '@floating-ui/react'
+import { Check, ChevronDown } from 'lucide-react'
+import Pill from './Pill'
+
+type Tone = 'neutral' | 'accent' | 'warm'
+
+export type SelectOption<V extends string> = {
+  value: V
+  label: ReactNode
+  /** String used for keyboard typeahead matching. Defaults to `label` if it's a string, else `value`. */
+  searchLabel?: string
+}
+
+type Props<V extends string> = {
+  value: V
+  onChange: (next: V) => void
+  options: ReadonlyArray<SelectOption<V>>
+  tone?: Tone
+  'aria-label'?: string
+}
+
+export default function Select<V extends string>({
+  value,
+  onChange,
+  options,
+  tone = 'neutral',
+  'aria-label': ariaLabel,
+}: Props<V>) {
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+
+  const listRef = useRef<Array<HTMLElement | null>>([])
+  const listContentRef = useRef(
+    options.map(
+      (o) => o.searchLabel ?? (typeof o.label === 'string' ? o.label : o.value),
+    ),
+  )
+
+  const selectedIndex = options.findIndex((o) => o.value === value)
+  const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined
+
+  const { refs, floatingStyles, context, isPositioned } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: 'bottom-start',
+    strategy: 'fixed',
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset({ mainAxis: 6 }),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      size({
+        apply({ availableHeight, elements, rects }) {
+          Object.assign(elements.floating.style, {
+            maxHeight: `${Math.min(availableHeight, 320)}px`,
+            minWidth: `${rects.reference.width}px`,
+          })
+        },
+        padding: 8,
+      }),
+    ],
+  })
+
+  const click = useClick(context, { event: 'mousedown' })
+  const dismiss = useDismiss(context)
+  const role = useRole(context, { role: 'listbox' })
+  const listNav = useListNavigation(context, {
+    listRef,
+    activeIndex,
+    selectedIndex: selectedIndex >= 0 ? selectedIndex : null,
+    onNavigate: setActiveIndex,
+    loop: true,
+  })
+  const typeahead = useTypeahead(context, {
+    listRef: listContentRef,
+    activeIndex,
+    selectedIndex: selectedIndex >= 0 ? selectedIndex : null,
+    onMatch: open ? setActiveIndex : undefined,
+  })
+
+  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions(
+    [click, dismiss, role, listNav, typeahead],
+  )
+
+  function handleSelect(i: number) {
+    const opt = options[i]
+    if (!opt) return
+    onChange(opt.value)
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <Pill
+        ref={refs.setReference}
+        tone={tone}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        {...getReferenceProps()}
+      >
+        <span>{selected?.label ?? value}</span>
+        <ChevronDown
+          size={12}
+          className={`transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </Pill>
+      {open && (
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <ul
+              ref={refs.setFloating}
+              style={{
+                ...floatingStyles,
+                visibility: isPositioned ? 'visible' : 'hidden',
+              }}
+              {...getFloatingProps()}
+              className="z-50 overflow-auto rounded-lg border border-border bg-panel py-1 text-sm text-ink shadow-lg scrollbar-thin focus:outline-none"
+            >
+              {options.map((opt, i) => (
+                <li key={opt.value}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={i === selectedIndex}
+                    ref={(node) => {
+                      listRef.current[i] = node
+                    }}
+                    tabIndex={i === activeIndex ? 0 : -1}
+                    {...getItemProps({
+                      onClick: () => handleSelect(i),
+                      onKeyDown: (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleSelect(i)
+                        }
+                      },
+                    })}
+                    className={`flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left transition hover:bg-panel-2 focus:bg-panel-2 focus:outline-none ${
+                      i === activeIndex ? 'bg-panel-2' : ''
+                    } ${i === selectedIndex ? 'text-accent' : 'text-ink'}`}
+                  >
+                    <span>{opt.label}</span>
+                    {i === selectedIndex && (
+                      <Check size={14} className="text-accent" />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </FloatingFocusManager>
+        </FloatingPortal>
+      )}
+    </>
+  )
+}

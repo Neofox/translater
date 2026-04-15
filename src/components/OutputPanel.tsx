@@ -30,7 +30,7 @@ export default function OutputPanel() {
             aria-label="Target language"
           />
           {copyText && <CopyButton text={copyText} />}
-          <LearningTips tips={outputTips} align="end" />
+          <LearningTips tips={outputTips} />
         </div>
         {streaming && (
           <span className="inline-flex items-center gap-1.5 text-xs text-accent">
