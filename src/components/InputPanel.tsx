@@ -60,20 +60,45 @@ const InputPanel = forwardRef<HTMLTextAreaElement, Props>(
             )}
           </div>
         </div>
-        <textarea
-          ref={ref}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-              e.preventDefault()
-              onSubmit()
-            }
-          }}
-          placeholder="Type or paste text…"
-          className={`min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl ${hasMeta ? 'max-h-[12rem]' : 'flex-1'}`}
-          spellCheck={false}
-        />
+        <div
+          className={`relative flex flex-col ${hasMeta ? '' : 'min-h-0 flex-1'}`}
+        >
+          <textarea
+            ref={ref}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.metaKey &&
+                !e.ctrlKey
+              ) {
+                e.preventDefault()
+                onSubmit()
+              }
+            }}
+            placeholder="Type or paste text…"
+            className={`min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl ${hasMeta ? 'max-h-[12rem]' : 'flex-1'}`}
+            spellCheck={false}
+          />
+          {!input && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const text = await navigator.clipboard.readText()
+                  if (text) setInput(text)
+                } catch {
+                  // clipboard unavailable or permission denied
+                }
+              }}
+              className="absolute left-4 top-12 text-sm text-ink-dim underline decoration-dotted underline-offset-4 transition hover:text-ink sm:left-6 sm:top-14 sm:text-base"
+            >
+              Paste clipboard
+            </button>
+          )}
+        </div>
         {!error && live?.intent === 'word' && (
           <WordSourceMeta
             result={live.partial}

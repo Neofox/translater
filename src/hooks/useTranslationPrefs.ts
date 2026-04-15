@@ -1,11 +1,12 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { usePersistentState } from '../lib/usePersistentState'
 import type { LangCode } from '../lib/languages'
 
 export type Mode = 'friends' | 'casual' | 'professional'
 
 export function useTranslationPrefs() {
-  const [input, setInput] = usePersistentState<string>('nt.input', '')
+  const [input, setInput] = useState<string>('')
+
   const [source, setSource] = usePersistentState<LangCode>('nt.source', 'auto')
   const [target, setTarget] = usePersistentState<LangCode>('nt.target', 'ko')
   const [prevTarget, setPrevTarget] = usePersistentState<LangCode>(
