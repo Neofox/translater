@@ -87,6 +87,7 @@ export function sentencePrompt(args: {
   const kr = source === 'ko' || target === 'ko'
   const system = [
     `You are a translator. Translate from ${langName(source)} to ${langName(target)}.`,
+    `OUTPUT LANGUAGE: \`main\` and every \`alternatives[].text\` MUST be written in ${langName(target)}. Never echo the source verbatim — the only exceptions are untranslatable tokens (proper nouns, brand names, URLs, numbers, or loanwords fully adopted in the target). If the source is already in ${langName(target)}, produce a natural paraphrase in ${langName(target)} rather than copying it.`,
     toneGuidance(mode),
     kr ? koreanRegisterGuidance(mode) : '',
     'Return ONE primary translation in `main`, plus 2-6 concise alternatives (unless the source is unambiguous, then 0). Each alternative should differ in a meaningful way (register, phrasing, idiom choice).',
@@ -310,6 +311,7 @@ export function wordPrompt(args: {
 
   const system = [
     `You are a bilingual dictionary. The headword is in ${langName(source)}. The user is fluent in English; they want to understand this word well enough to use it in ${langName(target)}.`,
+    `OUTPUT LANGUAGE: \`primaryTranslation\` and every \`alternativeTranslations[].text\` MUST be written in ${langName(target)}. Never echo the headword verbatim as the translation — except for untranslatable proper nouns or brand names. If the headword is already in ${langName(target)}, produce a natural ${langName(target)} paraphrase or near-synonym for the primary instead of copying it.`,
     `Current mode: ${mode.toUpperCase()}. Register band for primaryTranslation and every alternativeTranslation: ${band}. NEVER include a ${oppositeBand} variant in this response — it belongs in the other mode.`,
     '`posList` holds 1-3 parts of speech the headword can take, each with 1-4 ENGLISH senses. Include all POS a literate reader would expect (e.g., "thanks" → interjection + noun + verb).',
     'For each sense: `definition` is a clear ENGLISH explanation. `register` is an array of English tags like "informal", "formal", "technical", "slang", "archaic" (empty array if none). `examples` has 1-2 short example sentences IN THE HEADWORD\'S LANGUAGE showing natural native usage — if that language is not English, append an English gloss in parentheses (e.g. "그는 진짜 빵돌이라서 매일 빵집에 가요. (He\'s a real bread-lover, so he goes to the bakery every day.)"). Only use plain English examples when the headword itself is English. Never return an empty `examples` array.',

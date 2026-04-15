@@ -7,6 +7,8 @@ export function detectIntent(text: string): Intent {
   if (!trimmed) return 'sentence'
   if (SENTENCE_TERMINATORS.test(trimmed)) return 'sentence'
   const tokens = trimmed.split(/\s+/).filter(Boolean)
-  if (tokens.length <= 3 && trimmed.length <= 24) return 'word'
+  // ≤2 tokens covers single words and MWEs like "thank you" / "get up".
+  // 3+ tokens is almost always a phrase or sentence (e.g. "open the browser").
+  if (tokens.length <= 2 && trimmed.length <= 24) return 'word'
   return 'sentence'
 }
