@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
+import Pill from './ui/Pill'
 
 type Props = {
   tips?: Partial<LearningTipsType>
@@ -37,18 +38,13 @@ export default function LearningTips({ tips, align = 'start' }: Props) {
 
   return (
     <div className={`animate-settle relative ${open ? 'z-50' : ''}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1 text-xs text-ink-soft transition hover:border-accent/60 hover:text-ink"
-      >
-        <span>🎓 Learning tips</span>
+      <Pill tone="warm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span>Learning tips</span>
         <ChevronDown
           size={12}
           className={`transition-transform ${open ? 'rotate-180' : ''}`}
         />
-      </button>
+      </Pill>
 
       {open && (
         <div
@@ -58,7 +54,7 @@ export default function LearningTips({ tips, align = 'start' }: Props) {
         >
           {grammar && (
             <p>
-              <span className="mr-1 font-semibold uppercase tracking-wide text-ink-dim">
+              <span className="mr-1 font-semibold uppercase tracking-wide text-warm">
                 grammar ·
               </span>
               {grammar}
@@ -66,7 +62,7 @@ export default function LearningTips({ tips, align = 'start' }: Props) {
           )}
           {vocab && (
             <p>
-              <span className="mr-1 font-semibold uppercase tracking-wide text-ink-dim">
+              <span className="mr-1 font-semibold uppercase tracking-wide text-warm">
                 vocab ·
               </span>
               {vocab}
@@ -74,7 +70,7 @@ export default function LearningTips({ tips, align = 'start' }: Props) {
           )}
           {characters.length > 0 && (
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-semibold uppercase tracking-wide text-ink-dim">
+              <span className="font-semibold uppercase tracking-wide text-warm">
                 {charLabel} ·
               </span>
               {characters.map((c, i) => (
@@ -82,7 +78,7 @@ export default function LearningTips({ tips, align = 'start' }: Props) {
                   key={`${c.word}-${i}`}
                   className="inline-flex items-baseline gap-1"
                 >
-                  <span className="text-ink">{c.word}</span>
+                  <span className="font-medium text-warm">{c.word}</span>
                   <span className="text-ink-dim">
                     {c.chars.map((ch, j) => (
                       <span key={`${ch.char}-${j}`}>

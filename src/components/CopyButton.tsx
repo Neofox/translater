@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
+import Pill from './ui/Pill'
 
 type Props = {
   text: string
@@ -20,13 +21,9 @@ export default function CopyButton({ text, label = 'Copy' }: Props) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1 text-xs text-ink-soft transition hover:border-accent/60 hover:text-ink"
-    >
+    <Pill tone="neutral" onClick={handleCopy}>
       {copied ? <Check size={14} /> : <Copy size={14} />}
       {copied ? 'Copied' : label}
-    </button>
+    </Pill>
   )
 }

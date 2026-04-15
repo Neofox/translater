@@ -29,7 +29,7 @@ export default function SentenceView({ result, streaming }: Props) {
 
       {result.formalityNote && (
         <div className="animate-settle rounded-lg border border-border bg-panel px-4 py-3 text-sm text-ink-soft">
-          <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
+          <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-warm">
             Context
           </span>
           {result.formalityNote}

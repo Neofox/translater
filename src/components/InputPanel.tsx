@@ -36,24 +36,38 @@ export default function InputPanel() {
           <LearningTips tips={inputTips} />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-ink-dim">
-            {intent === 'word' ? 'Dictionary' : 'Sentence'}
-          </span>
+          {input && (
+            <span
+              className={`text-xs font-medium ${intent === 'word' ? 'text-warm' : 'text-accent'}`}
+            >
+              {intent === 'word' ? 'Dictionary' : 'Sentence'}
+            </span>
+          )}
           {input && (
             <button
               type="button"
               onClick={clearInput}
               title="Clear input  Esc"
               aria-label="Clear input"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-panel text-ink-soft transition hover:border-accent/60 hover:text-ink"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
             >
               <X size={14} />
             </button>
           )}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">
-        <div className="relative flex flex-col">
+      <div
+        className="flex min-h-0 flex-1 cursor-text flex-col overflow-y-auto scrollbar-thin"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) textareaRef.current?.focus()
+        }}
+      >
+        <div
+          className="relative flex flex-col"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) textareaRef.current?.focus()
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}

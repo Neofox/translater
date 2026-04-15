@@ -11,6 +11,8 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
+      { name: 'robots', content: 'noindex, nofollow, noarchive, nosnippet' },
+      { name: 'googlebot', content: 'noindex, nofollow' },
       { name: 'color-scheme', content: 'dark' },
       { name: 'theme-color', content: '#0f1118' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },

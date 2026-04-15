@@ -33,7 +33,7 @@ export default function OutputPanel() {
           <LearningTips tips={outputTips} align="end" />
         </div>
         {streaming && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
+          <span className="inline-flex items-center gap-1.5 text-xs text-accent">
             <Loader2 size={12} className="animate-spin" />
             Streaming…
           </span>

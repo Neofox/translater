@@ -9,10 +9,12 @@
   --color-panel-2: oklch(0.26 0.015 270);
   --color-border: oklch(0.32 0.015 270);
   --color-ink: oklch(0.96 0.01 270);
-  --color-ink-soft: oklch(0.72 0.02 270);
-  --color-ink-dim: oklch(0.55 0.02 270);
+  --color-ink-soft: oklch(0.84 0.015 270);
+  --color-ink-dim: oklch(0.68 0.02 270);
   --color-accent: oklch(0.75 0.16 290);
   --color-accent-soft: oklch(0.45 0.14 290 / 0.22);
+  --color-warm: oklch(0.8 0.13 75);
+  --color-warm-soft: oklch(0.5 0.12 75 / 0.22);
 }
 
 * {

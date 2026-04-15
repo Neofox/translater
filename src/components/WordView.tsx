@@ -3,6 +3,7 @@ import { MODE_LABEL } from '../lib/types'
 import type { Mode } from '../lib/types'
 import AlternativeItem from './AlternativeItem'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
+import Tag from './ui/Tag'
 
 type Props = {
   result: Partial<WordResult>
@@ -36,9 +37,7 @@ export default function WordView({ result, mode, streaming }: Props) {
         <div>
           <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-dim">
             Alternative translations
-            <span className="rounded bg-panel px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink-soft">
-              {MODE_LABEL[mode]}
-            </span>
+            <Tag tone="accent">{MODE_LABEL[mode]}</Tag>
           </p>
           <ul className="space-y-1.5">
             {settled.map((alt, i) => (
@@ -49,12 +48,9 @@ export default function WordView({ result, mode, streaming }: Props) {
                 note={alt.note}
               >
                 {alt.register.map((r) => (
-                  <span
-                    key={r}
-                    className="rounded bg-bg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-dim"
-                  >
+                  <Tag key={r} tone="neutral">
                     {r}
-                  </span>
+                  </Tag>
                 ))}
               </AlternativeItem>
             ))}

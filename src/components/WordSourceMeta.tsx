@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { WordResult } from '../server/schemas'
+import Tag from './ui/Tag'
 
 type Props = {
   result: Partial<WordResult>
@@ -139,7 +140,7 @@ function PosLabel({ pos }: { pos: string }) {
       className="animate-settle mb-3 flex items-baseline gap-2"
       style={{ animationDelay: '30ms' }}
     >
-      <span className="text-xs font-semibold uppercase tracking-wide text-ink-dim">
+      <span className="text-xs font-semibold uppercase tracking-wide text-warm">
         Part of speech
       </span>
       <span className="italic text-ink">{pos}</span>
@@ -156,19 +157,16 @@ function PrimaryBlock({
 }) {
   return (
     <div className="animate-settle mb-3" style={{ animationDelay: '60ms' }}>
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-dim">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-warm">
         Primary meaning
       </p>
       <p className="text-ink">{primary.definition}</p>
       {primary.register?.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1.5">
           {primary.register.map((r) => (
-            <span
-              key={r}
-              className="rounded bg-panel px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-dim"
-            >
+            <Tag key={r} tone="neutral">
               {r}
-            </span>
+            </Tag>
           ))}
         </div>
       )}
@@ -199,7 +197,7 @@ function OtherBlock({
 }) {
   return (
     <div className="animate-settle mb-3">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-dim">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
         Other meanings
       </p>
       <ol className="space-y-2 pl-4">
@@ -237,7 +235,7 @@ function OtherBlock({
 function TextBlock({ label, text }: { label: string; text: string }) {
   return (
     <div className="animate-settle mb-3">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-dim">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-warm">
         {label}
       </p>
       <p className="text-ink">{text}</p>
@@ -254,7 +252,7 @@ function SynonymBlock({
 }) {
   return (
     <div className="animate-settle">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-dim">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
         Synonyms
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -277,7 +275,7 @@ function SynonymBlock({
 function SkeletonBlock({ label }: { label: string }) {
   return (
     <div className="mb-3">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-dim">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
         {label}
       </p>
       <div className="animate-pulse space-y-2">
