@@ -73,6 +73,10 @@ button {
   animation: settle-in 0.3s ease-out both;
 }
 
+.field-sizing-content {
+  field-sizing: content;
+}
+
 .kbd {
   display: inline-block;
   min-width: 1.4em;

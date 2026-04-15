@@ -1,10 +1,13 @@
 import { Loader2 } from 'lucide-react'
+import CopyButton from './CopyButton'
+import KoreanInsight from './KoreanInsight'
 import LanguageSelect from './LanguageSelect'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import type { LangCode } from '../lib/languages'
 import type { LiveResult } from '../hooks/useTranslate'
 import type { Mode } from '../hooks/useTranslationPrefs'
+import type { KoreanInsight as KoreanInsightType } from '../server/schemas'
 
 type Props = {
   target: LangCode
@@ -14,6 +17,13 @@ type Props = {
   isPending: boolean
   streaming: boolean
   error: string | null
+  koreanInsight?: Partial<KoreanInsightType>
+}
+
+function mainText(live: LiveResult | null): string | null {
+  if (!live) return null
+  if (live.intent === 'sentence') return live.partial.main ?? null
+  return live.partial.primaryTranslation ?? null
 }
 
 export default function OutputPanel({
@@ -24,11 +34,17 @@ export default function OutputPanel({
   isPending,
   streaming,
   error,
+  koreanInsight,
 }: Props) {
+  const copyText = mainText(live)
   return (
     <section className="flex min-h-0 flex-col">
       <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft">
-        <LanguageSelect value={target} onChange={setTarget} />
+        <div className="flex flex-wrap items-center gap-2">
+          <LanguageSelect value={target} onChange={setTarget} />
+          {copyText && <CopyButton text={copyText} />}
+          <KoreanInsight insight={koreanInsight} />
+        </div>
         {streaming && (
           <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
             <Loader2 size={12} className="animate-spin" />

@@ -56,7 +56,10 @@ function priceFor(tokens: { input: number; output: number }) {
 export const translate = createServerFn({ method: 'POST' })
   .inputValidator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
+    // Bump when the response schema or prompt changes so stale entries miss.
+    const CACHE_VERSION = 'v2-koreanInsight'
     const cacheKey = JSON.stringify([
+      CACHE_VERSION,
       data.intent,
       data.mode,
       data.source,

@@ -1,5 +1,52 @@
 import { z } from 'zod'
 
+const KoreanInsight = z
+  .object({
+    grammar: z
+      .string()
+      .default('')
+      .describe(
+        'One short English sentence on the key Korean grammar point (particle, ending, honorific, construction). Empty string when nothing illuminating or when Korean is not in the language pair.',
+      ),
+    vocab: z
+      .string()
+      .default('')
+      .describe(
+        'One short English sentence on a notable Korean word choice, idiom, slang, or cultural connotation. Empty string when not useful or when Korean is not in the language pair.',
+      ),
+    hanja: z
+      .array(
+        z.object({
+          word: z
+            .string()
+            .describe(
+              'The Sino-Korean word as it appears in Hangul, e.g. 도서관.',
+            ),
+          chars: z
+            .array(
+              z.object({
+                char: z.string().describe('A single hanja character, e.g. 圖.'),
+                meaning: z
+                  .string()
+                  .describe('Short English gloss, e.g. "picture".'),
+              }),
+            )
+            .max(5)
+            .describe('The hanja breakdown in order.'),
+        }),
+      )
+      .max(3)
+      .default([])
+      .describe(
+        '0-3 Sino-Korean words worth breaking down for a learner. Skip purely native Korean (고유어) words and loanwords. Empty array when Korean is not in the pair.',
+      ),
+  })
+  .default({ grammar: '', vocab: '', hanja: [] })
+  .describe(
+    'Compact learning aid rendered in a collapsed pill. Populate ONLY when Korean is the source or target language. Leave every field at its default when the pair does not involve Korean.',
+  )
+export type KoreanInsight = z.infer<typeof KoreanInsight>
+
 export const SentenceResult = z.object({
   main: z.string().describe('The primary translation of the source text.'),
   rationale: z
@@ -28,6 +75,7 @@ export const SentenceResult = z.object({
     .describe(
       'Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, ENGLISH. Empty string when not relevant.',
     ),
+  koreanInsight: KoreanInsight,
 })
 export type SentenceResult = z.infer<typeof SentenceResult>
 
@@ -131,5 +179,7 @@ export const WordResult = z.object({
     .describe(
       'Usage notes, false friends, common collocations. ALWAYS IN ENGLISH — never Korean, Japanese, or any other language. Empty string when none worth noting.',
     ),
+
+  koreanInsight: KoreanInsight,
 })
 export type WordResult = z.infer<typeof WordResult>

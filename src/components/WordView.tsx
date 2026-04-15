@@ -35,11 +35,6 @@ export default function WordView({ result, mode, streaming }: Props) {
             {result.primaryUsageNote}
           </p>
         )}
-        {result.primaryTranslation && (
-          <div className="mt-3">
-            <CopyButton text={result.primaryTranslation} />
-          </div>
-        )}
       </div>
 
       {(settled.length > 0 || (streaming && all.length > 0)) && (
@@ -50,11 +45,11 @@ export default function WordView({ result, mode, streaming }: Props) {
               {MODE_LABEL[mode]}
             </span>
           </p>
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {settled.map((alt, i) => (
               <li
                 key={i}
-                className="animate-settle group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3"
+                className="animate-settle group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-3 py-2"
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="min-w-0 flex-1">
@@ -70,7 +65,7 @@ export default function WordView({ result, mode, streaming }: Props) {
                     ))}
                   </div>
                   {alt.note && (
-                    <p className="mt-0.5 text-xs text-ink-dim">{alt.note}</p>
+                    <p className="text-xs text-ink-dim">{alt.note}</p>
                   )}
                 </div>
                 {alt.text && (
@@ -81,7 +76,7 @@ export default function WordView({ result, mode, streaming }: Props) {
               </li>
             ))}
             {streaming && all.length > settled.length && (
-              <li className="flex items-start gap-3 rounded-lg border border-border bg-panel px-4 py-3">
+              <li className="flex items-start gap-3 rounded-lg border border-border bg-panel px-3 py-2">
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="h-4 w-3/4 animate-pulse rounded bg-ink-dim/10" />
                   <div className="h-3 w-1/2 animate-pulse rounded bg-ink-dim/10" />

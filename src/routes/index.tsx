@@ -5,6 +5,7 @@ import InputPanel from '../components/InputPanel'
 import ModeToggle from '../components/ModeToggle'
 import OutputPanel from '../components/OutputPanel'
 import { detectIntent } from '../lib/detectIntent'
+import { detectLanguage } from '../lib/detectLanguage'
 import { useAutoSwapTarget } from '../hooks/useAutoSwapTarget'
 import { useTranslate } from '../hooks/useTranslate'
 import type { LiveResult } from '../hooks/useTranslate'
@@ -40,6 +41,17 @@ function Translator() {
   })
 
   useAutoSwapTarget({ input, source, target, prevTarget, setTarget })
+
+  // Position the Korean insight pill under whichever side holds Korean text:
+  // under the input when the source is Korean, otherwise under the output when
+  // the translation is Korean. Only one side is ever populated at a time.
+  const koreanInsight = live?.partial?.koreanInsight
+  const sourceIsKorean =
+    source === 'ko' || (source === 'auto' && detectLanguage(input) === 'ko')
+  const targetIsKorean = target === 'ko'
+  const inputInsight = sourceIsKorean ? koreanInsight : undefined
+  const outputInsight =
+    !sourceIsKorean && targetIsKorean ? koreanInsight : undefined
 
   // Session totals: persist across input clears, reset on page refresh.
   const [lastMeta, setLastMeta] = useState<Meta | null>(null)
@@ -114,6 +126,7 @@ function Translator() {
           live={live}
           streaming={streaming}
           error={error}
+          koreanInsight={inputInsight}
           onSubmit={() => void run()}
           onClear={clearInput}
           onLookup={(text) => {
@@ -130,6 +143,7 @@ function Translator() {
           isPending={isPending}
           streaming={streaming}
           error={error}
+          koreanInsight={outputInsight}
         />
       </div>
 
