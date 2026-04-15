@@ -16,7 +16,7 @@ export default function LanguageSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as LangCode)}
-      className="rounded-md bg-transparent px-2 py-1 text-sm font-medium text-ink hover:bg-panel focus:bg-panel focus:outline-none"
+      className="cursor-pointer rounded-md border border-border/70 bg-panel/40 px-2.5 py-1.5 text-sm font-medium text-ink transition hover:border-accent/60 hover:bg-panel focus:border-accent focus:bg-panel focus:outline-none"
     >
       {LANGUAGES.filter((l) => includeAuto || l.code !== 'auto').map((l) => (
         <option key={l.code} value={l.code} className="bg-panel text-ink">

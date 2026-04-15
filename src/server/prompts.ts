@@ -15,16 +15,13 @@ function langName(code: string) {
   return LANG_NAMES[code] ?? code
 }
 
-// The only fields in the translation target language are `main` and `primaryTranslation`.
-// Every other field is always English — for the app user, who reads English.
+// The app user reads English. All explanatory/metadata fields are English.
+// Translation output fields follow the target language; `examples` follows the headword language (see schema).
 const METADATA_LANGUAGE_RULE = [
   '=== LANGUAGE RULE (non-negotiable) ===',
-  'The app user reads English.',
-  'ONLY these fields are in the translation target language:',
-  '  • `main` (sentence mode)',
-  '  • `primaryTranslation` (word mode)',
-  'EVERY other field is in ENGLISH: `rationale`, `note`, `formalityNote`, `pos`, `register`, `definition`, `examples`, `etymology`, `notes`.',
-  'This includes `definition` even in word mode. Never write `definition`, `notes`, `etymology`, or any other field in Korean, Japanese, Chinese, or any non-English language.',
+  'The app user reads English. Every explanatory field — `rationale`, `note`, `formalityNote`, `pos`, `register`, `definition`, `primaryUsageNote`, `etymology`, `notes` — is ENGLISH, even when the source or target is Korean/Japanese/etc.',
+  'Translation output fields follow the translation target language: `main` (sentence mode) and `primaryTranslation` / `alternativeTranslations[].text` (word mode).',
+  '`examples` follows the HEADWORD language (source) with an English gloss in parentheses when the headword is non-English — see schema for format.',
   '======================================',
 ].join('\n')
 
@@ -106,7 +103,6 @@ export function sentencePrompt(args: {
     .join('\n')
 
   return [
-    { role: 'developer' as const, content: METADATA_LANGUAGE_RULE },
     { role: 'system' as const, content: system },
     { role: 'user' as const, content: SENTENCE_FEWSHOT.user },
     { role: 'assistant' as const, content: SENTENCE_FEWSHOT.assistant },
@@ -316,7 +312,7 @@ export function wordPrompt(args: {
     `You are a bilingual dictionary. The headword is in ${langName(source)}. The user is fluent in English; they want to understand this word well enough to use it in ${langName(target)}.`,
     `Current mode: ${mode.toUpperCase()}. Register band for primaryTranslation and every alternativeTranslation: ${band}. NEVER include a ${oppositeBand} variant in this response — it belongs in the other mode.`,
     '`posList` holds 1-3 parts of speech the headword can take, each with 1-4 ENGLISH senses. Include all POS a literate reader would expect (e.g., "thanks" → interjection + noun + verb).',
-    'For each sense: `definition` is a clear ENGLISH explanation. `register` is an array of English tags like "informal", "formal", "technical", "slang", "archaic" (empty array if none). `examples` has 1-2 short English example sentences — if the headword is non-English, embed it in its original script inside the English sentence (e.g. "Her 잔소리 never stops."). Never return an empty `examples` array.',
+    'For each sense: `definition` is a clear ENGLISH explanation. `register` is an array of English tags like "informal", "formal", "technical", "slang", "archaic" (empty array if none). `examples` has 1-2 short example sentences IN THE HEADWORD\'S LANGUAGE showing natural native usage — if that language is not English, append an English gloss in parentheses (e.g. "그는 진짜 빵돌이라서 매일 빵집에 가요. (He\'s a real bread-lover, so he goes to the bakery every day.)"). Only use plain English examples when the headword itself is English. Never return an empty `examples` array.',
     '`primaryTranslation` is the single most common equivalent in the target language, WITHIN the current mode band.',
     `\`primaryUsageNote\` is one short English sentence on the register/context of the primary. When a strong opposite-band equivalent exists, mention it briefly (e.g., "Casual — for professional settings use 감사합니다.")${kr ? '' : ''}`,
     `\`alternativeTranslations\`: ${kr || target === 'ja' ? '2-4 entries showing within-band variants (different politeness gradations, emphasis, or lexical choice).' : '0-2 entries only when genuinely useful.'} Every entry is in the ${band} band. No cross-band mixing.`,
@@ -334,7 +330,6 @@ export function wordPrompt(args: {
         : WORD_FEWSHOT_PROFESSIONAL
 
   return [
-    { role: 'developer' as const, content: METADATA_LANGUAGE_RULE },
     { role: 'system' as const, content: system },
     { role: 'user' as const, content: fewshot.user },
     { role: 'assistant' as const, content: fewshot.assistant },

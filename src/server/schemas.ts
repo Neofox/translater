@@ -48,7 +48,7 @@ const Sense = z.object({
     .max(2)
     .default([])
     .describe(
-      'Up to 2 short English example sentences demonstrating this sense. ALWAYS in English.',
+      'Up to 2 short example sentences demonstrating this sense. Write them in the HEADWORD\'s language so the user sees natural native usage. If that language is not English, append an English gloss in parentheses, e.g. "그는 진짜 빵돌이라서 매일 빵집에 가요. (He\'s a real bread-lover, so he goes to the bakery every day.)". If the headword is English, the example is plain English.',
     ),
 })
 
