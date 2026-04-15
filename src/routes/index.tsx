@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DebugBar from '../components/DebugBar'
 import InputPanel from '../components/InputPanel'
 import ModeToggle from '../components/ModeToggle'
@@ -8,6 +8,7 @@ import { detectIntent } from '../lib/detectIntent'
 import { useAutoSwapTarget } from '../hooks/useAutoSwapTarget'
 import { useTranslate } from '../hooks/useTranslate'
 import type { LiveResult } from '../hooks/useTranslate'
+import type { Meta } from '../server/translate'
 import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { useTranslatorShortcuts } from '../hooks/useTranslatorShortcuts'
 
@@ -39,6 +40,26 @@ function Translator() {
   })
 
   useAutoSwapTarget({ input, source, target, prevTarget, setTarget })
+
+  // Session totals: persist across input clears, reset on page refresh.
+  const [lastMeta, setLastMeta] = useState<Meta | null>(null)
+  const [sessionCostUsd, setSessionCostUsd] = useState(0)
+  const [sessionCount, setSessionCount] = useState(0)
+  const countedMetaRef = useRef<Meta | null>(null)
+
+  useEffect(() => {
+    const meta = live?.meta
+    if (!live?.done || !meta) return
+    setLastMeta(meta)
+    if (countedMetaRef.current === meta) return
+    countedMetaRef.current = meta
+    // Skip cache hits — no provider call, no new cost incurred this session.
+    if (meta.durationMs === 0) return
+    setSessionCount((n) => n + 1)
+    if (typeof meta.costUsd === 'number') {
+      setSessionCostUsd((c) => c + (meta.costUsd ?? 0))
+    }
+  }, [live])
 
   // Focus input on mount, but not on touch devices (avoids popping the keyboard).
   useEffect(() => {
@@ -116,8 +137,10 @@ function Translator() {
         <ShortcutHints />
         <div className="ml-auto">
           <DebugBar
-            meta={live?.meta ?? null}
-            cached={live?.meta?.durationMs === 0}
+            meta={live?.meta ?? lastMeta}
+            cached={(live?.meta ?? lastMeta)?.durationMs === 0}
+            sessionCostUsd={sessionCostUsd}
+            sessionCount={sessionCount}
           />
         </div>
       </footer>

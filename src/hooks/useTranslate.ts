@@ -85,7 +85,7 @@ export function useTranslate(
           setError(err instanceof Error ? err.message : 'Translation failed.')
         }
       } finally {
-        if (!ctrl.signal.aborted) setIsPending(false)
+        if (abortRef.current === ctrl) setIsPending(false)
       }
 
       function applyChunk(chunk: TranslateChunk) {
@@ -119,8 +119,11 @@ export function useTranslate(
   }, [])
 
   // Debounced auto-run on arg change. Clearing text clears live result immediately.
+  // Abort any in-flight stream on input change so stale responses stop writing.
   useEffect(() => {
     if (!debounceMs) return
+    abortRef.current?.abort()
+    setIsPending(false)
     if (!args.text.trim()) {
       setLive(null)
       return
