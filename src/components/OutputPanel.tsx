@@ -5,6 +5,7 @@ import LanguageSelect from './LanguageSelect'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
+import { useUiLang } from '../hooks/useUiLang'
 import { mainText } from '../lib/liveResult'
 
 export default function OutputPanel() {
@@ -18,6 +19,7 @@ export default function OutputPanel() {
     error,
     outputTips,
   } = useTranslatorContext()
+  const { t } = useUiLang()
   const copyText = mainText(live)
 
   return (
@@ -27,7 +29,7 @@ export default function OutputPanel() {
           <LanguageSelect
             value={target}
             onChange={setTarget}
-            aria-label="Target language"
+            aria-label={t('targetLanguage')}
           />
           {copyText && <CopyButton text={copyText} />}
           <LearningTips tips={outputTips} />
@@ -35,7 +37,7 @@ export default function OutputPanel() {
         {streaming && (
           <span className="inline-flex items-center gap-1.5 text-xs text-accent">
             <Loader2 size={12} className="animate-spin" />
-            Streaming…
+            {t('streaming')}
           </span>
         )}
       </div>
@@ -54,26 +56,21 @@ export default function OutputPanel() {
 }
 
 function ErrorView({ message }: { message: string }) {
+  const { t } = useUiLang()
   return (
     <div className="p-6 text-sm text-red-400">
       {message}
-      <p className="mt-2 text-ink-dim">
-        Check <code className="font-mono text-xs">.env</code> — either{' '}
-        <code className="font-mono text-xs">OPENAI_API_KEY</code> for cloud or a
-        loaded LM Studio model for local.
-      </p>
+      <p className="mt-2 text-ink-dim">{t('errorEnvHint')}</p>
     </div>
   )
 }
 
 function EmptyState() {
+  const { t } = useUiLang()
   return (
     <div className="flex h-full min-h-[8rem] flex-col items-center justify-center p-6 text-center text-ink-dim">
-      <p className="text-sm">Paste or type something to translate.</p>
-      <p className="mt-1 text-xs">
-        Short input → dictionary view. Full sentences → translation with
-        alternatives.
-      </p>
+      <p className="text-sm">{t('emptyMain')}</p>
+      <p className="mt-1 text-xs">{t('emptySub')}</p>
     </div>
   )
 }

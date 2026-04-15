@@ -6,6 +6,8 @@ import type { Meta, TranslateChunk, TranslateDone } from '../server/translate'
 import type { SentenceResult, WordResult } from '../server/schemas'
 import type { Intent, Mode } from '../lib/types'
 import type { LangCode } from '../lib/languages'
+import { useUiLang } from './useUiLang'
+import { STRINGS } from '../lib/i18n'
 
 export type LiveResult =
   | {
@@ -39,6 +41,7 @@ export function useTranslate(
   { debounceMs = 800 }: Options = {},
 ) {
   const translateFn = useServerFn(translate)
+  const { lang: uiLang } = useUiLang()
 
   const [live, setLive] = useState<LiveResult | null>(null)
   const [isPending, setIsPending] = useState(false)
@@ -51,7 +54,7 @@ export function useTranslate(
       const trimmed = text.trim()
       if (!trimmed) return
       if (source === target && source !== 'auto') {
-        setError('Source and target languages are the same.')
+        setError(STRINGS[uiLang].sameLanguageError)
         return
       }
       abortRef.current?.abort()
@@ -64,7 +67,7 @@ export function useTranslate(
 
       try {
         const stream = await translateFn({
-          data: { text: trimmed, source, target, mode, intent },
+          data: { text: trimmed, source, target, mode, intent, uiLang },
           signal: ctrl.signal,
         })
 
@@ -80,7 +83,11 @@ export function useTranslate(
         }
       } catch (err) {
         if (!ctrl.signal.aborted) {
-          setError(err instanceof Error ? err.message : 'Translation failed.')
+          setError(
+            err instanceof Error
+              ? err.message
+              : STRINGS[uiLang].translationFailed,
+          )
         }
       } finally {
         if (abortRef.current === ctrl) setIsPending(false)
@@ -107,7 +114,7 @@ export function useTranslate(
         } as LiveResult)
       }
     },
-    [translateFn, args],
+    [translateFn, args, uiLang],
   )
 
   const reset = useCallback(() => {
@@ -130,7 +137,15 @@ export function useTranslate(
     return () => clearTimeout(id)
     // `run` intentionally omitted: it re-identities on every args change,
     // which would double-fire. Only re-debounce on actual input changes.
-  }, [args.text, args.source, args.target, args.mode, args.intent, debounceMs])
+  }, [
+    args.text,
+    args.source,
+    args.target,
+    args.mode,
+    args.intent,
+    uiLang,
+    debounceMs,
+  ])
 
   const streaming = isPending && !live?.done
 

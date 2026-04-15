@@ -1,6 +1,7 @@
 import type { SentenceResult } from '../server/schemas'
 import AlternativeItem from './AlternativeItem'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
+import { useUiLang } from '../hooks/useUiLang'
 
 type Props = {
   result: Partial<SentenceResult>
@@ -8,6 +9,7 @@ type Props = {
 }
 
 export default function SentenceView({ result, streaming }: Props) {
+  const { t } = useUiLang()
   const all = result.alternatives ?? []
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
 
@@ -30,7 +32,7 @@ export default function SentenceView({ result, streaming }: Props) {
       {result.formalityNote && (
         <div className="animate-settle rounded-lg border border-border bg-panel px-4 py-3 text-sm text-ink-soft">
           <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-warm">
-            Context
+            {t('contextLabel')}
           </span>
           {result.formalityNote}
         </div>
@@ -39,7 +41,7 @@ export default function SentenceView({ result, streaming }: Props) {
       {(settled.length > 0 || (streaming && all.length > 0)) && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-dim">
-            Alternatives
+            {t('alternatives')}
           </p>
           <ul className="space-y-1.5">
             {settled.map((alt, i) => (

@@ -12,6 +12,7 @@ const TranslateInput = z.object({
   target: z.string(),
   mode: z.enum(['friends', 'casual', 'professional']),
   intent: z.enum(['word', 'sentence']),
+  uiLang: z.enum(['en', 'ko']).default('en'),
 })
 
 export type Meta = {
@@ -54,13 +55,14 @@ export const translate = createServerFn({ method: 'POST' })
   .inputValidator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
     // Bump when the response schema or prompt changes so stale entries miss.
-    const CACHE_VERSION = 'v3-learningTips'
+    const CACHE_VERSION = 'v4-uiLang'
     const cacheKey = JSON.stringify([
       CACHE_VERSION,
       data.intent,
       data.mode,
       data.source,
       data.target,
+      data.uiLang,
       data.text.trim(),
     ])
 

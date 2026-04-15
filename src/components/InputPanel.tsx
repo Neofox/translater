@@ -4,6 +4,7 @@ import LearningTips from './LearningTips'
 import LanguageSelect from './LanguageSelect'
 import WordSourceMeta from './WordSourceMeta'
 import { useTranslatorContext } from '../context/TranslatorContext'
+import { useUiLang } from '../hooks/useUiLang'
 
 export default function InputPanel() {
   const {
@@ -21,6 +22,7 @@ export default function InputPanel() {
     lookupWord,
     textareaRef,
   } = useTranslatorContext()
+  const { t } = useUiLang()
 
   return (
     <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12">
@@ -30,7 +32,7 @@ export default function InputPanel() {
             value={source}
             onChange={setSource}
             includeAuto
-            aria-label="Source language"
+            aria-label={t('sourceLanguage')}
           />
           {input && <CopyButton text={input} />}
           <LearningTips tips={inputTips} />
@@ -40,15 +42,15 @@ export default function InputPanel() {
             <span
               className={`text-xs font-medium ${intent === 'word' ? 'text-warm' : 'text-accent'}`}
             >
-              {intent === 'word' ? 'Dictionary' : 'Sentence'}
+              {intent === 'word' ? t('intentWord') : t('intentSentence')}
             </span>
           )}
           {input && (
             <button
               type="button"
               onClick={clearInput}
-              title="Clear input  Esc"
-              aria-label="Clear input"
+              title={t('clearInputTitle')}
+              aria-label={t('clearInput')}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
             >
               <X size={14} />
@@ -83,8 +85,8 @@ export default function InputPanel() {
                 void run()
               }
             }}
-            placeholder="Type or paste text…"
-            aria-label="Input text"
+            placeholder={t('placeholder')}
+            aria-label={t('inputText')}
             className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl"
             spellCheck={false}
           />
@@ -99,9 +101,9 @@ export default function InputPanel() {
                   // clipboard unavailable or permission denied
                 }
               }}
-              className="absolute left-48 text-sm top-4 sm:left-55 sm:top-5 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
+              className="absolute left-35 text-sm top-4 sm:left-40 sm:top-5 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
             >
-              Paste clipboard
+              {t('pasteClipboard')}
             </button>
           )}
         </div>

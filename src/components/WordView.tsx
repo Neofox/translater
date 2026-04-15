@@ -1,9 +1,16 @@
 import type { WordResult } from '../server/schemas'
-import { MODE_LABEL } from '../lib/types'
 import type { Mode } from '../lib/types'
 import AlternativeItem from './AlternativeItem'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 import Tag from './ui/Tag'
+import { useUiLang } from '../hooks/useUiLang'
+import type { StringKey } from '../lib/i18n'
+
+const MODE_KEY: Record<Mode, StringKey> = {
+  friends: 'modeFriends',
+  casual: 'modeCasual',
+  professional: 'modeProfessional',
+}
 
 type Props = {
   result: Partial<WordResult>
@@ -12,6 +19,7 @@ type Props = {
 }
 
 export default function WordView({ result, mode, streaming }: Props) {
+  const { t } = useUiLang()
   const all = result.alternativeTranslations ?? []
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
 
@@ -36,8 +44,8 @@ export default function WordView({ result, mode, streaming }: Props) {
       {(settled.length > 0 || (streaming && all.length > 0)) && (
         <div>
           <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-dim">
-            Alternative translations
-            <Tag tone="accent">{MODE_LABEL[mode]}</Tag>
+            {t('alternativeTranslations')}
+            <Tag tone="accent">{t(MODE_KEY[mode])}</Tag>
           </p>
           <ul className="space-y-1.5">
             {settled.map((alt, i) => (

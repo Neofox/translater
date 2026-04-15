@@ -15,15 +15,17 @@ import {
 import { ChevronDown } from 'lucide-react'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
 import Pill from './ui/Pill'
+import { useUiLang } from '../hooks/useUiLang'
+import type { StringKey } from '../lib/i18n'
 
 type Props = {
   tips?: Partial<LearningTipsType>
 }
 
-// Pick a learner-friendly label for the character breakdown based on the script
-// of the first word. Korean hanja (Hangul word + Hanja chars), Japanese kanji
-// (kanji/mixed word), Chinese hanzi (Han-only word). Fallback: "characters".
-function characterLabel(word: string | undefined): string {
+// Pick a learner-friendly label key for the character breakdown based on the
+// script of the first word. Korean hanja (Hangul word + Hanja chars), Japanese
+// kanji (kanji/mixed word), Chinese hanzi (Han-only word).
+function characterLabelKey(word: string | undefined): StringKey {
   if (!word) return 'characters'
   if (/[\uAC00-\uD7AF]/.test(word)) return 'hanja'
   if (/[\u3040-\u30FF]/.test(word)) return 'kanji'
@@ -32,6 +34,7 @@ function characterLabel(word: string | undefined): string {
 }
 
 export default function LearningTips({ tips }: Props) {
+  const { t } = useUiLang()
   const [open, setOpen] = useState(false)
 
   const { refs, floatingStyles, context, isPositioned } = useFloating({
@@ -73,7 +76,7 @@ export default function LearningTips({ tips }: Props) {
 
   if (!grammar && !vocab && characters.length === 0) return null
 
-  const charLabel = characterLabel(characters[0]?.word)
+  const charLabel = t(characterLabelKey(characters[0]?.word))
 
   return (
     <>
@@ -83,7 +86,7 @@ export default function LearningTips({ tips }: Props) {
         aria-expanded={open}
         {...getReferenceProps()}
       >
-        <span>Learning tips</span>
+        <span>{t('learningTips')}</span>
         <ChevronDown
           size={12}
           className={`transition-transform ${open ? 'rotate-180' : ''}`}
@@ -104,7 +107,7 @@ export default function LearningTips({ tips }: Props) {
             {grammar && (
               <p>
                 <span className="mr-1 font-semibold uppercase tracking-wide text-warm">
-                  grammar ·
+                  {t('grammar')} ·
                 </span>
                 {grammar}
               </p>
@@ -112,7 +115,7 @@ export default function LearningTips({ tips }: Props) {
             {vocab && (
               <p>
                 <span className="mr-1 font-semibold uppercase tracking-wide text-warm">
-                  vocab ·
+                  {t('vocab')} ·
                 </span>
                 {vocab}
               </p>

@@ -3,11 +3,13 @@ import DebugBar from '../components/DebugBar'
 import InputPanel from '../components/InputPanel'
 import ModeToggle from '../components/ModeToggle'
 import OutputPanel from '../components/OutputPanel'
+import UiLangToggle from '../components/UiLangToggle'
 import {
   TranslatorProvider,
   useTranslatorContext,
 } from '../context/TranslatorContext'
 import { useTranslatorShortcuts } from '../hooks/useTranslatorShortcuts'
+import { useUiLang } from '../hooks/useUiLang'
 import { mainText } from '../lib/liveResult'
 
 export const Route = createFileRoute('/')({ component: Translator })
@@ -37,6 +39,7 @@ function Header() {
         <h1 className="text-sm font-semibold tracking-tight text-ink">
           Translater
         </h1>
+        <UiLangToggle />
       </div>
       <div className="ml-auto flex flex-wrap items-center gap-2 sm:gap-3">
         <ModeToggle value={mode} onChange={setMode} />
@@ -84,22 +87,23 @@ function TranslatorShortcuts() {
 }
 
 function ShortcutHints() {
+  const { t } = useUiLang()
   return (
     <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-x-4">
       <span>
-        <kbd className="kbd">↵</kbd> translate
+        <kbd className="kbd">↵</kbd> {t('kbdTranslate')}
       </span>
       <span>
-        <kbd className="kbd">⌘↵</kbd> force
+        <kbd className="kbd">⌘↵</kbd> {t('kbdForce')}
       </span>
       <span>
-        <kbd className="kbd">⌘K</kbd> focus input
+        <kbd className="kbd">⌘K</kbd> {t('kbdFocus')}
       </span>
       <span>
-        <kbd className="kbd">⌘⇧C</kbd> copy result
+        <kbd className="kbd">⌘⇧C</kbd> {t('kbdCopy')}
       </span>
       <span>
-        <kbd className="kbd">Esc</kbd> clear
+        <kbd className="kbd">Esc</kbd> {t('kbdClear')}
       </span>
     </div>
   )

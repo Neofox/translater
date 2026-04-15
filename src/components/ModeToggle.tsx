@@ -1,5 +1,6 @@
-import { MODE_LABEL } from '../lib/types'
 import type { Mode } from '../lib/types'
+import { useUiLang } from '../hooks/useUiLang'
+import type { StringKey } from '../lib/i18n'
 
 type Props = {
   value: Mode
@@ -8,7 +9,14 @@ type Props = {
 
 const MODES: Mode[] = ['friends', 'casual', 'professional']
 
+const MODE_KEY: Record<Mode, StringKey> = {
+  friends: 'modeFriends',
+  casual: 'modeCasual',
+  professional: 'modeProfessional',
+}
+
 export default function ModeToggle({ value, onChange }: Props) {
+  const { t } = useUiLang()
   return (
     <div className="inline-flex rounded-lg border border-border bg-panel p-0.5 text-sm">
       {MODES.map((m) => (
@@ -22,7 +30,7 @@ export default function ModeToggle({ value, onChange }: Props) {
               : 'text-ink-soft hover:text-ink'
           }`}
         >
-          {MODE_LABEL[m]}
+          {t(MODE_KEY[m])}
         </button>
       ))}
     </div>

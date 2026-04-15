@@ -2,6 +2,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { Analytics } from '@vercel/analytics/react'
 
 import appCss from '../styles.css?url'
+import { UiLangProvider } from '../hooks/useUiLang'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -35,7 +36,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-bg text-ink font-sans antialiased">
-        {children}
+        <UiLangProvider>{children}</UiLangProvider>
         <Analytics />
         <Scripts />
       </body>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { WordResult } from '../server/schemas'
 import Tag from './ui/Tag'
+import { useUiLang } from '../hooks/useUiLang'
 
 type Props = {
   result: Partial<WordResult>
@@ -11,6 +12,7 @@ type Props = {
 type SectionKey = 'primary' | 'other' | 'etymology' | 'notes' | 'synonyms'
 
 export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
+  const { t } = useUiLang()
   const posList = result.posList ?? []
   const synonyms = result.synonyms ?? []
   const [activeIdx, setActiveIdx] = useState(0)
@@ -58,26 +60,38 @@ export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
         />
       )}
 
-      {activePos && <PosLabel pos={activePos.pos} />}
+      {activePos && <PosLabel pos={activePos.pos} label={t('pos')} />}
 
-      {ready.primary && <PrimaryBlock primary={primary!} />}
-      {streamingKey === 'primary' && <SkeletonBlock label="Primary meaning" />}
+      {ready.primary && (
+        <PrimaryBlock primary={primary!} label={t('primaryMeaning')} />
+      )}
+      {streamingKey === 'primary' && (
+        <SkeletonBlock label={t('primaryMeaning')} />
+      )}
 
       {ready.other && (
-        <OtherBlock within={otherWithinPos} groups={otherPosGroups} />
+        <OtherBlock
+          within={otherWithinPos}
+          groups={otherPosGroups}
+          label={t('otherMeanings')}
+        />
       )}
-      {streamingKey === 'other' && <SkeletonBlock label="Other meanings" />}
+      {streamingKey === 'other' && <SkeletonBlock label={t('otherMeanings')} />}
 
       {ready.etymology && (
-        <TextBlock label="Etymology" text={result.etymology!} />
+        <TextBlock label={t('etymology')} text={result.etymology!} />
       )}
-      {streamingKey === 'etymology' && <SkeletonBlock label="Etymology" />}
+      {streamingKey === 'etymology' && <SkeletonBlock label={t('etymology')} />}
 
-      {ready.notes && <TextBlock label="Notes" text={result.notes!} />}
-      {streamingKey === 'notes' && <SkeletonBlock label="Notes" />}
+      {ready.notes && <TextBlock label={t('notes')} text={result.notes!} />}
+      {streamingKey === 'notes' && <SkeletonBlock label={t('notes')} />}
 
       {ready.synonyms && (
-        <SynonymBlock synonyms={synonyms} onLookup={onLookup} />
+        <SynonymBlock
+          synonyms={synonyms}
+          onLookup={onLookup}
+          label={t('synonyms')}
+        />
       )}
       {streamingKey === 'synonyms' && (
         <SkeletonRow>
@@ -134,14 +148,14 @@ function PosTabs({
   )
 }
 
-function PosLabel({ pos }: { pos: string }) {
+function PosLabel({ pos, label }: { pos: string; label: string }) {
   return (
     <div
       className="animate-settle mb-3 flex items-baseline gap-2"
       style={{ animationDelay: '30ms' }}
     >
       <span className="text-xs font-semibold uppercase tracking-wide text-warm">
-        Part of speech
+        {label}
       </span>
       <span className="italic text-ink">{pos}</span>
     </div>
@@ -150,15 +164,17 @@ function PosLabel({ pos }: { pos: string }) {
 
 function PrimaryBlock({
   primary,
+  label,
 }: {
   primary: NonNullable<
     NonNullable<Partial<WordResult>['posList']>[number]['senses']
   >[number]
+  label: string
 }) {
   return (
     <div className="animate-settle mb-3" style={{ animationDelay: '60ms' }}>
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-warm">
-        Primary meaning
+        {label}
       </p>
       <p className="text-ink">{primary.definition}</p>
       {primary.register?.length > 0 && (
@@ -189,16 +205,18 @@ function PrimaryBlock({
 function OtherBlock({
   within,
   groups,
+  label,
 }: {
   within: NonNullable<
     NonNullable<Partial<WordResult>['posList']>[number]['senses']
   >
   groups: NonNullable<Partial<WordResult>['posList']>
+  label: string
 }) {
   return (
     <div className="animate-settle mb-3">
       <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
-        Other meanings
+        {label}
       </p>
       <ol className="space-y-2 pl-4">
         {within.map((s, i) => (
@@ -246,14 +264,16 @@ function TextBlock({ label, text }: { label: string; text: string }) {
 function SynonymBlock({
   synonyms,
   onLookup,
+  label,
 }: {
   synonyms: string[]
   onLookup?: (text: string) => void
+  label: string
 }) {
   return (
     <div className="animate-settle">
       <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
-        Synonyms
+        {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {synonyms.map((s) => (
