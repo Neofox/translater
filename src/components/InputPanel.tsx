@@ -82,23 +82,23 @@ const InputPanel = forwardRef<HTMLTextAreaElement, Props>(
             className={`min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl ${hasMeta ? 'max-h-[12rem]' : 'flex-1'}`}
             spellCheck={false}
           />
+          {!input && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const text = await navigator.clipboard.readText()
+                  if (text) setInput(text)
+                } catch {
+                  // clipboard unavailable or permission denied
+                }
+              }}
+              className="absolute left-48 text-sm top-4 sm:left-55 sm:top-5 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
+            >
+              Paste clipboard
+            </button>
+          )}
         </div>
-        {!input && (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const text = await navigator.clipboard.readText()
-                if (text) setInput(text)
-              } catch {
-                // clipboard unavailable or permission denied
-              }
-            }}
-            className="absolute left-48 text-sm top-13 sm:left-55 sm:top-14 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
-          >
-            Paste clipboard
-          </button>
-        )}
         {!error && live?.intent === 'word' && (
           <WordSourceMeta
             result={live.partial}
