@@ -1,13 +1,8 @@
 import type { WordResult } from '../server/schemas'
-import CopyButton from './CopyButton'
-
-type Mode = 'friends' | 'casual' | 'professional'
-
-const MODE_LABEL: Record<Mode, string> = {
-  friends: 'Friends',
-  casual: 'Casual',
-  professional: 'Professional',
-}
+import { MODE_LABEL } from '../lib/types'
+import type { Mode } from '../lib/types'
+import AlternativeItem from './AlternativeItem'
+import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 
 type Props = {
   result: Partial<WordResult>
@@ -47,41 +42,24 @@ export default function WordView({ result, mode, streaming }: Props) {
           </p>
           <ul className="space-y-1.5">
             {settled.map((alt, i) => (
-              <li
+              <AlternativeItem
                 key={i}
-                className="animate-settle group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-3 py-2"
-                style={{ animationDelay: `${i * 60}ms` }}
+                index={i}
+                text={alt.text}
+                note={alt.note}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <p className="text-base text-ink">{alt.text}</p>
-                    {alt.register?.map((r) => (
-                      <span
-                        key={r}
-                        className="rounded bg-bg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-dim"
-                      >
-                        {r}
-                      </span>
-                    ))}
-                  </div>
-                  {alt.note && (
-                    <p className="text-xs text-ink-dim">{alt.note}</p>
-                  )}
-                </div>
-                {alt.text && (
-                  <div className="shrink-0 opacity-60 transition group-hover:opacity-100">
-                    <CopyButton text={alt.text} />
-                  </div>
-                )}
-              </li>
+                {alt.register.map((r) => (
+                  <span
+                    key={r}
+                    className="rounded bg-bg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-dim"
+                  >
+                    {r}
+                  </span>
+                ))}
+              </AlternativeItem>
             ))}
             {streaming && all.length > settled.length && (
-              <li className="flex items-start gap-3 rounded-lg border border-border bg-panel px-3 py-2">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="h-4 w-3/4 animate-pulse rounded bg-ink-dim/10" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-ink-dim/10" />
-                </div>
-              </li>
+              <AlternativeItemSkeleton />
             )}
           </ul>
         </div>

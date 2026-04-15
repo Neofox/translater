@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react'
 import { usePersistentState } from '../lib/usePersistentState'
 import type { LangCode } from '../lib/languages'
-
-export type Mode = 'friends' | 'casual' | 'professional'
+import type { Mode } from '../lib/types'
 
 export function useTranslationPrefs() {
   const [input, setInput] = useState<string>('')

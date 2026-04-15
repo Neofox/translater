@@ -1,5 +1,6 @@
 import type { SentenceResult } from '../server/schemas'
-import CopyButton from './CopyButton'
+import AlternativeItem from './AlternativeItem'
+import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 
 type Props = {
   result: Partial<SentenceResult>
@@ -42,33 +43,15 @@ export default function SentenceView({ result, streaming }: Props) {
           </p>
           <ul className="space-y-1.5">
             {settled.map((alt, i) => (
-              <li
+              <AlternativeItem
                 key={i}
-                className="animate-settle group flex items-start justify-between gap-3 rounded-lg border border-border bg-panel px-3 py-2"
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="whitespace-pre-wrap text-base text-ink">
-                    {alt.text}
-                  </p>
-                  {alt.note && (
-                    <p className="text-xs text-ink-dim">{alt.note}</p>
-                  )}
-                </div>
-                {alt.text && (
-                  <div className="shrink-0 opacity-60 transition group-hover:opacity-100">
-                    <CopyButton text={alt.text} />
-                  </div>
-                )}
-              </li>
+                index={i}
+                text={alt.text}
+                note={alt.note}
+              />
             ))}
             {streaming && all.length > settled.length && (
-              <li className="flex items-start gap-3 rounded-lg border border-border bg-panel px-3 py-2">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="h-4 w-3/4 animate-pulse rounded bg-ink-dim/10" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-ink-dim/10" />
-                </div>
-              </li>
+              <AlternativeItemSkeleton />
             )}
           </ul>
         </div>

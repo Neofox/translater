@@ -5,19 +5,15 @@ export function usePersistentState<T>(
   key: string,
   initial: T,
 ): [T, Dispatch<SetStateAction<T>>] {
-  const [value, setValue] = useState<T>(initial)
-
-  // Hydrate once from localStorage on mount. `key` isn't in deps because we
-  // only want this to run for the initial key — remounting for a new key is the
-  // caller's responsibility.
-  useEffect(() => {
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === 'undefined') return initial
     try {
       const raw = window.localStorage.getItem(key)
-      if (raw != null) setValue(JSON.parse(raw) as T)
+      return raw != null ? (JSON.parse(raw) as T) : initial
     } catch {
-      /* ignore */
+      return initial
     }
-  }, [])
+  })
 
   useEffect(() => {
     try {

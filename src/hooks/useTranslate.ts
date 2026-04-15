@@ -4,10 +4,8 @@ import { translate } from '../server/translate'
 import { partialParse } from '../lib/partialParse'
 import type { Meta, TranslateChunk, TranslateDone } from '../server/translate'
 import type { SentenceResult, WordResult } from '../server/schemas'
-import type { Intent } from '../lib/detectIntent'
+import type { Intent, Mode } from '../lib/types'
 import type { LangCode } from '../lib/languages'
-
-type Mode = 'friends' | 'casual' | 'professional'
 
 export type LiveResult =
   | {

@@ -1,4 +1,6 @@
-export type Intent = 'word' | 'sentence'
+import type { Intent } from './types'
+
+export type { Intent }
 
 const SENTENCE_TERMINATORS = /[.!?。！？…]/
 

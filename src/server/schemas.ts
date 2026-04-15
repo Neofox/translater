@@ -1,51 +1,51 @@
 import { z } from 'zod'
 
-const KoreanInsight = z
+const LearningTips = z
   .object({
     grammar: z
       .string()
       .default('')
       .describe(
-        'One short English sentence on the key Korean grammar point (particle, ending, honorific, construction). Empty string when nothing illuminating or when Korean is not in the language pair.',
+        'One or two short English sentences on a useful grammar/structure point from the translation — tense/mood, particle, verb ending, honorific, inversion, clitic placement, gender agreement, word-order quirk, etc. Empty string when nothing genuinely illuminating.',
       ),
     vocab: z
       .string()
       .default('')
       .describe(
-        'One short English sentence on a notable Korean word choice, idiom, slang, or cultural connotation. Empty string when not useful or when Korean is not in the language pair.',
+        'One or two short English sentences on a notable word choice, idiom, slang, false friend, cognate, regional variant, or cultural connotation that a literal gloss would miss. Empty string when not useful.',
       ),
-    hanja: z
+    characters: z
       .array(
         z.object({
           word: z
             .string()
             .describe(
-              'The Sino-Korean word as it appears in Hangul, e.g. 도서관.',
+              'The CJK word as it appears in its native script — Hangul for Korean (e.g. 도서관), mixed kanji/kana for Japanese (e.g. 図書館), Hanzi for Chinese (e.g. 图书馆).',
             ),
           chars: z
             .array(
               z.object({
-                char: z.string().describe('A single hanja character, e.g. 圖.'),
+                char: z.string().describe('A single CJK character, e.g. 書.'),
                 meaning: z
                   .string()
-                  .describe('Short English gloss, e.g. "picture".'),
+                  .describe('Short English gloss, e.g. "book".'),
               }),
             )
             .max(5)
-            .describe('The hanja breakdown in order.'),
+            .describe('The character breakdown in order.'),
         }),
       )
       .max(3)
       .default([])
       .describe(
-        '0-3 Sino-Korean words worth breaking down for a learner. Skip purely native Korean (고유어) words and loanwords. Empty array when Korean is not in the pair.',
+        '0-3 CJK-character words worth breaking down for a learner. Populate ONLY when source or target is Korean (Sino-Korean hanja), Japanese (kanji), or Chinese (hanzi). Skip purely native words (고유어, 和語) and loanwords. Empty array for non-CJK pairs.',
       ),
   })
-  .default({ grammar: '', vocab: '', hanja: [] })
+  .default({ grammar: '', vocab: '', characters: [] })
   .describe(
-    'Compact learning aid rendered in a collapsed pill. Populate ONLY when Korean is the source or target language. Leave every field at its default when the pair does not involve Korean.',
+    'Compact learning aid rendered as "Learning tips". Populate for any non-English source or target — give a useful grammar/structure point and any notable vocab/idiom/cultural note. Leave fields empty individually when there is nothing substantive to say.',
   )
-export type KoreanInsight = z.infer<typeof KoreanInsight>
+export type LearningTips = z.infer<typeof LearningTips>
 
 export const SentenceResult = z.object({
   main: z.string().describe('The primary translation of the source text.'),
@@ -75,7 +75,7 @@ export const SentenceResult = z.object({
     .describe(
       'Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, ENGLISH. Empty string when not relevant.',
     ),
-  koreanInsight: KoreanInsight,
+  learningTips: LearningTips,
 })
 export type SentenceResult = z.infer<typeof SentenceResult>
 
@@ -180,6 +180,6 @@ export const WordResult = z.object({
       'Usage notes, false friends, common collocations. ALWAYS IN ENGLISH — never Korean, Japanese, or any other language. Empty string when none worth noting.',
     ),
 
-  koreanInsight: KoreanInsight,
+  learningTips: LearningTips,
 })
 export type WordResult = z.infer<typeof WordResult>

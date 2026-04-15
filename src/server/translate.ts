@@ -26,9 +26,6 @@ export type TranslateDone =
   | { intent: 'sentence'; data: z.infer<typeof SentenceResult>; meta: Meta }
   | { intent: 'word'; data: z.infer<typeof WordResult>; meta: Meta }
 
-// Backwards-compatible alias: the client treats the last emitted chunk as the final result.
-export type TranslateResult = TranslateDone
-
 export type TranslateChunk =
   | { type: 'delta'; raw: string } // progressive JSON text
   | { type: 'cache'; done: TranslateDone } // cache hit — single terminal chunk
@@ -57,7 +54,7 @@ export const translate = createServerFn({ method: 'POST' })
   .inputValidator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
     // Bump when the response schema or prompt changes so stale entries miss.
-    const CACHE_VERSION = 'v2-koreanInsight'
+    const CACHE_VERSION = 'v3-learningTips'
     const cacheKey = JSON.stringify([
       CACHE_VERSION,
       data.intent,

@@ -1,49 +1,36 @@
 import { Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
-import KoreanInsight from './KoreanInsight'
+import LearningTips from './LearningTips'
 import LanguageSelect from './LanguageSelect'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
-import type { LangCode } from '../lib/languages'
-import type { LiveResult } from '../hooks/useTranslate'
-import type { Mode } from '../hooks/useTranslationPrefs'
-import type { KoreanInsight as KoreanInsightType } from '../server/schemas'
+import { useTranslatorContext } from '../context/TranslatorContext'
+import { mainText } from '../lib/liveResult'
 
-type Props = {
-  target: LangCode
-  setTarget: (next: LangCode) => void
-  mode: Mode
-  live: LiveResult | null
-  isPending: boolean
-  streaming: boolean
-  error: string | null
-  koreanInsight?: Partial<KoreanInsightType>
-}
-
-function mainText(live: LiveResult | null): string | null {
-  if (!live) return null
-  if (live.intent === 'sentence') return live.partial.main ?? null
-  return live.partial.primaryTranslation ?? null
-}
-
-export default function OutputPanel({
-  target,
-  setTarget,
-  mode,
-  live,
-  isPending,
-  streaming,
-  error,
-  koreanInsight,
-}: Props) {
+export default function OutputPanel() {
+  const {
+    target,
+    setTarget,
+    mode,
+    live,
+    isPending,
+    streaming,
+    error,
+    outputTips,
+  } = useTranslatorContext()
   const copyText = mainText(live)
+
   return (
     <section className="flex min-h-0 flex-col">
       <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft">
         <div className="flex flex-wrap items-center gap-2">
-          <LanguageSelect value={target} onChange={setTarget} />
+          <LanguageSelect
+            value={target}
+            onChange={setTarget}
+            aria-label="Target language"
+          />
           {copyText && <CopyButton text={copyText} />}
-          <KoreanInsight insight={koreanInsight} />
+          <LearningTips tips={outputTips} align="end" />
         </div>
         {streaming && (
           <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
