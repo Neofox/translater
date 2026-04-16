@@ -55,7 +55,7 @@ export default function WordView({ result, mode, streaming }: Props) {
                 text={alt.text}
                 note={alt.note}
               >
-                {alt.register.map((r) => (
+                {(alt.register ?? []).map((r) => (
                   <Tag key={r} tone="neutral">
                     {r}
                   </Tag>
