@@ -51,7 +51,7 @@ export default function InputPanel() {
               onClick={clearInput}
               title={t('clearInputTitle')}
               aria-label={t('clearInput')}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
             >
               <X size={14} />
             </button>

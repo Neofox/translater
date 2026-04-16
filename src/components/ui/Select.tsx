@@ -152,7 +152,7 @@ export default function Select<V extends string>({
                         }
                       },
                     })}
-                    className={`flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left transition hover:bg-panel-2 focus:bg-panel-2 focus:outline-none ${
+                    className={`flex w-full cursor-pointer items-center justify-between gap-4 px-3 py-1.5 text-left transition hover:bg-panel-2 focus:bg-panel-2 focus:outline-none ${
                       i === activeIndex ? 'bg-panel-2' : ''
                     } ${i === selectedIndex ? 'text-accent' : 'text-ink'}`}
                   >

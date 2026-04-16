@@ -34,7 +34,7 @@ export default function Pill({
       ref={ref}
       type="button"
       {...rest}
-      className={`inline-flex items-center rounded-md border border-border bg-panel text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
+      className={`inline-flex cursor-pointer items-center rounded-md border border-border bg-panel text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
     >
       {children}
     </button>

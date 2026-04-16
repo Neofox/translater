@@ -135,7 +135,7 @@ function PosTabs({
           key={`${p.pos}-${i}`}
           type="button"
           onClick={() => onSelect(i)}
-          className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
+          className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition ${
             i === activeIdx
               ? 'border-accent/60 bg-accent-soft text-ink'
               : 'border-border bg-panel text-ink-soft hover:text-ink'
@@ -282,7 +282,7 @@ function SynonymBlock({
             type="button"
             onClick={() => onLookup?.(s)}
             disabled={!onLookup}
-            className="rounded-full border border-border bg-panel px-2.5 py-0.5 text-xs text-ink-soft transition hover:border-accent/60 hover:text-ink disabled:cursor-default"
+            className="cursor-pointer rounded-full border border-border bg-panel px-2.5 py-0.5 text-xs text-ink-soft transition hover:border-accent/60 hover:text-ink disabled:cursor-default"
           >
             {s}
           </button>

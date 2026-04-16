@@ -24,7 +24,7 @@ export default function ModeToggle({ value, onChange }: Props) {
           key={m}
           type="button"
           onClick={() => onChange(m)}
-          className={`rounded-md px-3 py-1 transition ${
+          className={`cursor-pointer rounded-md px-3 py-1 transition ${
             value === m
               ? 'bg-accent-soft text-ink'
               : 'text-ink-soft hover:text-ink'
