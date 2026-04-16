@@ -6,13 +6,13 @@ const LearningTips = z
       .string()
       .default('')
       .describe(
-        'One or two short English sentences on a useful grammar/structure point from the translation — tense/mood, particle, verb ending, honorific, inversion, clitic placement, gender agreement, word-order quirk, etc. Empty string when nothing genuinely illuminating.',
+        'One or two short sentences (in the metadata language — see prompt) on a useful grammar/structure point from the translation — tense/mood, particle, verb ending, honorific, inversion, clitic placement, gender agreement, word-order quirk, etc. Empty string when nothing genuinely illuminating.',
       ),
     vocab: z
       .string()
       .default('')
       .describe(
-        'One or two short English sentences on a notable word choice, idiom, slang, false friend, cognate, regional variant, or cultural connotation that a literal gloss would miss. Empty string when not useful.',
+        'One or two short sentences (in the metadata language — see prompt) on a notable word choice, idiom, slang, false friend, cognate, regional variant, or cultural connotation that a literal gloss would miss. Empty string when not useful.',
       ),
     characters: z
       .array(
@@ -28,7 +28,9 @@ const LearningTips = z
                 char: z.string().describe('A single CJK character, e.g. 書.'),
                 meaning: z
                   .string()
-                  .describe('Short English gloss, e.g. "book".'),
+                  .describe(
+                    'Short gloss in the metadata language — see prompt.',
+                  ),
               }),
             )
             .max(5)
@@ -43,7 +45,7 @@ const LearningTips = z
   })
   .default({ grammar: '', vocab: '', characters: [] })
   .describe(
-    'Compact learning aid rendered as "Learning tips". Populate for any non-English source or target — give a useful grammar/structure point and any notable vocab/idiom/cultural note. Leave fields empty individually when there is nothing substantive to say.',
+    'Compact learning aid rendered as "Learning tips". Populate when the language pair involves a language the user does not speak natively — give a useful grammar/structure point and any notable vocab/idiom/cultural note. Leave fields empty individually when there is nothing substantive to say.',
   )
 export type LearningTips = z.infer<typeof LearningTips>
 
@@ -52,7 +54,7 @@ export const SentenceResult = z.object({
   rationale: z
     .string()
     .describe(
-      'One English sentence explaining the chosen translation — highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions. ALWAYS in English.',
+      'One sentence in the metadata language (see prompt) explaining the chosen translation — highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions.',
     ),
   alternatives: z
     .array(
@@ -61,7 +63,7 @@ export const SentenceResult = z.object({
         note: z
           .string()
           .describe(
-            'Insightful English note — explain wordplay, double meanings, slang origins, cultural connotations, or nuance that a literal translation would miss. Avoid generic register descriptions like "casual" or "informal" without further insight.',
+            'Insightful note in the metadata language (see prompt) — explain wordplay, double meanings, slang origins, cultural connotations, or nuance that a literal translation would miss. Avoid generic register descriptions like "casual" or "informal" without further insight.',
           ),
       }),
     )
@@ -73,7 +75,7 @@ export const SentenceResult = z.object({
     .string()
     .default('')
     .describe(
-      'Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, ENGLISH. Empty string when not relevant.',
+      'Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, in the metadata language (see prompt). Empty string when not relevant.',
     ),
   learningTips: LearningTips,
 })
@@ -82,45 +84,24 @@ export type SentenceResult = z.infer<typeof SentenceResult>
 const Sense = z.object({
   definition: z
     .string()
-    .describe(
-      'One-sentence definition IN ENGLISH. Always English, never Korean/Japanese/other.',
-    ),
+    .describe('One-sentence definition in the metadata language (see prompt).'),
   register: z
     .array(z.string())
     .default([])
     .describe(
-      'English tags like "informal", "formal", "technical", "slang", "archaic". Empty array when none apply.',
+      'Tags like "informal", "formal", "technical", "slang", "archaic" — written in the metadata language (see prompt). Empty array when none apply.',
     ),
   examples: z
     .array(z.string())
     .max(2)
     .default([])
     .describe(
-      'Up to 2 short example sentences demonstrating this sense. Write them in the HEADWORD\'s language so the user sees natural native usage. If that language is not English, append an English gloss in parentheses, e.g. "그는 진짜 빵돌이라서 매일 빵집에 가요. (He\'s a real bread-lover, so he goes to the bakery every day.)". If the headword is English, the example is plain English.',
+      "Up to 2 short example sentences demonstrating this sense. Write them in the HEADWORD's language so the user sees natural native usage. If the headword's language differs from the metadata language (see prompt), append a metadata-language gloss in parentheses, e.g. \"그는 진짜 빵돌이라서 매일 빵집에 가요. (He's a real bread-lover...)\" when metadata is English.",
     ),
 })
 
 export const WordResult = z.object({
   headword: z.string().describe('The source word, normalized (lemma form).'),
-
-  posList: z
-    .array(
-      z.object({
-        pos: z
-          .string()
-          .describe(
-            'Part of speech in English, e.g. "noun", "verb", "adjective", "interjection".',
-          ),
-        senses: z
-          .array(Sense)
-          .max(4)
-          .describe('1-4 senses ordered by frequency within this POS.'),
-      }),
-    )
-    .max(3)
-    .describe(
-      '1-3 parts of speech the headword can take, ordered by frequency of use.',
-    ),
 
   primaryTranslation: z
     .string()
@@ -132,7 +113,7 @@ export const WordResult = z.object({
     .string()
     .default('')
     .describe(
-      'One short English sentence on the register/context of primaryTranslation. When there is an important opposite-register equivalent, mention it briefly (e.g., "Casual — for professional settings use 감사합니다."). ALWAYS in English.',
+      'One short sentence in the metadata language (see prompt) on the register/context of primaryTranslation. When there is an important opposite-register equivalent, mention it briefly (e.g., "Casual — for professional settings use 감사합니다.").',
     ),
 
   alternativeTranslations: z
@@ -143,12 +124,12 @@ export const WordResult = z.object({
           .array(z.string())
           .default([])
           .describe(
-            'English tags strictly within the current mode band (e.g., ["casual polite"], ["very formal"]). Never cross bands.',
+            'Tags (in the metadata language — see prompt) strictly within the current mode band (e.g., ["casual polite"], ["very formal"]). Never cross bands.',
           ),
         note: z
           .string()
           .describe(
-            'Short English note on when/why to pick this over the primary.',
+            'Short note in the metadata language (see prompt) on when/why to pick this over the primary.',
           ),
       }),
     )
@@ -156,6 +137,25 @@ export const WordResult = z.object({
     .default([])
     .describe(
       '0-4 alternative equivalents, ALL within the current mode band. Casual mode → casual variants only; Professional → polite/formal only. Never mix bands.',
+    ),
+
+  posList: z
+    .array(
+      z.object({
+        pos: z
+          .string()
+          .describe(
+            'Part of speech in the metadata language (see prompt), e.g. "noun", "verb", "adjective", "interjection".',
+          ),
+        senses: z
+          .array(Sense)
+          .max(4)
+          .describe('1-4 senses ordered by frequency within this POS.'),
+      }),
+    )
+    .max(3)
+    .describe(
+      '1-3 parts of speech the headword can take, ordered by frequency of use.',
     ),
 
   synonyms: z
@@ -170,14 +170,14 @@ export const WordResult = z.object({
     .string()
     .default('')
     .describe(
-      'Brief etymology when genuinely illuminating. ALWAYS IN ENGLISH — never Korean, Japanese, or any other language. Empty string when not illuminating.',
+      'Brief etymology when genuinely illuminating, in the metadata language (see prompt). Empty string when not illuminating.',
     ),
 
   notes: z
     .string()
     .default('')
     .describe(
-      'Usage notes, false friends, common collocations. ALWAYS IN ENGLISH — never Korean, Japanese, or any other language. Empty string when none worth noting.',
+      'Usage notes, false friends, common collocations, in the metadata language (see prompt). Empty string when none worth noting.',
     ),
 
   learningTips: LearningTips,
