@@ -6,6 +6,7 @@ type Props = {
   value: LangCode
   onChange: (v: LangCode) => void
   includeAuto?: boolean
+  polish?: boolean
   'aria-label'?: string
 }
 
@@ -13,6 +14,7 @@ export default function LanguageSelect({
   value,
   onChange,
   includeAuto = false,
+  polish = false,
   'aria-label': ariaLabel,
 }: Props) {
   const options = LANGUAGES.filter((l) => includeAuto || l.code !== 'auto').map(
@@ -24,6 +26,7 @@ export default function LanguageSelect({
       value={value}
       onChange={onChange}
       options={options}
+      tone={polish ? 'active' : 'neutral'}
       aria-label={ariaLabel}
     />
   )

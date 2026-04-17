@@ -8,6 +8,7 @@ import {
   TranslatorProvider,
   useTranslatorContext,
 } from '../context/TranslatorContext'
+import { useKbd } from '../hooks/useKbd'
 import { useTranslatorShortcuts } from '../hooks/useTranslatorShortcuts'
 import { useUiLang } from '../hooks/useUiLang'
 import { mainText } from '../lib/liveResult'
@@ -88,19 +89,35 @@ function TranslatorShortcuts() {
 
 function ShortcutHints() {
   const { t } = useUiLang()
+  const { mod, shift, sep } = useKbd()
+  const Mod = () => <span className="kbd-sym">{mod}</span>
+  const Shift = () => <span className="kbd-sym">{shift}</span>
+  const Enter = () => <span className="kbd-sym">↵</span>
   return (
     <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-x-4">
       <span>
-        <kbd className="kbd">↵</kbd> {t('kbdTranslate')}
+        <kbd className="kbd">
+          <Mod />
+          {sep}
+          <Enter />
+        </kbd>{' '}
+        {t('kbdForce')}
       </span>
       <span>
-        <kbd className="kbd">⌘↵</kbd> {t('kbdForce')}
+        <kbd className="kbd">
+          <Mod />
+          {sep}K
+        </kbd>{' '}
+        {t('kbdFocus')}
       </span>
       <span>
-        <kbd className="kbd">⌘K</kbd> {t('kbdFocus')}
-      </span>
-      <span>
-        <kbd className="kbd">⌘⇧C</kbd> {t('kbdCopy')}
+        <kbd className="kbd">
+          <Mod />
+          {sep}
+          <Shift />
+          {sep}C
+        </kbd>{' '}
+        {t('kbdCopy')}
       </span>
       <span>
         <kbd className="kbd">Esc</kbd> {t('kbdClear')}

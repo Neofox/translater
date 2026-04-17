@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
-type Tone = 'neutral' | 'accent' | 'warm'
+type Tone = 'neutral' | 'accent' | 'warm' | 'active'
 type Size = 'sm' | 'md'
 
 type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
@@ -11,9 +11,10 @@ type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
 }
 
 const toneClass: Record<Tone, string> = {
-  neutral: 'hover:border-accent/60',
-  accent: 'hover:border-accent/60 [&>svg]:text-accent',
-  warm: 'hover:border-warm/60 [&>svg]:text-warm',
+  neutral: 'border-border bg-panel hover:border-accent/60',
+  accent: 'border-border bg-panel hover:border-accent/60 [&>svg]:text-accent',
+  warm: 'border-border bg-panel hover:border-warm/60 [&>svg]:text-warm',
+  active: 'border-accent/70 bg-accent-soft [&>svg]:text-accent',
 }
 
 const sizeClass: Record<Size, string> = {
@@ -34,7 +35,7 @@ export default function Pill({
       ref={ref}
       type="button"
       {...rest}
-      className={`inline-flex cursor-pointer items-center rounded-md border border-border bg-panel text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
+      className={`inline-flex cursor-pointer items-center rounded-md border text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
     >
       {children}
     </button>

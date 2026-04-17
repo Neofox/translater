@@ -9,6 +9,10 @@ export const STRINGS = {
     intentWord: 'Dictionary',
     intentSentence: 'Sentence',
     streaming: 'Streaming…',
+    polishing: 'Polishing…',
+    polishBadge: 'Polish',
+    polishingHint:
+      'Same language on both sides — polishing instead of translating.',
     emptyMain: 'Paste or type something to translate.',
     emptySub:
       'Short input → dictionary view. Full sentences → translation with alternatives.',
@@ -48,7 +52,6 @@ export const STRINGS = {
     stack: 'Stack',
     errorEnvHint:
       'Check .env — either OPENAI_API_KEY for cloud or a loaded LM Studio model for local.',
-    sameLanguageError: 'Source and target languages are the same.',
     translationFailed: 'Translation failed.',
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
@@ -60,6 +63,9 @@ export const STRINGS = {
     intentWord: '사전',
     intentSentence: '문장',
     streaming: '스트리밍 중…',
+    polishing: '다듬는 중…',
+    polishBadge: '다듬기',
+    polishingHint: '양쪽 언어가 같아 번역 대신 다듬기를 합니다.',
     emptyMain: '번역할 내용을 입력하거나 붙여넣으세요.',
     emptySub: '짧은 입력 → 사전 보기. 문장 → 대안과 함께 번역.',
     placeholder: '텍스트 입력 또는',
@@ -98,7 +104,6 @@ export const STRINGS = {
     stack: '스택',
     errorEnvHint:
       '.env를 확인하세요 — 클라우드는 OPENAI_API_KEY, 로컬은 LM Studio 모델이 로드되어 있어야 합니다.',
-    sameLanguageError: '입력 언어와 출력 언어가 같습니다.',
     translationFailed: '번역에 실패했습니다.',
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',

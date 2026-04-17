@@ -13,6 +13,7 @@ export default function OutputPanel() {
     target,
     setTarget,
     mode,
+    isPolish,
     live,
     isPending,
     streaming,
@@ -29,6 +30,7 @@ export default function OutputPanel() {
           <LanguageSelect
             value={target}
             onChange={setTarget}
+            polish={isPolish}
             aria-label={t('targetLanguage')}
           />
           {copyText && <CopyButton text={copyText} />}
@@ -37,7 +39,7 @@ export default function OutputPanel() {
         {streaming && (
           <span className="inline-flex items-center gap-1.5 text-xs text-accent">
             <Loader2 size={12} className="animate-spin" />
-            {t('streaming')}
+            {isPolish ? t('polishing') : t('streaming')}
           </span>
         )}
       </div>

@@ -19,7 +19,7 @@ import {
 import { Check, ChevronDown } from 'lucide-react'
 import Pill from './Pill'
 
-type Tone = 'neutral' | 'accent' | 'warm'
+type Tone = 'neutral' | 'accent' | 'warm' | 'active'
 
 export type SelectOption<V extends string> = {
   value: V

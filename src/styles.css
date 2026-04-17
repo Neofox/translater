@@ -80,7 +80,9 @@ button {
 }
 
 .kbd {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
   min-width: 1.4em;
   padding: 0.05em 0.35em;
   border: 1px solid var(--color-border);
@@ -92,4 +94,12 @@ button {
   line-height: 1.4;
   text-align: center;
   margin-right: 0.2em;
+}
+
+/* Keyboard symbol glyphs (⌘ ⇧ ↵ etc) render small in mono fonts; bump them
+   so they're legible inside the compact .kbd chip. */
+.kbd-sym {
+  font-family: var(--default-font-family, system-ui);
+  font-size: 1.05em;
+  line-height: 1;
 }

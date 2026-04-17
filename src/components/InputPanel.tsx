@@ -13,11 +13,11 @@ export default function InputPanel() {
     source,
     setSource,
     intent,
+    isPolish,
     live,
     streaming,
     error,
     inputTips,
-    run,
     clearInput,
     lookupWord,
     textareaRef,
@@ -32,6 +32,7 @@ export default function InputPanel() {
             value={source}
             onChange={setSource}
             includeAuto
+            polish={isPolish}
             aria-label={t('sourceLanguage')}
           />
           {input && <CopyButton text={input} />}
@@ -74,17 +75,6 @@ export default function InputPanel() {
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (
-                e.key === 'Enter' &&
-                !e.shiftKey &&
-                !e.metaKey &&
-                !e.ctrlKey
-              ) {
-                e.preventDefault()
-                void run()
-              }
-            }}
             placeholder={t('placeholder')}
             aria-label={t('inputText')}
             className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl"

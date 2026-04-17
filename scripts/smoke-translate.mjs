@@ -142,6 +142,44 @@ try {
     mode: 'casual',
   })
   assertEnglish('hello casual', w4.data)
+
+  const p1 = await run('Polish: KR→KR friends (sentence)', 'sentence', {
+    text: '안녕하세요, 오늘도 잘 지내셨습니까?',
+    source: 'ko',
+    target: 'ko',
+    mode: 'friends',
+  })
+  if (p1.data.main === '안녕하세요, 오늘도 잘 지내셨습니까?') {
+    console.warn('  ⚠ polish sentence is a verbatim copy of the source')
+  } else {
+    console.log('  ✓ polish sentence rewrote the source')
+  }
+
+  const p2 = await run('Polish: KR→KR professional (word)', 'word', {
+    text: '고마워',
+    source: 'ko',
+    target: 'ko',
+    mode: 'professional',
+  })
+  if (p2.data.primaryTranslation === '고마워') {
+    console.warn('  ⚠ polish word primary is the headword itself')
+  } else {
+    console.log(
+      `  ✓ polish word primary is a synonym: ${p2.data.primaryTranslation}`,
+    )
+  }
+
+  const p3 = await run('Polish: EN→EN professional (sentence)', 'sentence', {
+    text: 'hey can u send the doc whenever u get a sec thx',
+    source: 'en',
+    target: 'en',
+    mode: 'professional',
+  })
+  if (p3.data.main === 'hey can u send the doc whenever u get a sec thx') {
+    console.warn('  ⚠ polish EN sentence is a verbatim copy of the source')
+  } else {
+    console.log('  ✓ polish EN sentence rewrote the source')
+  }
 } catch (err) {
   console.error('SMOKE FAILED:', err)
   process.exit(1)

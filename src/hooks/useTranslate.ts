@@ -53,10 +53,6 @@ export function useTranslate(
       const { text, source, target, mode, intent } = { ...args, ...override }
       const trimmed = text.trim()
       if (!trimmed) return
-      if (source === target && source !== 'auto') {
-        setError(STRINGS[uiLang].sameLanguageError)
-        return
-      }
       abortRef.current?.abort()
       const ctrl = new AbortController()
       abortRef.current = ctrl

@@ -7,7 +7,6 @@ import {
   useState,
 } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { useAutoSwapTarget } from '../hooks/useAutoSwapTarget'
 import { useTranslate } from '../hooks/useTranslate'
 import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { detectIntent } from '../lib/detectIntent'
@@ -29,6 +28,7 @@ type TranslatorContextValue = {
   mode: Mode
   setMode: (next: Mode) => void
   intent: Intent
+  isPolish: boolean
   live: TranslateHandle['live']
   isPending: boolean
   streaming: boolean
@@ -55,7 +55,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     setSource,
     target,
     setTarget,
-    prevTarget,
     mode,
     setMode,
   } = useTranslationPrefs()
@@ -63,22 +62,26 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const intent = detectIntent(input)
 
+  // Resolve source='auto' to the detected language when it matches the target,
+  // so polish mode activates (instead of asking the server to translate X→X).
+  const rawDetected = source === 'auto' ? detectLanguage(input) : null
+  const effectiveSource: LangCode =
+    rawDetected && rawDetected === target ? target : source
+  const isPolish = effectiveSource === target
+
   const { live, isPending, streaming, error, run, reset } = useTranslate({
     text: input,
-    source,
+    source: effectiveSource,
     target,
     mode,
     intent,
   })
 
-  useAutoSwapTarget({ input, source, target, prevTarget, setTarget })
-
   // Position the learning-tips pill on whichever side holds the non-English
   // language. If the source is foreign the user is reading — show tips there;
   // otherwise if the target is foreign the user is composing — show on output.
   const learningTips = live?.partial.learningTips
-  const detectedSource =
-    source === 'auto' ? (detectLanguage(input) ?? 'en') : source
+  const detectedSource = source === 'auto' ? (rawDetected ?? 'en') : source
   const sourceIsForeign = detectedSource !== 'en'
   const targetIsForeign = target !== 'en'
   const inputTips = sourceIsForeign ? learningTips : undefined
@@ -137,6 +140,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     mode,
     setMode,
     intent,
+    isPolish,
     live,
     isPending,
     streaming,

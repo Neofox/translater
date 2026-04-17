@@ -6,9 +6,10 @@ import { useUiLang } from '../hooks/useUiLang'
 type Props = {
   text: string
   label?: string
+  compact?: boolean
 }
 
-export default function CopyButton({ text, label }: Props) {
+export default function CopyButton({ text, label, compact = false }: Props) {
   const { t } = useUiLang()
   const [copied, setCopied] = useState(false)
 
@@ -22,10 +23,11 @@ export default function CopyButton({ text, label }: Props) {
     }
   }
 
+  const label_ = copied ? t('copied') : (label ?? t('copy'))
   return (
-    <Pill tone="neutral" onClick={handleCopy}>
+    <Pill tone="neutral" onClick={handleCopy} aria-label={label_}>
       {copied ? <Check size={14} /> : <Copy size={14} />}
-      {copied ? t('copied') : (label ?? t('copy'))}
+      {!compact && <span>{label_}</span>}
     </Pill>
   )
 }
