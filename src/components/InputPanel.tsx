@@ -52,6 +52,7 @@ export default function InputPanel() {
               onClick={clearInput}
               title={t('clearInputTitle')}
               aria-label={t('clearInput')}
+              data-testid="clear-input"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
             >
               <X size={14} />
@@ -77,6 +78,7 @@ export default function InputPanel() {
             onChange={(e) => setInput(e.target.value)}
             placeholder={t('placeholder')}
             aria-label={t('inputText')}
+            data-testid="input-textarea"
             className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl"
             spellCheck={false}
           />

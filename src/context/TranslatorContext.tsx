@@ -62,16 +62,31 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const intent = detectIntent(input)
 
-  // Resolve source='auto' to the detected language when it matches the target,
-  // so polish mode activates (instead of asking the server to translate X→X).
+  // Polish mode activates only when the user explicitly sets source === target.
   const rawDetected = source === 'auto' ? detectLanguage(input) : null
-  const effectiveSource: LangCode =
-    rawDetected && rawDetected === target ? target : source
-  const isPolish = effectiveSource === target
+  const isPolish = source !== 'auto' && source === target
+
+  // Auto-swap target when source=auto and the detected input language matches the
+  // current target, so we always translate instead of polishing or idling.
+  const hasSwappedRef = useRef(false)
+  useEffect(() => {
+    if (!input.trim()) {
+      hasSwappedRef.current = false
+      return
+    }
+    if (hasSwappedRef.current) return
+    if (source !== 'auto') return
+    if (!rawDetected) return
+    if (rawDetected === target) {
+      const nextTarget = target === 'en' ? 'ko' : 'en'
+      setTarget(nextTarget)
+      hasSwappedRef.current = true
+    }
+  }, [source, rawDetected, target, input, setTarget])
 
   const { live, isPending, streaming, error, run, reset } = useTranslate({
     text: input,
-    source: effectiveSource,
+    source,
     target,
     mode,
     intent,

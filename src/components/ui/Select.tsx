@@ -113,6 +113,7 @@ export default function Select<V extends string>({
         tone={tone}
         aria-label={ariaLabel}
         aria-expanded={open}
+        data-testid="select-trigger"
         {...getReferenceProps()}
       >
         <span>{selected?.label ?? value}</span>
@@ -143,6 +144,8 @@ export default function Select<V extends string>({
                       listRef.current[i] = node
                     }}
                     tabIndex={i === activeIndex ? 0 : -1}
+                    data-testid="select-option"
+                    data-value={opt.value}
                     {...getItemProps({
                       onClick: () => handleSelect(i),
                       onKeyDown: (e) => {
