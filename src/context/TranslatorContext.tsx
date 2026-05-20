@@ -8,6 +8,7 @@ import {
 } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { useTranslate } from '../hooks/useTranslate'
+import type { TranslateError } from '../hooks/useTranslate'
 import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { detectIntent } from '../lib/detectIntent'
 import { detectLanguage } from '../lib/detectLanguage'
@@ -32,7 +33,7 @@ type TranslatorContextValue = {
   live: TranslateHandle['live']
   isPending: boolean
   streaming: boolean
-  error: string | null
+  error: TranslateError | null
   run: TranslateHandle['run']
   reset: TranslateHandle['reset']
   inputTips?: Partial<LearningTipsType>

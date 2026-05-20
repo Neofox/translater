@@ -8,6 +8,13 @@ import type { Intent, Mode } from '../lib/types'
 import type { LangCode } from '../lib/languages'
 import { useUiLang } from './useUiLang'
 import { STRINGS } from '../lib/i18n'
+import { MAX_INPUT_CHARS } from '../lib/limits'
+
+export type TranslateError = {
+  message: string
+  hint?: string
+  kind: 'input' | 'server'
+}
 
 export type LiveResult =
   | {
@@ -45,7 +52,7 @@ export function useTranslate(
 
   const [live, setLive] = useState<LiveResult | null>(null)
   const [isPending, setIsPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<TranslateError | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const run = useCallback(
@@ -54,6 +61,21 @@ export function useTranslate(
       const trimmed = text.trim()
       if (!trimmed) return
       abortRef.current?.abort()
+
+      if (trimmed.length > MAX_INPUT_CHARS) {
+        const s = STRINGS[uiLang]
+        setIsPending(false)
+        setLive(null)
+        setError({
+          kind: 'input',
+          message: s.inputTooLong,
+          hint: s.inputTooLongHint
+            .replace('{max}', String(MAX_INPUT_CHARS))
+            .replace('{count}', String(trimmed.length)),
+        })
+        return
+      }
+
       const ctrl = new AbortController()
       abortRef.current = ctrl
 
@@ -79,11 +101,13 @@ export function useTranslate(
         }
       } catch (err) {
         if (!ctrl.signal.aborted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : STRINGS[uiLang].translationFailed,
-          )
+          setError({
+            kind: 'server',
+            message:
+              err instanceof Error
+                ? err.message
+                : STRINGS[uiLang].translationFailed,
+          })
         }
       } finally {
         if (abortRef.current === ctrl) setIsPending(false)
@@ -127,6 +151,7 @@ export function useTranslate(
     setIsPending(false)
     if (!args.text.trim()) {
       setLive(null)
+      setError(null)
       return
     }
     const id = setTimeout(() => void run(), debounceMs)

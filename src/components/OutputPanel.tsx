@@ -44,7 +44,7 @@ export default function OutputPanel() {
         )}
       </div>
       <div className="flex-1 overflow-hidden">
-        {error && <ErrorView message={error} />}
+        {error && <ErrorView error={error} />}
         {!error && live?.intent === 'sentence' && (
           <SentenceView result={live.partial} streaming={streaming} />
         )}
@@ -57,12 +57,18 @@ export default function OutputPanel() {
   )
 }
 
-function ErrorView({ message }: { message: string }) {
+function ErrorView({
+  error,
+}: {
+  error: { message: string; hint?: string; kind: 'input' | 'server' }
+}) {
   const { t } = useUiLang()
+  const hint =
+    error.hint ?? (error.kind === 'server' ? t('errorEnvHint') : null)
   return (
     <div className="p-6 text-sm text-red-400">
-      {message}
-      <p className="mt-2 text-ink-dim">{t('errorEnvHint')}</p>
+      {error.message}
+      {hint && <p className="mt-2 text-ink-dim">{hint}</p>}
     </div>
   )
 }

@@ -53,6 +53,10 @@ export const STRINGS = {
     errorEnvHint:
       'Check .env — either OPENAI_API_KEY for cloud or a loaded LM Studio model for local.',
     translationFailed: 'Translation failed.',
+    inputTooLong: 'Text is too long to translate.',
+    inputTooLongHint:
+      'Limit is {max} characters; current is {count}. Try shortening or splitting the text.',
+    charCount: '{count} / {max}',
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
   },
@@ -105,6 +109,10 @@ export const STRINGS = {
     errorEnvHint:
       '.env를 확인하세요 — 클라우드는 OPENAI_API_KEY, 로컬은 LM Studio 모델이 로드되어 있어야 합니다.',
     translationFailed: '번역에 실패했습니다.',
+    inputTooLong: '입력이 너무 깁니다.',
+    inputTooLongHint:
+      '최대 {max}자까지 가능하며, 현재 {count}자입니다. 내용을 줄이거나 나눠서 번역하세요.',
+    charCount: '{count} / {max}',
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
   },

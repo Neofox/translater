@@ -33,7 +33,7 @@ const LearningTips = z
                   ),
               }),
             )
-            .max(5)
+            .max(10)
             .describe('The character breakdown in order.'),
         }),
       )
