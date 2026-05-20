@@ -103,6 +103,8 @@ export default function InputPanel() {
             data-testid="input-textarea"
             className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl"
             spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
           />
           {!input && (
             <button
