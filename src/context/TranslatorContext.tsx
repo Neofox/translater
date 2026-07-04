@@ -8,10 +8,12 @@ import {
 } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { useTranslate } from '../hooks/useTranslate'
+import type { TranslateError } from '../hooks/useTranslate'
 import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { detectIntent } from '../lib/detectIntent'
 import { detectLanguage } from '../lib/detectLanguage'
 import type { LangCode } from '../lib/languages'
+import { resolveTranslationTarget } from '../lib/resolveTranslationTarget'
 import type { Intent, Mode } from '../lib/types'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
 import type { Meta } from '../server/translate'
@@ -32,7 +34,7 @@ type TranslatorContextValue = {
   live: TranslateHandle['live']
   isPending: boolean
   streaming: boolean
-  error: string | null
+  error: TranslateError | null
   run: TranslateHandle['run']
   reset: TranslateHandle['reset']
   inputTips?: Partial<LearningTipsType>
@@ -65,29 +67,25 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   // Polish mode activates only when the user explicitly sets source === target.
   const rawDetected = source === 'auto' ? detectLanguage(input) : null
   const isPolish = source !== 'auto' && source === target
+  const translationTarget = resolveTranslationTarget({
+    source,
+    target,
+    detected: rawDetected,
+  })
 
   // Auto-swap target when source=auto and the detected input language matches the
   // current target, so we always translate instead of polishing or idling.
-  const hasSwappedRef = useRef(false)
   useEffect(() => {
-    if (!input.trim()) {
-      hasSwappedRef.current = false
-      return
-    }
-    if (hasSwappedRef.current) return
+    if (!input.trim()) return
     if (source !== 'auto') return
     if (!rawDetected) return
-    if (rawDetected === target) {
-      const nextTarget = target === 'en' ? 'ko' : 'en'
-      setTarget(nextTarget)
-      hasSwappedRef.current = true
-    }
-  }, [source, rawDetected, target, input, setTarget])
+    if (translationTarget !== target) setTarget(translationTarget)
+  }, [source, rawDetected, target, translationTarget, input, setTarget])
 
   const { live, isPending, streaming, error, run, reset } = useTranslate({
     text: input,
     source,
-    target,
+    target: translationTarget,
     mode,
     intent,
   })
@@ -98,7 +96,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const learningTips = live?.partial.learningTips
   const detectedSource = source === 'auto' ? (rawDetected ?? 'en') : source
   const sourceIsForeign = detectedSource !== 'en'
-  const targetIsForeign = target !== 'en'
+  const targetIsForeign = translationTarget !== 'en'
   const inputTips = sourceIsForeign ? learningTips : undefined
   const outputTips =
     !sourceIsForeign && targetIsForeign ? learningTips : undefined

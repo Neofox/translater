@@ -5,6 +5,8 @@ import LanguageSelect from './LanguageSelect'
 import WordSourceMeta from './WordSourceMeta'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
+import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
+import { STRINGS } from '../lib/i18n'
 
 export default function InputPanel() {
   const {
@@ -22,7 +24,19 @@ export default function InputPanel() {
     lookupWord,
     textareaRef,
   } = useTranslatorContext()
-  const { t } = useUiLang()
+  const { t, lang } = useUiLang()
+
+  const charCount = input.length
+  const showCounter = charCount >= INPUT_WARN_THRESHOLD
+  const overLimit = charCount > MAX_INPUT_CHARS
+  const counterText = STRINGS[lang].charCount
+    .replace('{count}', String(charCount))
+    .replace('{max}', String(MAX_INPUT_CHARS))
+  const counterTone = overLimit
+    ? 'text-red-400'
+    : charCount >= MAX_INPUT_CHARS * 0.95
+      ? 'text-warm'
+      : 'text-ink-dim'
 
   return (
     <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12">
@@ -39,7 +53,15 @@ export default function InputPanel() {
           <LearningTips tips={inputTips} />
         </div>
         <div className="flex items-center gap-2">
-          {input && (
+          {showCounter && (
+            <span
+              className={`text-xs font-medium tabular-nums ${counterTone}`}
+              aria-live="polite"
+            >
+              {counterText}
+            </span>
+          )}
+          {input && !overLimit && (
             <span
               className={`text-xs font-medium ${intent === 'word' ? 'text-warm' : 'text-accent'}`}
             >
@@ -80,7 +102,9 @@ export default function InputPanel() {
             aria-label={t('inputText')}
             data-testid="input-textarea"
             className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl"
-            spellCheck={false}
+            spellCheck
+            autoComplete="off"
+            autoCorrect="on"
           />
           {!input && (
             <button

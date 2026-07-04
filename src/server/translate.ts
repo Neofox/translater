@@ -5,9 +5,10 @@ import { PROVIDER } from './llm'
 import { SentenceResult, WordResult } from './schemas'
 import { sentencePrompt, wordPrompt } from './prompts'
 import { translationCache } from './cache'
+import { MAX_INPUT_CHARS } from '../lib/limits'
 
 const TranslateInput = z.object({
-  text: z.string().min(1).max(4000),
+  text: z.string().min(1).max(MAX_INPUT_CHARS),
   source: z.string(),
   target: z.string(),
   mode: z.enum(['friends', 'casual', 'professional']),
