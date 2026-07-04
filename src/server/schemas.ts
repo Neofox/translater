@@ -15,29 +15,35 @@ const LearningTips = z
         'One or two short sentences (in the metadata language — see prompt) on a notable word choice, idiom, slang, false friend, cognate, regional variant, or cultural connotation that a literal gloss would miss. Empty string when not useful.',
       ),
     characters: z
-      .array(
-        z.object({
-          word: z
-            .string()
-            .describe(
-              'The CJK word as it appears in its native script — Hangul for Korean (e.g. 도서관), mixed kanji/kana for Japanese (e.g. 図書館), Hanzi for Chinese (e.g. 图书馆).',
-            ),
-          chars: z
-            .array(
-              z.object({
-                char: z.string().describe('A single CJK character, e.g. 書.'),
-                meaning: z
-                  .string()
-                  .describe(
-                    'Short gloss in the metadata language — see prompt.',
-                  ),
-              }),
-            )
-            .max(5)
-            .describe('The character breakdown in order.'),
-        }),
+      .preprocess(
+        (value) => (Array.isArray(value) ? value.slice(0, 3) : value),
+        z
+          .array(
+            z.object({
+              word: z
+                .string()
+                .describe(
+                  'The CJK word as it appears in its native script — Hangul for Korean (e.g. 도서관), mixed kanji/kana for Japanese (e.g. 図書館), Hanzi for Chinese (e.g. 图书馆).',
+                ),
+              chars: z
+                .array(
+                  z.object({
+                    char: z
+                      .string()
+                      .describe('A single CJK character, e.g. 書.'),
+                    meaning: z
+                      .string()
+                      .describe(
+                        'Short gloss in the metadata language — see prompt.',
+                      ),
+                  }),
+                )
+                .max(5)
+                .describe('The character breakdown in order.'),
+            }),
+          )
+          .max(3),
       )
-      .max(3)
       .default([])
       .describe(
         '0-3 CJK-character words worth breaking down for a learner. Populate ONLY when source or target is Korean (Sino-Korean hanja), Japanese (kanji), or Chinese (hanzi). Skip purely native words (고유어, 和語) and loanwords. Empty array for non-CJK pairs.',
