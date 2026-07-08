@@ -14,7 +14,6 @@ export default function InputPanel() {
     setInput,
     source,
     setSource,
-    intent,
     detected,
     live,
     streaming,
@@ -40,7 +39,7 @@ export default function InputPanel() {
 
   return (
     <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12">
-      <div className="shrink-0 px-3 py-2 text-sm text-ink-soft sm:px-4">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
         <LanguageChipBar
           kind="source"
           value={source}
@@ -48,41 +47,30 @@ export default function InputPanel() {
           detected={detected}
           aria-label={t('sourceLanguage')}
         />
-        {input && (
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <CopyButton text={input} />
-              <LearningTips tips={inputTips} />
-            </div>
-            <div className="flex items-center gap-2">
-              {showCounter && (
-                <span
-                  className={`text-xs font-medium tabular-nums ${counterTone}`}
-                  aria-live="polite"
-                >
-                  {counterText}
-                </span>
-              )}
-              {!overLimit && (
-                <span
-                  className={`text-xs font-medium ${intent === 'word' ? 'text-warm' : 'text-accent'}`}
-                >
-                  {intent === 'word' ? t('intentWord') : t('intentSentence')}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={clearInput}
-                title={t('clearInputTitle')}
-                aria-label={t('clearInput')}
-                data-testid="clear-input"
-                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <LearningTips tips={inputTips} />
+          {showCounter && (
+            <span
+              className={`text-xs font-medium tabular-nums ${counterTone}`}
+              aria-live="polite"
+            >
+              {counterText}
+            </span>
+          )}
+          {input && <CopyButton text={input} compact />}
+          {input && (
+            <button
+              type="button"
+              onClick={clearInput}
+              title={t('clearInputTitle')}
+              aria-label={t('clearInput')}
+              data-testid="clear-input"
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
       <div
         className="flex min-h-0 flex-1 cursor-text flex-col overflow-y-auto scrollbar-thin"
