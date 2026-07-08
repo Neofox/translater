@@ -23,6 +23,17 @@ import type { Meta } from '../server/translate'
 
 type TranslateHandle = ReturnType<typeof useTranslate>
 
+// Streaming partials can carry a truncated sourceLang (partial-json cuts
+// mid-string), so only trust complete known codes. 'other' renders nothing.
+const VALID_DETECTED: ReadonlyArray<LangCode> = [
+  'en',
+  'ko',
+  'ja',
+  'fr',
+  'es',
+  'zh',
+]
+
 type TranslatorContextValue = {
   input: string
   setInput: (next: string) => void
@@ -71,10 +82,21 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   // Polish mode activates only when the user explicitly sets source === target.
   const rawDetected = source === 'auto' ? detectLanguage(input) : null
   const isPolish = source !== 'auto' && source === target
+
+  // Safety net: the model says the source language IS the current target
+  // (something the client heuristic missed). Flip the target once and let the
+  // debounced effect re-run. Guarded per input text — max one extra call.
+  //
+  // Declared above `translationTarget` on purpose: once the safety net has
+  // flipped for this exact input, the heuristic detector must stop feeding
+  // the resolver, or a stale `rawDetected` (e.g. the low-confidence English
+  // fallback) can immediately flip the freshly-corrected target a second
+  // time — see the merci-beaucoup/fr/en/ko cascade this guards against.
+  const flipGuardRef = useRef<string | null>(null)
   const translationTarget = resolveTranslationTarget({
     source,
     target,
-    detected: rawDetected,
+    detected: flipGuardRef.current === input ? null : rawDetected,
   })
 
   // Auto-swap target when source=auto and the detected input language matches the
@@ -94,35 +116,27 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     intent,
   })
 
-  // Streaming partials can carry a truncated sourceLang (partial-json cuts
-  // mid-string), so only trust complete known codes. 'other' renders nothing.
-  const VALID_DETECTED: ReadonlyArray<LangCode> = [
-    'en',
-    'ko',
-    'ja',
-    'fr',
-    'es',
-    'zh',
-  ]
-  const reportedSource = live?.partial.sourceLang
+  // Only trust the model's reported source language while `live` still
+  // corresponds to the current input — `live` deliberately outlives input
+  // changes (to keep the old translation visible while typing), so a stale
+  // `live.partial.sourceLang` must not leak into the heuristic here.
+  const liveMatchesInput = live?.text === input.trim()
+  const reportedSource = liveMatchesInput ? live.partial.sourceLang : undefined
   const modelDetected = VALID_DETECTED.includes(reportedSource as LangCode)
     ? (reportedSource as LangCode)
     : null
   const detected = source === 'auto' ? (modelDetected ?? rawDetected) : null
 
-  // Safety net: the model says the source language IS the current target
-  // (something the client heuristic missed). Flip the target once and let the
-  // debounced effect re-run. Guarded per input text — max one extra call.
-  const flipGuardRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!live?.done || source !== 'auto' || isPolish) return
+    if (!live?.done || source !== 'auto') return
+    if (live.text !== input.trim()) return
     const reported = live.partial.sourceLang
     if (!reported || reported === 'other') return
     if (reported !== target) return
     if (flipGuardRef.current === input) return
     flipGuardRef.current = input
     setTarget(fallbackTargetFor(reported))
-  }, [live, source, target, input, isPolish, setTarget])
+  }, [live, source, target, input, setTarget])
 
   // Position the learning-tips pill on whichever side holds the non-English
   // language. If the source is foreign the user is reading — show tips there;

@@ -54,10 +54,13 @@ export default function Select<V extends string>({
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
   const listRef = useRef<Array<HTMLElement | null>>([])
-  const listContentRef = useRef(
-    options.map(
-      (o) => o.searchLabel ?? (typeof o.label === 'string' ? o.label : o.value),
-    ),
+  const listContentRef = useRef<string[]>([])
+  // Reassigned every render (not just once) so keyboard typeahead always
+  // matches the current option set — the chip-bar's "more" menu options
+  // shrink when a recent chip gets promoted, and a stale ref would let
+  // typeahead select the wrong language.
+  listContentRef.current = options.map(
+    (o) => o.searchLabel ?? (typeof o.label === 'string' ? o.label : o.value),
   )
 
   const selectedIndex = options.findIndex((o) => o.value === value)

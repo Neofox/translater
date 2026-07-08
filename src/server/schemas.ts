@@ -57,7 +57,7 @@ export const SentenceResult = z.object({
     'The actual language of the source text. When the instructions name a forced source language, echo its code. Otherwise report the language you detected. Use "other" only when the language is not in this list.',
   ),
   targetLang: UsedLang.describe(
-    'The language the output (`main` / `primaryTranslation` and alternatives) is actually written in.',
+    'The language `main` and every alternative are actually written in.',
   ),
   main: z.string().describe('The primary translation of the source text.'),
   rationale: z
@@ -111,7 +111,7 @@ export const WordResult = z.object({
     'The actual language of the source text. When the instructions name a forced source language, echo its code. Otherwise report the language you detected. Use "other" only when the language is not in this list.',
   ),
   targetLang: UsedLang.describe(
-    'The language the output (`main` / `primaryTranslation` and alternatives) is actually written in.',
+    'The language `primaryTranslation` and every alternative are actually written in.',
   ),
   headword: z.string().describe('The source word, normalized (lemma form).'),
 

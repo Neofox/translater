@@ -22,12 +22,17 @@ export type LiveResult =
       partial: Partial<SentenceResult>
       done: boolean
       meta: Meta | null
+      /** The trimmed input text this result was produced for — lets stale
+       * consumers (heuristics, safety nets) detect that `live` outlived the
+       * input it was streamed for and fall back to fresh evidence. */
+      text: string
     }
   | {
       intent: 'word'
       partial: Partial<WordResult>
       done: boolean
       meta: Meta | null
+      text: string
     }
 
 export type TranslateArgs = {
@@ -81,7 +86,7 @@ export function useTranslate(
 
       setIsPending(true)
       setError(null)
-      setLive({ intent, partial: {}, done: false, meta: null })
+      setLive({ intent, partial: {}, done: false, meta: null, text: trimmed })
 
       try {
         const stream = await translateFn({
@@ -117,9 +122,7 @@ export function useTranslate(
         if (chunk.type === 'delta') {
           const parsed = partialParse<SentenceResult | WordResult>(chunk.raw)
           if (!parsed) return
-          setLive((prev) =>
-            prev ? ({ ...prev, partial: parsed } as LiveResult) : prev,
-          )
+          setLive((prev) => (prev ? { ...prev, partial: parsed } : prev))
         } else {
           commit(chunk.done)
         }
@@ -131,7 +134,8 @@ export function useTranslate(
           partial: done.data,
           done: true,
           meta: done.meta,
-        } as LiveResult)
+          text: trimmed,
+        })
       }
     },
     [translateFn, args, uiLang],
