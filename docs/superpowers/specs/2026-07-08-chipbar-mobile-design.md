@@ -30,7 +30,9 @@ A new `useMediaQuery(query: string): boolean` hook (`src/hooks/useMediaQuery.ts`
 - The Auto chip's inline detection label (`Auto · English`) renders identically on both breakpoints.
 - Test IDs unchanged (`lang-chip`, `lang-more-trigger`, `select-option`).
 
-### 2. Two-row panel headers
+### 2. Two-row panel headers — REVISED same day, see §2b
+
+> **Revision (2026-07-08, after user reviewed the merged result):** the meta row is dropped in favor of a single-row header. §2b replaces this section; the original text is kept for history.
 
 Both `InputPanel` and `OutputPanel` headers restructure from one flex-wrap row to:
 
@@ -40,6 +42,16 @@ Both `InputPanel` and `OutputPanel` headers restructure from one flex-wrap row t
   - OutputPanel: left = `CopyButton` (when copy text), `LearningTips` (when tips). No right side.
   - All meta-row controls keep their current small sizing; the clear button stays 28px round.
 - When a panel is empty the header is a single clean row of chips.
+
+### 2b. Single-row header (revision)
+
+Both panel headers are ONE row (`flex flex-wrap items-center justify-between`): chip bar left, a right-aligned utility group vertically centered with the chips.
+
+- **InputPanel right group, in order:** `LearningTips` (self-hides when empty) · char counter (when shown) · Dictionary/Sentence intent hint (when input and not over limit) · icon-only `CopyButton` (`compact`, when input) · clear button (when input).
+- **OutputPanel right group, in order:** `LearningTips` · streaming indicator (when streaming) · icon-only `CopyButton` (`compact`, when copy text exists).
+- The Copy button uses the existing `compact` prop (icon only) so it reads as a peer of the clear `✕`.
+- On very narrow screens the right group may wrap below the chips (flex-wrap) — acceptable; it is icons plus one short pill.
+- No meta row anywhere; when a panel is empty the right group renders nothing (LearningTips self-hides) and the header is just the chips.
 
 ### 3. Out of scope
 
