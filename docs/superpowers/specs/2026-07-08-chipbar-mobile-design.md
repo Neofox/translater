@@ -21,10 +21,12 @@ On narrow screens the panel header's single flex-wrap row explodes: four big chi
 
 A new `useMediaQuery(query: string): boolean` hook (`src/hooks/useMediaQuery.ts`) wraps `window.matchMedia` with a change listener; returns `false` during SSR/first render and corrects on mount (renders the desktop variant momentarily — invisible in practice).
 
-`LanguageChipBar` uses `useMediaQuery('(min-width: 640px)')` (Tailwind `sm`):
+`LanguageChipBar` collapses whenever its panel is narrow, not just on phones. Panels are full-width below Tailwind `md` (768px) and half-width from `md` up, so the expanded bar is only safe when the panel itself is wide:
 
-- **Desktop (`isDesktop === true`):** current behavior, unchanged — fixed chips + persisted recent chip + `⋯` listbox of the remainder.
-- **Mobile:** visible chips = `[value]` only, plus the `⋯` trigger. The `⋯` option list contains **every other selectable language**: for `kind="source"` that includes `auto` when it isn't selected; for `kind="target"`, `auto` is never offered. Selecting an option just calls `onChange` — recent-chip promotion (the `nt.recentSource`/`nt.recentTarget` effect) keeps running regardless of breakpoint so the desktop layout stays in sync with choices made on mobile.
+`useMediaQuery('(min-width: 640px) and (max-width: 767px), (min-width: 1024px)')` — expanded on 640–767px (full-width panel) and ≥1024px (two wide columns); collapsed below 640px and in the 768–1023px two-narrow-columns band that would otherwise re-wrap the chips.
+
+- **Expanded (`isExpanded === true`):** current behavior, unchanged — fixed chips + persisted recent chip + `⋯` listbox of the remainder.
+- **Collapsed:** visible chips = `[value]` only, plus the `⋯` trigger. The `⋯` option list contains **every other selectable language**: for `kind="source"` that includes `auto` when it isn't selected; for `kind="target"`, `auto` is never offered. Selecting an option just calls `onChange` — recent-chip promotion (the `nt.recentSource`/`nt.recentTarget` effect) keeps running regardless of breakpoint so the expanded layout stays in sync with choices made while collapsed.
 - The Auto chip's inline detection label (`Auto · English`) renders identically on both breakpoints.
 - Test IDs unchanged (`lang-chip`, `lang-more-trigger`, `select-option`).
 
