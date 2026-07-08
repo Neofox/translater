@@ -16,7 +16,7 @@ export default function DebugBar({
   const parts: Array<string> = []
   if (meta) {
     parts.push(cached ? 'cache hit' : `${(meta.durationMs / 1000).toFixed(2)}s`)
-    parts.push(`${meta.provider}:${meta.model}`)
+    parts.push(meta.model)
     parts.push(`${meta.tokens.input}→${meta.tokens.output} tok`)
     if (typeof meta.costUsd === 'number') {
       parts.push(`$${meta.costUsd.toFixed(5)}`)

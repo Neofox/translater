@@ -1,55 +1,50 @@
 import { z } from 'zod'
 
+// All fields are required: these schemas are sent to the OpenAI Responses API
+// as strict structured outputs (via `zodTextFormat`), which guarantees every
+// field is present. "Not applicable" is an empty string / empty array, never
+// a missing key — so no `.optional()` / `.default()` here.
+
 const LearningTips = z
   .object({
     grammar: z
       .string()
-      .default('')
       .describe(
         'One or two short sentences (in the metadata language — see prompt) on a useful grammar/structure point from the translation — tense/mood, particle, verb ending, honorific, inversion, clitic placement, gender agreement, word-order quirk, etc. Empty string when nothing genuinely illuminating.',
       ),
     vocab: z
       .string()
-      .default('')
       .describe(
         'One or two short sentences (in the metadata language — see prompt) on a notable word choice, idiom, slang, false friend, cognate, regional variant, or cultural connotation that a literal gloss would miss. Empty string when not useful.',
       ),
     characters: z
-      .preprocess(
-        (value) => (Array.isArray(value) ? value.slice(0, 3) : value),
-        z
-          .array(
-            z.object({
-              word: z
-                .string()
-                .describe(
-                  'The CJK word as it appears in its native script — Hangul for Korean (e.g. 도서관), mixed kanji/kana for Japanese (e.g. 図書館), Hanzi for Chinese (e.g. 图书馆).',
-                ),
-              chars: z
-                .array(
-                  z.object({
-                    char: z
-                      .string()
-                      .describe('A single CJK character, e.g. 書.'),
-                    meaning: z
-                      .string()
-                      .describe(
-                        'Short gloss in the metadata language — see prompt.',
-                      ),
-                  }),
-                )
-                .max(10)
-                .describe('The character breakdown in order.'),
-            }),
-          )
-          .max(3),
+      .array(
+        z.object({
+          word: z
+            .string()
+            .describe(
+              'The CJK word as it appears in its native script — Hangul for Korean (e.g. 도서관), mixed kanji/kana for Japanese (e.g. 図書館), Hanzi for Chinese (e.g. 图书馆).',
+            ),
+          chars: z
+            .array(
+              z.object({
+                char: z.string().describe('A single CJK character, e.g. 書.'),
+                meaning: z
+                  .string()
+                  .describe(
+                    'Short gloss in the metadata language — see prompt.',
+                  ),
+              }),
+            )
+            .max(10)
+            .describe('The character breakdown in order.'),
+        }),
       )
-      .default([])
+      .max(3)
       .describe(
         '0-3 CJK-character words worth breaking down for a learner. Populate ONLY when source or target is Korean (Sino-Korean hanja), Japanese (kanji), or Chinese (hanzi). Skip purely native words (고유어, 和語) and loanwords. Empty array for non-CJK pairs.',
       ),
   })
-  .default({ grammar: '', vocab: '', characters: [] })
   .describe(
     'Compact learning aid rendered as "Learning tips". Populate when the language pair involves a language the user does not speak natively — give a useful grammar/structure point and any notable vocab/idiom/cultural note. Leave fields empty individually when there is nothing substantive to say.',
   )
@@ -73,13 +68,12 @@ export const SentenceResult = z.object({
           ),
       }),
     )
-    .max(7)
+    .max(6)
     .describe(
       '0-6 alternative phrasings. Leave empty if the source is unambiguous.',
     ),
   formalityNote: z
     .string()
-    .default('')
     .describe(
       'Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, in the metadata language (see prompt). Empty string when not relevant.',
     ),
@@ -93,14 +87,12 @@ const Sense = z.object({
     .describe('One-sentence definition in the metadata language (see prompt).'),
   register: z
     .array(z.string())
-    .default([])
     .describe(
       'Tags like "informal", "formal", "technical", "slang", "archaic" — written in the metadata language (see prompt). Empty array when none apply.',
     ),
   examples: z
     .array(z.string())
     .max(2)
-    .default([])
     .describe(
       "Up to 2 short example sentences demonstrating this sense. Write them in the HEADWORD's language so the user sees natural native usage. If the headword's language differs from the metadata language (see prompt), append a metadata-language gloss in parentheses, e.g. \"그는 진짜 빵돌이라서 매일 빵집에 가요. (He's a real bread-lover...)\" when metadata is English.",
     ),
@@ -117,9 +109,8 @@ export const WordResult = z.object({
 
   primaryUsageNote: z
     .string()
-    .default('')
     .describe(
-      'One short sentence in the metadata language (see prompt) on the register/context of primaryTranslation. When there is an important opposite-register equivalent, mention it briefly (e.g., "Casual — for professional settings use 감사합니다.").',
+      'One short sentence in the metadata language (see prompt) on the register/context of primaryTranslation. When there is an important opposite-register equivalent, mention it briefly (e.g., "Casual — for professional settings use 감사합니다."). Empty string when nothing worth noting.',
     ),
 
   alternativeTranslations: z
@@ -128,9 +119,8 @@ export const WordResult = z.object({
         text: z.string(),
         register: z
           .array(z.string())
-          .default([])
           .describe(
-            'Tags (in the metadata language — see prompt) strictly within the current mode band (e.g., ["casual polite"], ["very formal"]). Never cross bands.',
+            'Tags (in the metadata language — see prompt) strictly within the current mode band (e.g., ["casual polite"], ["very formal"]). Never cross bands. Empty array when none apply.',
           ),
         note: z
           .string()
@@ -139,8 +129,7 @@ export const WordResult = z.object({
           ),
       }),
     )
-    .max(5)
-    .default([])
+    .max(4)
     .describe(
       '0-4 alternative equivalents, ALL within the current mode band. Casual mode → casual variants only; Professional → polite/formal only. Never mix bands.',
     ),
@@ -166,22 +155,19 @@ export const WordResult = z.object({
 
   synonyms: z
     .array(z.string())
-    .max(8)
-    .default([])
+    .max(6)
     .describe(
       '3-6 source-language synonyms of the headword when common synonyms exist. Empty array for bare function words.',
     ),
 
   etymology: z
     .string()
-    .default('')
     .describe(
       'Brief etymology when genuinely illuminating, in the metadata language (see prompt). Empty string when not illuminating.',
     ),
 
   notes: z
     .string()
-    .default('')
     .describe(
       'Usage notes, false friends, common collocations, in the metadata language (see prompt). Empty string when none worth noting.',
     ),

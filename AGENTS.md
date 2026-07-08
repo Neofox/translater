@@ -2,22 +2,21 @@
 
 ## Project
 
-Translator app built with **TanStack Start** (React SSR) + **Vite** + **TailwindCSS v4** + **Nitro** (deployed to Vercel). Uses the OpenAI Responses API with structured JSON output (`json_schema`).
+Translator app built with **TanStack Start** (React SSR) + **Vite** + **TailwindCSS v4** + **Nitro** (deployed to Vercel). Uses the OpenAI Responses API with strict structured output (`zodTextFormat` from `openai/helpers/zod`). OpenAI is the only provider; model comes from `TRANSLATE_MODEL` (default `gpt-5.4-mini`).
 
 ## Key Files
 
-| File                                | Role                                                                                                            |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `src/server/prompts.ts`             | All LLM prompt templates and few-shot examples (sentence + word mode, per-mode register guidance)               |
-| `src/server/schemas.ts`             | Zod schemas for LLM response validation (`SentenceResult`, `WordResult`). Converted to JSON Schema for the API. |
-| `src/server/translate.ts`           | Server function — cache check, LLM call with streaming, temperature per intent/mode                             |
-| `src/server/llm.ts`                 | Provider resolution (OpenAI / OpenRouter / LM Studio) via env vars                                              |
-| `src/server/cache.ts`               | In-memory LRU cache (max 50 entries)                                                                            |
-| `src/hooks/useTranslate.ts`         | Client hook — streams translation, returns `LiveResult`                                                         |
-| `src/lib/detectIntent.ts`           | Heuristic: ≤3 tokens AND ≤24 chars → `word`, else `sentence`                                                    |
-| `src/components/SentenceView.tsx`   | Renders sentence-mode results (main, rationale, alternatives, formalityNote)                                    |
-| `src/components/WordView.tsx`       | Renders word-mode results (primaryTranslation, alternatives, register tags)                                     |
-| `src/components/WordSourceMeta.tsx` | Dictionary metadata panel (POS, definitions, etymology, synonyms)                                               |
+| File                                | Role                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `src/server/prompts.ts`             | All LLM prompt templates and few-shot examples (sentence + word mode, per-mode register guidance)         |
+| `src/server/schemas.ts`             | Zod schemas for LLM output (`SentenceResult`, `WordResult`). Strict-mode compliant: every field required. |
+| `src/server/translate.ts`           | Server function — cache check, OpenAI client, streaming via `responses.stream` + `zodTextFormat` (strict) |
+| `src/server/cache.ts`               | In-memory LRU cache (max 50 entries)                                                                      |
+| `src/hooks/useTranslate.ts`         | Client hook — streams translation, returns `LiveResult`                                                   |
+| `src/lib/detectIntent.ts`           | Heuristic: ≤3 tokens AND ≤24 chars → `word`, else `sentence`                                              |
+| `src/components/SentenceView.tsx`   | Renders sentence-mode results (main, rationale, alternatives, formalityNote)                              |
+| `src/components/WordView.tsx`       | Renders word-mode results (primaryTranslation, alternatives, register tags)                               |
+| `src/components/WordSourceMeta.tsx` | Dictionary metadata panel (POS, definitions, etymology, synonyms)                                         |
 
 ## Architecture Notes
 
@@ -52,13 +51,13 @@ The project includes browser-friendly `data-testid` attributes on key interactiv
 
 ### Stable selectors
 
-| Element | Selector | Notes |
-| ------- | -------- | ----- |
-| Source language trigger | `[data-testid="select-trigger"]` | Custom Floating-UI dropdown, not a native `<select>` |
-| Target language trigger | `[data-testid="select-trigger"]` | Same component; use DOM order or `aria-label` to disambiguate |
+| Element                    | Selector                                         | Notes                                                                   |
+| -------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
+| Source language trigger    | `[data-testid="select-trigger"]`                 | Custom Floating-UI dropdown, not a native `<select>`                    |
+| Target language trigger    | `[data-testid="select-trigger"]`                 | Same component; use DOM order or `aria-label` to disambiguate           |
 | Dropdown option (by value) | `[data-testid="select-option"][data-value="en"]` | Works for any language code: `auto`, `en`, `ko`, `ja`, `fr`, `es`, `zh` |
-| Input textarea | `[data-testid="input-textarea"]` | React controlled input; do **not** clear by direct `.value` mutation |
-| Clear input button | `[data-testid="clear-input"]` | Only rendered when `input` is non-empty |
+| Input textarea             | `[data-testid="input-textarea"]`                 | React controlled input; do **not** clear by direct `.value` mutation    |
+| Clear input button         | `[data-testid="clear-input"]`                    | Only rendered when `input` is non-empty                                 |
 
 ### Why direct `.value` mutation fails
 
@@ -77,6 +76,7 @@ cmux browser --surface <s> click --selector "[data-testid='select-option'][data-
 ```
 
 If you need to disambiguate source vs. target triggers, use the `aria-label`:
+
 ```bash
 cmux browser --surface <s> click --selector "[aria-label='Source language']"
 ```
@@ -102,4 +102,4 @@ cmux browser --surface <s> click --selector "[aria-label='Source language']"
 
 - Typecheck: `npx tsc --noEmit`
 - Dev server: `npm run dev`
-- Smoke test: `node scripts/smoke-translate.mjs`
+- Smoke test: `npx tsx scripts/smoke-translate.mjs`

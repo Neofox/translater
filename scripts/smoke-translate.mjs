@@ -1,46 +1,32 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
-import { z } from 'zod'
-import { PROVIDER } from '../src/server/llm.ts'
+import { zodTextFormat } from 'openai/helpers/zod'
 import { SentenceResult, WordResult } from '../src/server/schemas.ts'
 import { sentencePrompt, wordPrompt } from '../src/server/prompts.ts'
 
-console.log(`[smoke] provider=${PROVIDER.name} model=${PROVIDER.model}`)
+const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.4-mini'
+console.log(`[smoke] model=${MODEL}`)
 
-const client = new OpenAI({
-  apiKey: PROVIDER.apiKey,
-  baseURL: PROVIDER.baseURL,
-})
+const client = new OpenAI()
 
 async function callStructured(intent, args) {
   const messages = intent === 'word' ? wordPrompt(args) : sentencePrompt(args)
-  const schema = intent === 'word' ? WordResult : SentenceResult
-  const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7' })
+  const format =
+    intent === 'word'
+      ? zodTextFormat(WordResult, 'word_translation')
+      : zodTextFormat(SentenceResult, 'sentence_translation')
   const t0 = Date.now()
-  const response = await client.responses.create({
-    model: PROVIDER.model,
-    input: messages.map((m) => ({ role: m.role, content: m.content })),
+  const response = await client.responses.parse({
+    model: MODEL,
+    input: messages,
     temperature: intent === 'word' ? 0.2 : args.mode === 'casual' ? 0.7 : 0.3,
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'translation_output',
-        schema: jsonSchema,
-        strict: false,
-      },
-    },
+    text: { format },
   })
-  const ms = Date.now() - t0
-  let text = ''
-  for (const item of response.output ?? []) {
-    if (item.type === 'message') {
-      for (const part of item.content ?? []) {
-        if (part.type === 'output_text') text += part.text
-      }
-    }
+  return {
+    data: response.output_parsed,
+    ms: Date.now() - t0,
+    usage: response.usage,
   }
-  const parsed = schema.parse(JSON.parse(text))
-  return { data: parsed, ms, usage: response.usage }
 }
 
 async function run(label, intent, args) {
@@ -53,7 +39,7 @@ async function run(label, intent, args) {
 }
 
 // Fails the run if any English-only field contains non-Latin script we care about.
-const NON_ENGLISH_RE = /[\uac00-\ud7af\u3040-\u30ff\u4e00-\u9fff]/
+const NON_ENGLISH_RE = /[가-힯぀-ヿ一-鿿]/
 function assertEnglish(label, obj) {
   const englishFields = [
     'rationale',
