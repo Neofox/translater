@@ -7,6 +7,8 @@ const characterEntry = (char: string) => ({
 })
 
 const validResult = {
+  sourceLang: 'zh',
+  targetLang: 'en',
   main: 'School life',
   rationale: 'A direct translation.',
   alternatives: [],
@@ -38,5 +40,16 @@ describe('SentenceResult', () => {
   it('rejects payloads with missing fields — strict mode means no defaults', () => {
     const { formalityNote: _omitted, ...withoutFormalityNote } = validResult
     expect(() => SentenceResult.parse(withoutFormalityNote)).toThrow()
+  })
+
+  it('rejects payloads missing sourceLang/targetLang', () => {
+    const { sourceLang: _s, targetLang: _t, ...without } = validResult
+    expect(() => SentenceResult.parse(without)).toThrow()
+  })
+
+  it('rejects unknown language codes', () => {
+    expect(() =>
+      SentenceResult.parse({ ...validResult, sourceLang: 'auto' }),
+    ).toThrow()
   })
 })

@@ -53,7 +53,7 @@ export const translate = createServerFn({ method: 'POST' })
   .validator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
     // Bump when the response schema or prompt changes so stale entries miss.
-    const CACHE_VERSION = 'v9-strict'
+    const CACHE_VERSION = 'v10-strict'
     const cacheKey = JSON.stringify([
       CACHE_VERSION,
       data.intent,

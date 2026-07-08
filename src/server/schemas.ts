@@ -50,7 +50,15 @@ const LearningTips = z
   )
 export type LearningTips = z.infer<typeof LearningTips>
 
+const UsedLang = z.enum(['en', 'ko', 'ja', 'fr', 'es', 'zh', 'other'])
+
 export const SentenceResult = z.object({
+  sourceLang: UsedLang.describe(
+    'The actual language of the source text. When the instructions name a forced source language, echo its code. Otherwise report the language you detected. Use "other" only when the language is not in this list.',
+  ),
+  targetLang: UsedLang.describe(
+    'The language the output (`main` / `primaryTranslation` and alternatives) is actually written in.',
+  ),
   main: z.string().describe('The primary translation of the source text.'),
   rationale: z
     .string()
@@ -99,6 +107,12 @@ const Sense = z.object({
 })
 
 export const WordResult = z.object({
+  sourceLang: UsedLang.describe(
+    'The actual language of the source text. When the instructions name a forced source language, echo its code. Otherwise report the language you detected. Use "other" only when the language is not in this list.',
+  ),
+  targetLang: UsedLang.describe(
+    'The language the output (`main` / `primaryTranslation` and alternatives) is actually written in.',
+  ),
   headword: z.string().describe('The source word, normalized (lemma form).'),
 
   primaryTranslation: z

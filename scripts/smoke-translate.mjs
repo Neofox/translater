@@ -80,6 +80,18 @@ function assertEnglish(label, obj) {
   }
 }
 
+function assertLangs(label, obj, src, tgt) {
+  if (obj.sourceLang === src && obj.targetLang === tgt) {
+    console.log(
+      `  ✓ ${label} — sourceLang=${obj.sourceLang} targetLang=${obj.targetLang}`,
+    )
+  } else {
+    console.warn(
+      `  ⚠ ${label} — expected ${src}→${tgt}, got ${obj.sourceLang}→${obj.targetLang}`,
+    )
+  }
+}
+
 try {
   const s1 = await run('EN→KR casual (sentence)', 'sentence', {
     text: "I'll grab dinner with my friend tonight.",
@@ -88,6 +100,7 @@ try {
     mode: 'casual',
   })
   assertEnglish('EN→KR casual', s1.data)
+  assertLangs('EN→KR langs', s1.data, 'en', 'ko')
 
   const s2 = await run('KR→EN professional (sentence)', 'sentence', {
     text: '회의 일정을 조율해 주시겠습니까?',
@@ -96,6 +109,7 @@ try {
     mode: 'professional',
   })
   assertEnglish('KR→EN professional', s2.data)
+  assertLangs('KR→EN langs', s2.data, 'ko', 'en')
 
   const w1 = await run('Word: thanks EN→KR casual', 'word', {
     text: 'thanks',
@@ -104,6 +118,7 @@ try {
     mode: 'casual',
   })
   assertEnglish('thanks casual', w1.data)
+  assertLangs('thanks langs', w1.data, 'en', 'ko')
 
   const w2 = await run('Word: thanks EN→KR professional', 'word', {
     text: 'thanks',
@@ -140,6 +155,7 @@ try {
   } else {
     console.log('  ✓ polish sentence rewrote the source')
   }
+  assertLangs('polish langs', p1.data, 'ko', 'ko')
 
   const p2 = await run('Polish: KR→KR professional (word)', 'word', {
     text: '고마워',
@@ -166,6 +182,14 @@ try {
   } else {
     console.log('  ✓ polish EN sentence rewrote the source')
   }
+
+  const s4 = await run('AUTO(fr)→EN casual (sentence)', 'sentence', {
+    text: "Bonjour, comment ça va aujourd'hui ?",
+    source: 'auto',
+    target: 'en',
+    mode: 'casual',
+  })
+  assertLangs('auto-detect French', s4.data, 'fr', 'en')
 } catch (err) {
   console.error('SMOKE FAILED:', err)
   process.exit(1)
