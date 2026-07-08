@@ -142,5 +142,19 @@ describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
     )
 
     expect(holder.current?.target).toBe('en')
+
+    // Whitespace regression (W1): the flip guard stored the RAW input
+    // ('merci beaucoup') while the resolver and freshness gates compare
+    // against the TRIMMED input. Appending a trailing space changes the raw
+    // input without changing the trimmed input, so an unfixed guard stops
+    // matching, rawDetected('en') is fed back into the resolver, and it
+    // reads as matching the just-corrected target('en') -> flips to 'ko'.
+    // The guard must be keyed on trimmed input so it still matches here.
+    act(() => {
+      holder.current?.setInput('merci beaucoup ')
+    })
+    await waitFor(() => expect(holder.current?.input).toBe('merci beaucoup '))
+
+    expect(holder.current?.target).toBe('en')
   })
 })

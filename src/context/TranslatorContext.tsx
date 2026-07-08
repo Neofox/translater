@@ -78,6 +78,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const intent = detectIntent(input)
+  const trimmedInput = input.trim()
 
   // Polish mode activates only when the user explicitly sets source === target.
   const rawDetected = source === 'auto' ? detectLanguage(input) : null
@@ -96,7 +97,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const translationTarget = resolveTranslationTarget({
     source,
     target,
-    detected: flipGuardRef.current === input ? null : rawDetected,
+    detected: flipGuardRef.current === trimmedInput ? null : rawDetected,
   })
 
   // Auto-swap target when source=auto and the detected input language matches the
@@ -133,8 +134,8 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     const reported = live.partial.sourceLang
     if (!reported || reported === 'other') return
     if (reported !== target) return
-    if (flipGuardRef.current === input) return
-    flipGuardRef.current = input
+    if (flipGuardRef.current === trimmedInput) return
+    flipGuardRef.current = trimmedInput
     setTarget(fallbackTargetFor(reported))
   }, [live, source, target, input, setTarget])
 
