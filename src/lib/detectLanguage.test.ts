@@ -45,4 +45,12 @@ describe('detectLanguage', () => {
   it('returns null for digits and punctuation only', () => {
     expect(detectLanguage('1234 !?')).toBe(null)
   })
+
+  it('falls back to English for an out-of-set Latin language (German)', () => {
+    // tinyld with only: ['en','fr','es'] scores this well under MIN_ACCURACY
+    // (~0.12), so it must fall back to 'en' rather than mis-tag as fr/es.
+    expect(detectLanguage('Ich möchte heute in die Bibliothek gehen.')).toBe(
+      'en',
+    )
+  })
 })
