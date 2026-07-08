@@ -1,19 +1,32 @@
+import { detectAll } from 'tinyld/light'
 import type { LangCode } from './languages'
 
-// Rough client-side detector. We only care about routing decisions (e.g., auto-swap
-// target when the user pastes in the language we're already translating to), so a
-// script-based heuristic is enough — we don't need to distinguish EN from FR here.
-// Pick the dominant script by character count so a stray foreign word inside an
-// otherwise-English sentence doesn't flip the detection.
+// Client-side detector for routing decisions (auto-flip target, Auto-chip label).
+// CJK scripts are unambiguous, so counting characters is reliable and free.
+// Latin scripts all look alike to a regex, so we hand those to tinyld restricted
+// to the Latin languages we support. Low confidence falls back to English —
+// wrong-but-stable beats flickering, and the model's own report corrects us.
+const LATIN_LANGS = ['en', 'fr', 'es']
+const MIN_ACCURACY = 0.5
+
 export function detectLanguage(text: string): LangCode | null {
   const t = text.trim()
   if (!t) return null
-  const counts: Array<[LangCode, number]> = [
-    ['ko', (t.match(/[\uac00-\ud7af]/g) ?? []).length],
-    ['ja', (t.match(/[\u3040-\u309f\u30a0-\u30ff]/g) ?? []).length],
-    ['zh', (t.match(/[\u4e00-\u9fff]/g) ?? []).length],
-    ['en', (t.match(/[A-Za-z]/g) ?? []).length],
-  ]
-  const best = counts.reduce((a, b) => (b[1] > a[1] ? b : a))
-  return best[1] > 0 ? best[0] : null
+
+  const kana = (t.match(/[぀-ゟ゠-ヿ]/g) ?? []).length
+  const hangul = (t.match(/[가-힯]/g) ?? []).length
+  const hanzi = (t.match(/[一-鿿]/g) ?? []).length
+  const latin = (t.match(/[A-Za-z]/g) ?? []).length
+
+  const cjk = kana + hangul + hanzi
+  if (cjk > 0 && cjk >= latin) {
+    // Any kana means Japanese — kanji-heavy sentences would otherwise count as zh.
+    if (kana > 0 && kana + hanzi >= hangul) return 'ja'
+    return hangul >= hanzi ? 'ko' : 'zh'
+  }
+
+  if (latin === 0) return null
+
+  const best = detectAll(t, { only: LATIN_LANGS })[0]
+  return best && best.accuracy >= MIN_ACCURACY ? (best.lang as LangCode) : 'en'
 }
