@@ -53,8 +53,8 @@ The project includes browser-friendly `data-testid` attributes on key interactiv
 
 | Element                    | Selector                                         | Notes                                                                   |
 | -------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
-| Source language trigger    | `[data-testid="select-trigger"]`                 | Custom Floating-UI dropdown, not a native `<select>`                    |
-| Target language trigger    | `[data-testid="select-trigger"]`                 | Same component; use DOM order or `aria-label` to disambiguate           |
+| Language chip (by value)   | `[data-testid="lang-chip"][data-value="en"]`     | Big chip buttons; source bar has `auto`, both have `en`/`ko` + recent   |
+| More-languages trigger     | `[data-testid="lang-more-trigger"]`              | Opens the Floating-UI listbox with the remaining languages              |
 | Dropdown option (by value) | `[data-testid="select-option"][data-value="en"]` | Works for any language code: `auto`, `en`, `ko`, `ja`, `fr`, `es`, `zh` |
 | Input textarea             | `[data-testid="input-textarea"]`                 | React controlled input; do **not** clear by direct `.value` mutation    |
 | Clear input button         | `[data-testid="clear-input"]`                    | Only rendered when `input` is non-empty                                 |
@@ -63,22 +63,31 @@ The project includes browser-friendly `data-testid` attributes on key interactiv
 
 The textarea is a React controlled component (`value={input}` + `onChange={(e) => setInput(e.target.value)}`). Setting `.value` directly and dispatching an `input` event does **not** sync React state because React's internal `_valueTracker` intercepts changes. Always clear via the **Clear input** button (`[data-testid="clear-input"]`) or type new text over the existing content.
 
-### Driving the custom dropdown
+### Driving the language chip bars
 
-The language pickers are custom Floating-UI listboxes (not native `<select>`). The `browser select` command does **not** work on them. Use this sequence instead:
+Each panel renders a `LanguageChipBar`: a `role="group"` of big `Pill` chips (source bar = `auto`/`en`/`ko` + one persisted "recent" chip; target bar = `en`/`ko` + recent) plus a trailing `⋯` more-languages trigger. Click a chip directly by `data-value` — no dropdown needed for the fixed languages:
 
 ```bash
-# 1. Open the dropdown
-cmux browser --surface <s> click --selector "[data-testid='select-trigger']"
-
-# 2. Click the desired option by data-value
-cmux browser --surface <s> click --selector "[data-testid='select-option'][data-value='en']"
+cmux browser --surface <s> click --selector "[data-testid='lang-chip'][data-value='ko']"
 ```
 
-If you need to disambiguate source vs. target triggers, use the `aria-label`:
+For a language not already shown as a chip, open the more-languages trigger first, then click the option in the Floating-UI listbox it opens (same listbox/option markup as before — `browser select` still does **not** work on it):
 
 ```bash
-cmux browser --surface <s> click --selector "[aria-label='Source language']"
+# 1. Open the "more languages" listbox
+cmux browser --surface <s> click --selector "[data-testid='lang-more-trigger']"
+
+# 2. Click the desired option by data-value
+cmux browser --surface <s> click --selector "[data-testid='select-option'][data-value='ja']"
+```
+
+Picking a language this way promotes it to a persistent 4th chip on that bar (stored in localStorage), so it's directly clickable next time without reopening the listbox.
+
+Disambiguate source vs. target bars via the group's `aria-label` (scope both the chip and the more-trigger selectors under it):
+
+```bash
+cmux browser --surface <s> click --selector "[aria-label='Source language'] [data-testid='lang-chip'][data-value='en']"
+cmux browser --surface <s> click --selector "[aria-label='Target language'] [data-testid='lang-more-trigger']"
 ```
 
 ### Page structure snapshot (high-level)
@@ -86,16 +95,16 @@ cmux browser --surface <s> click --selector "[aria-label='Source language']"
 ```
 - button "EN" / button "한"              (UI language toggle)
 - button "Friends|Casual|Professional"   (Mode toggle)
-  - combobox "Source language"           (Pill trigger + floating listbox)
+  - group "Source language"              (chip bar: Auto / EN / KO [/ recent] + more-trigger)
   - textbox "Input text"                 (textarea)
   - button "Paste clipboard"
-  - combobox "Target language"
+  - group "Target language"              (chip bar: EN / KO [/ recent] + more-trigger)
 ```
 
 ### Gotchas discovered
 
 - **Ephemeral refs**: cmux snapshot refs (`[ref=e123]`) change between commands. Never hard-code them in scripts; always prefer `data-testid`, `aria-label`, or `eval` with `querySelector`.
-- **Hidden native `<select>`**: We experimented with adding a visually hidden `<select>` inside the custom dropdown so `browser select` would work natively. It succeeded for automation but leaked into the accessibility tree as a duplicate combobox with concatenated option text, confusing screen readers. The custom dropdown already has proper ARIA (`role="listbox"`, `role="option"`, `aria-expanded`, `aria-selected`), so we removed the hidden select and rely on `data-testid` + `data-value` instead.
+- **Chips vs. dropdown**: The visible chip bars are plain buttons, not a combobox — only the trailing `⋯` trigger opens a Floating-UI listbox (`role="listbox"`, `role="option"`, `aria-expanded`, `aria-selected`). Prefer clicking chips directly; only fall back to the listbox for languages not already promoted to a chip.
 - **Auto-swap reset**: The auto-swap logic resets its one-shot flag when the input is cleared. If a test needs to re-trigger swap behavior, clear the textarea first (via the Clear input button), then type the new language.
 
 ## Commands
