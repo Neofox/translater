@@ -13,7 +13,10 @@ import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { detectIntent } from '../lib/detectIntent'
 import { detectLanguage } from '../lib/detectLanguage'
 import type { LangCode } from '../lib/languages'
-import { resolveTranslationTarget } from '../lib/resolveTranslationTarget'
+import {
+  fallbackTargetFor,
+  resolveTranslationTarget,
+} from '../lib/resolveTranslationTarget'
 import type { Intent, Mode } from '../lib/types'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
 import type { Meta } from '../server/translate'
@@ -31,6 +34,7 @@ type TranslatorContextValue = {
   setMode: (next: Mode) => void
   intent: Intent
   isPolish: boolean
+  detected: LangCode | null
   live: TranslateHandle['live']
   isPending: boolean
   streaming: boolean
@@ -89,6 +93,36 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     mode,
     intent,
   })
+
+  // Streaming partials can carry a truncated sourceLang (partial-json cuts
+  // mid-string), so only trust complete known codes. 'other' renders nothing.
+  const VALID_DETECTED: ReadonlyArray<LangCode> = [
+    'en',
+    'ko',
+    'ja',
+    'fr',
+    'es',
+    'zh',
+  ]
+  const reportedSource = live?.partial.sourceLang
+  const modelDetected = VALID_DETECTED.includes(reportedSource as LangCode)
+    ? (reportedSource as LangCode)
+    : null
+  const detected = source === 'auto' ? (modelDetected ?? rawDetected) : null
+
+  // Safety net: the model says the source language IS the current target
+  // (something the client heuristic missed). Flip the target once and let the
+  // debounced effect re-run. Guarded per input text — max one extra call.
+  const flipGuardRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!live?.done || source !== 'auto' || isPolish) return
+    const reported = live.partial.sourceLang
+    if (!reported || reported === 'other') return
+    if (reported !== target) return
+    if (flipGuardRef.current === input) return
+    flipGuardRef.current = input
+    setTarget(fallbackTargetFor(reported))
+  }, [live, source, target, input, isPolish, setTarget])
 
   // Position the learning-tips pill on whichever side holds the non-English
   // language. If the source is foreign the user is reading — show tips there;
@@ -154,6 +188,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     setMode,
     intent,
     isPolish,
+    detected,
     live,
     isPending,
     streaming,

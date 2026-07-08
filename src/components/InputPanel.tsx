@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import CopyButton from './CopyButton'
 import LearningTips from './LearningTips'
-import LanguageSelect from './LanguageSelect'
+import LanguageChipBar from './LanguageChipBar'
 import WordSourceMeta from './WordSourceMeta'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
@@ -15,7 +15,7 @@ export default function InputPanel() {
     source,
     setSource,
     intent,
-    isPolish,
+    detected,
     live,
     streaming,
     error,
@@ -42,11 +42,11 @@ export default function InputPanel() {
     <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12">
       <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
         <div className="flex flex-wrap items-center gap-2">
-          <LanguageSelect
+          <LanguageChipBar
+            kind="source"
             value={source}
             onChange={setSource}
-            includeAuto
-            polish={isPolish}
+            detected={detected}
             aria-label={t('sourceLanguage')}
           />
           {input && <CopyButton text={input} />}

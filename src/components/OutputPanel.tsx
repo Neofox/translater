@@ -1,7 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
 import LearningTips from './LearningTips'
-import LanguageSelect from './LanguageSelect'
+import LanguageChipBar from './LanguageChipBar'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -27,10 +27,10 @@ export default function OutputPanel() {
     <section className="flex min-h-0 flex-col xl:p-6 2xl:p-12">
       <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft">
         <div className="flex flex-wrap items-center gap-2">
-          <LanguageSelect
+          <LanguageChipBar
+            kind="target"
             value={target}
             onChange={setTarget}
-            polish={isPolish}
             aria-label={t('targetLanguage')}
           />
           {copyText && <CopyButton text={copyText} />}
