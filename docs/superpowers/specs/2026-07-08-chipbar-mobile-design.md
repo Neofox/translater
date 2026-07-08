@@ -19,7 +19,7 @@ On narrow screens the panel header's single flex-wrap row explodes: four big chi
 
 ### 1. Responsive `LanguageChipBar`
 
-A new `useMediaQuery(query: string): boolean` hook (`src/hooks/useMediaQuery.ts`) wraps `window.matchMedia` with a change listener; returns `false` during SSR/first render and corrects on mount (renders the desktop variant momentarily — invisible in practice).
+A new `useMediaQuery(query: string): boolean` hook (`src/hooks/useMediaQuery.ts`) wraps `window.matchMedia` with a change listener; returns `false` during SSR/first render and corrects on mount (renders the collapsed variant momentarily — invisible in practice).
 
 `LanguageChipBar` collapses whenever its panel is narrow, not just on phones. Panels are full-width below Tailwind `md` (768px) and half-width from `md` up, so the expanded bar is only safe when the panel itself is wide:
 
