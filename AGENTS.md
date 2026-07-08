@@ -90,6 +90,8 @@ cmux browser --surface <s> click --selector "[aria-label='Source language'] [dat
 cmux browser --surface <s> click --selector "[aria-label='Target language'] [data-testid='lang-more-trigger']"
 ```
 
+**Narrow panels collapse the bar.** Below 640px viewport width — and in the 768–1023px band where the two-column layout makes panels narrow — only the SELECTED chip renders plus the `⋯` trigger; the other languages (including `auto` for the source bar) move into the `⋯` listbox. Automation that clicks `[data-testid="lang-chip"][data-value="..."]` for a non-selected language must either run at ≥1024px (or 640–767px) viewport width, or go through `lang-more-trigger` + `select-option` instead.
+
 ### Page structure snapshot (high-level)
 
 ```
