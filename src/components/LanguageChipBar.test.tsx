@@ -4,6 +4,25 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import LanguageChipBar from './LanguageChipBar'
 import { UiLangProvider } from '../hooks/useUiLang'
 
+type Listener = (e: { matches: boolean }) => void
+
+function stubMatchMedia(initial: boolean) {
+  const listeners = new Set<Listener>()
+  const mql = {
+    matches: initial,
+    media: '',
+    addEventListener: (_: string, cb: Listener) => listeners.add(cb),
+    removeEventListener: (_: string, cb: Listener) => listeners.delete(cb),
+  }
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mql))
+  return {
+    fire(matches: boolean) {
+      mql.matches = matches
+      listeners.forEach((cb) => cb({ matches }))
+    },
+  }
+}
+
 function renderBar(props: Partial<Parameters<typeof LanguageChipBar>[0]> = {}) {
   const onChange = vi.fn()
   render(
@@ -24,8 +43,14 @@ const chip = (code: string) =>
     `[data-testid="lang-chip"][data-value="${code}"]`,
   )
 
-beforeEach(() => window.localStorage.clear())
-afterEach(() => cleanup())
+beforeEach(() => {
+  window.localStorage.clear()
+  stubMatchMedia(true)
+})
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 describe('LanguageChipBar', () => {
   it('source bar renders Auto, English, 한국어 chips and a more trigger', () => {
@@ -62,5 +87,39 @@ describe('LanguageChipBar', () => {
     renderBar({ value: 'ja' })
     expect(chip('ja')).toBeTruthy()
     expect(chip('ja')!.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('collapsed mode renders only the selected chip plus the more trigger', () => {
+    stubMatchMedia(false)
+    renderBar({ value: 'en' })
+    expect(chip('en')).toBeTruthy()
+    expect(chip('auto')).toBeNull()
+    expect(chip('ko')).toBeNull()
+    expect(screen.getByTestId('lang-more-trigger')).toBeTruthy()
+  })
+
+  it('collapsed source bar offers auto in the more listbox when not selected', () => {
+    stubMatchMedia(false)
+    renderBar({ value: 'en' })
+    fireEvent.mouseDown(screen.getByTestId('lang-more-trigger'))
+    expect(
+      document.querySelector(
+        '[data-testid="select-option"][data-value="auto"]',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('collapsed target bar never offers auto', () => {
+    stubMatchMedia(false)
+    renderBar({ kind: 'target', value: 'ko' })
+    fireEvent.mouseDown(screen.getByTestId('lang-more-trigger'))
+    expect(
+      document.querySelector(
+        '[data-testid="select-option"][data-value="auto"]',
+      ),
+    ).toBeNull()
+    expect(
+      document.querySelector('[data-testid="select-option"][data-value="en"]'),
+    ).toBeTruthy()
   })
 })

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { LANGUAGES } from '../lib/languages'
 import type { LangCode } from '../lib/languages'
 import { usePersistentState } from '../lib/usePersistentState'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useUiLang } from '../hooks/useUiLang'
 import Pill from './ui/Pill'
 import Select from './ui/Select'
@@ -16,6 +17,12 @@ type Props = {
   detected?: LangCode | null
   'aria-label'?: string
 }
+
+// Expanded only when the panel is wide: full-width panels on small screens
+// (640-767px) or two wide columns (>=1024px). In the 768-1023px band the
+// two-column layout makes each panel too narrow for the full chip set.
+const EXPANDED_QUERY =
+  '(min-width: 640px) and (max-width: 767px), (min-width: 1024px)'
 
 const FIXED: Record<Kind, ReadonlyArray<LangCode>> = {
   source: ['auto', 'en', 'ko'],
@@ -38,6 +45,7 @@ export default function LanguageChipBar({
     kind === 'source' ? 'nt.recentSource' : 'nt.recentTarget',
     null,
   )
+  const isExpanded = useMediaQuery(EXPANDED_QUERY)
 
   // A language picked from the "more" dropdown earns a persistent 4th chip so
   // it stays one click away next time.
@@ -45,10 +53,13 @@ export default function LanguageChipBar({
     if (!fixed.includes(value) && value !== recent) setRecent(value)
   }, [value, recent, fixed, setRecent])
 
-  const chips: ReadonlyArray<LangCode> =
+  const expandedChips: ReadonlyArray<LangCode> =
     recent && !fixed.includes(recent) ? [...fixed, recent] : fixed
+  // Collapsed (narrow panel): only the active language stays a chip; every
+  // other choice moves into the ⋯ listbox — including `auto` for the source.
+  const chips: ReadonlyArray<LangCode> = isExpanded ? expandedChips : [value]
   const moreOptions = LANGUAGES.filter(
-    (l) => l.code !== 'auto' && !chips.includes(l.code),
+    (l) => (kind === 'source' || l.code !== 'auto') && !chips.includes(l.code),
   ).map((l) => ({ value: l.code, label: l.label, searchLabel: l.promptName }))
   const moreSelected = !chips.includes(value)
 
