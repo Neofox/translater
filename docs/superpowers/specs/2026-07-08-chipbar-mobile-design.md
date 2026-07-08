@@ -47,7 +47,7 @@ Both `InputPanel` and `OutputPanel` headers restructure from one flex-wrap row t
 
 Both panel headers are ONE row (`flex flex-wrap items-center justify-between`): chip bar left, a right-aligned utility group vertically centered with the chips.
 
-- **InputPanel right group, in order:** `LearningTips` (self-hides when empty) · char counter (when shown) · Dictionary/Sentence intent hint (when input and not over limit) · icon-only `CopyButton` (`compact`, when input) · clear button (when input).
+- **InputPanel right group, in order:** `LearningTips` (self-hides when empty) · char counter (when shown) · icon-only `CopyButton` (`compact`, when input) · clear button (when input). The Dictionary/Sentence intent hint is REMOVED entirely (user request — frees space on small screens; the word-mode dictionary panel already makes the mode obvious).
 - **OutputPanel right group, in order:** `LearningTips` · streaming indicator (when streaming) · icon-only `CopyButton` (`compact`, when copy text exists).
 - The Copy button uses the existing `compact` prop (icon only) so it reads as a peer of the clear `✕`.
 - On very narrow screens the right group may wrap below the chips (flex-wrap) — acceptable; it is icons plus one short pill.
