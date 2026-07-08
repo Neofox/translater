@@ -52,6 +52,10 @@ type TranslatorContextValue = {
   error: TranslateError | null
   run: TranslateHandle['run']
   reset: TranslateHandle['reset']
+  /** Fire a pending debounced translation now (Enter / blur). Returns true when one was pending. */
+  flush: TranslateHandle['flush']
+  /** Skip the debounce for the next auto-run — call before programmatic input changes (paste). */
+  queueImmediate: TranslateHandle['queueImmediate']
   inputTips?: Partial<LearningTipsType>
   outputTips?: Partial<LearningTipsType>
   lastMeta: Meta | null
@@ -109,7 +113,16 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     if (translationTarget !== target) setTarget(translationTarget)
   }, [source, rawDetected, target, translationTarget, input, setTarget])
 
-  const { live, isPending, streaming, error, run, reset } = useTranslate({
+  const {
+    live,
+    isPending,
+    streaming,
+    error,
+    run,
+    reset,
+    flush,
+    queueImmediate,
+  } = useTranslate({
     text: input,
     source,
     target: translationTarget,
@@ -210,6 +223,8 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     error,
     run,
     reset,
+    flush,
+    queueImmediate,
     inputTips,
     outputTips,
     lastMeta,

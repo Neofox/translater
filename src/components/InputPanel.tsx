@@ -22,6 +22,8 @@ export default function InputPanel() {
     clearInput,
     lookupWord,
     textareaRef,
+    flush,
+    queueImmediate,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
 
@@ -88,6 +90,25 @@ export default function InputPanel() {
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={() => queueImmediate()}
+            onBlur={() => flush()}
+            onKeyDown={(e) => {
+              // Enter fires a pending debounced translation immediately;
+              // when nothing is pending it stays a plain newline.
+              // Shift+Enter always inserts a newline; Cmd/Ctrl+Enter is the
+              // global force-run shortcut. Skip mid-IME-composition Enter
+              // (Korean/Japanese input commits the composition with Enter).
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.nativeEvent.isComposing &&
+                flush()
+              ) {
+                e.preventDefault()
+              }
+            }}
             placeholder={t('placeholder')}
             aria-label={t('inputText')}
             data-testid="input-textarea"
@@ -102,7 +123,10 @@ export default function InputPanel() {
               onClick={async () => {
                 try {
                   const text = await navigator.clipboard.readText()
-                  if (text) setInput(text)
+                  if (text) {
+                    queueImmediate()
+                    setInput(text)
+                  }
                 } catch {
                   // clipboard unavailable or permission denied
                 }

@@ -50,7 +50,7 @@ type Options = {
 
 export function useTranslate(
   args: TranslateArgs,
-  { debounceMs = 800 }: Options = {},
+  { debounceMs = 400 }: Options = {},
 ) {
   const translateFn = useServerFn(translate)
   const { lang: uiLang } = useUiLang()
@@ -59,6 +59,8 @@ export function useTranslate(
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<TranslateError | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipDebounceRef = useRef(false)
 
   const run = useCallback(
     async (override?: Partial<TranslateArgs>) => {
@@ -87,6 +89,9 @@ export function useTranslate(
       setIsPending(true)
       setError(null)
       setLive({ intent, partial: {}, done: false, meta: null, text: trimmed })
+
+      // Server streams incremental JSON fragments; accumulate them here.
+      let rawJson = ''
 
       try {
         const stream = await translateFn({
@@ -120,7 +125,8 @@ export function useTranslate(
 
       function applyChunk(chunk: TranslateChunk) {
         if (chunk.type === 'delta') {
-          const parsed = partialParse<SentenceResult | WordResult>(chunk.raw)
+          rawJson += chunk.raw
+          const parsed = partialParse<SentenceResult | WordResult>(rawJson)
           if (!parsed) return
           setLive((prev) => (prev ? { ...prev, partial: parsed } : prev))
         } else {
@@ -147,6 +153,23 @@ export function useTranslate(
     setError(null)
   }, [])
 
+  /** Skip the debounce window for the next auto-run — call right before a
+   * programmatic input change (paste, clipboard button) so the translation
+   * fires as soon as the new text lands. */
+  const queueImmediate = useCallback(() => {
+    skipDebounceRef.current = true
+  }, [])
+
+  /** Fire a pending debounced translation now (Enter / blur). Returns true
+   * when a run was actually pending and got flushed; false when idle. */
+  const flush = useCallback(() => {
+    if (timerRef.current === null) return false
+    clearTimeout(timerRef.current)
+    timerRef.current = null
+    void run()
+    return true
+  }, [run])
+
   // Debounced auto-run on arg change. Clearing text clears live result immediately.
   // Abort any in-flight stream on input change so stale responses stop writing.
   useEffect(() => {
@@ -154,12 +177,22 @@ export function useTranslate(
     abortRef.current?.abort()
     setIsPending(false)
     if (!args.text.trim()) {
+      skipDebounceRef.current = false
       setLive(null)
       setError(null)
       return
     }
-    const id = setTimeout(() => void run(), debounceMs)
-    return () => clearTimeout(id)
+    const delay = skipDebounceRef.current ? 0 : debounceMs
+    skipDebounceRef.current = false
+    const id = setTimeout(() => {
+      timerRef.current = null
+      void run()
+    }, delay)
+    timerRef.current = id
+    return () => {
+      clearTimeout(id)
+      if (timerRef.current === id) timerRef.current = null
+    }
     // `run` intentionally omitted: it re-identities on every args change,
     // which would double-fire. Only re-debounce on actual input changes.
   }, [
@@ -174,5 +207,14 @@ export function useTranslate(
 
   const streaming = isPending && !live?.done
 
-  return { live, isPending, streaming, error, run, reset }
+  return {
+    live,
+    isPending,
+    streaming,
+    error,
+    run,
+    reset,
+    flush,
+    queueImmediate,
+  }
 }

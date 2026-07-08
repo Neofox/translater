@@ -28,15 +28,15 @@ export type TranslateDone =
   | { intent: 'word'; data: WordResult; meta: Meta }
 
 export type TranslateChunk =
-  | { type: 'delta'; raw: string } // progressive JSON text
+  | { type: 'delta'; raw: string } // incremental JSON fragment — client accumulates
   | { type: 'cache'; done: TranslateDone } // cache hit — single terminal chunk
   | { type: 'done'; done: TranslateDone } // stream terminal chunk
 
 const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.4-mini'
 
 // Word lookups want determinism; sentence temperature loosens with the mode.
-const SENTENCE_TEMPERATURE = { friends: 0.85, casual: 0.7, professional: 0.3 }
-const WORD_TEMPERATURE = 0.2
+// const SENTENCE_TEMPERATURE = { friends: 0.85, casual: 0.7, professional: 0.3 }
+// const WORD_TEMPERATURE = 0.2
 
 // Lazy so the OpenAI client (and its OPENAI_API_KEY check) only exists server-side.
 let _client: OpenAI | undefined
@@ -87,9 +87,17 @@ export const translate = createServerFn({ method: 'POST' })
           const stream = client().responses.stream({
             model: MODEL,
             input: isWord ? wordPrompt(data) : sentencePrompt(data),
-            temperature: isWord
-              ? WORD_TEMPERATURE
-              : SENTENCE_TEMPERATURE[data.mode],
+            // temperature: isWord
+            //   ? WORD_TEMPERATURE
+            //   : SENTENCE_TEMPERATURE[data.mode],
+            // Hidden reasoning tokens delay the first output delta by seconds;
+            // translation quality here comes from the prompt, not deliberation.
+            reasoning: { effort: 'none' },
+            // Everything except the final user message is a stable prefix per
+            // prompt shape — route same-shape requests to the same prefix cache.
+            prompt_cache_key: `nt:${data.intent}:${data.uiLang}:${data.mode}:${
+              data.source === data.target ? 'polish' : 'translate'
+            }`,
             text: {
               format: isWord
                 ? zodTextFormat(WordResult, 'word_translation')
@@ -97,12 +105,12 @@ export const translate = createServerFn({ method: 'POST' })
             },
           })
 
-          // Forward progressive JSON to the client; it renders via partial-json.
-          let accumulated = ''
+          // Forward each JSON fragment as-is; the client accumulates and
+          // renders via partial-json. Sending only the delta keeps the stream
+          // payload linear instead of quadratic in response length.
           for await (const event of stream) {
             if (event.type === 'response.output_text.delta') {
-              accumulated += event.delta
-              controller.enqueue({ type: 'delta', raw: accumulated })
+              controller.enqueue({ type: 'delta', raw: event.delta })
             }
           }
 
