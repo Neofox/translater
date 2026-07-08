@@ -25,22 +25,26 @@ export default function OutputPanel() {
 
   return (
     <section className="flex min-h-0 flex-col xl:p-6 2xl:p-12">
-      <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="px-4 py-2 text-sm text-ink-soft">
+        <div className="flex items-center justify-between gap-2">
           <LanguageChipBar
             kind="target"
             value={target}
             onChange={setTarget}
             aria-label={t('targetLanguage')}
           />
-          {copyText && <CopyButton text={copyText} />}
-          <LearningTips tips={outputTips} />
+          {streaming && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-accent">
+              <Loader2 size={12} className="animate-spin" />
+              {isPolish ? t('polishing') : t('streaming')}
+            </span>
+          )}
         </div>
-        {streaming && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-accent">
-            <Loader2 size={12} className="animate-spin" />
-            {isPolish ? t('polishing') : t('streaming')}
-          </span>
+        {(copyText || outputTips) && (
+          <div className="mt-2 flex items-center gap-2">
+            {copyText && <CopyButton text={copyText} />}
+            <LearningTips tips={outputTips} />
+          </div>
         )}
       </div>
       <div className="flex-1 overflow-hidden">
