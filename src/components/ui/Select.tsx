@@ -33,7 +33,11 @@ type Props<V extends string> = {
   onChange: (next: V) => void
   options: ReadonlyArray<SelectOption<V>>
   tone?: Tone
+  size?: 'sm' | 'md' | 'lg'
+  /** Trigger content when `value` is not among `options` (chip-bar "more" trigger). */
+  placeholder?: ReactNode
   'aria-label'?: string
+  'data-testid'?: string
 }
 
 export default function Select<V extends string>({
@@ -41,7 +45,10 @@ export default function Select<V extends string>({
   onChange,
   options,
   tone = 'neutral',
+  size: pillSize = 'sm',
+  placeholder,
   'aria-label': ariaLabel,
+  'data-testid': testId = 'select-trigger',
 }: Props<V>) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
@@ -111,12 +118,13 @@ export default function Select<V extends string>({
       <Pill
         ref={refs.setReference}
         tone={tone}
+        size={pillSize}
         aria-label={ariaLabel}
         aria-expanded={open}
-        data-testid="select-trigger"
+        data-testid={testId}
         {...getReferenceProps()}
       >
-        <span>{selected?.label ?? value}</span>
+        <span>{selected?.label ?? placeholder ?? value}</span>
         <ChevronDown
           size={12}
           className={`transition-transform ${open ? 'rotate-180' : ''}`}

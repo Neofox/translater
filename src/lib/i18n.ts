@@ -59,6 +59,7 @@ export const STRINGS = {
     charCount: '{count} / {max}',
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
+    moreLanguages: 'More languages',
   },
   ko: {
     sourceLanguage: '입력 언어',
@@ -115,6 +116,7 @@ export const STRINGS = {
     charCount: '{count} / {max}',
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
+    moreLanguages: '다른 언어',
   },
 } as const satisfies Record<UiLang, Record<string, string>>
 

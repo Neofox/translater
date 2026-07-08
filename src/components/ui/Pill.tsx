@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 type Tone = 'neutral' | 'accent' | 'warm' | 'active'
-type Size = 'sm' | 'md'
+type Size = 'sm' | 'md' | 'lg'
 
 type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
   tone?: Tone
@@ -20,6 +20,7 @@ const toneClass: Record<Tone, string> = {
 const sizeClass: Record<Size, string> = {
   sm: 'gap-1.5 px-2 py-1 text-xs',
   md: 'gap-2 px-3 py-1.5 text-sm',
+  lg: 'gap-2 px-3.5 py-2 text-sm',
 }
 
 export default function Pill({
