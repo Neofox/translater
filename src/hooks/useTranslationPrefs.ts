@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePersistentState } from '../lib/usePersistentState'
 import { useUiLang } from './useUiLang'
 import type { LangCode } from '../lib/languages'
@@ -9,21 +9,41 @@ export function useTranslationPrefs() {
   const { lang: uiLang } = useUiLang()
 
   const [source, setSource] = usePersistentState<LangCode>('nt.source', 'auto')
-  const [target, setTarget] = usePersistentState<LangCode>('nt.target', 'ko')
+  const [target, setTargetState] = usePersistentState<LangCode>(
+    'nt.target',
+    'ko',
+  )
   const [mode, setMode] = usePersistentState<Mode>('nt.mode', 'casual')
 
-  // Default target mirrors the UI language (EN UI → ko, 한 UI → en). uiLang
-  // hydrates async, so correct the default reactively — but only until the
-  // user has ever chosen a target (a persisted value always wins).
-  useEffect(() => {
+  // usePersistentState stamps its default into localStorage on first mount,
+  // so "has the user ever chosen a target" must be captured synchronously,
+  // before any effect runs. Any later setTarget call counts as a choice.
+  const [hadStoredTarget] = useState(() => {
+    if (typeof window === 'undefined') return true
     try {
-      if (window.localStorage.getItem('nt.target') == null && uiLang === 'ko') {
-        setTarget('en')
-      }
+      return window.localStorage.getItem('nt.target') != null
     } catch {
-      /* ignore */
+      return true
     }
-  }, [uiLang, setTarget])
+  })
+  const targetChosen = useRef(hadStoredTarget)
+
+  const setTarget: typeof setTargetState = useCallback(
+    (next) => {
+      targetChosen.current = true
+      setTargetState(next)
+    },
+    [setTargetState],
+  )
+
+  // Default target mirrors the UI language (EN UI → ko, 한 UI → en). uiLang
+  // hydrates async, so correct the default reactively until a choice lands.
+  useEffect(() => {
+    if (uiLang === 'ko' && !targetChosen.current) {
+      targetChosen.current = true
+      setTargetState('en')
+    }
+  }, [uiLang, setTargetState])
 
   return {
     input,
