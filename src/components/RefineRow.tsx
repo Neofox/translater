@@ -28,6 +28,7 @@ export default function RefineRow() {
     live,
     streaming,
     error,
+    input,
     refinements,
     addRefinement,
     removeRefinement,
@@ -40,6 +41,9 @@ export default function RefineRow() {
   // Only meaningful under a completed sentence result.
   if (error || streaming) return null
   if (!live || live.intent !== 'sentence' || !live.done) return null
+  // `live` outlives input edits during the debounce window — don't show
+  // refine controls for a result that no longer matches the current input.
+  if (live.text !== input.trim()) return null
 
   const submitFreeform = () => {
     const trimmed = freeform.trim()
@@ -57,6 +61,7 @@ export default function RefineRow() {
               key={r}
               type="button"
               onClick={() => removeRefinement(i)}
+              aria-label={`${t('refineRemove')}: ${r}`}
               data-testid={`refine-active-${i}`}
               className="cursor-pointer"
             >

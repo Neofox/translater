@@ -69,6 +69,7 @@ export const STRINGS = {
     refineMorePlayful: 'More playful',
     refinePlaceholder: 'or describe a change…',
     refineUndo: 'Undo',
+    refineRemove: 'Remove adjustment',
   },
   ko: {
     sourceLanguage: '입력 언어',
@@ -135,6 +136,7 @@ export const STRINGS = {
     refineMorePlayful: '더 장난스럽게',
     refinePlaceholder: '원하는 변경을 입력…',
     refineUndo: '되돌리기',
+    refineRemove: '조정 제거',
   },
 } as const satisfies Record<UiLang, Record<string, string>>
 
