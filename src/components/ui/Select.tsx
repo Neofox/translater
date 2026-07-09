@@ -33,7 +33,7 @@ type Props<V extends string> = {
   onChange: (next: V) => void
   options: ReadonlyArray<SelectOption<V>>
   tone?: Tone
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md'
   /** Trigger content when `value` is not among `options` (chip-bar "more" trigger). */
   placeholder?: ReactNode
   'aria-label'?: string

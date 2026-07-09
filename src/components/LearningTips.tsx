@@ -83,6 +83,7 @@ export default function LearningTips({ tips }: Props) {
       <Pill
         ref={refs.setReference}
         tone="warm"
+        size="md"
         aria-expanded={open}
         {...getReferenceProps()}
       >

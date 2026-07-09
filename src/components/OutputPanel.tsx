@@ -40,7 +40,7 @@ export default function OutputPanel() {
               {isPolish ? t('polishing') : t('streaming')}
             </span>
           )}
-          {copyText && <CopyButton text={copyText} compact />}
+          {copyText && <CopyButton text={copyText} compact size="md" />}
         </div>
       </div>
       <div className="flex-1 overflow-hidden">

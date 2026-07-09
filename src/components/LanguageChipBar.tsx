@@ -74,7 +74,7 @@ export default function LanguageChipBar({
         return (
           <Pill
             key={code}
-            size="lg"
+            size="md"
             tone={selected ? 'active' : 'neutral'}
             aria-pressed={selected}
             data-testid="lang-chip"
@@ -97,7 +97,7 @@ export default function LanguageChipBar({
         value={value}
         onChange={onChange}
         options={moreOptions}
-        size="lg"
+        size="md"
         tone={moreSelected ? 'active' : 'neutral'}
         placeholder="⋯"
         aria-label={t('moreLanguages')}

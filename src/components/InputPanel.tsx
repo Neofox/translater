@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import CopyButton from './CopyButton'
+import Pill from './ui/Pill'
 import LearningTips from './LearningTips'
 import LanguageChipBar from './LanguageChipBar'
 import WordSourceMeta from './WordSourceMeta'
@@ -59,18 +60,17 @@ export default function InputPanel() {
               {counterText}
             </span>
           )}
-          {input && <CopyButton text={input} compact />}
+          {input && <CopyButton text={input} compact size="md" />}
           {input && (
-            <button
-              type="button"
+            <Pill
+              size="md"
               onClick={clearInput}
               title={t('clearInputTitle')}
               aria-label={t('clearInput')}
               data-testid="clear-input"
-              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-border bg-panel text-ink transition hover:border-accent/60"
             >
               <X size={14} />
-            </button>
+            </Pill>
           )}
         </div>
       </div>
