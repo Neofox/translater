@@ -50,6 +50,9 @@ vi.mock('../hooks/useTranslate', async () => {
       error: null,
       run: () => Promise.resolve(),
       reset: () => {},
+      flush: () => false,
+      queueImmediate: () => {},
+      restore: (v: unknown) => applyMockLive(v),
     }
   }
 
@@ -156,5 +159,106 @@ describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
     await waitFor(() => expect(holder.current?.input).toBe('merci beaucoup '))
 
     expect(holder.current?.target).toBe('en')
+  })
+})
+
+describe('refine + context state', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never
+  })
+
+  afterEach(() => {
+    cleanup()
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  function setup() {
+    const holder: { current: ReturnType<typeof useTranslatorContext> | null } =
+      { current: null }
+    render(
+      <UiLangProvider>
+        <TranslatorProvider>
+          <Consumer capture={(c) => (holder.current = c)} />
+        </TranslatorProvider>
+      </UiLangProvider>,
+    )
+    return holder
+  }
+
+  async function completeSentence(
+    holder: ReturnType<typeof setup>,
+    text: string,
+    main: string,
+  ) {
+    act(() => holder.current!.setInput(text))
+    await waitFor(() => expect(holder.current?.input).toBe(text))
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main },
+      done: true,
+      meta: null,
+      text,
+    })
+  }
+
+  it('addRefinement stacks, dedupes, and caps at 5', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+    act(() => holder.current!.addRefinement('make it softer'))
+    act(() => holder.current!.addRefinement('make it softer')) // duplicate
+    expect(holder.current?.refinements).toEqual(['make it softer'])
+    act(() => {
+      for (const r of ['a', 'b', 'c', 'd', 'e', 'f'])
+        holder.current!.addRefinement(r)
+    })
+    expect(holder.current?.refinements).toHaveLength(5)
+  })
+
+  it('editing the input text clears refinements and the undo stack; context survives', async () => {
+    const holder = setup()
+    act(() => holder.current!.setContext('회의 몇 시에 해요?'))
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+    act(() => holder.current!.addRefinement('make it softer'))
+    expect(holder.current?.refinements).toEqual(['make it softer'])
+    expect(holder.current?.canUndo).toBe(true)
+
+    act(() => holder.current!.setInput('a different sentence'))
+    expect(holder.current?.refinements).toEqual([])
+    expect(holder.current?.canUndo).toBe(false)
+    expect(holder.current?.context).toBe('회의 몇 시에 해요?')
+  })
+
+  it('mode change keeps refinements', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+    act(() => holder.current!.addRefinement('make it softer'))
+    act(() => holder.current!.setMode('friends'))
+    expect(holder.current?.refinements).toEqual(['make it softer'])
+  })
+
+  it('undoRefine restores the previous result and refinement list', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+    act(() => holder.current!.addRefinement('make it softer'))
+    // simulate the refined run completing
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요~' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+    act(() => holder.current!.undoRefine())
+    expect(holder.current?.refinements).toEqual([])
+    expect(holder.current?.canUndo).toBe(false)
+    await waitFor(() =>
+      expect(
+        (holder.current?.live?.partial as { main?: string } | undefined)?.main,
+      ).toBe('내일 봐요'),
+    )
   })
 })

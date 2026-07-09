@@ -8,20 +8,28 @@ import {
 } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { useTranslate } from '../hooks/useTranslate'
-import type { TranslateError } from '../hooks/useTranslate'
+import type { LiveResult, TranslateError } from '../hooks/useTranslate'
 import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { detectIntent } from '../lib/detectIntent'
 import { detectLanguage } from '../lib/detectLanguage'
 import type { LangCode } from '../lib/languages'
+import { MAX_REFINEMENTS, MAX_REFINEMENT_CHARS } from '../lib/limits'
 import {
   fallbackTargetFor,
   resolveTranslationTarget,
 } from '../lib/resolveTranslationTarget'
+import { useSessionState } from '../lib/usePersistentState'
 import type { Intent, Mode } from '../lib/types'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
 import type { Meta } from '../server/translate'
 
 type TranslateHandle = ReturnType<typeof useTranslate>
+
+type RefineSnapshot = {
+  live: LiveResult
+  refinements: string[]
+  previousMain: string
+}
 
 // Streaming partials can carry a truncated sourceLang (partial-json cuts
 // mid-string), so only trust complete known codes. 'other' renders nothing.
@@ -62,6 +70,13 @@ type TranslatorContextValue = {
   textareaRef: RefObject<HTMLTextAreaElement | null>
   clearInput: () => void
   lookupWord: (text: string) => void
+  context: string
+  setContext: (next: string) => void
+  refinements: string[]
+  addRefinement: (instruction: string) => void
+  removeRefinement: (index: number) => void
+  undoRefine: () => void
+  canUndo: boolean
 }
 
 const TranslatorContext = createContext<TranslatorContextValue | null>(null)
@@ -77,6 +92,22 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     mode,
     setMode,
   } = useTranslationPrefs()
+
+  const MAX_UNDO = 10
+
+  const [context, setContext] = useSessionState('nt.context', '')
+  const [refinements, setRefinements] = useState<string[]>([])
+  const [previousMain, setPreviousMain] = useState('')
+  const [undoStack, setUndoStack] = useState<RefineSnapshot[]>([])
+  // True between a refine action firing and its run settling — gates the
+  // rollback-on-error effect so unrelated failures don't pop the stack.
+  const refineInFlightRef = useRef(false)
+  // Mirrors `refinements` synchronously so rapid-fire add/remove calls made
+  // within the same React batch (no re-render between them) see an
+  // up-to-date length/contents instead of the stale render-time closure —
+  // otherwise the cap/dedupe checks below would all read the same pre-batch
+  // value and the cap would never trip.
+  const refinementsRef = useRef<string[]>(refinements)
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const intent = detectIntent(input)
@@ -120,12 +151,16 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     reset,
     flush,
     queueImmediate,
+    restore,
   } = useTranslate({
     text: input,
     source,
     target: translationTarget,
     mode,
     intent,
+    context,
+    refinements,
+    previousMain,
   })
 
   // Only trust the model's reported source language while `live` still
@@ -176,23 +211,102 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Refinements describe a result produced for a specific source text; once
+  // that text changes they are meaningless. Context intentionally survives.
+  const setInputWithRefineReset = useCallback(
+    (next: string) => {
+      if (next.trim() !== input.trim()) {
+        refinementsRef.current = []
+        setRefinements([])
+        setPreviousMain('')
+        setUndoStack([])
+        refineInFlightRef.current = false
+      }
+      setInput(next)
+    },
+    [input, setInput],
+  )
+
   const clearInput = useCallback(() => {
-    setInput('')
+    setInputWithRefineReset('')
     reset()
     textareaRef.current?.focus()
-  }, [setInput, reset])
+  }, [setInputWithRefineReset, reset])
 
   const lookupWord = useCallback(
     (text: string) => {
-      setInput(text)
+      setInputWithRefineReset(text)
       textareaRef.current?.focus()
     },
-    [setInput],
+    [setInputWithRefineReset],
   )
+
+  const addRefinement = useCallback(
+    (instruction: string) => {
+      const trimmed = instruction.trim().slice(0, MAX_REFINEMENT_CHARS)
+      if (!trimmed) return
+      const current = refinementsRef.current
+      if (current.length >= MAX_REFINEMENTS) return
+      if (current.includes(trimmed)) return
+      if (!live || live.intent !== 'sentence' || !live.done) return
+      setUndoStack((prev) => [
+        ...prev.slice(-(MAX_UNDO - 1)),
+        { live, refinements: current, previousMain },
+      ])
+      setPreviousMain(live.partial.main ?? '')
+      refineInFlightRef.current = true
+      queueImmediate()
+      const next = [...current, trimmed]
+      refinementsRef.current = next
+      setRefinements(next)
+    },
+    [live, previousMain, queueImmediate],
+  )
+
+  const removeRefinement = useCallback(
+    (index: number) => {
+      const current = refinementsRef.current
+      if (!live || live.intent !== 'sentence' || !live.done) return
+      if (index < 0 || index >= current.length) return
+      setUndoStack((prev) => [
+        ...prev.slice(-(MAX_UNDO - 1)),
+        { live, refinements: current, previousMain },
+      ])
+      setPreviousMain(live.partial.main ?? '')
+      refineInFlightRef.current = true
+      queueImmediate()
+      const next = current.filter((_, i) => i !== index)
+      refinementsRef.current = next
+      setRefinements(next)
+    },
+    [live, previousMain, queueImmediate],
+  )
+
+  const undoRefine = useCallback(() => {
+    const snap = undoStack[undoStack.length - 1]
+    if (!snap) return
+    refineInFlightRef.current = false
+    restore(snap.live)
+    refinementsRef.current = snap.refinements
+    setRefinements(snap.refinements)
+    setPreviousMain(snap.previousMain)
+    setUndoStack((prev) => prev.slice(0, -1))
+  }, [undoStack, restore])
+
+  useEffect(() => {
+    if (live?.done) refineInFlightRef.current = false
+  }, [live])
+
+  useEffect(() => {
+    if (!error || error.kind !== 'server') return
+    if (!refineInFlightRef.current) return
+    refineInFlightRef.current = false
+    undoRefine()
+  }, [error, undoRefine])
 
   const value: TranslatorContextValue = {
     input,
-    setInput,
+    setInput: setInputWithRefineReset,
     source,
     setSource,
     target,
@@ -216,6 +330,13 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     textareaRef,
     clearInput,
     lookupWord,
+    context,
+    setContext,
+    refinements,
+    addRefinement,
+    removeRefinement,
+    undoRefine,
+    canUndo: undoStack.length > 0,
   }
 
   return (

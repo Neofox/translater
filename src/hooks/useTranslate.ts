@@ -41,6 +41,9 @@ export type TranslateArgs = {
   target: LangCode
   mode: Mode
   intent: Intent
+  context: string
+  refinements: string[]
+  previousMain: string
 }
 
 type Options = {
@@ -61,10 +64,20 @@ export function useTranslate(
   const abortRef = useRef<AbortController | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipDebounceRef = useRef(false)
+  const suppressAutoRunRef = useRef(false)
 
   const run = useCallback(
     async (override?: Partial<TranslateArgs>) => {
-      const { text, source, target, mode, intent } = { ...args, ...override }
+      const {
+        text,
+        source,
+        target,
+        mode,
+        intent,
+        context,
+        refinements,
+        previousMain,
+      } = { ...args, ...override }
       const trimmed = text.trim()
       if (!trimmed) return
       abortRef.current?.abort()
@@ -95,7 +108,17 @@ export function useTranslate(
 
       try {
         const stream = await translateFn({
-          data: { text: trimmed, source, target, mode, intent, uiLang },
+          data: {
+            text: trimmed,
+            source,
+            target,
+            mode,
+            intent,
+            uiLang,
+            context,
+            refinements,
+            previousMain,
+          },
           signal: ctrl.signal,
         })
 
@@ -153,6 +176,18 @@ export function useTranslate(
     setError(null)
   }, [])
 
+  /** Replace the live result from a client-side snapshot (refine undo) without
+   * firing a network run. Suppresses the next auto-run cycle — the caller
+   * restores `refinements` in the same tick, which would otherwise re-trigger
+   * the debounced effect and defeat the instant undo. */
+  const restore = useCallback((snapshot: LiveResult) => {
+    abortRef.current?.abort()
+    suppressAutoRunRef.current = true
+    setIsPending(false)
+    setError(null)
+    setLive(snapshot)
+  }, [])
+
   /** Skip the debounce window for the next auto-run — call right before a
    * programmatic input change (paste, clipboard button) so the translation
    * fires as soon as the new text lands. */
@@ -182,6 +217,10 @@ export function useTranslate(
       setError(null)
       return
     }
+    if (suppressAutoRunRef.current) {
+      suppressAutoRunRef.current = false
+      return
+    }
     const delay = skipDebounceRef.current ? 0 : debounceMs
     skipDebounceRef.current = false
     const id = setTimeout(() => {
@@ -195,12 +234,17 @@ export function useTranslate(
     }
     // `run` intentionally omitted: it re-identities on every args change,
     // which would double-fire. Only re-debounce on actual input changes.
+    // `args.previousMain` intentionally omitted: it only ever changes
+    // together with `args.refinements` (same refine/undo action), so listing
+    // it here would double-schedule the debounce for a single user action.
   }, [
     args.text,
     args.source,
     args.target,
     args.mode,
     args.intent,
+    args.context,
+    args.refinements,
     uiLang,
     debounceMs,
   ])
@@ -216,5 +260,6 @@ export function useTranslate(
     reset,
     flush,
     queueImmediate,
+    restore,
   }
 }
