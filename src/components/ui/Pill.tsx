@@ -19,7 +19,10 @@ const toneClass: Record<Tone, string> = {
 
 const sizeClass: Record<Size, string> = {
   sm: 'gap-1.5 px-2 py-1 text-xs',
-  md: 'gap-2 px-3 py-1.5 text-sm',
+  // min-h keeps icon-only pills (copy, clear) as tall as text pills: a 14px
+  // svg doesn't establish the 20px text-sm line-height, so they'd render 28px
+  // instead of the 34px a labeled md pill computes to.
+  md: 'gap-2 px-3 py-1.5 text-sm min-h-8.5',
 }
 
 export default function Pill({

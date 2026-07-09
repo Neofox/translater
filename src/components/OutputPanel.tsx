@@ -33,13 +33,13 @@ export default function OutputPanel() {
           aria-label={t('targetLanguage')}
         />
         <div className="flex items-center gap-2">
-          <LearningTips tips={outputTips} />
           {streaming && (
             <span className="inline-flex items-center gap-1.5 text-xs text-accent">
               <Loader2 size={12} className="animate-spin" />
               {isPolish ? t('polishing') : t('streaming')}
             </span>
           )}
+          <LearningTips tips={outputTips} />
           {copyText && <CopyButton text={copyText} compact size="md" />}
         </div>
       </div>
