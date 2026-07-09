@@ -66,7 +66,10 @@ vi.mock('../hooks/useTranslate', async () => {
       reset: () => {},
       flush: () => false,
       queueImmediate: () => {},
-      restore: (v: unknown) => applyMockLive(v),
+      restore: (v: unknown, opts?: { keepError?: boolean }) => {
+        if (!opts?.keepError) applyMockError(null)
+        applyMockLive(v)
+      },
     }
   }
 
@@ -336,6 +339,53 @@ describe('refine + context state', () => {
 
     expect(holder.current?.refinements).toEqual([])
     expect(holder.current?.canUndo).toBe(false)
+    // Per the design spec's State rules: a failed refine keeps the previous
+    // result on screen AND keeps the inline error visible — it must not be
+    // cleared by the rollback.
+    expect(holder.current?.error).not.toBeNull()
+  })
+
+  it('user-initiated undo clears any existing error', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+
+    act(() => holder.current!.addRefinement('make it softer'))
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요~' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+    expect(holder.current?.canUndo).toBe(true)
+
+    // Simulate an unrelated error surfacing while nothing is in flight (not
+    // a refine rollback) so it lingers on screen.
+    await setMockError({ kind: 'server', message: 'boom' })
+    expect(holder.current?.error).not.toBeNull()
+
+    act(() => holder.current!.undoRefine())
+
+    expect(holder.current?.error).toBeNull()
+    expect(holder.current?.refinements).toEqual([])
+    expect(holder.current?.canUndo).toBe(false)
+  })
+
+  it('addRefinement is a no-op while live is stale relative to the current input', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'text A', '결과 A')
+
+    // Edit the input before any new live result arrives. The reset already
+    // clears refinements/undo here, but that's not what this test pins down
+    // — it pins the guard that must ALSO reject the action outright for the
+    // window where `live` (still produced for "text A") is stale relative to
+    // the now-current input ("text B").
+    act(() => holder.current!.setInput('text B'))
+    expect(holder.current?.refinements).toEqual([])
+
+    act(() => holder.current!.addRefinement('make it softer'))
+
+    expect(holder.current?.refinements).toEqual([])
   })
 
   it('a server error with no refine in flight leaves refinements and the undo stack untouched', async () => {

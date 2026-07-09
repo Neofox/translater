@@ -775,6 +775,8 @@ git add src/lib/usePersistentState.ts src/hooks/useTranslate.ts src/context/Tran
 git commit -m "feat: client state for conversation context and refinements with undo"
 ```
 
+> Deviation note (final review): rollback-on-error now preserves the inline error per the spec's State rules; the plan's original rollback-via-undoRefine cleared it.
+
 ---
 
 ### Task 4: Context field UI (InputPanel)
