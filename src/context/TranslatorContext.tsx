@@ -111,6 +111,12 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   // True between a refine action firing and its run settling — gates the
   // rollback-on-error effect so unrelated failures don't pop the stack.
   const refineInFlightRef = useRef(false)
+  // Set just before the error-rollback effect calls `restoreSnapshot`, so the
+  // `[live]` effect below knows the very next `live.done` transition is the
+  // rollback's own synchronous snapshot restore — not a genuinely new
+  // completed run — and must not wipe the `refineError` it was just set
+  // alongside. Consumed (reset to false) the first time that effect sees it.
+  const preserveRefineErrorRef = useRef(false)
   // Mirrors `refinements` synchronously so rapid-fire add/remove calls made
   // within the same React batch (no re-render between them) see an
   // up-to-date length/contents instead of the stale render-time closure —
@@ -331,14 +337,17 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!live?.done) return
-    // Only clear a stale refine-failure notice when this transition is a
-    // genuinely new completed result for an in-flight refine — NOT when it's
-    // the error-rollback effect below restoring a previous snapshot. The
-    // rollback path sets `refineInFlightRef.current = false` synchronously
-    // (in `restoreSnapshot`, before this effect ever runs), so by the time
-    // this effect observes the rollback's `live` change the ref is already
-    // false and the notice it just set survives.
-    if (refineInFlightRef.current) setRefineError(null)
+    // `refineError` clears on ANY newly completed live — a tone/language
+    // change, a context edit, a fresh refine, whatever — EXCEPT the one
+    // transition caused by the error-rollback effect's own synchronous
+    // `restoreSnapshot` call, which must not wipe the notice it just set
+    // alongside. That transition is flagged via `preserveRefineErrorRef`
+    // (set right before `restoreSnapshot` runs) and consumed here once.
+    if (preserveRefineErrorRef.current) {
+      preserveRefineErrorRef.current = false
+    } else {
+      setRefineError(null)
+    }
     refineInFlightRef.current = false
   }, [live])
 
@@ -348,6 +357,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     const snap = undoStack[undoStack.length - 1]
     if (!snap) return
     setRefineError(error)
+    preserveRefineErrorRef.current = true
     restoreSnapshot(snap)
   }, [error, undoStack, restoreSnapshot])
 

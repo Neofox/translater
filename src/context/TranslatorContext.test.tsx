@@ -354,6 +354,49 @@ describe('refine + context state', () => {
     )
   })
 
+  it('refineError does not linger past the next unrelated completed run', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+
+    act(() => holder.current!.addRefinement('make it softer'))
+    expect(holder.current?.refinements).toEqual(['make it softer'])
+
+    // Mirrors what the real run() does the instant it starts: it immediately
+    // replaces `live` with an in-progress (done:false) placeholder before
+    // any network I/O — so by the time an error can land, `live` in state is
+    // already a different object from the pre-refine snapshot. Without this
+    // step the mock would never actually change `live` object identity
+    // during the rollback below, which isn't representative of production.
+    await setMockLive({
+      intent: 'sentence',
+      partial: {},
+      done: false,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+
+    // Refine fails and rolls back — refineError is set alongside the
+    // restored snapshot (mirrors the existing rollback test above).
+    await setMockError({ kind: 'server', message: 'boom' })
+    expect(holder.current?.refineError).not.toBeNull()
+
+    // Clear the mock error channel so it doesn't re-trigger the rollback
+    // effect, then simulate a later, entirely unrelated run completing
+    // (e.g. a tone-mode change, language change, or context edit) for the
+    // SAME input text. Before the fix this landed with
+    // `refineInFlightRef.current` false and left the stale notice up.
+    await setMockError(null)
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '새 결과' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+
+    expect(holder.current?.refineError).toBeNull()
+  })
+
   it('refineError clears on the next refine action', async () => {
     const holder = setup()
     await completeSentence(holder, 'see you tomorrow', '내일 봐요')
