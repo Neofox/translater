@@ -49,4 +49,10 @@ describe('cacheKeyFor', () => {
       cacheKeyFor({ ...word, context: '배 타고 왔어' }),
     )
   })
+
+  it('ignores a stale previousMain once refinements is empty', () => {
+    expect(cacheKeyFor({ ...base, refinements: [], previousMain: 'x' })).toBe(
+      cacheKeyFor(base),
+    )
+  })
 })

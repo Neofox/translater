@@ -19,6 +19,10 @@ export function cacheKeyFor(d: CacheKeyInput): string {
   // refinements/previousMain are sentence-mode only — word requests must not
   // fragment the cache on fields their prompt never sees.
   const isWord = d.intent === 'word'
+  // previousMain only matters when it's anchoring at least one refinement —
+  // a stale previousMain sitting alongside an empty refinements list must not
+  // fragment the cache (see TranslatorContext.removeRefinement).
+  const anchored = !isWord && d.refinements.length > 0
   return JSON.stringify([
     CACHE_VERSION,
     d.intent,
@@ -28,7 +32,7 @@ export function cacheKeyFor(d: CacheKeyInput): string {
     d.uiLang,
     d.text.trim(),
     d.context.trim(),
-    isWord ? [] : d.refinements,
-    isWord ? '' : d.previousMain,
+    isWord ? [] : d.refinements.map((r) => r.trim()),
+    anchored ? d.previousMain : '',
   ])
 }

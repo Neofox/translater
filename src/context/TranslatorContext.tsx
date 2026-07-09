@@ -249,6 +249,10 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
       if (current.length >= MAX_REFINEMENTS) return
       if (current.includes(trimmed)) return
       if (!live || live.intent !== 'sentence' || !live.done) return
+      // `live` outlives input edits (kept on screen during the debounce
+      // window); once it no longer matches the current input, refining it
+      // would apply an adjustment to a stale/about-to-be-replaced result.
+      if (!liveMatchesInput) return
       setUndoStack((prev) => [
         ...prev.slice(-(MAX_UNDO - 1)),
         { live, refinements: current, previousMain },
@@ -260,38 +264,56 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
       refinementsRef.current = next
       setRefinements(next)
     },
-    [live, previousMain, queueImmediate],
+    [live, previousMain, queueImmediate, liveMatchesInput],
   )
 
   const removeRefinement = useCallback(
     (index: number) => {
       const current = refinementsRef.current
       if (!live || live.intent !== 'sentence' || !live.done) return
+      // See addRefinement: `live` can outlive an input edit during the
+      // debounce window — don't act on a stale result.
+      if (!liveMatchesInput) return
       if (index < 0 || index >= current.length) return
       setUndoStack((prev) => [
         ...prev.slice(-(MAX_UNDO - 1)),
         { live, refinements: current, previousMain },
       ])
-      setPreviousMain(live.partial.main ?? '')
+      const next = current.filter((_, i) => i !== index)
+      // A stale previousMain sitting alongside an empty refinements list
+      // would fragment the LRU cache (see cacheKey.ts) and serve no purpose
+      // once there is nothing left to anchor — reset it instead of the live
+      // main.
+      setPreviousMain(next.length > 0 ? (live.partial.main ?? '') : '')
       refineInFlightRef.current = true
       queueImmediate()
-      const next = current.filter((_, i) => i !== index)
       refinementsRef.current = next
       setRefinements(next)
     },
-    [live, previousMain, queueImmediate],
+    [live, previousMain, queueImmediate, liveMatchesInput],
+  )
+
+  // Shared by user-initiated undo and the error-rollback effect. `keepError`
+  // is set only by the latter — the design spec's State rules say a failed
+  // refine must keep the existing inline error visible while rolling back;
+  // user-initiated undo always clears any error, as before.
+  const restoreSnapshot = useCallback(
+    (snap: RefineSnapshot, opts?: { keepError?: boolean }) => {
+      refineInFlightRef.current = false
+      restore(snap.live, opts)
+      refinementsRef.current = snap.refinements
+      setRefinements(snap.refinements)
+      setPreviousMain(snap.previousMain)
+      setUndoStack((prev) => prev.slice(0, -1))
+    },
+    [restore],
   )
 
   const undoRefine = useCallback(() => {
     const snap = undoStack[undoStack.length - 1]
     if (!snap) return
-    refineInFlightRef.current = false
-    restore(snap.live)
-    refinementsRef.current = snap.refinements
-    setRefinements(snap.refinements)
-    setPreviousMain(snap.previousMain)
-    setUndoStack((prev) => prev.slice(0, -1))
-  }, [undoStack, restore])
+    restoreSnapshot(snap)
+  }, [undoStack, restoreSnapshot])
 
   useEffect(() => {
     if (live?.done) refineInFlightRef.current = false
@@ -300,9 +322,10 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!error || error.kind !== 'server') return
     if (!refineInFlightRef.current) return
-    refineInFlightRef.current = false
-    undoRefine()
-  }, [error, undoRefine])
+    const snap = undoStack[undoStack.length - 1]
+    if (!snap) return
+    restoreSnapshot(snap, { keepError: true })
+  }, [error, undoStack, restoreSnapshot])
 
   const value: TranslatorContextValue = {
     input,
