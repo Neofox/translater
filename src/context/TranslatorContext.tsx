@@ -59,8 +59,6 @@ type TranslatorContextValue = {
   inputTips?: Partial<LearningTipsType>
   outputTips?: Partial<LearningTipsType>
   lastMeta: Meta | null
-  sessionCostUsd: number
-  sessionCount: number
   textareaRef: RefObject<HTMLTextAreaElement | null>
   clearInput: () => void
   lookupWord: (text: string) => void
@@ -163,24 +161,11 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const outputTips =
     !sourceIsForeign && targetIsForeign ? learningTips : undefined
 
-  // Session totals: persist across input clears, reset on page refresh.
+  // Last completed request's meta survives input clears for the debug bar.
   const [lastMeta, setLastMeta] = useState<Meta | null>(null)
-  const [sessionCostUsd, setSessionCostUsd] = useState(0)
-  const [sessionCount, setSessionCount] = useState(0)
-  const countedMetaRef = useRef<Meta | null>(null)
 
   useEffect(() => {
-    const meta = live?.meta
-    if (!live?.done || !meta) return
-    setLastMeta(meta)
-    if (countedMetaRef.current === meta) return
-    countedMetaRef.current = meta
-    // Skip cache hits — no provider call, no new cost incurred this session.
-    if (meta.durationMs === 0) return
-    setSessionCount((n) => n + 1)
-    if (typeof meta.costUsd === 'number') {
-      setSessionCostUsd((c) => c + (meta.costUsd ?? 0))
-    }
+    if (live?.done && live.meta) setLastMeta(live.meta)
   }, [live])
 
   // Focus input on mount, but not on touch devices (avoids popping the keyboard).
@@ -228,8 +213,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     inputTips,
     outputTips,
     lastMeta,
-    sessionCostUsd,
-    sessionCount,
     textareaRef,
     clearInput,
     lookupWord,

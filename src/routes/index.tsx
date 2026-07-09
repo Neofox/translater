@@ -50,19 +50,13 @@ function Header() {
 }
 
 function Footer() {
-  const { live, lastMeta, sessionCostUsd, sessionCount } =
-    useTranslatorContext()
+  const { live, lastMeta } = useTranslatorContext()
   const meta = live?.meta ?? lastMeta
   return (
     <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3 py-1.5 text-[11px] text-white/80 sm:px-4">
       <ShortcutHints />
       <div className="ml-auto">
-        <DebugBar
-          meta={meta}
-          cached={meta?.durationMs === 0}
-          sessionCostUsd={sessionCostUsd}
-          sessionCount={sessionCount}
-        />
+        <DebugBar meta={meta} cached={meta?.durationMs === 0} />
       </div>
     </footer>
   )
