@@ -70,6 +70,7 @@ export const STRINGS = {
     refinePlaceholder: 'or describe a change…',
     refineUndo: 'Undo',
     refineRemove: 'Remove adjustment',
+    refineFailed: 'Adjustment failed',
   },
   ko: {
     sourceLanguage: '입력 언어',
@@ -137,6 +138,7 @@ export const STRINGS = {
     refinePlaceholder: '원하는 변경을 입력…',
     refineUndo: '되돌리기',
     refineRemove: '조정 제거',
+    refineFailed: '조정 실패',
   },
 } as const satisfies Record<UiLang, Record<string, string>>
 

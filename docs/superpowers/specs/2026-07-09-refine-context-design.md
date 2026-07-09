@@ -122,9 +122,10 @@ stays as-is (the prefix is unchanged per shape).
 - Tone-mode / language changes keep refinements and re-run as today.
 - Clear-input button also clears refinements (consistent with the auto-swap
   reset).
-- A failed refine run keeps the previous result on screen, shows the existing
-  inline error treatment, and rolls the refinement back out of the active
-  list.
+- A failed refine run keeps the previous result on screen, rolls the
+  refinement back out of the active list, and shows a compact inline failure
+  notice in the refine row (the full-panel error view remains reserved for
+  normal translation errors).
 
 ## Testing
 

@@ -17,6 +17,12 @@ vi.mock('../hooks/useTranslate', async () => {
     currentLive = v
     listeners.forEach((fn) => fn(v))
   }
+  let currentError: unknown = null
+  const errorListeners = new Set<(v: unknown) => void>()
+  function applyMockError(v: unknown) {
+    currentError = v
+    errorListeners.forEach((fn) => fn(v))
+  }
   function useTranslate() {
     const [live, setLive] = React.useState(currentLive)
     React.useEffect(() => {
@@ -25,19 +31,33 @@ vi.mock('../hooks/useTranslate', async () => {
         listeners.delete(setLive)
       }
     }, [])
+    const [error, setError] = React.useState(currentError)
+    React.useEffect(() => {
+      errorListeners.add(setError)
+      return () => {
+        errorListeners.delete(setError)
+      }
+    }, [])
     return {
       live,
       isPending: false,
       streaming: false,
-      error: null,
+      error,
       run: () => Promise.resolve(),
       reset: () => {},
       flush: () => false,
       queueImmediate: () => {},
-      restore: (v: unknown) => applyMockLive(v),
+      restore: (v: unknown) => {
+        applyMockError(null)
+        applyMockLive(v)
+      },
     }
   }
-  return { useTranslate, __setMockLive: applyMockLive }
+  return {
+    useTranslate,
+    __setMockLive: applyMockLive,
+    __setMockError: applyMockError,
+  }
 })
 
 async function setMockLive(v: unknown) {
@@ -45,6 +65,13 @@ async function setMockLive(v: unknown) {
     __setMockLive: (v: unknown) => void
   }
   act(() => mod.__setMockLive(v))
+}
+
+async function setMockError(v: unknown) {
+  const mod = (await import('../hooks/useTranslate')) as unknown as {
+    __setMockError: (v: unknown) => void
+  }
+  act(() => mod.__setMockError(v))
 }
 
 function Setup({ text }: { text: string }) {
@@ -72,6 +99,7 @@ describe('RefineRow', () => {
     window.sessionStorage.clear()
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never
     await setMockLive(null)
+    await setMockError(null)
   })
   afterEach(() => {
     cleanup()
@@ -117,5 +145,33 @@ describe('RefineRow', () => {
   it('renders nothing without a completed sentence result', () => {
     renderRow('see you tomorrow')
     expect(screen.queryByTestId('refine-chip-softer')).toBeNull()
+  })
+
+  it('shows a compact inline notice and stays visible when a refine fails', async () => {
+    renderRow('see you tomorrow')
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+    const chip = await screen.findByTestId('refine-chip-softer')
+    // Triggers TranslatorContext's addRefinement, which pushes an undo
+    // snapshot and marks a refine in flight.
+    fireEvent.click(chip)
+    expect(await screen.findByTestId('refine-active-0')).toBeTruthy()
+
+    // Simulate the refine's run rejecting — TranslatorContext's
+    // error-rollback effect fires, stashes the error into `refineError`,
+    // and restores the pre-refine snapshot (clearing the hook `error`).
+    await setMockError({ kind: 'server', message: 'boom' })
+
+    const notice = await screen.findByTestId('refine-error')
+    expect(notice.textContent).toContain('boom')
+    // The row itself (chips) stays rendered — the failure is a compact
+    // inline notice, not a replacement of the whole row.
+    expect(screen.getByTestId('refine-chip-softer')).toBeTruthy()
+    expect(screen.queryByTestId('refine-active-0')).toBeNull()
   })
 })

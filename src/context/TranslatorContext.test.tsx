@@ -66,8 +66,8 @@ vi.mock('../hooks/useTranslate', async () => {
       reset: () => {},
       flush: () => false,
       queueImmediate: () => {},
-      restore: (v: unknown, opts?: { keepError?: boolean }) => {
-        if (!opts?.keepError) applyMockError(null)
+      restore: (v: unknown) => {
+        applyMockError(null)
         applyMockLive(v)
       },
     }
@@ -339,10 +339,31 @@ describe('refine + context state', () => {
 
     expect(holder.current?.refinements).toEqual([])
     expect(holder.current?.canUndo).toBe(false)
-    // Per the design spec's State rules: a failed refine keeps the previous
-    // result on screen AND keeps the inline error visible — it must not be
-    // cleared by the rollback.
-    expect(holder.current?.error).not.toBeNull()
+    // Per the amended design spec's State rules: a failed refine keeps the
+    // previous result on screen (hook `error` is cleared by the rollback so
+    // OutputPanel renders the restored result instead of the full-panel
+    // ErrorView) and surfaces a compact inline failure notice via
+    // `refineError` instead.
+    expect(holder.current?.error).toBeNull()
+    expect(holder.current?.refineError).not.toBeNull()
+    expect(holder.current?.refineError?.message).toBe('boom')
+    await waitFor(() =>
+      expect(
+        (holder.current?.live?.partial as { main?: string } | undefined)?.main,
+      ).toBe('내일 봐요'),
+    )
+  })
+
+  it('refineError clears on the next refine action', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+
+    act(() => holder.current!.addRefinement('make it softer'))
+    await setMockError({ kind: 'server', message: 'boom' })
+    expect(holder.current?.refineError).not.toBeNull()
+
+    act(() => holder.current!.addRefinement('make it shorter'))
+    expect(holder.current?.refineError).toBeNull()
   })
 
   it('user-initiated undo clears any existing error', async () => {

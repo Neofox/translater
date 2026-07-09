@@ -777,6 +777,8 @@ git commit -m "feat: client state for conversation context and refinements with 
 
 > Deviation note (final review): rollback-on-error now preserves the inline error per the spec's State rules; the plan's original rollback-via-undoRefine cleared it.
 
+> Deviation note (final-review round 2): keeping the hook `error` through rollback hid the restored result behind OutputPanel's `error && <ErrorView/>` XOR gate — the opposite visibility bug. Rollback now clears the hook `error` (so the result renders again) and stashes it in a new `refineError` context field instead; `RefineRow` renders a compact inline failure notice from `refineError`, independent of the hook `error` it already gates on for the normal-error case. The `keepError` option on `restore()` was removed as dead plumbing.
+
 ---
 
 ### Task 4: Context field UI (InputPanel)

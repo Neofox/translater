@@ -28,6 +28,7 @@ export default function RefineRow() {
     live,
     streaming,
     error,
+    refineError,
     input,
     refinements,
     addRefinement,
@@ -72,6 +73,11 @@ export default function RefineRow() {
             </button>
           ))}
         </div>
+      )}
+      {refineError && (
+        <p data-testid="refine-error" className="mb-2 text-xs text-red-400">
+          {t('refineFailed')}: {refineError.message}
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         {CHIPS.filter((c) => !refinements.includes(c.instruction)).map((c) => (

@@ -77,6 +77,11 @@ type TranslatorContextValue = {
   removeRefinement: (index: number) => void
   undoRefine: () => void
   canUndo: boolean
+  /** Set only by the rollback effect below when a refine run fails — holds
+   * the error that triggered the rollback so RefineRow can show a compact
+   * inline failure notice while the full-panel error view stays reserved
+   * for normal (non-refine) translation errors. */
+  refineError: TranslateError | null
 }
 
 const TranslatorContext = createContext<TranslatorContextValue | null>(null)
@@ -99,6 +104,10 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const [refinements, setRefinements] = useState<string[]>([])
   const [previousMain, setPreviousMain] = useState('')
   const [undoStack, setUndoStack] = useState<RefineSnapshot[]>([])
+  // Set by the error-rollback effect when a refine run fails; cleared by any
+  // refine action, an input edit, or a genuinely new completed result. See
+  // `refineError` on TranslatorContextValue for the rendering contract.
+  const [refineError, setRefineError] = useState<TranslateError | null>(null)
   // True between a refine action firing and its run settling — gates the
   // rollback-on-error effect so unrelated failures don't pop the stack.
   const refineInFlightRef = useRef(false)
@@ -221,6 +230,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
         setPreviousMain('')
         setUndoStack([])
         refineInFlightRef.current = false
+        setRefineError(null)
       }
       setInput(next)
     },
@@ -259,6 +269,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
       ])
       setPreviousMain(live.partial.main ?? '')
       refineInFlightRef.current = true
+      setRefineError(null)
       queueImmediate()
       const next = [...current, trimmed]
       refinementsRef.current = next
@@ -286,6 +297,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
       // main.
       setPreviousMain(next.length > 0 ? (live.partial.main ?? '') : '')
       refineInFlightRef.current = true
+      setRefineError(null)
       queueImmediate()
       refinementsRef.current = next
       setRefinements(next)
@@ -293,14 +305,15 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     [live, previousMain, queueImmediate, liveMatchesInput],
   )
 
-  // Shared by user-initiated undo and the error-rollback effect. `keepError`
-  // is set only by the latter — the design spec's State rules say a failed
-  // refine must keep the existing inline error visible while rolling back;
-  // user-initiated undo always clears any error, as before.
+  // Shared by user-initiated undo and the error-rollback effect below. Always
+  // clears the hook's `error` (via plain `restore()`) so OutputPanel renders
+  // the restored result instead of the full-panel ErrorView — the failure
+  // notice for a rolled-back refine lives in `refineError` instead, set by
+  // the caller, not here.
   const restoreSnapshot = useCallback(
-    (snap: RefineSnapshot, opts?: { keepError?: boolean }) => {
+    (snap: RefineSnapshot) => {
       refineInFlightRef.current = false
-      restore(snap.live, opts)
+      restore(snap.live)
       refinementsRef.current = snap.refinements
       setRefinements(snap.refinements)
       setPreviousMain(snap.previousMain)
@@ -312,11 +325,21 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const undoRefine = useCallback(() => {
     const snap = undoStack[undoStack.length - 1]
     if (!snap) return
+    setRefineError(null)
     restoreSnapshot(snap)
   }, [undoStack, restoreSnapshot])
 
   useEffect(() => {
-    if (live?.done) refineInFlightRef.current = false
+    if (!live?.done) return
+    // Only clear a stale refine-failure notice when this transition is a
+    // genuinely new completed result for an in-flight refine — NOT when it's
+    // the error-rollback effect below restoring a previous snapshot. The
+    // rollback path sets `refineInFlightRef.current = false` synchronously
+    // (in `restoreSnapshot`, before this effect ever runs), so by the time
+    // this effect observes the rollback's `live` change the ref is already
+    // false and the notice it just set survives.
+    if (refineInFlightRef.current) setRefineError(null)
+    refineInFlightRef.current = false
   }, [live])
 
   useEffect(() => {
@@ -324,7 +347,8 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     if (!refineInFlightRef.current) return
     const snap = undoStack[undoStack.length - 1]
     if (!snap) return
-    restoreSnapshot(snap, { keepError: true })
+    setRefineError(error)
+    restoreSnapshot(snap)
   }, [error, undoStack, restoreSnapshot])
 
   const value: TranslatorContextValue = {
@@ -360,6 +384,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     removeRefinement,
     undoRefine,
     canUndo: undoStack.length > 0,
+    refineError,
   }
 
   return (

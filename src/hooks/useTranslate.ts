@@ -176,24 +176,20 @@ export function useTranslate(
     setError(null)
   }, [])
 
-  /** Replace the live result from a client-side snapshot (refine undo) without
-   * firing a network run. Suppresses the next auto-run cycle — the caller
-   * restores `refinements` in the same tick, which would otherwise re-trigger
-   * the debounced effect and defeat the instant undo.
-   *
-   * `keepError` skips clearing the error — used by the rollback-on-error path
-   * so the inline error treatment stays visible per the design spec's State
-   * rules, while user-initiated undo (the default) still clears it. */
-  const restore = useCallback(
-    (snapshot: LiveResult, opts?: { keepError?: boolean }) => {
-      abortRef.current?.abort()
-      suppressAutoRunRef.current = true
-      setIsPending(false)
-      if (!opts?.keepError) setError(null)
-      setLive(snapshot)
-    },
-    [],
-  )
+  /** Replace the live result from a client-side snapshot (refine undo/
+   * rollback) without firing a network run. Suppresses the next auto-run
+   * cycle — the caller restores `refinements` in the same tick, which would
+   * otherwise re-trigger the debounced effect and defeat the instant undo.
+   * Always clears `error` so the result renders again; a rolled-back refine's
+   * failure notice is tracked separately by the caller (`refineError` on
+   * TranslatorContext), not kept here. */
+  const restore = useCallback((snapshot: LiveResult) => {
+    abortRef.current?.abort()
+    suppressAutoRunRef.current = true
+    setIsPending(false)
+    setError(null)
+    setLive(snapshot)
+  }, [])
 
   /** Skip the debounce window for the next auto-run — call right before a
    * programmatic input change (paste, clipboard button) so the translation
