@@ -63,6 +63,12 @@ export const STRINGS = {
     contextToggle: 'Replying to…',
     contextPlaceholder: 'Paste the message you are replying to…',
     contextClear: 'Clear context',
+    refineSofter: 'Softer',
+    refineMoreDirect: 'More direct',
+    refineShorter: 'Shorter',
+    refineMorePlayful: 'More playful',
+    refinePlaceholder: 'or describe a change…',
+    refineUndo: 'Undo',
   },
   ko: {
     sourceLanguage: '입력 언어',
@@ -123,6 +129,12 @@ export const STRINGS = {
     contextToggle: '답장 대상…',
     contextPlaceholder: '답장할 상대의 메시지를 붙여넣으세요…',
     contextClear: '문맥 지우기',
+    refineSofter: '더 부드럽게',
+    refineMoreDirect: '더 직설적으로',
+    refineShorter: '더 짧게',
+    refineMorePlayful: '더 장난스럽게',
+    refinePlaceholder: '원하는 변경을 입력…',
+    refineUndo: '되돌리기',
   },
 } as const satisfies Record<UiLang, Record<string, string>>
 

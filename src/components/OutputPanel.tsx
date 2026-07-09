@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
 import LearningTips from './LearningTips'
 import LanguageChipBar from './LanguageChipBar'
+import RefineRow from './RefineRow'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -46,7 +47,12 @@ export default function OutputPanel() {
       <div className="flex-1 overflow-hidden">
         {error && <ErrorView error={error} />}
         {!error && live?.intent === 'sentence' && (
-          <SentenceView result={live.partial} streaming={streaming} />
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <SentenceView result={live.partial} streaming={streaming} />
+            </div>
+            <RefineRow />
+          </div>
         )}
         {!error && live?.intent === 'word' && (
           <WordView result={live.partial} mode={mode} streaming={streaming} />
