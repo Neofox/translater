@@ -23,8 +23,9 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - Two translation modes: **sentence** and **word**, auto-detected from input.
 - Three tone modes: `friends` (slang/반말), `casual` (해요체), `professional` (하십시오체).
 - Prompts are multi-message conversations: `developer` (language rule) → `system` (instructions) → few-shot `user`/`assistant` → actual `user` input.
-- LLM responses are streamed as partial JSON and parsed incrementally via `partial-json`.
-- Temperature: word=0.2, sentence varies by mode (friends=0.85, casual=0.7, professional=0.3).
+- LLM responses are streamed as incremental JSON fragments (server sends each delta, client accumulates) and parsed via `partial-json`.
+- Latency: `reasoning: { effort: 'none' }` (no `temperature` — the API rejects it alongside reasoning params) plus a `prompt_cache_key` per prompt shape; system-prompt lines are ordered stable-first / mode-dependent-last for OpenAI prefix caching. Keep that ordering when editing `prompts.ts`.
+- Client debounce is 400ms; paste skips it (`queueImmediate`) and Enter/blur flush a pending run (`flush`). Plain Enter is a newline when nothing is pending; Shift+Enter always newline; Cmd/Ctrl+Enter force-runs.
 
 ## Styling
 
