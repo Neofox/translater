@@ -5,7 +5,13 @@ import { z } from 'zod'
 import { SentenceResult, WordResult } from './schemas'
 import { sentencePrompt, wordPrompt } from './prompts'
 import { translationCache } from './cache'
-import { MAX_INPUT_CHARS } from '../lib/limits'
+import { cacheKeyFor } from './cacheKey'
+import {
+  MAX_CONTEXT_CHARS,
+  MAX_INPUT_CHARS,
+  MAX_REFINEMENT_CHARS,
+  MAX_REFINEMENTS,
+} from '../lib/limits'
 
 const TranslateInput = z.object({
   text: z.string().min(1).max(MAX_INPUT_CHARS),
@@ -14,6 +20,12 @@ const TranslateInput = z.object({
   mode: z.enum(['friends', 'casual', 'professional']),
   intent: z.enum(['word', 'sentence']),
   uiLang: z.enum(['en', 'ko']).default('en'),
+  context: z.string().max(MAX_CONTEXT_CHARS).default(''),
+  refinements: z
+    .array(z.string().min(1).max(MAX_REFINEMENT_CHARS))
+    .max(MAX_REFINEMENTS)
+    .default([]),
+  previousMain: z.string().max(MAX_INPUT_CHARS).default(''),
 })
 
 export type Meta = {
@@ -52,17 +64,7 @@ function priceFor(tokens: { input: number; output: number }) {
 export const translate = createServerFn({ method: 'POST' })
   .validator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
-    // Bump when the response schema or prompt changes so stale entries miss.
-    const CACHE_VERSION = 'v10-strict'
-    const cacheKey = JSON.stringify([
-      CACHE_VERSION,
-      data.intent,
-      data.mode,
-      data.source,
-      data.target,
-      data.uiLang,
-      data.text.trim(),
-    ])
+    const cacheKey = cacheKeyFor(data)
 
     const cached = translationCache.get(cacheKey) as TranslateDone | undefined
     if (cached) {
