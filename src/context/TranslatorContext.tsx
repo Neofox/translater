@@ -75,8 +75,6 @@ type TranslatorContextValue = {
   refinements: string[]
   addRefinement: (instruction: string) => void
   removeRefinement: (index: number) => void
-  undoRefine: () => void
-  canUndo: boolean
   /** Set only by the rollback effect below when a refine run fails — holds
    * the error that triggered the rollback so RefineRow can show a compact
    * inline failure notice while the full-panel error view stays reserved
@@ -311,11 +309,12 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     [live, previousMain, queueImmediate, liveMatchesInput],
   )
 
-  // Shared by user-initiated undo and the error-rollback effect below. Always
-  // clears the hook's `error` (via plain `restore()`) so OutputPanel renders
-  // the restored result instead of the full-panel ErrorView — the failure
-  // notice for a rolled-back refine lives in `refineError` instead, set by
-  // the caller, not here.
+  // Used by the error-rollback effect below (chips are toggles in the UI, so
+  // user-facing "undo" is just removeRefinement — no separate undo control).
+  // Always clears the hook's `error` (via plain `restore()`) so OutputPanel
+  // renders the restored result instead of the full-panel ErrorView — the
+  // failure notice for a rolled-back refine lives in `refineError` instead,
+  // set by the caller, not here.
   const restoreSnapshot = useCallback(
     (snap: RefineSnapshot) => {
       refineInFlightRef.current = false
@@ -327,13 +326,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     },
     [restore],
   )
-
-  const undoRefine = useCallback(() => {
-    const snap = undoStack[undoStack.length - 1]
-    if (!snap) return
-    setRefineError(null)
-    restoreSnapshot(snap)
-  }, [undoStack, restoreSnapshot])
 
   useEffect(() => {
     if (!live?.done) return
@@ -392,8 +384,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     refinements,
     addRefinement,
     removeRefinement,
-    undoRefine,
-    canUndo: undoStack.length > 0,
     refineError,
   }
 

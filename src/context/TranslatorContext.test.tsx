@@ -236,17 +236,16 @@ describe('refine + context state', () => {
     })
   }
 
-  it('addRefinement stacks, dedupes, and caps at 5', async () => {
+  it('addRefinement stacks, dedupes, and caps at 3', async () => {
     const holder = setup()
     await completeSentence(holder, 'see you tomorrow', '내일 봐요')
     act(() => holder.current!.addRefinement('make it softer'))
     act(() => holder.current!.addRefinement('make it softer')) // duplicate
     expect(holder.current?.refinements).toEqual(['make it softer'])
     act(() => {
-      for (const r of ['a', 'b', 'c', 'd', 'e', 'f'])
-        holder.current!.addRefinement(r)
+      for (const r of ['a', 'b', 'c', 'd']) holder.current!.addRefinement(r)
     })
-    expect(holder.current?.refinements).toHaveLength(5)
+    expect(holder.current?.refinements).toHaveLength(3)
   })
 
   it('editing the input text clears refinements and the undo stack; context survives', async () => {
@@ -255,11 +254,9 @@ describe('refine + context state', () => {
     await completeSentence(holder, 'see you tomorrow', '내일 봐요')
     act(() => holder.current!.addRefinement('make it softer'))
     expect(holder.current?.refinements).toEqual(['make it softer'])
-    expect(holder.current?.canUndo).toBe(true)
 
     act(() => holder.current!.setInput('a different sentence'))
     expect(holder.current?.refinements).toEqual([])
-    expect(holder.current?.canUndo).toBe(false)
     expect(holder.current?.context).toBe('회의 몇 시에 해요?')
   })
 
@@ -269,28 +266,6 @@ describe('refine + context state', () => {
     act(() => holder.current!.addRefinement('make it softer'))
     act(() => holder.current!.setMode('friends'))
     expect(holder.current?.refinements).toEqual(['make it softer'])
-  })
-
-  it('undoRefine restores the previous result and refinement list', async () => {
-    const holder = setup()
-    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
-    act(() => holder.current!.addRefinement('make it softer'))
-    // simulate the refined run completing
-    await setMockLive({
-      intent: 'sentence',
-      partial: { main: '내일 봐요~' },
-      done: true,
-      meta: null,
-      text: 'see you tomorrow',
-    })
-    act(() => holder.current!.undoRefine())
-    expect(holder.current?.refinements).toEqual([])
-    expect(holder.current?.canUndo).toBe(false)
-    await waitFor(() =>
-      expect(
-        (holder.current?.live?.partial as { main?: string } | undefined)?.main,
-      ).toBe('내일 봐요'),
-    )
   })
 
   it('removeRefinement drops only the targeted refinement and pushes an undo snapshot', async () => {
@@ -321,7 +296,6 @@ describe('refine + context state', () => {
     act(() => holder.current!.removeRefinement(0))
 
     expect(holder.current?.refinements).toEqual(['more formal'])
-    expect(holder.current?.canUndo).toBe(true)
   })
 
   it('a server error while a refine is in flight rolls back to the pre-refine state', async () => {
@@ -330,7 +304,6 @@ describe('refine + context state', () => {
 
     act(() => holder.current!.addRefinement('make it softer'))
     expect(holder.current?.refinements).toEqual(['make it softer'])
-    expect(holder.current?.canUndo).toBe(true)
 
     // The refine's run rejects — TranslatorContext's rollback effect is
     // gated on `refineInFlightRef`, which is still set from addRefinement
@@ -338,7 +311,6 @@ describe('refine + context state', () => {
     await setMockError({ kind: 'server', message: 'boom' })
 
     expect(holder.current?.refinements).toEqual([])
-    expect(holder.current?.canUndo).toBe(false)
     // Per the amended design spec's State rules: a failed refine keeps the
     // previous result on screen (hook `error` is cleared by the rollback so
     // OutputPanel renders the restored result instead of the full-panel
@@ -409,32 +381,6 @@ describe('refine + context state', () => {
     expect(holder.current?.refineError).toBeNull()
   })
 
-  it('user-initiated undo clears any existing error', async () => {
-    const holder = setup()
-    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
-
-    act(() => holder.current!.addRefinement('make it softer'))
-    await setMockLive({
-      intent: 'sentence',
-      partial: { main: '내일 봐요~' },
-      done: true,
-      meta: null,
-      text: 'see you tomorrow',
-    })
-    expect(holder.current?.canUndo).toBe(true)
-
-    // Simulate an unrelated error surfacing while nothing is in flight (not
-    // a refine rollback) so it lingers on screen.
-    await setMockError({ kind: 'server', message: 'boom' })
-    expect(holder.current?.error).not.toBeNull()
-
-    act(() => holder.current!.undoRefine())
-
-    expect(holder.current?.error).toBeNull()
-    expect(holder.current?.refinements).toEqual([])
-    expect(holder.current?.canUndo).toBe(false)
-  })
-
   it('addRefinement is a no-op while live is stale relative to the current input', async () => {
     const holder = setup()
     await completeSentence(holder, 'text A', '결과 A')
@@ -452,16 +398,15 @@ describe('refine + context state', () => {
     expect(holder.current?.refinements).toEqual([])
   })
 
-  it('a server error with no refine in flight leaves refinements and the undo stack untouched', async () => {
+  it('a server error with no refine in flight leaves refinements and the result untouched', async () => {
     const holder = setup()
     await completeSentence(holder, 'see you tomorrow', '내일 봐요')
     expect(holder.current?.refinements).toEqual([])
-    expect(holder.current?.canUndo).toBe(false)
 
     await setMockError({ kind: 'server', message: 'boom' })
 
     expect(holder.current?.refinements).toEqual([])
-    expect(holder.current?.canUndo).toBe(false)
+    expect(holder.current?.refineError).toBeNull()
     await waitFor(() =>
       expect(
         (holder.current?.live?.partial as { main?: string } | undefined)?.main,

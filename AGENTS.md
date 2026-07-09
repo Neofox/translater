@@ -26,7 +26,7 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - LLM responses are streamed as incremental JSON fragments (server sends each delta, client accumulates) and parsed via `partial-json`.
 - Latency: `reasoning: { effort: 'none' }` (no `temperature` — the API rejects it alongside reasoning params) plus a `prompt_cache_key` per prompt shape; system-prompt lines are ordered stable-first / mode-dependent-last for OpenAI prefix caching. Keep that ordering when editing `prompts.ts`.
 - Client debounce is 400ms; paste skips it (`queueImmediate`) and Enter/blur flush a pending run (`flush`). Plain Enter is a newline when nothing is pending; Shift+Enter always newline; Cmd/Ctrl+Enter force-runs.
-- Refine + context: `TranslateInput` carries optional `context` (sentence + word), `refinements` + `previousMain` (sentence only). They are injected only into the FINAL user message as `<context>`/`<adjustments>` blocks; the explaining system lines are UNCONDITIONAL so the prefix cache stays intact — keep them that way. Undo is a client-side result stack in `TranslatorContext` (no network). Editing the input clears refinements; context is sessionStorage-sticky.
+- Refine + context: `TranslateInput` carries optional `context` (sentence + word), `refinements` + `previousMain` (sentence only, max 3 refinements of which at most one is free-text). They are injected only into the FINAL user message as `<context>`/`<adjustments>` blocks; the explaining system lines are UNCONDITIONAL so the prefix cache stays intact — keep them that way. Refine chips are toggles (`aria-pressed`); toggling one off removes that adjustment and re-runs (LRU makes it cheap). A failed refine rolls back via an internal snapshot stack (no user-facing undo control). Editing the input clears refinements; context is sessionStorage-sticky.
 
 ## Styling
 
@@ -62,9 +62,9 @@ The project includes browser-friendly `data-testid` attributes on key interactiv
 | Clear input button         | `[data-testid="clear-input"]`                    | Only rendered when `input` is non-empty                                 |
 | Context toggle             | `[data-testid="context-toggle"]`                 | Input panel meta row; opens the "Replying to…" textarea                 |
 | Context textarea           | `[data-testid="context-textarea"]`               | Session-sticky; has `[data-testid="context-clear"]` when non-empty      |
-| Refine chip (by id)        | `[data-testid="refine-chip-softer"]`             | ids: `softer`, `direct`, `shorter`, `playful`; sentence results only    |
-| Refine free-text           | `[data-testid="refine-freeform"]`                | Enter submits; active refinements are `[data-testid="refine-active-N"]` |
-| Refine undo                | `[data-testid="refine-undo"]`                    | Visible once a refinement was applied; restores previous result         |
+| Refine chip (by id)        | `[data-testid="refine-chip-softer"]`             | ids: `softer`, `direct`, `shorter`, `playful`; TOGGLES (`aria-pressed`) |
+| Refine free-text           | `[data-testid="refine-freeform"]`                | Enter submits; hidden while a custom adjustment is active               |
+| Refine custom button       | `[data-testid="refine-custom"]`                  | Replaces the free-text input (label ≤20 chars); click removes it        |
 
 ### Why direct `.value` mutation fails
 

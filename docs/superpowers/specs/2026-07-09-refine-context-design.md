@@ -39,7 +39,7 @@ clients are unaffected):
 | Field          | Type                     | Constraint                                                     | Applies to                                         |
 | -------------- | ------------------------ | -------------------------------------------------------------- | -------------------------------------------------- |
 | `context`      | `string`, default `''`   | ≤ 1,000 chars (new `MAX_CONTEXT_CHARS` in `src/lib/limits.ts`) | sentence + word                                    |
-| `refinements`  | `string[]`, default `[]` | ≤ 5 items, each ≤ 200 chars                                    | sentence only                                      |
+| `refinements`  | `string[]`, default `[]` | ≤ 3 items (at most one free-text), each ≤ 200 chars            | sentence only                                      |
 | `previousMain` | `string`, default `''`   | ≤ `MAX_INPUT_CHARS`                                            | sentence only; sent iff `refinements` is non-empty |
 
 `previousMain` is the `main` the user is refining — the prompt anchors on it
@@ -96,15 +96,19 @@ stays as-is (the prefix is unchanged per shape).
 - `Pill` chips, accent (violet) tone: **Softer · More direct · Shorter ·
   More playful**, plus a compact free-text input ("or describe a change…",
   submits on Enter).
-- Tapping a chip / submitting free text appends the instruction to
-  `refinements` and re-runs (streams like a normal run; row disabled while
-  streaming).
-- Active refinements render as removable `Tag`s above the row; ✕ removes that
-  refinement and re-runs with the remaining list.
-- **Undo** pill (visible when the history stack is non-empty) restores the
-  previous completed result **client-side** from a result stack (max depth
-  10, oldest dropped) — no network call. Re-applying the same refinement later is an LRU cache hit.
+- Chips are **toggles** (`aria-pressed`): tapping activates the adjustment and
+  re-runs; tapping the active chip removes it and re-runs (that is the undo —
+  no separate Undo control; re-runs hit the LRU cache when repeated).
+- Free text allows **one custom adjustment at a time**: on submit the input is
+  replaced by an active button whose label truncates to 20 chars; tapping it
+  removes the custom adjustment and restores the input.
+- **Cap: 3 active adjustments total** (custom counts). At the cap, inactive
+  chips and the free-text input render disabled.
+- A snapshot stack (max depth 10, oldest dropped) remains internal, used for
+  failed-refine rollback — no network call.
 - Labels localized in `src/lib/i18n.ts` (en/ko).
+- _Iteration note (2026-07-09): replaced the original removable-tags row +
+  Undo pill with the toggle-chip design above; cap lowered from 5 to 3._
 
 ### Context field (input panel)
 
@@ -142,8 +146,8 @@ stays as-is (the prefix is unchanged per shape).
 ## Browser automation
 
 New stable selectors, to be documented in CLAUDE.md:
-`data-testid="refine-chip"` (with `data-value` per chip),
-`refine-freeform`, `refine-undo`, `context-toggle`, `context-textarea`.
+`data-testid="refine-chip-<id>"` (toggle chips, `aria-pressed`),
+`refine-freeform`, `refine-custom`, `context-toggle`, `context-textarea`.
 
 ## Out of scope (later sub-projects)
 

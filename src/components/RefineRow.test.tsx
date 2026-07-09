@@ -107,7 +107,7 @@ describe('RefineRow', () => {
     vi.restoreAllMocks()
   })
 
-  it('clicking a chip moves it to the active-refinement tags', async () => {
+  it('chips toggle: click activates, second click removes the adjustment', async () => {
     renderRow('see you tomorrow')
     await setMockLive({
       intent: 'sentence',
@@ -117,14 +117,18 @@ describe('RefineRow', () => {
       text: 'see you tomorrow',
     })
     const chip = await screen.findByTestId('refine-chip-softer')
+    expect(chip.getAttribute('aria-pressed')).toBe('false')
+
     fireEvent.click(chip)
-    expect(await screen.findByTestId('refine-active-0')).toBeTruthy()
-    expect(screen.queryByTestId('refine-chip-softer')).toBeNull()
-    // undo appears once a refinement was applied
-    expect(screen.getByTestId('refine-undo')).toBeTruthy()
+    expect(chip.getAttribute('aria-pressed')).toBe('true')
+    // The chip stays in place as the active affordance — no tags row.
+    expect(screen.queryByTestId('refine-active-0')).toBeNull()
+
+    fireEvent.click(chip)
+    expect(chip.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('free-text Enter adds a refinement and clears the field', async () => {
+  it('free-text Enter replaces the input with a truncated custom button; clicking it restores the input', async () => {
     renderRow('see you tomorrow')
     await setMockLive({
       intent: 'sentence',
@@ -136,10 +140,45 @@ describe('RefineRow', () => {
     const input = (await screen.findByTestId(
       'refine-freeform',
     )) as unknown as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'less textbook-y' } })
+    // 26 chars — must truncate to 20 + ellipsis on the button label.
+    fireEvent.change(input, {
+      target: { value: 'less textbook-y and warmer' },
+    })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(await screen.findByTestId('refine-active-0')).toBeTruthy()
-    expect(input.value).toBe('')
+
+    const custom = await screen.findByTestId('refine-custom')
+    expect(custom.textContent).toBe('less textbook-y and …')
+    expect(screen.queryByTestId('refine-freeform')).toBeNull()
+
+    fireEvent.click(custom)
+    expect(screen.queryByTestId('refine-custom')).toBeNull()
+    expect(await screen.findByTestId('refine-freeform')).toBeTruthy()
+  })
+
+  it('caps at 3 adjustments: remaining chips and the free-text input become disabled', async () => {
+    renderRow('see you tomorrow')
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+    fireEvent.click(await screen.findByTestId('refine-chip-softer'))
+    fireEvent.click(screen.getByTestId('refine-chip-direct'))
+    fireEvent.click(screen.getByTestId('refine-chip-shorter'))
+
+    const playful = screen.getByTestId('refine-chip-playful')
+    expect((playful as unknown as HTMLButtonElement).disabled).toBe(true)
+    const input = screen.getByTestId(
+      'refine-freeform',
+    ) as unknown as HTMLInputElement
+    expect(input.disabled).toBe(true)
+    // Active chips stay enabled so any of them can be toggled back off.
+    expect(
+      (screen.getByTestId('refine-chip-softer') as unknown as HTMLButtonElement)
+        .disabled,
+    ).toBe(false)
   })
 
   it('renders nothing without a completed sentence result', () => {
@@ -160,7 +199,7 @@ describe('RefineRow', () => {
     // Triggers TranslatorContext's addRefinement, which pushes an undo
     // snapshot and marks a refine in flight.
     fireEvent.click(chip)
-    expect(await screen.findByTestId('refine-active-0')).toBeTruthy()
+    expect(chip.getAttribute('aria-pressed')).toBe('true')
 
     // Simulate the refine's run rejecting — TranslatorContext's
     // error-rollback effect fires, stashes the error into `refineError`,
@@ -169,9 +208,10 @@ describe('RefineRow', () => {
 
     const notice = await screen.findByTestId('refine-error')
     expect(notice.textContent).toContain('boom')
-    // The row itself (chips) stays rendered — the failure is a compact
-    // inline notice, not a replacement of the whole row.
-    expect(screen.getByTestId('refine-chip-softer')).toBeTruthy()
-    expect(screen.queryByTestId('refine-active-0')).toBeNull()
+    // The row itself stays rendered and the rolled-back chip reads inactive —
+    // the failure is a compact inline notice, not a replacement of the row.
+    expect(
+      screen.getByTestId('refine-chip-softer').getAttribute('aria-pressed'),
+    ).toBe('false')
   })
 })
