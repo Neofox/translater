@@ -190,6 +190,29 @@ try {
     mode: 'casual',
   })
   assertLangs('auto-detect French', s4.data, 'fr', 'en')
+
+  const c1 = await run('Context: KO reply register (sentence)', 'sentence', {
+    text: 'sounds good, see you then',
+    source: 'en',
+    target: 'ko',
+    mode: 'professional',
+    context: '부장님: 내일 오후 3시에 회의 가능하실까요?',
+  })
+  assertLangs('context langs', c1.data, 'en', 'ko')
+
+  const r1 = await run('Refine: softer + shorter (sentence)', 'sentence', {
+    text: 'Send me the report by tomorrow.',
+    source: 'en',
+    target: 'ko',
+    mode: 'casual',
+    refinements: ['make it softer', 'make it shorter'],
+    previousMain: '내일까지 보고서 보내 주세요.',
+  })
+  if (r1.data.main === '내일까지 보고서 보내 주세요.') {
+    console.warn('  ⚠ refine returned the previous translation verbatim')
+  } else {
+    console.log(`  ✓ refine produced an adjusted main: ${r1.data.main}`)
+  }
 } catch (err) {
   console.error('SMOKE FAILED:', err)
   process.exit(1)
