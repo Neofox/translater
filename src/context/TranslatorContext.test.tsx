@@ -28,26 +28,40 @@ vi.mock('../hooks/useTranslate', async () => {
   const React = await import('react')
 
   let currentLive: unknown = null
-  const listeners = new Set<(v: unknown) => void>()
+  const liveListeners = new Set<(v: unknown) => void>()
+  let currentError: unknown = null
+  const errorListeners = new Set<(v: unknown) => void>()
 
   function applyMockLive(v: unknown) {
     currentLive = v
-    listeners.forEach((fn) => fn(v))
+    liveListeners.forEach((fn) => fn(v))
+  }
+
+  function applyMockError(v: unknown) {
+    currentError = v
+    errorListeners.forEach((fn) => fn(v))
   }
 
   function useTranslate() {
     const [live, setLive] = React.useState(currentLive)
     React.useEffect(() => {
-      listeners.add(setLive)
+      liveListeners.add(setLive)
       return () => {
-        listeners.delete(setLive)
+        liveListeners.delete(setLive)
+      }
+    }, [])
+    const [error, setError] = React.useState(currentError)
+    React.useEffect(() => {
+      errorListeners.add(setError)
+      return () => {
+        errorListeners.delete(setError)
       }
     }, [])
     return {
       live,
       isPending: false,
       streaming: false,
-      error: null,
+      error,
       run: () => Promise.resolve(),
       reset: () => {},
       flush: () => false,
@@ -56,7 +70,11 @@ vi.mock('../hooks/useTranslate', async () => {
     }
   }
 
-  return { useTranslate, __setMockLive: applyMockLive }
+  return {
+    useTranslate,
+    __setMockLive: applyMockLive,
+    __setMockError: applyMockError,
+  }
 })
 
 async function setMockLive(v: unknown) {
@@ -65,6 +83,15 @@ async function setMockLive(v: unknown) {
   }
   act(() => {
     mod.__setMockLive(v)
+  })
+}
+
+async function setMockError(v: unknown) {
+  const mod = (await import('../hooks/useTranslate')) as unknown as {
+    __setMockError: (v: unknown) => void
+  }
+  act(() => {
+    mod.__setMockError(v)
   })
 }
 
@@ -163,10 +190,11 @@ describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
 })
 
 describe('refine + context state', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     window.localStorage.clear()
     window.sessionStorage.clear()
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never
+    await setMockError(null)
   })
 
   afterEach(() => {
@@ -253,6 +281,71 @@ describe('refine + context state', () => {
       text: 'see you tomorrow',
     })
     act(() => holder.current!.undoRefine())
+    expect(holder.current?.refinements).toEqual([])
+    expect(holder.current?.canUndo).toBe(false)
+    await waitFor(() =>
+      expect(
+        (holder.current?.live?.partial as { main?: string } | undefined)?.main,
+      ).toBe('내일 봐요'),
+    )
+  })
+
+  it('removeRefinement drops only the targeted refinement and pushes an undo snapshot', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+
+    act(() => holder.current!.addRefinement('make it softer'))
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요~' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+    act(() => holder.current!.addRefinement('more formal'))
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 뵙겠습니다' },
+      done: true,
+      meta: null,
+      text: 'see you tomorrow',
+    })
+    expect(holder.current?.refinements).toEqual([
+      'make it softer',
+      'more formal',
+    ])
+
+    act(() => holder.current!.removeRefinement(0))
+
+    expect(holder.current?.refinements).toEqual(['more formal'])
+    expect(holder.current?.canUndo).toBe(true)
+  })
+
+  it('a server error while a refine is in flight rolls back to the pre-refine state', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+
+    act(() => holder.current!.addRefinement('make it softer'))
+    expect(holder.current?.refinements).toEqual(['make it softer'])
+    expect(holder.current?.canUndo).toBe(true)
+
+    // The refine's run rejects — TranslatorContext's rollback effect is
+    // gated on `refineInFlightRef`, which is still set from addRefinement
+    // above since no live update has landed yet.
+    await setMockError({ kind: 'server', message: 'boom' })
+
+    expect(holder.current?.refinements).toEqual([])
+    expect(holder.current?.canUndo).toBe(false)
+  })
+
+  it('a server error with no refine in flight leaves refinements and the undo stack untouched', async () => {
+    const holder = setup()
+    await completeSentence(holder, 'see you tomorrow', '내일 봐요')
+    expect(holder.current?.refinements).toEqual([])
+    expect(holder.current?.canUndo).toBe(false)
+
+    await setMockError({ kind: 'server', message: 'boom' })
+
     expect(holder.current?.refinements).toEqual([])
     expect(holder.current?.canUndo).toBe(false)
     await waitFor(() =>
