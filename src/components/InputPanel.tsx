@@ -50,7 +50,11 @@ export default function InputPanel() {
       : 'text-ink-dim'
 
   return (
-    <section className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12">
+    <section
+      className={`flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12 ${
+        input ? '' : 'flex-1'
+      }`}
+    >
       <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
         <LanguageChipBar
           kind="source"

@@ -321,6 +321,7 @@ export function sentencePrompt(args: {
     isPolish
       ? 'Return ONE primary rewrite in `main`, plus 2-6 concise alternatives showing other phrasings within the same register band.'
       : 'Return ONE primary translation in `main`, plus 2-6 concise alternatives (unless the source is unambiguous, then 0). Each alternative should differ in a meaningful way (register, phrasing, idiom choice).',
+    'LONG INPUT OVERRIDE: when the source spans multiple lines, contains three or more sentences, or reads as a paragraph, set `alternatives` to an empty array — alternative phrasings only help for short single-sentence input. `main` must still cover the ENTIRE source.',
     isPolish
       ? `The \`rationale\` (in ${metaLang}) is an edit note — explain what you changed and why (register shift, awkwardness fixed, clarity improved, idiom swapped). Not a translation note.`
       : `The \`rationale\` (in ${metaLang}) should highlight interesting linguistic or cultural nuances — wordplay, double meanings, idioms, slang origins, ambiguity resolved. Avoid generic tone descriptions like "casual" or "informal" without further insight.`,

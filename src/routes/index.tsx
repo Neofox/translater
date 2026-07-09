@@ -36,8 +36,21 @@ function Header() {
   return (
     <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-3">
       <div className="flex items-center gap-2">
-        <span className="inline-block h-2 w-2 rounded-full bg-accent" />
-        <h1 className="text-sm font-semibold tracking-tight text-ink">
+        <span className="hidden h-2 w-2 rounded-full bg-accent sm:inline-block" />
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          className="h-4 w-4 text-accent sm:hidden"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18" />
+          <path d="M12 3a13.5 13.5 0 0 1 0 18a13.5 13.5 0 0 1 0-18" />
+        </svg>
+        <h1 className="hidden text-sm font-semibold tracking-tight text-ink sm:block">
           Translater
         </h1>
         <UiLangToggle />

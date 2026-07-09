@@ -8,6 +8,7 @@ import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { mainText } from '../lib/liveResult'
+import { isLongForm } from '../lib/longForm'
 
 export default function OutputPanel() {
   const {
@@ -25,7 +26,7 @@ export default function OutputPanel() {
   const copyText = mainText(live)
 
   return (
-    <section className="flex min-h-0 flex-col xl:p-6 2xl:p-12">
+    <section className="flex min-h-0 flex-1 flex-col xl:p-6 xl:pb-0 2xl:p-12 2xl:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft">
         <LanguageChipBar
           kind="target"
@@ -40,7 +41,9 @@ export default function OutputPanel() {
               {isPolish ? t('polishing') : t('streaming')}
             </span>
           )}
-          <LearningTips tips={outputTips} />
+          <span className={streaming ? 'hidden sm:contents' : 'contents'}>
+            <LearningTips tips={outputTips} />
+          </span>
           {copyText && <CopyButton text={copyText} compact size="md" />}
         </div>
       </div>
@@ -49,7 +52,11 @@ export default function OutputPanel() {
         {!error && live?.intent === 'sentence' && (
           <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-hidden">
-              <SentenceView result={live.partial} streaming={streaming} />
+              <SentenceView
+                result={live.partial}
+                streaming={streaming}
+                hideAlternatives={isLongForm(live.text)}
+              />
             </div>
             <RefineRow />
           </div>
