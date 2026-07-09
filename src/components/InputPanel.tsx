@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import CopyButton from './CopyButton'
 import Pill from './ui/Pill'
 import LearningTips from './LearningTips'
 import LanguageChipBar from './LanguageChipBar'
 import WordSourceMeta from './WordSourceMeta'
+import { ContextTextarea, ContextToggle } from './ContextField'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
@@ -25,8 +27,15 @@ export default function InputPanel() {
     textareaRef,
     flush,
     queueImmediate,
+    context,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
+
+  const [contextOpen, setContextOpen] = useState(false)
+  // Auto-open when a sticky context hydrates from sessionStorage after reload.
+  useEffect(() => {
+    if (context.trim()) setContextOpen(true)
+  }, [context])
 
   const charCount = input.length
   const showCounter = charCount >= INPUT_WARN_THRESHOLD
@@ -51,6 +60,10 @@ export default function InputPanel() {
           aria-label={t('sourceLanguage')}
         />
         <div className="flex items-center gap-2">
+          <ContextToggle
+            open={contextOpen}
+            onToggle={() => setContextOpen((v) => !v)}
+          />
           <LearningTips tips={inputTips} />
           {showCounter && (
             <span
@@ -80,6 +93,7 @@ export default function InputPanel() {
           if (e.target === e.currentTarget) textareaRef.current?.focus()
         }}
       >
+        {contextOpen && <ContextTextarea />}
         <div
           className="relative flex flex-col"
           onClick={(e) => {

@@ -60,6 +60,9 @@ export const STRINGS = {
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
     moreLanguages: 'More languages',
+    contextToggle: 'Replying to…',
+    contextPlaceholder: 'Paste the message you are replying to…',
+    contextClear: 'Clear context',
   },
   ko: {
     sourceLanguage: '입력 언어',
@@ -117,6 +120,9 @@ export const STRINGS = {
     uiLangToggleEn: 'EN',
     uiLangToggleKo: '한',
     moreLanguages: '다른 언어',
+    contextToggle: '답장 대상…',
+    contextPlaceholder: '답장할 상대의 메시지를 붙여넣으세요…',
+    contextClear: '문맥 지우기',
   },
 } as const satisfies Record<UiLang, Record<string, string>>
 
