@@ -24,7 +24,7 @@ export default function WordView({ result, mode, streaming }: Props) {
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
 
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-6 scrollbar-thin">
+    <div className="flex h-full flex-col gap-5 overflow-y-auto p-6 scrollbar-thin xl:px-12 2xl:px-18">
       <div>
         <p className="text-3xl font-semibold text-ink">
           {result.primaryTranslation || (

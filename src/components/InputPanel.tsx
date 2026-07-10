@@ -51,11 +51,11 @@ export default function InputPanel() {
 
   return (
     <section
-      className={`flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:p-6 2xl:p-12 ${
+      className={`flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:py-6 2xl:py-12 ${
         input ? '' : 'flex-1'
       }`}
     >
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4 xl:px-10 2xl:px-16">
         <LanguageChipBar
           kind="source"
           value={source}
@@ -130,7 +130,7 @@ export default function InputPanel() {
             placeholder={t('placeholder')}
             aria-label={t('inputText')}
             data-testid="input-textarea"
-            className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl"
+            className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl xl:px-12 2xl:px-18"
             spellCheck
             autoComplete="off"
             autoCorrect="on"
@@ -149,7 +149,7 @@ export default function InputPanel() {
                   // clipboard unavailable or permission denied
                 }
               }}
-              className="absolute left-35 text-sm top-4 sm:left-40 sm:top-5 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
+              className="absolute left-35 text-sm top-4 sm:left-40 sm:top-5 xl:left-46 2xl:left-52 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
             >
               {t('pasteClipboard')}
             </button>

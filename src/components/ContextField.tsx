@@ -42,7 +42,7 @@ export function ContextTextarea() {
         placeholder={t('contextPlaceholder')}
         aria-label={t('contextToggle')}
         data-testid="context-textarea"
-        className="field-sizing-content max-h-32 min-h-[3rem] w-full resize-none bg-transparent px-4 py-2 text-sm leading-relaxed text-ink-soft placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6"
+        className="field-sizing-content max-h-32 min-h-[3rem] w-full resize-none bg-transparent px-4 py-2 text-sm leading-relaxed text-ink-soft placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 xl:px-12 2xl:px-18"
       />
       {context && (
         <button
@@ -50,7 +50,7 @@ export function ContextTextarea() {
           onClick={() => setContext('')}
           aria-label={t('contextClear')}
           data-testid="context-clear"
-          className="absolute right-2 top-2 cursor-pointer rounded p-1 text-ink-dim transition hover:text-ink"
+          className="absolute right-2 top-2 xl:right-8 2xl:right-14 cursor-pointer rounded p-1 text-ink-dim transition hover:text-ink"
         >
           <X size={12} />
         </button>

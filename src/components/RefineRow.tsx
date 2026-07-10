@@ -66,7 +66,7 @@ export default function RefineRow() {
   }
 
   return (
-    <div className="shrink-0 border-t border-border px-2 py-2 xl:py-3">
+    <div className="shrink-0 border-t border-border px-2 py-2 xl:px-8 xl:py-3 2xl:px-14">
       {refineError && (
         <p data-testid="refine-error" className="mb-2 text-xs text-red-400">
           {t('refineFailed')}: {refineError.message}
