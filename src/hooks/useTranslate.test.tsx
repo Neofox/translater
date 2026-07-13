@@ -21,11 +21,6 @@ function makeCacheStream(main: string): ReadableStream<TranslateChunk> {
   const done: TranslateDone = {
     intent: 'sentence',
     data: { main } as unknown as TranslateDone['data'],
-    meta: {
-      durationMs: 0,
-      model: 'test-model',
-      tokens: { input: 0, output: 0, total: 0 },
-    },
   } as TranslateDone
   return new ReadableStream<TranslateChunk>({
     start(controller) {
@@ -93,6 +88,28 @@ describe('useTranslate', () => {
     expect(translateMock).toHaveBeenCalledTimes(1)
   })
 
+  it('groups page-lifetime requests under one anonymous session', async () => {
+    const sessionId = '00000000-0000-4000-8000-000000000001'
+    vi.spyOn(window.crypto, 'randomUUID').mockReturnValue(sessionId)
+    const { result } = renderHook(
+      (props: TranslateArgs) => useTranslate(props),
+      { initialProps: baseArgs, wrapper },
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400)
+    })
+    await act(async () => {
+      await result.current.run()
+    })
+
+    expect(
+      translateMock.mock.calls.map(
+        ([request]) => request.data.analyticsSessionId,
+      ),
+    ).toEqual([sessionId, sessionId])
+  })
+
   it('restore() + refinements change in the same act suppresses the scheduled run', async () => {
     const { result, rerender } = renderHook(
       (props: TranslateArgs) => useTranslate(props),
@@ -116,7 +133,6 @@ describe('useTranslate', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     }
 

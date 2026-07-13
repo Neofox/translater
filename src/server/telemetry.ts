@@ -1,4 +1,7 @@
-import type { startObservation } from '@langfuse/tracing'
+import type { propagateAttributes, startObservation } from '@langfuse/tracing'
+
+export type CharacterCountBucket =
+  '0' | '1-24' | '25-100' | '101-500' | '501-2000' | '2001+'
 
 type TranslationDimensions = {
   intent: 'word' | 'sentence'
@@ -8,8 +11,11 @@ type TranslationDimensions = {
   uiLanguage: 'en' | 'ko'
   hasContext: boolean
   refinementCount: number
+  requestKind: 'initial' | 'context' | 'refinement'
+  inputLengthBucket: CharacterCountBucket
   isPolish: boolean
   promptVersion: string
+  analyticsSessionId?: string
 }
 
 type TokenUsage = {
@@ -21,8 +27,13 @@ type TokenUsage = {
 }
 
 type TranslationResult = {
-  tokens: TokenUsage
+  tokens?: TokenUsage
   costUsd?: number
+  resolvedSourceLanguage: string
+  resolvedTargetLanguage: string
+  outputLengthBucket: CharacterCountBucket
+  alternativeCount: number
+  hasLearningTips: boolean
 }
 
 export type TranslationTelemetry = {
@@ -33,6 +44,7 @@ export type TranslationTelemetry = {
 
 type LangfuseRuntime = {
   startObservation: typeof startObservation
+  propagateAttributes: typeof propagateAttributes
 }
 
 let runtimePromise: Promise<LangfuseRuntime | undefined> | undefined
@@ -60,13 +72,12 @@ async function initializeLangfuse(): Promise<LangfuseRuntime | undefined> {
   if (!hasCredentials()) return undefined
 
   try {
-    const [{ NodeSDK }, { LangfuseSpanProcessor }, tracing] = await Promise.all(
-      [
-        import('@opentelemetry/sdk-node'),
+    const [{ NodeTracerProvider }, { LangfuseSpanProcessor }, tracing] =
+      await Promise.all([
+        import('@opentelemetry/sdk-trace-node'),
         import('@langfuse/otel'),
         import('@langfuse/tracing'),
-      ],
-    )
+      ])
 
     const processor = new LangfuseSpanProcessor({
       publicKey: process.env.LANGFUSE_PUBLIC_KEY,
@@ -82,17 +93,15 @@ async function initializeLangfuse(): Promise<LangfuseRuntime | undefined> {
       mediaUploadEnabled: false,
     })
 
-    const sdk = new NodeSDK({
+    const provider = new NodeTracerProvider({
       spanProcessors: [processor],
-      // Node's default resource detectors include process command arguments.
-      // They are unnecessary for this product telemetry and broaden the data
-      // boundary beyond the explicit metadata assembled below.
-      autoDetectResources: false,
-      resourceDetectors: [],
     })
-    sdk.start()
+    provider.register()
 
-    return { startObservation: tracing.startObservation }
+    return {
+      startObservation: tracing.startObservation,
+      propagateAttributes: tracing.propagateAttributes,
+    }
   } catch (error) {
     warnOnce(
       'initialization failed; translations will continue untraced',
@@ -121,6 +130,15 @@ export function langfuseUsageDetails(tokens: TokenUsage) {
   }
 }
 
+export function characterCountBucket(count: number): CharacterCountBucket {
+  if (count === 0) return '0'
+  if (count <= 24) return '1-24'
+  if (count <= 100) return '25-100'
+  if (count <= 500) return '101-500'
+  if (count <= 2_000) return '501-2000'
+  return '2001+'
+}
+
 function safeErrorStatus(error: unknown) {
   if (!error || typeof error !== 'object') return 'Translation request failed'
 
@@ -143,32 +161,58 @@ export async function startTranslationTelemetry(
   if (!runtime) return noopTelemetry
 
   try {
-    const metadata = {
-      ...dimensions,
+    const { analyticsSessionId, ...safeDimensions } = dimensions
+    const requestMetadata = {
+      ...safeDimensions,
       cacheLayer,
       providerRequest: cacheLayer === 'openai',
     }
-    const request = runtime.startObservation('translation.request', {
-      metadata,
-    })
-    const generation =
-      cacheLayer === 'openai'
-        ? request.startObservation(
-            'openai.responses',
-            {
-              model,
-              metadata: {
-                intent: dimensions.intent,
-                mode: dimensions.mode,
-                sourceLanguage: dimensions.sourceLanguage,
-                targetLanguage: dimensions.targetLanguage,
-                promptVersion: dimensions.promptVersion,
-              },
-              modelParameters: { reasoningEffort: 'none' },
-            },
-            { asType: 'generation' },
-          )
-        : undefined
+    const generationMetadata = {
+      intent: dimensions.intent,
+      mode: dimensions.mode,
+      sourceLanguage: dimensions.sourceLanguage,
+      targetLanguage: dimensions.targetLanguage,
+      requestKind: dimensions.requestKind,
+      inputLengthBucket: dimensions.inputLengthBucket,
+      promptVersion: dimensions.promptVersion,
+    }
+    const { request, generation } = runtime.propagateAttributes(
+      {
+        traceName: 'translation',
+        version: dimensions.promptVersion,
+        tags: [
+          'translation',
+          dimensions.intent,
+          dimensions.mode,
+          dimensions.requestKind,
+          cacheLayer,
+        ],
+        ...(analyticsSessionId ? { sessionId: analyticsSessionId } : {}),
+      },
+      () => {
+        const startedRequest = runtime.startObservation('translation.request', {
+          metadata: requestMetadata,
+          version: dimensions.promptVersion,
+        })
+        const startedGeneration =
+          cacheLayer === 'openai'
+            ? startedRequest.startObservation(
+                'openai.responses',
+                {
+                  model,
+                  metadata: generationMetadata,
+                  modelParameters: { reasoningEffort: 'none' },
+                  version: dimensions.promptVersion,
+                },
+                { asType: 'generation' },
+              )
+            : undefined
+        return {
+          request: startedRequest,
+          generation: startedGeneration,
+        }
+      },
+    )
 
     let ended = false
     let markedFirstToken = false
@@ -180,24 +224,50 @@ export async function startTranslationTelemetry(
       try {
         if (error) {
           const statusMessage = safeErrorStatus(error)
-          generation?.update({ level: 'ERROR', statusMessage }).end()
-          request.update({ level: 'ERROR', statusMessage }).end()
+          generation
+            ?.update({
+              level: 'ERROR',
+              statusMessage,
+              metadata: { ...generationMetadata, outcome: 'error' },
+            })
+            .end()
+          request
+            .update({
+              level: 'ERROR',
+              statusMessage,
+              metadata: { ...requestMetadata, outcome: 'error' },
+            })
+            .end()
           return
         }
 
-        if (generation && result) {
+        const resultMetadata = result
+          ? {
+              resolvedSourceLanguage: result.resolvedSourceLanguage,
+              resolvedTargetLanguage: result.resolvedTargetLanguage,
+              outputLengthBucket: result.outputLengthBucket,
+              alternativeCount: result.alternativeCount,
+              hasLearningTips: result.hasLearningTips,
+              outcome: 'success',
+            }
+          : { outcome: 'success' }
+
+        if (generation) {
           generation
             .update({
-              usageDetails: langfuseUsageDetails(result.tokens),
-              ...(typeof result.costUsd === 'number'
+              metadata: { ...generationMetadata, ...resultMetadata },
+              ...(result?.tokens
+                ? { usageDetails: langfuseUsageDetails(result.tokens) }
+                : {}),
+              ...(typeof result?.costUsd === 'number'
                 ? { costDetails: { total: result.costUsd } }
                 : {}),
             })
             .end()
-        } else {
-          generation?.end()
         }
-        request.end()
+        request
+          .update({ metadata: { ...requestMetadata, ...resultMetadata } })
+          .end()
       } catch (telemetryError) {
         warnOnce(
           'trace update failed; translations will continue',

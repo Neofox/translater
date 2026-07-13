@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
 import { translate } from '../server/translate'
 import { partialParse } from '../lib/partialParse'
-import type { Meta, TranslateChunk, TranslateDone } from '../server/translate'
+import type { TranslateChunk, TranslateDone } from '../server/translate'
 import type { SentenceResult, WordResult } from '../server/schemas'
 import type { Intent, Mode } from '../lib/types'
 import type { LangCode } from '../lib/languages'
@@ -21,7 +21,6 @@ export type LiveResult =
       intent: 'sentence'
       partial: Partial<SentenceResult>
       done: boolean
-      meta: Meta | null
       /** The trimmed input text this result was produced for — lets stale
        * consumers (heuristics, safety nets) detect that `live` outlived the
        * input it was streamed for and fall back to fresh evidence. */
@@ -31,7 +30,6 @@ export type LiveResult =
       intent: 'word'
       partial: Partial<WordResult>
       done: boolean
-      meta: Meta | null
       text: string
     }
 
@@ -65,6 +63,17 @@ export function useTranslate(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipDebounceRef = useRef(false)
   const suppressAutoRunRef = useRef(false)
+  const analyticsSessionIdRef = useRef<string | null>(null)
+
+  // Group translations from one open page without creating a durable user
+  // identifier. This stays in memory only and resets on every page load.
+  if (
+    analyticsSessionIdRef.current === null &&
+    typeof window !== 'undefined' &&
+    typeof window.crypto.randomUUID === 'function'
+  ) {
+    analyticsSessionIdRef.current = window.crypto.randomUUID()
+  }
 
   const run = useCallback(
     async (override?: Partial<TranslateArgs>) => {
@@ -101,7 +110,7 @@ export function useTranslate(
 
       setIsPending(true)
       setError(null)
-      setLive({ intent, partial: {}, done: false, meta: null, text: trimmed })
+      setLive({ intent, partial: {}, done: false, text: trimmed })
 
       // Server streams incremental JSON fragments; accumulate them here.
       let rawJson = ''
@@ -118,6 +127,7 @@ export function useTranslate(
             context,
             refinements,
             previousMain,
+            analyticsSessionId: analyticsSessionIdRef.current ?? undefined,
           },
           signal: ctrl.signal,
         })
@@ -162,7 +172,6 @@ export function useTranslate(
           intent: done.intent,
           partial: done.data,
           done: true,
-          meta: done.meta,
           text: trimmed,
         })
       }

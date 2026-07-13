@@ -21,7 +21,6 @@ import {
 import { useSessionState } from '../lib/usePersistentState'
 import type { Intent, Mode } from '../lib/types'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
-import type { Meta } from '../server/translate'
 
 type TranslateHandle = ReturnType<typeof useTranslate>
 
@@ -66,7 +65,6 @@ type TranslatorContextValue = {
   queueImmediate: TranslateHandle['queueImmediate']
   inputTips?: Partial<LearningTipsType>
   outputTips?: Partial<LearningTipsType>
-  lastMeta: Meta | null
   textareaRef: RefObject<HTMLTextAreaElement | null>
   clearInput: () => void
   lookupWord: (text: string) => void
@@ -208,13 +206,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const inputTips = sourceIsForeign ? learningTips : undefined
   const outputTips =
     !sourceIsForeign && targetIsForeign ? learningTips : undefined
-
-  // Last completed request's meta survives input clears for the debug bar.
-  const [lastMeta, setLastMeta] = useState<Meta | null>(null)
-
-  useEffect(() => {
-    if (live?.done && live.meta) setLastMeta(live.meta)
-  }, [live])
 
   // Focus input on mount, but not on touch devices (avoids popping the keyboard).
   useEffect(() => {
@@ -375,7 +366,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     queueImmediate,
     inputTips,
     outputTips,
-    lastMeta,
     textareaRef,
     clearInput,
     lookupWord,

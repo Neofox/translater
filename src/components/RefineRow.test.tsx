@@ -10,7 +10,7 @@ import { UiLangProvider } from '../hooks/useUiLang'
 import RefineRow from './RefineRow'
 
 vi.mock('../hooks/useTranslate', async () => {
-  const React = await import('react')
+  const reactModule = await import('react')
   let currentLive: unknown = null
   const listeners = new Set<(v: unknown) => void>()
   function applyMockLive(v: unknown) {
@@ -24,15 +24,15 @@ vi.mock('../hooks/useTranslate', async () => {
     errorListeners.forEach((fn) => fn(v))
   }
   function useTranslate() {
-    const [live, setLive] = React.useState(currentLive)
-    React.useEffect(() => {
+    const [live, setLive] = reactModule.useState(currentLive)
+    reactModule.useEffect(() => {
       listeners.add(setLive)
       return () => {
         listeners.delete(setLive)
       }
     }, [])
-    const [error, setError] = React.useState(currentError)
-    React.useEffect(() => {
+    const [error, setError] = reactModule.useState(currentError)
+    reactModule.useEffect(() => {
       errorListeners.add(setError)
       return () => {
         errorListeners.delete(setError)
@@ -113,7 +113,6 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
     const chip = await screen.findByTestId('refine-chip-softer')
@@ -134,7 +133,6 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
     const input = (await screen.findByTestId(
@@ -161,7 +159,6 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
     fireEvent.click(await screen.findByTestId('refine-chip-softer'))
@@ -192,7 +189,6 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
     const chip = await screen.findByTestId('refine-chip-softer')

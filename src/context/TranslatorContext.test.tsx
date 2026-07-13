@@ -157,7 +157,6 @@ describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
       intent: 'sentence',
       partial: { sourceLang: 'fr' },
       done: true,
-      meta: null,
       text: 'merci beaucoup',
     })
 
@@ -231,7 +230,6 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main },
       done: true,
-      meta: null,
       text,
     })
   }
@@ -277,7 +275,6 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요~' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
     act(() => holder.current!.addRefinement('more formal'))
@@ -285,7 +282,6 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main: '내일 뵙겠습니다' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
     expect(holder.current?.refinements).toEqual([
@@ -343,7 +339,6 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: {},
       done: false,
-      meta: null,
       text: 'see you tomorrow',
     })
 
@@ -362,7 +357,6 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main: '새 결과' },
       done: true,
-      meta: null,
       text: 'see you tomorrow',
     })
 
