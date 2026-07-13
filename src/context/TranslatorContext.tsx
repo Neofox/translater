@@ -63,7 +63,6 @@ type TranslatorContextValue = {
   flush: TranslateHandle['flush']
   /** Skip the debounce for the next auto-run — call before programmatic input changes (paste). */
   queueImmediate: TranslateHandle['queueImmediate']
-  inputTips?: Partial<LearningTipsType>
   outputTips?: Partial<LearningTipsType>
   textareaRef: RefObject<HTMLTextAreaElement | null>
   clearInput: () => void
@@ -196,16 +195,9 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     setTarget(fallbackTargetFor(reported))
   }, [live, source, target, input, setTarget])
 
-  // Position the learning-tips pill on whichever side holds the non-English
-  // language. If the source is foreign the user is reading — show tips there;
-  // otherwise if the target is foreign the user is composing — show on output.
-  const learningTips = live?.partial.learningTips
-  const detectedSource = source === 'auto' ? (rawDetected ?? 'en') : source
-  const sourceIsForeign = detectedSource !== 'en'
-  const targetIsForeign = translationTarget !== 'en'
-  const inputTips = sourceIsForeign ? learningTips : undefined
-  const outputTips =
-    !sourceIsForeign && targetIsForeign ? learningTips : undefined
+  // Learning tips always belong to the translated result, so keep their
+  // placement stable in the target panel regardless of the language pair.
+  const outputTips = live?.partial.learningTips
 
   // Focus input on mount, but not on touch devices (avoids popping the keyboard).
   useEffect(() => {
@@ -364,7 +356,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     reset,
     flush,
     queueImmediate,
-    inputTips,
     outputTips,
     textareaRef,
     clearInput,

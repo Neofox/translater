@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import CopyButton from './CopyButton'
 import Pill from './ui/Pill'
-import LearningTips from './LearningTips'
 import LanguageChipBar from './LanguageChipBar'
 import WordSourceMeta from './WordSourceMeta'
 import { ContextTextarea, ContextToggle } from './ContextField'
@@ -21,7 +20,6 @@ export default function InputPanel() {
     live,
     streaming,
     error,
-    inputTips,
     clearInput,
     lookupWord,
     textareaRef,
@@ -68,7 +66,6 @@ export default function InputPanel() {
             open={contextOpen}
             onToggle={() => setContextOpen((v) => !v)}
           />
-          <LearningTips tips={inputTips} />
           {showCounter && (
             <span
               className={`text-xs font-medium tabular-nums ${counterTone}`}
