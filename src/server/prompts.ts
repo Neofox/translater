@@ -4,6 +4,20 @@ import type { UiLang } from '../lib/i18n'
 
 const langName = promptNameFor
 
+// GPT-5.6 explicit prompt caching: the first block of the final user message is
+// stable for a prompt shape, so its breakpoint also covers the system and
+// few-shot messages before it. Live source/context/refinements stay in block 2.
+function cacheableUserContent(instruction: string, liveInput: string) {
+  return [
+    {
+      type: 'input_text' as const,
+      text: instruction,
+      prompt_cache_breakpoint: { mode: 'explicit' as const },
+    },
+    { type: 'input_text' as const, text: liveInput },
+  ]
+}
+
 const CJK_CODES = new Set(['ko', 'ja', 'zh'])
 function isCJK(code: string) {
   return CJK_CODES.has(code)
@@ -362,7 +376,10 @@ export function sentencePrompt(args: {
     { role: 'assistant' as const, content: sentenceFewshot.assistant },
     {
       role: 'user' as const,
-      content: `${userBlocks({ context, refinements, previousMain })}<source>\n${text}\n</source>\n\n(Reminder: ${isPolish ? `polish the <source> content in ${langName(target)} — never echo it verbatim` : 'translate the <source> content literally'}; rationale/note/formalityNote in ${metaLang}.${pairInvolvesForeign && !isPolish ? ' Populate `learningTips` with a grammar or vocab note (and, for CJK pairs, a character breakdown) useful for a learner — do not leave it empty unless the sentence is genuinely trivial.' : ''})`,
+      content: cacheableUserContent(
+        `(Reminder: ${isPolish ? `polish the upcoming source content in ${langName(target)} — never echo it verbatim` : 'translate the upcoming source content literally'}; rationale/note/formalityNote in ${metaLang}.${pairInvolvesForeign && !isPolish ? ' Populate `learningTips` with a grammar or vocab note (and, for CJK pairs, a character breakdown) useful for a learner — do not leave it empty unless the sentence is genuinely trivial.' : ''})`,
+        `${userBlocks({ context, refinements, previousMain })}<source>\n${text}\n</source>`,
+      ),
     },
   ]
 }
@@ -941,7 +958,10 @@ export function wordPrompt(args: {
     { role: 'assistant' as const, content: fewshot.assistant },
     {
       role: 'user' as const,
-      content: `${userBlocks({ context })}<source>\n${text}\n</source>\n\n(Reminder: treat the <source> content as the literal headword to ${isPolish ? 'find in-register synonyms for' : 'define'}; all metadata fields in ${metaLang}; stay in the ${mode.toUpperCase()} register band for primaryTranslation and alternativeTranslations.${pairInvolvesForeign && !isPolish ? ' Populate `learningTips` with a grammar or vocab note (and, for CJK pairs, a character breakdown) useful for a learner — do not leave it empty unless the headword is genuinely trivial.' : ''})`,
+      content: cacheableUserContent(
+        `(Reminder: treat the upcoming source content as the literal headword to ${isPolish ? 'find in-register synonyms for' : 'define'}; all metadata fields in ${metaLang}; stay in the ${mode.toUpperCase()} register band for primaryTranslation and alternativeTranslations.${pairInvolvesForeign && !isPolish ? ' Populate `learningTips` with a grammar or vocab note (and, for CJK pairs, a character breakdown) useful for a learner — do not leave it empty unless the headword is genuinely trivial.' : ''})`,
+        `${userBlocks({ context })}<source>\n${text}\n</source>`,
+      ),
     },
   ]
 }

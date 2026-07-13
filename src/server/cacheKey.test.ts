@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cacheKeyFor } from './cacheKey'
+import { cacheKeyFor, promptCacheKeyFor } from './cacheKey'
 
 const base = {
   intent: 'sentence' as const,
@@ -54,5 +54,27 @@ describe('cacheKeyFor', () => {
     expect(cacheKeyFor({ ...base, refinements: [], previousMain: 'x' })).toBe(
       cacheKeyFor(base),
     )
+  })
+})
+
+describe('promptCacheKeyFor', () => {
+  it('varies for every field that changes the reusable prompt prefix', () => {
+    const key = promptCacheKeyFor(base)
+    expect(promptCacheKeyFor({ ...base, intent: 'word' })).not.toBe(key)
+    expect(promptCacheKeyFor({ ...base, mode: 'professional' })).not.toBe(key)
+    expect(promptCacheKeyFor({ ...base, source: 'auto' })).not.toBe(key)
+    expect(promptCacheKeyFor({ ...base, target: 'ja' })).not.toBe(key)
+    expect(promptCacheKeyFor({ ...base, uiLang: 'ko' })).not.toBe(key)
+  })
+
+  it('ignores live input that appears after the cache breakpoint', () => {
+    const changedLiveInput = {
+      ...base,
+      text: 'different source',
+      context: 'different context',
+      refinements: ['shorter'],
+      previousMain: 'old output',
+    }
+    expect(promptCacheKeyFor(base)).toBe(promptCacheKeyFor(changedLiveInput))
   })
 })

@@ -36,3 +36,20 @@ export function cacheKeyFor(d: CacheKeyInput): string {
     anchored ? d.previousMain : '',
   ])
 }
+
+// Route requests with an identical stable system + few-shot prefix to the same
+// prompt cache. Live text/context/refinements occur after the explicit cache
+// breakpoint and therefore do not belong in this key.
+export function promptCacheKeyFor(
+  d: Pick<CacheKeyInput, 'intent' | 'mode' | 'source' | 'target' | 'uiLang'>,
+): string {
+  return [
+    'nt',
+    CACHE_VERSION,
+    d.intent,
+    d.uiLang,
+    d.source,
+    d.target,
+    d.mode,
+  ].join(':')
+}

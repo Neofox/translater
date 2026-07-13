@@ -3,14 +3,17 @@ import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { SentenceResult, WordResult } from '../src/server/schemas.ts'
 import { sentencePrompt, wordPrompt } from '../src/server/prompts.ts'
+import { promptCacheKeyFor } from '../src/server/cacheKey.ts'
 
-const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.4-mini'
+const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.6-luna'
 console.log(`[smoke] model=${MODEL}`)
 
 const client = new OpenAI()
 
 async function callStructured(intent, args) {
-  const messages = intent === 'word' ? wordPrompt(args) : sentencePrompt(args)
+  const promptArgs = { uiLang: 'en', ...args, intent }
+  const messages =
+    intent === 'word' ? wordPrompt(promptArgs) : sentencePrompt(promptArgs)
   const format =
     intent === 'word'
       ? zodTextFormat(WordResult, 'word_translation')
@@ -19,7 +22,10 @@ async function callStructured(intent, args) {
   const response = await client.responses.parse({
     model: MODEL,
     input: messages,
-    temperature: intent === 'word' ? 0.2 : args.mode === 'casual' ? 0.7 : 0.3,
+    reasoning: { effort: 'none' },
+    store: false,
+    prompt_cache_key: promptCacheKeyFor(promptArgs),
+    prompt_cache_options: { mode: 'explicit', ttl: '30m' },
     text: { format },
   })
   return {
@@ -32,7 +38,7 @@ async function callStructured(intent, args) {
 async function run(label, intent, args) {
   const { data, ms, usage } = await callStructured(intent, args)
   console.log(
-    `\n=== ${label} ===  ${ms} ms | in=${usage?.input_tokens} out=${usage?.output_tokens} total=${usage?.total_tokens}`,
+    `\n=== ${label} ===  ${ms} ms | in=${usage?.input_tokens} cached=${usage?.input_tokens_details?.cached_tokens ?? 0} write=${usage?.input_tokens_details?.cache_write_tokens ?? 0} out=${usage?.output_tokens} total=${usage?.total_tokens}`,
   )
   console.log(JSON.stringify(data, null, 2))
   return { data, ms, usage }

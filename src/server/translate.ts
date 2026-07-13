@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { SentenceResult, WordResult } from './schemas'
 import { sentencePrompt, wordPrompt } from './prompts'
 import { translationCache } from './cache'
-import { cacheKeyFor } from './cacheKey'
+import { CACHE_VERSION, cacheKeyFor, promptCacheKeyFor } from './cacheKey'
+import { calculateTokenCostUsd } from './pricing'
+import { startTranslationTelemetry } from './telemetry'
 import {
   MAX_CONTEXT_CHARS,
   MAX_INPUT_CHARS,
@@ -30,8 +32,15 @@ const TranslateInput = z.object({
 
 export type Meta = {
   durationMs: number
+  timeToFirstTokenMs?: number
   model: string
-  tokens: { input: number; output: number; total: number }
+  tokens: {
+    input: number
+    cachedInput: number
+    cacheWriteInput: number
+    output: number
+    total: number
+  }
   costUsd?: number
 }
 
@@ -44,30 +53,68 @@ export type TranslateChunk =
   | { type: 'cache'; done: TranslateDone } // cache hit — single terminal chunk
   | { type: 'done'; done: TranslateDone } // stream terminal chunk
 
-const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.4-mini'
+const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.6-luna'
 
-// Word lookups want determinism; sentence temperature loosens with the mode.
-// const SENTENCE_TEMPERATURE = { friends: 0.85, casual: 0.7, professional: 0.3 }
-// const WORD_TEMPERATURE = 0.2
+function telemetryDimensions(data: z.infer<typeof TranslateInput>) {
+  return {
+    intent: data.intent,
+    mode: data.mode,
+    sourceLanguage: data.source,
+    targetLanguage: data.target,
+    uiLanguage: data.uiLang,
+    hasContext: Boolean(data.context),
+    refinementCount: data.refinements.length,
+    isPolish: data.source === data.target,
+    promptVersion: CACHE_VERSION,
+  }
+}
 
 // Lazy so the OpenAI client (and its OPENAI_API_KEY check) only exists server-side.
 let _client: OpenAI | undefined
 const client = () => (_client ??= new OpenAI())
 
-function priceFor(tokens: { input: number; output: number }) {
+function priceFor(tokens: {
+  input: number
+  cachedInput: number
+  cacheWriteInput: number
+  output: number
+}) {
   const inPer1M = Number(process.env.TRANSLATE_PRICE_INPUT_PER_1M)
+  const cachedInPer1M = Number(process.env.TRANSLATE_PRICE_CACHED_INPUT_PER_1M)
+  const cacheWriteInPer1M = Number(
+    process.env.TRANSLATE_PRICE_CACHE_WRITE_INPUT_PER_1M,
+  )
   const outPer1M = Number(process.env.TRANSLATE_PRICE_OUTPUT_PER_1M)
   if (!Number.isFinite(inPer1M) || !Number.isFinite(outPer1M)) return undefined
-  return (tokens.input * inPer1M + tokens.output * outPer1M) / 1_000_000
+
+  // Preserve the old all-input-at-base-rate estimate when detailed cache
+  // prices are not configured (for example, an older deployment environment).
+  if (!Number.isFinite(cachedInPer1M) || !Number.isFinite(cacheWriteInPer1M)) {
+    return (tokens.input * inPer1M + tokens.output * outPer1M) / 1_000_000
+  }
+
+  return calculateTokenCostUsd(tokens, {
+    inputPer1M: inPer1M,
+    cachedInputPer1M: cachedInPer1M,
+    cacheWriteInputPer1M: cacheWriteInPer1M,
+    outputPer1M: outPer1M,
+  })
 }
 
 export const translate = createServerFn({ method: 'POST' })
   .validator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
     const cacheKey = cacheKeyFor(data)
+    const dimensions = telemetryDimensions(data)
 
     const cached = translationCache.get(cacheKey) as TranslateDone | undefined
     if (cached) {
+      const telemetry = await startTranslationTelemetry(
+        dimensions,
+        'local',
+        MODEL,
+      )
+      telemetry.succeed()
       const done: TranslateDone = {
         ...cached,
         meta: { ...cached.meta, durationMs: 0 },
@@ -81,7 +128,13 @@ export const translate = createServerFn({ method: 'POST' })
     }
 
     const isWord = data.intent === 'word'
+    const telemetry = await startTranslationTelemetry(
+      dimensions,
+      'openai',
+      MODEL,
+    )
     const t0 = Date.now()
+    let firstTokenAt: number | undefined
 
     return new ReadableStream<TranslateChunk>({
       async start(controller) {
@@ -89,17 +142,14 @@ export const translate = createServerFn({ method: 'POST' })
           const stream = client().responses.stream({
             model: MODEL,
             input: isWord ? wordPrompt(data) : sentencePrompt(data),
-            // temperature: isWord
-            //   ? WORD_TEMPERATURE
-            //   : SENTENCE_TEMPERATURE[data.mode],
             // Hidden reasoning tokens delay the first output delta by seconds;
             // translation quality here comes from the prompt, not deliberation.
             reasoning: { effort: 'none' },
-            // Everything except the final user message is a stable prefix per
-            // prompt shape — route same-shape requests to the same prefix cache.
-            prompt_cache_key: `nt:${data.intent}:${data.uiLang}:${data.mode}:${
-              data.source === data.target ? 'polish' : 'translate'
-            }`,
+            store: false,
+            // The explicit breakpoint follows a stable reminder in the final
+            // user message; live source/context/refinements come after it.
+            prompt_cache_key: promptCacheKeyFor(data),
+            prompt_cache_options: { mode: 'explicit', ttl: '30m' },
             text: {
               format: isWord
                 ? zodTextFormat(WordResult, 'word_translation')
@@ -112,6 +162,10 @@ export const translate = createServerFn({ method: 'POST' })
           // payload linear instead of quadratic in response length.
           for await (const event of stream) {
             if (event.type === 'response.output_text.delta') {
+              if (firstTokenAt === undefined) {
+                firstTokenAt = Date.now()
+                telemetry.markFirstToken()
+              }
               controller.enqueue({ type: 'delta', raw: event.delta })
             }
           }
@@ -121,17 +175,31 @@ export const translate = createServerFn({ method: 'POST' })
           const parsed = response.output_parsed
           if (!parsed) throw new Error('Model returned no structured output')
 
+          const inputTokens = response.usage?.input_tokens ?? 0
+          const cachedInput =
+            response.usage?.input_tokens_details.cached_tokens ?? 0
+          const cacheWriteInput =
+            response.usage?.input_tokens_details.cache_write_tokens ?? 0
+          const outputTokens = response.usage?.output_tokens ?? 0
+
           const meta: Meta = {
             durationMs: Date.now() - t0,
+            ...(firstTokenAt === undefined
+              ? {}
+              : { timeToFirstTokenMs: firstTokenAt - t0 }),
             model: MODEL,
             tokens: {
-              input: response.usage?.input_tokens ?? 0,
-              output: response.usage?.output_tokens ?? 0,
+              input: inputTokens,
+              cachedInput,
+              cacheWriteInput,
+              output: outputTokens,
               total: response.usage?.total_tokens ?? 0,
             },
             costUsd: priceFor({
-              input: response.usage?.input_tokens ?? 0,
-              output: response.usage?.output_tokens ?? 0,
+              input: inputTokens,
+              cachedInput,
+              cacheWriteInput,
+              output: outputTokens,
             }),
           }
 
@@ -139,10 +207,12 @@ export const translate = createServerFn({ method: 'POST' })
             ? { intent: 'word', data: parsed as WordResult, meta }
             : { intent: 'sentence', data: parsed as SentenceResult, meta }
 
+          telemetry.succeed({ tokens: meta.tokens, costUsd: meta.costUsd })
           translationCache.set(cacheKey, done)
           controller.enqueue({ type: 'done', done })
           controller.close()
         } catch (err) {
+          telemetry.fail(err)
           controller.error(err)
         }
       },
