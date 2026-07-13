@@ -59,9 +59,9 @@ type TranslatorContextValue = {
   error: TranslateError | null
   run: TranslateHandle['run']
   reset: TranslateHandle['reset']
-  /** Fire a pending debounced translation now (Enter / blur). Returns true when one was pending. */
+  /** Fire a pending debounced translation now and record whether Enter or blur triggered it. */
   flush: TranslateHandle['flush']
-  /** Skip the debounce for the next auto-run — call before programmatic input changes (paste). */
+  /** Skip the debounce for the next paste/refinement run and record its trigger. */
   queueImmediate: TranslateHandle['queueImmediate']
   outputTips?: Partial<LearningTipsType>
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -257,7 +257,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
       setPreviousMain(live.partial.main ?? '')
       refineInFlightRef.current = true
       setRefineError(null)
-      queueImmediate()
+      queueImmediate('refinement')
       const next = [...current, trimmed]
       refinementsRef.current = next
       setRefinements(next)
@@ -285,7 +285,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
       setPreviousMain(next.length > 0 ? (live.partial.main ?? '') : '')
       refineInFlightRef.current = true
       setRefineError(null)
-      queueImmediate()
+      queueImmediate('refinement')
       refinementsRef.current = next
       setRefinements(next)
     },

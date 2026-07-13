@@ -105,8 +105,8 @@ export default function InputPanel() {
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onPaste={() => queueImmediate()}
-            onBlur={() => flush()}
+            onPaste={() => queueImmediate('paste')}
+            onBlur={() => flush('blur')}
             onKeyDown={(e) => {
               // Enter fires a pending debounced translation immediately;
               // when nothing is pending it stays a plain newline.
@@ -119,7 +119,7 @@ export default function InputPanel() {
                 !e.metaKey &&
                 !e.ctrlKey &&
                 !e.nativeEvent.isComposing &&
-                flush()
+                flush('enter')
               ) {
                 e.preventDefault()
               }
@@ -139,7 +139,7 @@ export default function InputPanel() {
                 try {
                   const text = await navigator.clipboard.readText()
                   if (text) {
-                    queueImmediate()
+                    queueImmediate('paste')
                     setInput(text)
                   }
                 } catch {

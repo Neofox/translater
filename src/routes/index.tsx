@@ -74,7 +74,7 @@ function TranslatorShortcuts() {
   useTranslatorShortcuts({
     hasInput: Boolean(input),
     live,
-    onForce: () => void run(),
+    onForce: () => void run(undefined, 'force'),
     onCopy: () => {
       const text = mainText(live)
       if (text) void navigator.clipboard.writeText(text)

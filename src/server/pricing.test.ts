@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { calculateTokenCostUsd, configuredTokenCostUsd } from './pricing'
+import {
+  calculateTokenCostDetailsUsd,
+  calculateTokenCostUsd,
+  configuredTokenCostDetailsUsd,
+  configuredTokenCostUsd,
+} from './pricing'
 
 const lunaPrices = {
   inputPer1M: 1,
@@ -31,6 +36,26 @@ describe('calculateTokenCostUsd', () => {
       ),
     ).toBe(0.001135)
   })
+
+  it('returns a cost breakdown matching the exclusive usage buckets', () => {
+    expect(
+      calculateTokenCostDetailsUsd(
+        {
+          input: 1_000,
+          cachedInput: 600,
+          cacheWriteInput: 300,
+          output: 100,
+        },
+        lunaPrices,
+      ),
+    ).toEqual({
+      input: 0.0001,
+      cache_read_input_tokens: 0.00006,
+      cache_write_input_tokens: 0.000375,
+      output: 0.0006,
+      total: 0.001135,
+    })
+  })
 })
 
 describe('configuredTokenCostUsd', () => {
@@ -50,6 +75,20 @@ describe('configuredTokenCostUsd', () => {
         output: 100,
       }),
     ).toBe(0.001135)
+    expect(
+      configuredTokenCostDetailsUsd({
+        input: 1_000,
+        cachedInput: 600,
+        cacheWriteInput: 300,
+        output: 100,
+      }),
+    ).toEqual({
+      input: 0.0001,
+      cache_read_input_tokens: 0.00006,
+      cache_write_input_tokens: 0.000375,
+      output: 0.0006,
+      total: 0.001135,
+    })
   })
 
   it('requires all four current pricing rates', () => {

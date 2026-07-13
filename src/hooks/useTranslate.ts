@@ -44,6 +44,17 @@ export type TranslateArgs = {
   previousMain: string
 }
 
+export type TranslationTrigger =
+  'debounce' | 'paste' | 'enter' | 'blur' | 'force' | 'refinement'
+
+type ImmediateTrigger = Extract<TranslationTrigger, 'paste' | 'refinement'>
+type FlushTrigger = Extract<TranslationTrigger, 'enter' | 'blur'>
+
+type ActiveRun = {
+  controller: AbortController
+  id?: string
+}
+
 type Options = {
   /** Debounce window for auto-run when args change. 0 disables auto-run. */
   debounceMs?: number
@@ -61,11 +72,15 @@ export function useTranslate(
   const [live, setLive] = useState<LiveResult | null>(null)
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<TranslateError | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const activeRunRef = useRef<ActiveRun | null>(null)
+  const supersededRunIdRef = useRef<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipDebounceRef = useRef(false)
+  const immediateTriggerRef = useRef<ImmediateTrigger | null>(null)
   const suppressAutoRunRef = useRef(false)
   const analyticsSessionIdRef = useRef<string | null>(null)
+  const inputRevisionRef = useRef(args.text.trim() ? 1 : 0)
+  const previousInputRef = useRef(args.text)
 
   // Group translations from one open page without creating a durable user
   // identifier. This stays in memory only and resets on every page load.
@@ -77,8 +92,43 @@ export function useTranslate(
     analyticsSessionIdRef.current = window.crypto.randomUUID()
   }
 
+  const analyticsId = useCallback(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.crypto.randomUUID !== 'function'
+    ) {
+      return undefined
+    }
+    return window.crypto.randomUUID()
+  }, [])
+
+  const abortActiveRun = useCallback((preserveForNextRun: boolean) => {
+    const active = activeRunRef.current
+    if (!preserveForNextRun) supersededRunIdRef.current = null
+    if (!active || active.controller.signal.aborted) return
+    if (preserveForNextRun && active.id) {
+      supersededRunIdRef.current = active.id
+    }
+    active.controller.abort()
+  }, [])
+
+  const finishActiveRun = useCallback((controller: AbortController) => {
+    if (activeRunRef.current?.controller !== controller) return
+    activeRunRef.current = null
+    setIsPending(false)
+  }, [])
+
+  useEffect(() => {
+    if (previousInputRef.current === args.text) return
+    previousInputRef.current = args.text
+    inputRevisionRef.current += 1
+  }, [args.text])
+
   const run = useCallback(
-    async (override?: Partial<TranslateArgs>) => {
+    async (
+      override?: Partial<TranslateArgs>,
+      trigger: TranslationTrigger = 'force',
+    ) => {
       const {
         text,
         source,
@@ -91,7 +141,7 @@ export function useTranslate(
       } = { ...args, ...override }
       const trimmed = text.trim()
       if (!trimmed) return
-      abortRef.current?.abort()
+      abortActiveRun(true)
 
       if (trimmed.length > MAX_INPUT_CHARS) {
         const s = STRINGS[uiLang]
@@ -108,7 +158,10 @@ export function useTranslate(
       }
 
       const ctrl = new AbortController()
-      abortRef.current = ctrl
+      const runId = analyticsId()
+      const supersedesRunId = supersededRunIdRef.current ?? undefined
+      supersededRunIdRef.current = null
+      activeRunRef.current = { controller: ctrl, id: runId }
 
       setIsPending(true)
       setError(null)
@@ -130,6 +183,10 @@ export function useTranslate(
             refinements,
             previousMain,
             analyticsSessionId: analyticsSessionIdRef.current ?? undefined,
+            analyticsRunId: runId,
+            analyticsSupersedesRunId: supersedesRunId,
+            analyticsInputRevision: inputRevisionRef.current,
+            analyticsTrigger: trigger,
           },
           signal: ctrl.signal,
         })
@@ -155,7 +212,7 @@ export function useTranslate(
           })
         }
       } finally {
-        if (abortRef.current === ctrl) setIsPending(false)
+        finishActiveRun(ctrl)
       }
 
       function applyChunk(chunk: TranslateChunk) {
@@ -178,14 +235,15 @@ export function useTranslate(
         })
       }
     },
-    [translateFn, args, uiLang],
+    [translateFn, args, uiLang, abortActiveRun, analyticsId, finishActiveRun],
   )
 
   const reset = useCallback(() => {
-    abortRef.current?.abort()
+    abortActiveRun(false)
+    activeRunRef.current = null
     setLive(null)
     setError(null)
-  }, [])
+  }, [abortActiveRun])
 
   /** Replace the live result from a client-side snapshot (refine undo/
    * rollback) without firing a network run. Suppresses the next auto-run
@@ -194,39 +252,48 @@ export function useTranslate(
    * Always clears `error` so the result renders again; a rolled-back refine's
    * failure notice is tracked separately by the caller (`refineError` on
    * TranslatorContext), not kept here. */
-  const restore = useCallback((snapshot: LiveResult) => {
-    abortRef.current?.abort()
-    suppressAutoRunRef.current = true
-    setIsPending(false)
-    setError(null)
-    setLive(snapshot)
-  }, [])
+  const restore = useCallback(
+    (snapshot: LiveResult) => {
+      abortActiveRun(false)
+      activeRunRef.current = null
+      suppressAutoRunRef.current = true
+      setIsPending(false)
+      setError(null)
+      setLive(snapshot)
+    },
+    [abortActiveRun],
+  )
 
-  /** Skip the debounce window for the next auto-run — call right before a
-   * programmatic input change (paste, clipboard button) so the translation
-   * fires as soon as the new text lands. */
-  const queueImmediate = useCallback(() => {
+  /** Skip the debounce window for the next auto-run and retain the reason —
+   * call right before a paste or refinement changes the request arguments. */
+  const queueImmediate = useCallback((trigger: ImmediateTrigger) => {
     skipDebounceRef.current = true
+    immediateTriggerRef.current = trigger
   }, [])
 
   /** Fire a pending debounced translation now (Enter / blur). Returns true
    * when a run was actually pending and got flushed; false when idle. */
-  const flush = useCallback(() => {
-    if (timerRef.current === null) return false
-    clearTimeout(timerRef.current)
-    timerRef.current = null
-    void run()
-    return true
-  }, [run])
+  const flush = useCallback(
+    (trigger: FlushTrigger) => {
+      if (timerRef.current === null) return false
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+      void run(undefined, trigger)
+      return true
+    },
+    [run],
+  )
 
   // Debounced auto-run on arg change. Clearing text clears live result immediately.
   // Abort any in-flight stream on input change so stale responses stop writing.
   useEffect(() => {
     if (!debounceMs) return
-    abortRef.current?.abort()
+    abortActiveRun(true)
     setIsPending(false)
     if (!args.text.trim()) {
       skipDebounceRef.current = false
+      immediateTriggerRef.current = null
+      supersededRunIdRef.current = null
       setLive(null)
       setError(null)
       return
@@ -236,10 +303,12 @@ export function useTranslate(
       return
     }
     const delay = skipDebounceRef.current ? 0 : debounceMs
+    const trigger = immediateTriggerRef.current ?? 'debounce'
     skipDebounceRef.current = false
+    immediateTriggerRef.current = null
     const id = setTimeout(() => {
       timerRef.current = null
-      void run()
+      void run(undefined, trigger)
     }, delay)
     timerRef.current = id
     return () => {
@@ -261,6 +330,7 @@ export function useTranslate(
     args.refinements,
     uiLang,
     debounceMs,
+    abortActiveRun,
   ])
 
   const streaming = isPending && !live?.done

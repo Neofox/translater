@@ -112,6 +112,19 @@ describe('useTranslate', () => {
 
     rerender({ ...baseArgs, text: 'see you tomorrow!' })
     expect(firstSignal?.aborted).toBe(true)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
+    })
+
+    const [firstRequest, replacementRequest] = translateMock.mock.calls.map(
+      ([request]) => request.data,
+    )
+    expect(replacementRequest.analyticsSupersedesRunId).toBe(
+      firstRequest.analyticsRunId,
+    )
+    expect(replacementRequest.analyticsInputRevision).toBe(2)
+    expect(replacementRequest.analyticsTrigger).toBe('debounce')
   })
 
   it('changing args.refinements schedules a run after the debounce window', async () => {
@@ -138,7 +151,12 @@ describe('useTranslate', () => {
 
   it('groups page-lifetime requests under one anonymous session', async () => {
     const sessionId = '00000000-0000-4000-8000-000000000001'
-    vi.spyOn(window.crypto, 'randomUUID').mockReturnValue(sessionId)
+    const firstRunId = '00000000-0000-4000-8000-000000000002'
+    const secondRunId = '00000000-0000-4000-8000-000000000003'
+    vi.spyOn(window.crypto, 'randomUUID')
+      .mockReturnValueOnce(sessionId)
+      .mockReturnValueOnce(firstRunId)
+      .mockReturnValueOnce(secondRunId)
     const { result } = renderHook(
       (props: TranslateArgs) => useTranslate(props),
       { initialProps: baseArgs, wrapper },
@@ -151,11 +169,22 @@ describe('useTranslate', () => {
       await result.current.run()
     })
 
-    expect(
-      translateMock.mock.calls.map(
-        ([request]) => request.data.analyticsSessionId,
-      ),
-    ).toEqual([sessionId, sessionId])
+    const requests = translateMock.mock.calls.map(([request]) => request.data)
+    expect(requests.map((request) => request.analyticsSessionId)).toEqual([
+      sessionId,
+      sessionId,
+    ])
+    expect(requests.map((request) => request.analyticsRunId)).toEqual([
+      firstRunId,
+      secondRunId,
+    ])
+    expect(requests.map((request) => request.analyticsTrigger)).toEqual([
+      'debounce',
+      'force',
+    ])
+    expect(requests.map((request) => request.analyticsInputRevision)).toEqual([
+      1, 1,
+    ])
   })
 
   it('restore() + refinements change in the same act suppresses the scheduled run', async () => {

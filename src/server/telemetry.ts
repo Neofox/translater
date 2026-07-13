@@ -1,4 +1,5 @@
 import type { propagateAttributes, startObservation } from '@langfuse/tracing'
+import type { TokenCostDetails } from './pricing'
 
 export type CharacterCountBucket =
   '0' | '1-24' | '25-100' | '101-500' | '501-2000' | '2001+'
@@ -16,6 +17,10 @@ type TranslationDimensions = {
   isPolish: boolean
   promptVersion: string
   analyticsSessionId?: string
+  clientRunId?: string
+  supersedesRunId?: string
+  inputRevision?: number
+  trigger: 'debounce' | 'paste' | 'enter' | 'blur' | 'force' | 'refinement'
 }
 
 type TokenUsage = {
@@ -28,7 +33,7 @@ type TokenUsage = {
 
 type TranslationResult = {
   tokens?: TokenUsage
-  costUsd?: number
+  costDetails?: TokenCostDetails
   resolvedSourceLanguage: string
   resolvedTargetLanguage: string
   outputLengthBucket: CharacterCountBucket
@@ -179,6 +184,17 @@ export async function startTranslationTelemetry(
       promptVersion: dimensions.promptVersion,
       cacheLayer,
       providerRequest: String(cacheLayer === 'openai'),
+      requestedModel: model,
+      trigger: dimensions.trigger,
+      ...(dimensions.clientRunId
+        ? { clientRunId: dimensions.clientRunId }
+        : {}),
+      ...(dimensions.supersedesRunId
+        ? { supersedesRunId: dimensions.supersedesRunId }
+        : {}),
+      ...(dimensions.inputRevision !== undefined
+        ? { inputRevision: String(dimensions.inputRevision) }
+        : {}),
     }
     const safeInput = {
       intent: dimensions.intent,
@@ -189,6 +205,10 @@ export async function startTranslationTelemetry(
       inputLengthBucket: dimensions.inputLengthBucket,
       hasContext: dimensions.hasContext,
       refinementCount: dimensions.refinementCount,
+      trigger: dimensions.trigger,
+      ...(dimensions.inputRevision !== undefined
+        ? { inputRevision: dimensions.inputRevision }
+        : {}),
     }
     const { request, generation } = runtime.propagateAttributes(
       {
@@ -201,6 +221,7 @@ export async function startTranslationTelemetry(
           dimensions.mode,
           dimensions.requestKind,
           cacheLayer,
+          dimensions.trigger,
         ],
         ...(dimensions.analyticsSessionId
           ? { sessionId: dimensions.analyticsSessionId }
@@ -216,8 +237,6 @@ export async function startTranslationTelemetry(
             ? startedRequest.startObservation(
                 'openai.responses',
                 {
-                  model,
-                  input: safeInput,
                   modelParameters: {
                     reasoningEffort: 'none',
                     promptCacheMode: 'explicit',
@@ -244,7 +263,11 @@ export async function startTranslationTelemetry(
 
       try {
         const statusMessage = safeErrorStatus(error)
-        const errorMetadata = { outcome: 'error' }
+        const errorMetadata = {
+          outcome: 'error',
+          providerUsageKnown: 'false',
+          providerCostKnown: 'false',
+        }
         generation
           ?.update({
             level: 'ERROR',
@@ -275,6 +298,8 @@ export async function startTranslationTelemetry(
         const canceledMetadata = {
           outcome: 'canceled',
           canceledBeforeFirstToken: String(!markedFirstToken),
+          providerUsageKnown: 'false',
+          providerCostKnown: 'false',
         }
         const canceledUpdate = {
           statusMessage: 'Client request canceled',
@@ -302,6 +327,8 @@ export async function startTranslationTelemetry(
           alternativeCount: String(result.alternativeCount),
           hasLearningTips: String(result.hasLearningTips),
           outcome: 'success',
+          providerUsageKnown: String(Boolean(result.tokens)),
+          providerCostKnown: String(Boolean(result.costDetails)),
         }
         const safeOutput = {
           resolvedSourceLanguage: result.resolvedSourceLanguage,
@@ -313,14 +340,14 @@ export async function startTranslationTelemetry(
 
         generation
           ?.update({
+            model,
+            input: safeInput,
             output: safeOutput,
             metadata: resultMetadata,
             ...(result.tokens
               ? { usageDetails: langfuseUsageDetails(result.tokens) }
               : {}),
-            ...(typeof result.costUsd === 'number'
-              ? { costDetails: { total: result.costUsd } }
-              : {}),
+            ...(result.costDetails ? { costDetails: result.costDetails } : {}),
           })
           .end()
         request.update({ output: safeOutput, metadata: resultMetadata }).end()

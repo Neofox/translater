@@ -7,7 +7,7 @@ import { SentenceResult, WordResult } from './schemas'
 import { sentencePrompt, wordPrompt } from './prompts'
 import { translationCache } from './cache'
 import { CACHE_VERSION, cacheKeyFor, promptCacheKeyFor } from './cacheKey'
-import { configuredTokenCostUsd } from './pricing'
+import { configuredTokenCostDetailsUsd } from './pricing'
 import { characterCountBucket, startTranslationTelemetry } from './telemetry'
 import {
   MAX_CONTEXT_CHARS,
@@ -30,6 +30,12 @@ const TranslateInput = z.object({
     .default([]),
   previousMain: z.string().max(MAX_INPUT_CHARS).default(''),
   analyticsSessionId: z.uuid().optional(),
+  analyticsRunId: z.uuid().optional(),
+  analyticsSupersedesRunId: z.uuid().optional(),
+  analyticsInputRevision: z.number().int().nonnegative().optional(),
+  analyticsTrigger: z
+    .enum(['debounce', 'paste', 'enter', 'blur', 'force', 'refinement'])
+    .default('debounce'),
 })
 
 export type TranslateDone =
@@ -64,6 +70,14 @@ function telemetryDimensions(data: z.infer<typeof TranslateInput>) {
     ...(data.analyticsSessionId
       ? { analyticsSessionId: data.analyticsSessionId }
       : {}),
+    ...(data.analyticsRunId ? { clientRunId: data.analyticsRunId } : {}),
+    ...(data.analyticsSupersedesRunId
+      ? { supersedesRunId: data.analyticsSupersedesRunId }
+      : {}),
+    ...(data.analyticsInputRevision !== undefined
+      ? { inputRevision: data.analyticsInputRevision }
+      : {}),
+    trigger: data.analyticsTrigger,
   }
 }
 
@@ -186,7 +200,7 @@ export const translate = createServerFn({ method: 'POST' })
           telemetry.succeed({
             ...resultAnalytics(done.data),
             tokens,
-            costUsd: configuredTokenCostUsd(tokens),
+            costDetails: configuredTokenCostDetailsUsd(tokens),
           })
           translationCache.set(cacheKey, done)
           controller.enqueue({ type: 'done', done })

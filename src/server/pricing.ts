@@ -12,6 +12,14 @@ export type TokenPrices = {
   outputPer1M: number
 }
 
+export type TokenCostDetails = {
+  input: number
+  cache_read_input_tokens: number
+  cache_write_input_tokens: number
+  output: number
+  total: number
+}
+
 function configuredPrice(name: string) {
   const raw = process.env[name]
   if (!raw?.trim()) return undefined
@@ -19,24 +27,43 @@ function configuredPrice(name: string) {
   return Number.isFinite(value) ? value : undefined
 }
 
-export function calculateTokenCostUsd(
+export function calculateTokenCostDetailsUsd(
   usage: UsageForPricing,
   prices: TokenPrices,
-) {
+): TokenCostDetails {
   const regularInput = Math.max(
     0,
     usage.input - usage.cachedInput - usage.cacheWriteInput,
   )
-  return (
+  const input = (regularInput * prices.inputPer1M) / 1_000_000
+  const cacheRead = (usage.cachedInput * prices.cachedInputPer1M) / 1_000_000
+  const cacheWrite =
+    (usage.cacheWriteInput * prices.cacheWriteInputPer1M) / 1_000_000
+  const output = (usage.output * prices.outputPer1M) / 1_000_000
+  const total =
     (regularInput * prices.inputPer1M +
       usage.cachedInput * prices.cachedInputPer1M +
       usage.cacheWriteInput * prices.cacheWriteInputPer1M +
       usage.output * prices.outputPer1M) /
     1_000_000
-  )
+
+  return {
+    input,
+    cache_read_input_tokens: cacheRead,
+    cache_write_input_tokens: cacheWrite,
+    output,
+    total,
+  }
 }
 
-export function configuredTokenCostUsd(usage: UsageForPricing) {
+export function calculateTokenCostUsd(
+  usage: UsageForPricing,
+  prices: TokenPrices,
+) {
+  return calculateTokenCostDetailsUsd(usage, prices).total
+}
+
+export function configuredTokenCostDetailsUsd(usage: UsageForPricing) {
   const inputPer1M = configuredPrice('TRANSLATE_PRICE_INPUT_PER_1M')
   const cachedInputPer1M = configuredPrice(
     'TRANSLATE_PRICE_CACHED_INPUT_PER_1M',
@@ -55,10 +82,14 @@ export function configuredTokenCostUsd(usage: UsageForPricing) {
     return undefined
   }
 
-  return calculateTokenCostUsd(usage, {
+  return calculateTokenCostDetailsUsd(usage, {
     inputPer1M,
     cachedInputPer1M,
     cacheWriteInputPer1M,
     outputPer1M,
   })
+}
+
+export function configuredTokenCostUsd(usage: UsageForPricing) {
+  return configuredTokenCostDetailsUsd(usage)?.total
 }
