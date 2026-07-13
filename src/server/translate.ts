@@ -104,9 +104,10 @@ export const translate = createServerFn({ method: 'POST' })
       )
       telemetry.succeed(resultAnalytics(cached.data))
       return new ReadableStream<TranslateChunk>({
-        start(controller) {
+        async start(controller) {
           controller.enqueue({ type: 'cache', done: cached })
           controller.close()
+          await telemetry.flush()
         },
       })
     }
@@ -185,9 +186,11 @@ export const translate = createServerFn({ method: 'POST' })
           translationCache.set(cacheKey, done)
           controller.enqueue({ type: 'done', done })
           controller.close()
+          await telemetry.flush()
         } catch (err) {
           telemetry.fail(err)
           controller.error(err)
+          await telemetry.flush()
         }
       },
     })

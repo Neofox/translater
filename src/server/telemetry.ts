@@ -38,13 +38,15 @@ type TranslationResult = {
 
 export type TranslationTelemetry = {
   markFirstToken: () => void
-  succeed: (result?: TranslationResult) => void
+  succeed: (result: TranslationResult) => void
   fail: (error: unknown) => void
+  flush: () => Promise<void>
 }
 
 type LangfuseRuntime = {
   startObservation: typeof startObservation
   propagateAttributes: typeof propagateAttributes
+  forceFlush: () => Promise<void>
 }
 
 let runtimePromise: Promise<LangfuseRuntime | undefined> | undefined
@@ -52,8 +54,9 @@ let warned = false
 
 const noopTelemetry: TranslationTelemetry = {
   markFirstToken() {},
-  succeed() {},
+  succeed(_result) {},
   fail() {},
+  async flush() {},
 }
 
 function warnOnce(message: string, error?: unknown) {
@@ -83,12 +86,8 @@ async function initializeLangfuse(): Promise<LangfuseRuntime | undefined> {
       publicKey: process.env.LANGFUSE_PUBLIC_KEY,
       secretKey: process.env.LANGFUSE_SECRET_KEY,
       baseUrl: process.env.LANGFUSE_BASE_URL,
-      environment:
-        process.env.LANGFUSE_TRACING_ENVIRONMENT ??
-        process.env.VERCEL_ENV ??
-        process.env.NODE_ENV,
-      release:
-        process.env.LANGFUSE_RELEASE ?? process.env.VERCEL_GIT_COMMIT_SHA,
+      // v5 reads release/environment from LANGFUSE_RELEASE and
+      // LANGFUSE_TRACING_ENVIRONMENT rather than trace attributes.
       exportMode: 'immediate',
       mediaUploadEnabled: false,
     })
@@ -101,6 +100,7 @@ async function initializeLangfuse(): Promise<LangfuseRuntime | undefined> {
     return {
       startObservation: tracing.startObservation,
       propagateAttributes: tracing.propagateAttributes,
+      forceFlush: () => processor.forceFlush(),
     }
   } catch (error) {
     warnOnce(
@@ -161,25 +161,38 @@ export async function startTranslationTelemetry(
   if (!runtime) return noopTelemetry
 
   try {
-    const { analyticsSessionId, ...safeDimensions } = dimensions
-    const requestMetadata = {
-      ...safeDimensions,
+    // Langfuse v5 propagated metadata requires alphanumeric keys and short
+    // string values. Content itself stays out of traces by product policy.
+    const requestMetadata: Record<string, string> = {
+      intent: dimensions.intent,
+      mode: dimensions.mode,
+      sourceLanguage: dimensions.sourceLanguage,
+      targetLanguage: dimensions.targetLanguage,
+      uiLanguage: dimensions.uiLanguage,
+      hasContext: String(dimensions.hasContext),
+      refinementCount: String(dimensions.refinementCount),
+      requestKind: dimensions.requestKind,
+      inputLengthBucket: dimensions.inputLengthBucket,
+      isPolish: String(dimensions.isPolish),
+      promptVersion: dimensions.promptVersion,
       cacheLayer,
-      providerRequest: cacheLayer === 'openai',
+      providerRequest: String(cacheLayer === 'openai'),
     }
-    const generationMetadata = {
+    const safeInput = {
       intent: dimensions.intent,
       mode: dimensions.mode,
       sourceLanguage: dimensions.sourceLanguage,
       targetLanguage: dimensions.targetLanguage,
       requestKind: dimensions.requestKind,
       inputLengthBucket: dimensions.inputLengthBucket,
-      promptVersion: dimensions.promptVersion,
+      hasContext: dimensions.hasContext,
+      refinementCount: dimensions.refinementCount,
     }
     const { request, generation } = runtime.propagateAttributes(
       {
         traceName: 'translation',
         version: dimensions.promptVersion,
+        metadata: requestMetadata,
         tags: [
           'translation',
           dimensions.intent,
@@ -187,11 +200,13 @@ export async function startTranslationTelemetry(
           dimensions.requestKind,
           cacheLayer,
         ],
-        ...(analyticsSessionId ? { sessionId: analyticsSessionId } : {}),
+        ...(dimensions.analyticsSessionId
+          ? { sessionId: dimensions.analyticsSessionId }
+          : {}),
       },
       () => {
         const startedRequest = runtime.startObservation('translation.request', {
-          metadata: requestMetadata,
+          input: safeInput,
           version: dimensions.promptVersion,
         })
         const startedGeneration =
@@ -200,8 +215,12 @@ export async function startTranslationTelemetry(
                 'openai.responses',
                 {
                   model,
-                  metadata: generationMetadata,
-                  modelParameters: { reasoningEffort: 'none' },
+                  input: safeInput,
+                  modelParameters: {
+                    reasoningEffort: 'none',
+                    promptCacheMode: 'explicit',
+                    promptCacheTtl: '30m',
+                  },
                   version: dimensions.promptVersion,
                 },
                 { asType: 'generation' },
@@ -217,57 +236,69 @@ export async function startTranslationTelemetry(
     let ended = false
     let markedFirstToken = false
 
-    const finish = (error?: unknown, result?: TranslationResult) => {
+    const finishError = (error: unknown) => {
       if (ended) return
       ended = true
 
       try {
-        if (error) {
-          const statusMessage = safeErrorStatus(error)
-          generation
-            ?.update({
-              level: 'ERROR',
-              statusMessage,
-              metadata: { ...generationMetadata, outcome: 'error' },
-            })
-            .end()
-          request
-            .update({
-              level: 'ERROR',
-              statusMessage,
-              metadata: { ...requestMetadata, outcome: 'error' },
-            })
-            .end()
-          return
-        }
-
-        const resultMetadata = result
-          ? {
-              resolvedSourceLanguage: result.resolvedSourceLanguage,
-              resolvedTargetLanguage: result.resolvedTargetLanguage,
-              outputLengthBucket: result.outputLengthBucket,
-              alternativeCount: result.alternativeCount,
-              hasLearningTips: result.hasLearningTips,
-              outcome: 'success',
-            }
-          : { outcome: 'success' }
-
-        if (generation) {
-          generation
-            .update({
-              metadata: { ...generationMetadata, ...resultMetadata },
-              ...(result?.tokens
-                ? { usageDetails: langfuseUsageDetails(result.tokens) }
-                : {}),
-              ...(typeof result?.costUsd === 'number'
-                ? { costDetails: { total: result.costUsd } }
-                : {}),
-            })
-            .end()
-        }
-        request
-          .update({ metadata: { ...requestMetadata, ...resultMetadata } })
+        const statusMessage = safeErrorStatus(error)
+        const errorMetadata = { outcome: 'error' }
+        generation
+          ?.update({
+            level: 'ERROR',
+            statusMessage,
+            metadata: errorMetadata,
+          })
           .end()
+        request
+          .update({
+            level: 'ERROR',
+            statusMessage,
+            metadata: errorMetadata,
+          })
+          .end()
+      } catch (telemetryError) {
+        warnOnce(
+          'trace update failed; translations will continue',
+          telemetryError,
+        )
+      }
+    }
+
+    const finishSuccess = (result: TranslationResult) => {
+      if (ended) return
+      ended = true
+
+      try {
+        const resultMetadata: Record<string, string> = {
+          resolvedSourceLanguage: result.resolvedSourceLanguage,
+          resolvedTargetLanguage: result.resolvedTargetLanguage,
+          outputLengthBucket: result.outputLengthBucket,
+          alternativeCount: String(result.alternativeCount),
+          hasLearningTips: String(result.hasLearningTips),
+          outcome: 'success',
+        }
+        const safeOutput = {
+          resolvedSourceLanguage: result.resolvedSourceLanguage,
+          resolvedTargetLanguage: result.resolvedTargetLanguage,
+          outputLengthBucket: result.outputLengthBucket,
+          alternativeCount: result.alternativeCount,
+          hasLearningTips: result.hasLearningTips,
+        }
+
+        generation
+          ?.update({
+            output: safeOutput,
+            metadata: resultMetadata,
+            ...(result.tokens
+              ? { usageDetails: langfuseUsageDetails(result.tokens) }
+              : {}),
+            ...(typeof result.costUsd === 'number'
+              ? { costDetails: { total: result.costUsd } }
+              : {}),
+          })
+          .end()
+        request.update({ output: safeOutput, metadata: resultMetadata }).end()
       } catch (telemetryError) {
         warnOnce(
           'trace update failed; translations will continue',
@@ -287,10 +318,17 @@ export async function startTranslationTelemetry(
         }
       },
       succeed(result) {
-        finish(undefined, result)
+        finishSuccess(result)
       },
       fail(error) {
-        finish(error)
+        finishError(error)
+      },
+      async flush() {
+        try {
+          await runtime.forceFlush()
+        } catch (error) {
+          warnOnce('trace flush failed; translations will continue', error)
+        }
       },
     }
   } catch (error) {
