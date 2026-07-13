@@ -49,9 +49,11 @@ type Options = {
   debounceMs?: number
 }
 
+export const DEFAULT_TRANSLATE_DEBOUNCE_MS = 800
+
 export function useTranslate(
   args: TranslateArgs,
-  { debounceMs = 400 }: Options = {},
+  { debounceMs = DEFAULT_TRANSLATE_DEBOUNCE_MS }: Options = {},
 ) {
   const translateFn = useServerFn(translate)
   const { lang: uiLang } = useUiLang()

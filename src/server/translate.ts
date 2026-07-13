@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { getRequest } from '@tanstack/react-start/server'
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { z } from 'zod'
@@ -118,28 +119,32 @@ export const translate = createServerFn({ method: 'POST' })
       'openai',
       MODEL,
     )
+    const requestSignal = getRequest().signal
     let sawFirstToken = false
 
     return new ReadableStream<TranslateChunk>({
       async start(controller) {
         try {
-          const stream = client().responses.stream({
-            model: MODEL,
-            input: isWord ? wordPrompt(data) : sentencePrompt(data),
-            // Hidden reasoning tokens delay the first output delta by seconds;
-            // translation quality here comes from the prompt, not deliberation.
-            reasoning: { effort: 'none' },
-            store: false,
-            // The explicit breakpoint follows a stable reminder in the final
-            // user message; live source/context/refinements come after it.
-            prompt_cache_key: promptCacheKeyFor(data),
-            prompt_cache_options: { mode: 'explicit', ttl: '30m' },
-            text: {
-              format: isWord
-                ? zodTextFormat(WordResult, 'word_translation')
-                : zodTextFormat(SentenceResult, 'sentence_translation'),
+          const stream = client().responses.stream(
+            {
+              model: MODEL,
+              input: isWord ? wordPrompt(data) : sentencePrompt(data),
+              // Hidden reasoning tokens delay the first output delta by seconds;
+              // translation quality here comes from the prompt, not deliberation.
+              reasoning: { effort: 'none' },
+              store: false,
+              // The explicit breakpoint follows a stable reminder in the final
+              // user message; live source/context/refinements come after it.
+              prompt_cache_key: promptCacheKeyFor(data),
+              prompt_cache_options: { mode: 'explicit', ttl: '30m' },
+              text: {
+                format: isWord
+                  ? zodTextFormat(WordResult, 'word_translation')
+                  : zodTextFormat(SentenceResult, 'sentence_translation'),
+              },
             },
-          })
+            { signal: requestSignal },
+          )
 
           // Forward each JSON fragment as-is; the client accumulates and
           // renders via partial-json. Sending only the delta keeps the stream
@@ -186,10 +191,18 @@ export const translate = createServerFn({ method: 'POST' })
           translationCache.set(cacheKey, done)
           controller.enqueue({ type: 'done', done })
           controller.close()
-          await telemetry.flush()
         } catch (err) {
-          telemetry.fail(err)
+          if (
+            requestSignal.aborted ||
+            err instanceof OpenAI.APIUserAbortError ||
+            (err instanceof Error && err.name === 'AbortError')
+          ) {
+            telemetry.cancel()
+          } else {
+            telemetry.fail(err)
+          }
           controller.error(err)
+        } finally {
           await telemetry.flush()
         }
       },

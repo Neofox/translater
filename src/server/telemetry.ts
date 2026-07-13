@@ -39,6 +39,7 @@ type TranslationResult = {
 export type TranslationTelemetry = {
   markFirstToken: () => void
   succeed: (result: TranslationResult) => void
+  cancel: () => void
   fail: (error: unknown) => void
   flush: () => Promise<void>
 }
@@ -55,6 +56,7 @@ let warned = false
 const noopTelemetry: TranslationTelemetry = {
   markFirstToken() {},
   succeed(_result) {},
+  cancel() {},
   fail() {},
   async flush() {},
 }
@@ -265,6 +267,29 @@ export async function startTranslationTelemetry(
       }
     }
 
+    const finishCanceled = () => {
+      if (ended) return
+      ended = true
+
+      try {
+        const canceledMetadata = {
+          outcome: 'canceled',
+          canceledBeforeFirstToken: String(!markedFirstToken),
+        }
+        const canceledUpdate = {
+          statusMessage: 'Client request canceled',
+          metadata: canceledMetadata,
+        }
+        generation?.update(canceledUpdate).end()
+        request.update(canceledUpdate).end()
+      } catch (telemetryError) {
+        warnOnce(
+          'trace cancellation update failed; translations will continue',
+          telemetryError,
+        )
+      }
+    }
+
     const finishSuccess = (result: TranslationResult) => {
       if (ended) return
       ended = true
@@ -319,6 +344,9 @@ export async function startTranslationTelemetry(
       },
       succeed(result) {
         finishSuccess(result)
+      },
+      cancel() {
+        finishCanceled()
       },
       fail(error) {
         finishError(error)

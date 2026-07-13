@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useTranslate } from './useTranslate'
+import { DEFAULT_TRANSLATE_DEBOUNCE_MS, useTranslate } from './useTranslate'
 import type { LiveResult, TranslateArgs } from './useTranslate'
 import { UiLangProvider } from './useUiLang'
 import type { TranslateChunk, TranslateDone } from '../server/translate'
@@ -66,6 +66,54 @@ describe('useTranslate', () => {
     vi.restoreAllMocks()
   })
 
+  it('waits for the full default debounce before translating', async () => {
+    renderHook((props: TranslateArgs) => useTranslate(props), {
+      initialProps: baseArgs,
+      wrapper,
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS - 1)
+    })
+    expect(translateMock).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(translateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts an in-flight request when the input changes', async () => {
+    let firstSignal: AbortSignal | undefined
+    translateMock.mockImplementationOnce(
+      (request: { signal?: AbortSignal }) => {
+        firstSignal = request.signal
+        return Promise.resolve(
+          new ReadableStream<TranslateChunk>({
+            start(controller) {
+              request.signal?.addEventListener('abort', () => {
+                controller.error(new DOMException('Aborted', 'AbortError'))
+              })
+            },
+          }),
+        )
+      },
+    )
+
+    const { rerender } = renderHook(
+      (props: TranslateArgs) => useTranslate(props),
+      { initialProps: baseArgs, wrapper },
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
+    })
+    expect(firstSignal?.aborted).toBe(false)
+
+    rerender({ ...baseArgs, text: 'see you tomorrow!' })
+    expect(firstSignal?.aborted).toBe(true)
+  })
+
   it('changing args.refinements schedules a run after the debounce window', async () => {
     const { rerender } = renderHook(
       (props: TranslateArgs) => useTranslate(props),
@@ -75,14 +123,14 @@ describe('useTranslate', () => {
     // Mount itself schedules a debounced run for the initial non-empty text —
     // let it fire and settle before isolating the assertion to the change.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
     expect(translateMock).toHaveBeenCalledTimes(1)
     translateMock.mockClear()
 
     rerender({ ...baseArgs, refinements: ['make it softer'] })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
 
     expect(translateMock).toHaveBeenCalledTimes(1)
@@ -97,7 +145,7 @@ describe('useTranslate', () => {
     )
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
     await act(async () => {
       await result.current.run()
@@ -117,14 +165,14 @@ describe('useTranslate', () => {
     )
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
     translateMock.mockClear()
 
     // Simulate an add-refinement action: refinements change, its run fires.
     rerender({ ...baseArgs, refinements: ['make it softer'] })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
     expect(translateMock).toHaveBeenCalledTimes(1)
     translateMock.mockClear()
@@ -147,7 +195,7 @@ describe('useTranslate', () => {
     expect(result.current.live).toEqual(snapshot)
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
 
     expect(translateMock).not.toHaveBeenCalled()
@@ -161,7 +209,7 @@ describe('useTranslate', () => {
     )
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS)
     })
     translateMock.mockClear()
     translateMock.mockRejectedValueOnce(new Error('boom'))
