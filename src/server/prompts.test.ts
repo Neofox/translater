@@ -5,17 +5,18 @@ import { SentenceResult, WordResult } from './schemas'
 const MODES = ['friends', 'casual', 'professional'] as const
 const UI_LANGS = ['en', 'ko'] as const
 
-type PromptMessages =
+type PromptBundle =
   ReturnType<typeof sentencePrompt> | ReturnType<typeof wordPrompt>
 
-function textOf(content: PromptMessages[number]['content']): string {
-  return typeof content === 'string'
-    ? content
-    : content.map((block) => block.text).join('')
+function textOf(content: PromptBundle['messages'][number]['content']): string {
+  if (typeof content !== 'string') {
+    throw new Error('translation prompts must use text-only model messages')
+  }
+  return content
 }
 
-function assistantOf(msgs: PromptMessages): unknown {
-  const m = msgs.find((x) => x.role === 'assistant')
+function assistantOf(prompt: PromptBundle): unknown {
+  const m = prompt.messages.find((message) => message.role === 'assistant')
   if (!m) throw new Error('no assistant few-shot in prompt')
   return JSON.parse(textOf(m.content))
 }
@@ -84,26 +85,55 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
       refinements: ['make it softer'],
       previousMain: '내일 봐요',
     })
-    expect(textOf(full[0]!.content)).toBe(textOf(bare[0]!.content))
+    expect(full.instructions).toEqual(bare.instructions)
   })
 
   it('word system prompt is byte-identical with and without context', () => {
     const bare = wordPrompt(base)
     const full = wordPrompt({ ...base, context: '배 타고 왔어요' })
-    expect(textOf(full[0]!.content)).toBe(textOf(bare[0]!.content))
+    expect(full.instructions).toEqual(bare.instructions)
   })
 
-  it('marks the stable prefix before live user input with an explicit cache breakpoint', () => {
-    for (const msgs of [sentencePrompt(base), wordPrompt(base)]) {
-      const user = msgs.at(-1)
-      expect(user?.content).not.toBeTypeOf('string')
-      if (typeof user?.content === 'string') continue
-      expect(user?.content[0]?.prompt_cache_breakpoint).toEqual({
-        mode: 'explicit',
-      })
-      expect(user?.content[1]?.prompt_cache_breakpoint).toBeUndefined()
-      expect(user?.content[1]?.text).toContain('<source>')
+  it('keeps stable instructions before all live content', () => {
+    for (const prompt of [sentencePrompt(base), wordPrompt(base)]) {
+      expect(prompt.instructions.map((message) => message.role)).toEqual([
+        'system',
+        'system',
+      ])
+      expect(prompt.messages.map((message) => message.role)).toEqual([
+        'user',
+        'assistant',
+        'user',
+      ])
+      const finalUser = textOf(prompt.messages.at(-1)!.content)
+      expect(finalUser).toContain('<source>')
+      expect(finalUser.indexOf('(Reminder:')).toBeLessThan(
+        finalUser.indexOf('<source>'),
+      )
     }
+  })
+
+  it('puts the metadata-language rule first in v7 instructions', () => {
+    const english = sentencePrompt(base)
+    const korean = sentencePrompt({ ...base, uiLang: 'ko' })
+    expect(english.instructions[0]?.role).toBe('system')
+    expect(korean.instructions[0]?.role).toBe('system')
+    expect(english.instructions[0]!.content).not.toBe(
+      korean.instructions[0]!.content,
+    )
+  })
+
+  it('keeps instructions and every pre-live message byte-identical', () => {
+    const bare = sentencePrompt(base)
+    const live = sentencePrompt({
+      ...base,
+      text: 'different text',
+      context: 'private context',
+      refinements: ['make it softer'],
+      previousMain: 'previous result',
+    })
+    expect(live.instructions).toEqual(bare.instructions)
+    expect(live.messages.slice(0, -1)).toEqual(bare.messages.slice(0, -1))
   })
 
   it('sentence user message carries <context> and <adjustments> before <source>', () => {
@@ -113,7 +143,7 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
       refinements: ['make it softer', 'make it shorter'],
       previousMain: '내일 봐요',
     })
-    const user = textOf(msgs[msgs.length - 1]!.content)
+    const user = textOf(msgs.messages.at(-1)!.content)
     expect(user).toContain('<context>\nctx here\n</context>')
     expect(user).toContain(
       '<adjustments>\nprevious: 내일 봐요\n- make it softer\n- make it shorter\n</adjustments>',
@@ -125,7 +155,7 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
   })
 
   it('bare sentence requests omit both blocks', () => {
-    const user = textOf(sentencePrompt(base).at(-1)!.content)
+    const user = textOf(sentencePrompt(base).messages.at(-1)!.content)
     expect(user).not.toContain('<context>')
     expect(user).not.toContain('<adjustments>')
   })
@@ -136,19 +166,21 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
         ...base,
         text: '배',
         context: '배 타고 왔어',
-      }).at(-1)!.content,
+      }).messages.at(-1)!.content,
     )
     expect(withCtx).toContain('<context>\n배 타고 왔어\n</context>')
     expect(withCtx.indexOf('<context>')).toBeLessThan(
       withCtx.indexOf('<source>'),
     )
-    const bare = textOf(wordPrompt({ ...base, text: '배' }).at(-1)!.content)
+    const bare = textOf(
+      wordPrompt({ ...base, text: '배' }).messages.at(-1)!.content,
+    )
     expect(bare).not.toContain('<context>')
   })
 
   it('whitespace-only context is treated as absent', () => {
     const user = textOf(
-      sentencePrompt({ ...base, context: '   ' }).at(-1)!.content,
+      sentencePrompt({ ...base, context: '   ' }).messages.at(-1)!.content,
     )
     expect(user).not.toContain('<context>')
   })
