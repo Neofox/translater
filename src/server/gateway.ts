@@ -1,3 +1,5 @@
+import type { JSONValue } from 'ai'
+
 export const DEFAULT_TRANSLATE_MODEL = 'openai/gpt-5.6-luna'
 
 export class GatewayConfigurationError extends Error {
@@ -49,16 +51,16 @@ export function gatewayProviderOptions(input: {
   model: string
   promptCacheKey: string
   tags: string[]
-}) {
-  const gateway = { caching: 'auto' as const, tags: input.tags }
-  if (!input.model.startsWith('openai/')) return { gateway }
-
-  return {
-    gateway,
-    openai: {
-      reasoningEffort: 'none',
-      store: false,
-      promptCacheKey: input.promptCacheKey,
-    },
+}): Record<string, Record<string, JSONValue>> {
+  const options: Record<string, Record<string, JSONValue>> = {
+    gateway: { caching: 'auto', tags: input.tags },
   }
+  if (!input.model.startsWith('openai/')) return options
+
+  options.openai = {
+    reasoningEffort: 'none',
+    store: false,
+    promptCacheKey: input.promptCacheKey,
+  }
+  return options
 }
