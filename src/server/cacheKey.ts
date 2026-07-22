@@ -1,7 +1,7 @@
 import type { Intent, Mode } from '../lib/types'
 
 // Bump when the response schema or prompt changes so stale entries miss.
-export const CACHE_VERSION = 'v11-context-refine'
+export const CACHE_VERSION = 'v12-ai-gateway'
 
 export type CacheKeyInput = {
   intent: Intent
@@ -15,7 +15,7 @@ export type CacheKeyInput = {
   previousMain: string
 }
 
-export function cacheKeyFor(d: CacheKeyInput): string {
+export function cacheKeyFor(d: CacheKeyInput, model: string): string {
   // refinements/previousMain are sentence-mode only — word requests must not
   // fragment the cache on fields their prompt never sees.
   const isWord = d.intent === 'word'
@@ -25,6 +25,7 @@ export function cacheKeyFor(d: CacheKeyInput): string {
   const anchored = !isWord && d.refinements.length > 0
   return JSON.stringify([
     CACHE_VERSION,
+    model,
     d.intent,
     d.mode,
     d.source,

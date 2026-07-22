@@ -107,7 +107,7 @@ const client = () => (_client ??= new OpenAI())
 export const translate = createServerFn({ method: 'POST' })
   .validator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {
-    const cacheKey = cacheKeyFor(data)
+    const cacheKey = cacheKeyFor(data, MODEL)
     const dimensions = telemetryDimensions(data)
 
     const cached = translationCache.get(cacheKey) as TranslateDone | undefined
