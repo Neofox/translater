@@ -1,13 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { Output, streamText } from 'ai'
-import { z } from 'zod'
-import {
-  MAX_CONTEXT_CHARS,
-  MAX_INPUT_CHARS,
-  MAX_REFINEMENT_CHARS,
-  MAX_REFINEMENTS,
-} from '../lib/limits'
 import { translationCache } from './cache'
 import { CACHE_VERSION, cacheKeyFor, promptCacheKeyFor } from './cacheKey'
 import {
@@ -20,34 +13,18 @@ import { sentencePrompt, wordPrompt } from './prompts'
 import { SentenceResult, WordResult } from './schemas'
 import { consumeStructuredStream } from './structuredStream'
 import {
+  prepareTranslationTelemetry,
+  translationRuntimeContext,
+  translationTelemetryOptions,
+} from './telemetry'
+import {
   classifyTranslationError,
   isTranslationAbort,
   publicTranslationError,
 } from './translationError'
+import { TranslateInput, type TranslateInputData } from './translateTypes'
 
-export const TranslateInput = z.object({
-  text: z.string().min(1).max(MAX_INPUT_CHARS),
-  source: z.string(),
-  target: z.string(),
-  mode: z.enum(['friends', 'casual', 'professional']),
-  intent: z.enum(['word', 'sentence']),
-  uiLang: z.enum(['en', 'ko']).default('en'),
-  context: z.string().max(MAX_CONTEXT_CHARS).default(''),
-  refinements: z
-    .array(z.string().min(1).max(MAX_REFINEMENT_CHARS))
-    .max(MAX_REFINEMENTS)
-    .default([]),
-  previousMain: z.string().max(MAX_INPUT_CHARS).default(''),
-  analyticsSessionId: z.uuid().optional(),
-  analyticsRunId: z.uuid().optional(),
-  analyticsSupersedesRunId: z.uuid().optional(),
-  analyticsInputRevision: z.number().int().nonnegative().optional(),
-  analyticsTrigger: z
-    .enum(['debounce', 'paste', 'enter', 'blur', 'force', 'refinement'])
-    .default('debounce'),
-})
-
-export type TranslateInputData = z.infer<typeof TranslateInput>
+export { TranslateInput, type TranslateInputData } from './translateTypes'
 
 export type TranslateDone =
   | { intent: 'sentence'; data: SentenceResult }
@@ -66,6 +43,7 @@ type TranslationCache = {
 type TranslationDependencies = {
   streamText: typeof streamText
   cache: TranslationCache
+  prepareTelemetry: typeof prepareTranslationTelemetry
 }
 
 const MODEL = resolveTranslateModel()
@@ -73,15 +51,17 @@ const MODEL = resolveTranslateModel()
 const defaultDependencies: TranslationDependencies = {
   streamText,
   cache: translationCache,
+  prepareTelemetry: prepareTranslationTelemetry,
 }
 
 export async function handleTranslate(
   data: TranslateInputData,
   requestSignal: AbortSignal,
-  dependencies: TranslationDependencies = defaultDependencies,
+  dependencies: Partial<TranslationDependencies> = {},
 ): Promise<ReadableStream<TranslateChunk>> {
+  const runtime = { ...defaultDependencies, ...dependencies }
   const cacheKey = cacheKeyFor(data, MODEL)
-  const cached = dependencies.cache.get(cacheKey) as TranslateDone | undefined
+  const cached = runtime.cache.get(cacheKey) as TranslateDone | undefined
 
   if (cached) {
     return new ReadableStream<TranslateChunk>({
@@ -93,6 +73,7 @@ export async function handleTranslate(
   }
 
   assertGatewayApiKey()
+  const nativeTelemetry = await runtime.prepareTelemetry()
 
   const isWord = data.intent === 'word'
   const requestKind =
@@ -109,7 +90,7 @@ export async function handleTranslate(
   return new ReadableStream<TranslateChunk>({
     async start(controller) {
       try {
-        const result = dependencies.streamText({
+        const result = runtime.streamText({
           model: MODEL,
           instructions: prompt.instructions,
           messages: prompt.messages,
@@ -125,6 +106,12 @@ export async function handleTranslate(
               promptVersion: CACHE_VERSION,
             }),
           }),
+          runtimeContext: translationRuntimeContext(
+            data,
+            MODEL,
+            CACHE_VERSION,
+          ),
+          telemetry: translationTelemetryOptions(nativeTelemetry.enabled),
         })
 
         const parsed = await consumeStructuredStream({
@@ -140,7 +127,7 @@ export async function handleTranslate(
           ? { intent: 'word', data: parsed as unknown as WordResult }
           : { intent: 'sentence', data: parsed as unknown as SentenceResult }
 
-        dependencies.cache.set(cacheKey, done)
+        runtime.cache.set(cacheKey, done)
         controller.enqueue({ type: 'done', done })
         controller.close()
       } catch (error) {
@@ -158,6 +145,8 @@ export async function handleTranslate(
             ),
           )
         }
+      } finally {
+        await nativeTelemetry.flush()
       }
     },
   })

@@ -1,10 +1,40 @@
-import type { propagateAttributes, startObservation } from '@langfuse/tracing'
-import type { TokenCostDetails } from './pricing'
+import type { Telemetry, TelemetryOptions } from 'ai'
+import { characterCountBucket } from './translationDimensions'
+import type { TranslateInputData } from './translateTypes'
 
-export type CharacterCountBucket =
-  '0' | '1-24' | '25-100' | '101-500' | '501-2000' | '2001+'
+export const SAFE_TRANSLATION_CONTEXT_KEYS = {
+  intent: true,
+  mode: true,
+  sourceLanguage: true,
+  targetLanguage: true,
+  uiLanguage: true,
+  hasContext: true,
+  refinementCount: true,
+  requestKind: true,
+  inputLengthBucket: true,
+  isPolish: true,
+  promptVersion: true,
+  requestedModel: true,
+  gatewayCacheMode: true,
+  trigger: true,
+  analyticsSessionId: true,
+  clientRunId: true,
+  supersedesRunId: true,
+  inputRevision: true,
+} as const
 
-type TranslationDimensions = {
+type LangfuseEnvironment = Partial<
+  Pick<
+    NodeJS.ProcessEnv,
+    | 'LANGFUSE_PUBLIC_KEY'
+    | 'LANGFUSE_SECRET_KEY'
+    | 'LANGFUSE_BASE_URL'
+    | 'LANGFUSE_TRACING_ENVIRONMENT'
+    | 'LANGFUSE_RELEASE'
+  >
+>
+
+export type TranslationRuntimeContext = {
   intent: 'word' | 'sentence'
   mode: 'friends' | 'casual' | 'professional'
   sourceLanguage: string
@@ -13,384 +43,172 @@ type TranslationDimensions = {
   hasContext: boolean
   refinementCount: number
   requestKind: 'initial' | 'context' | 'refinement'
-  inputLengthBucket: CharacterCountBucket
+  inputLengthBucket: ReturnType<typeof characterCountBucket>
   isPolish: boolean
   promptVersion: string
-  analyticsSessionId?: string
-  clientRunId?: string
-  supersedesRunId?: string
-  inputRevision?: number
-  trigger: 'debounce' | 'paste' | 'enter' | 'blur' | 'force' | 'refinement'
+  requestedModel: string
+  gatewayCacheMode: 'auto'
+  trigger: TranslateInputData['analyticsTrigger']
+  analyticsSessionId: string
+  clientRunId: string
+  supersedesRunId: string
+  inputRevision: number
 }
 
-type TokenUsage = {
-  input: number
-  cachedInput: number
-  cacheWriteInput: number
-  output: number
-  total: number
-}
-
-type TranslationResult = {
-  tokens?: TokenUsage
-  costDetails?: TokenCostDetails
-  resolvedSourceLanguage: string
-  resolvedTargetLanguage: string
-  outputLengthBucket: CharacterCountBucket
-  alternativeCount: number
-  hasLearningTips: boolean
-}
-
-export type TranslationTelemetry = {
-  markFirstToken: () => void
-  succeed: (result: TranslationResult) => void
-  cancel: () => void
-  fail: (error: unknown) => void
+export type PreparedTranslationTelemetry = {
+  enabled: boolean
   flush: () => Promise<void>
 }
 
-type LangfuseRuntime = {
-  startObservation: typeof startObservation
-  propagateAttributes: typeof propagateAttributes
+type LoadedTelemetry = {
+  registerTelemetry: (integration: unknown) => void
+  integration: unknown
+  start: () => void | Promise<void>
   forceFlush: () => Promise<void>
 }
 
-let runtimePromise: Promise<LangfuseRuntime | undefined> | undefined
+type PrepareTranslationTelemetryOptions = {
+  env?: LangfuseEnvironment
+  load?: (env: LangfuseEnvironment) => Promise<LoadedTelemetry>
+}
+
+const GLOBAL_STATE_KEY = '__neotranslateAiTelemetry'
+
+type TelemetryGlobal = typeof globalThis & {
+  [GLOBAL_STATE_KEY]?: Promise<PreparedTranslationTelemetry>
+}
+
+const telemetryGlobal = globalThis as TelemetryGlobal
 let warned = false
 
-const noopTelemetry: TranslationTelemetry = {
-  markFirstToken() {},
-  succeed(_result) {},
-  cancel() {},
-  fail() {},
+const disabledTelemetry: PreparedTranslationTelemetry = {
+  enabled: false,
   async flush() {},
 }
 
-function warnOnce(message: string, error?: unknown) {
+function warnOnce(message: string) {
   if (warned) return
   warned = true
-  console.warn(`[langfuse] ${message}`, error)
+  console.warn(`[langfuse] ${message}`)
 }
 
-function hasCredentials() {
+export function isLangfuseConfigured(env: LangfuseEnvironment): boolean {
   return Boolean(
-    process.env.LANGFUSE_PUBLIC_KEY && process.env.LANGFUSE_SECRET_KEY,
+    env.LANGFUSE_PUBLIC_KEY?.trim() && env.LANGFUSE_SECRET_KEY?.trim(),
   )
 }
 
-async function initializeLangfuse(): Promise<LangfuseRuntime | undefined> {
-  if (!hasCredentials()) return undefined
-
-  try {
-    const [{ NodeTracerProvider }, { LangfuseSpanProcessor }, tracing] =
-      await Promise.all([
-        import('@opentelemetry/sdk-trace-node'),
-        import('@langfuse/otel'),
-        import('@langfuse/tracing'),
-      ])
-
-    const processor = new LangfuseSpanProcessor({
-      publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-      secretKey: process.env.LANGFUSE_SECRET_KEY,
-      baseUrl: process.env.LANGFUSE_BASE_URL,
-      // v5 reads release/environment from LANGFUSE_RELEASE and
-      // LANGFUSE_TRACING_ENVIRONMENT rather than trace attributes.
-      exportMode: 'immediate',
-      mediaUploadEnabled: false,
-    })
-
-    const provider = new NodeTracerProvider({
-      spanProcessors: [processor],
-    })
-    provider.register()
-
-    return {
-      startObservation: tracing.startObservation,
-      propagateAttributes: tracing.propagateAttributes,
-      forceFlush: () => processor.forceFlush(),
-    }
-  } catch (error) {
-    warnOnce(
-      'initialization failed; translations will continue untraced',
-      error,
-    )
-    return undefined
-  }
-}
-
-function langfuseRuntime() {
-  return (runtimePromise ??= initializeLangfuse())
-}
-
-export function langfuseUsageDetails(tokens: TokenUsage) {
+export function translationTelemetryOptions(
+  enabled: boolean,
+): TelemetryOptions<TranslationRuntimeContext> {
   return {
-    // Langfuse flat usage buckets must be mutually exclusive. OpenAI's input
-    // count includes cache reads and writes, so subtract both from base input.
-    input: Math.max(
-      0,
-      tokens.input - tokens.cachedInput - tokens.cacheWriteInput,
-    ),
-    cache_read_input_tokens: tokens.cachedInput,
-    cache_write_input_tokens: tokens.cacheWriteInput,
-    output: tokens.output,
-    total: tokens.total,
+    isEnabled: enabled,
+    recordInputs: false,
+    recordOutputs: false,
+    functionId: 'translation',
+    includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
   }
 }
 
-export function characterCountBucket(count: number): CharacterCountBucket {
-  if (count === 0) return '0'
-  if (count <= 24) return '1-24'
-  if (count <= 100) return '25-100'
-  if (count <= 500) return '101-500'
-  if (count <= 2_000) return '501-2000'
-  return '2001+'
-}
-
-function safeErrorStatus(error: unknown) {
-  if (!error || typeof error !== 'object') return 'Translation request failed'
-
-  const value = error as { name?: unknown; status?: unknown; code?: unknown }
-  const name = typeof value.name === 'string' ? value.name : 'Error'
-  const status = typeof value.status === 'number' ? ` HTTP ${value.status}` : ''
-  const code =
-    typeof value.code === 'string' && /^[a-z0-9_.-]+$/i.test(value.code)
-      ? ` (${value.code})`
-      : ''
-  return `${name}${status}${code}`
-}
-
-export async function startTranslationTelemetry(
-  dimensions: TranslationDimensions,
-  cacheLayer: 'local' | 'openai',
+export function translationRuntimeContext(
+  data: TranslateInputData,
   model: string,
-): Promise<TranslationTelemetry> {
-  const runtime = await langfuseRuntime()
-  if (!runtime) return noopTelemetry
+  promptVersion: string,
+): TranslationRuntimeContext {
+  const requestKind =
+    data.refinements.length > 0
+      ? 'refinement'
+      : data.context
+        ? 'context'
+        : 'initial'
 
-  try {
-    // Langfuse v5 propagated metadata requires alphanumeric keys and short
-    // string values. Content itself stays out of traces by product policy.
-    const requestMetadata: Record<string, string> = {
-      intent: dimensions.intent,
-      mode: dimensions.mode,
-      sourceLanguage: dimensions.sourceLanguage,
-      targetLanguage: dimensions.targetLanguage,
-      uiLanguage: dimensions.uiLanguage,
-      hasContext: String(dimensions.hasContext),
-      refinementCount: String(dimensions.refinementCount),
-      requestKind: dimensions.requestKind,
-      inputLengthBucket: dimensions.inputLengthBucket,
-      isPolish: String(dimensions.isPolish),
-      promptVersion: dimensions.promptVersion,
-      cacheLayer,
-      providerRequest: String(cacheLayer === 'openai'),
-      requestedModel: model,
-      trigger: dimensions.trigger,
-      ...(dimensions.clientRunId
-        ? { clientRunId: dimensions.clientRunId }
-        : {}),
-      ...(dimensions.supersedesRunId
-        ? { supersedesRunId: dimensions.supersedesRunId }
-        : {}),
-      ...(dimensions.inputRevision !== undefined
-        ? { inputRevision: String(dimensions.inputRevision) }
-        : {}),
-    }
-    const safeInput = {
-      intent: dimensions.intent,
-      mode: dimensions.mode,
-      sourceLanguage: dimensions.sourceLanguage,
-      targetLanguage: dimensions.targetLanguage,
-      requestKind: dimensions.requestKind,
-      inputLengthBucket: dimensions.inputLengthBucket,
-      hasContext: dimensions.hasContext,
-      refinementCount: dimensions.refinementCount,
-      trigger: dimensions.trigger,
-      ...(dimensions.inputRevision !== undefined
-        ? { inputRevision: dimensions.inputRevision }
-        : {}),
-    }
-    const { request, generation } = runtime.propagateAttributes(
-      {
-        traceName: 'translation',
-        version: dimensions.promptVersion,
-        metadata: requestMetadata,
-        tags: [
-          'translation',
-          dimensions.intent,
-          dimensions.mode,
-          dimensions.requestKind,
-          cacheLayer,
-          dimensions.trigger,
-        ],
-        ...(dimensions.analyticsSessionId
-          ? { sessionId: dimensions.analyticsSessionId }
-          : {}),
-      },
-      () => {
-        const startedRequest = runtime.startObservation('translation.request', {
-          input: safeInput,
-          version: dimensions.promptVersion,
-        })
-        const startedGeneration =
-          cacheLayer === 'openai'
-            ? startedRequest.startObservation(
-                'openai.responses',
-                {
-                  modelParameters: {
-                    reasoningEffort: 'none',
-                    promptCacheMode: 'explicit',
-                    promptCacheTtl: '30m',
-                  },
-                  version: dimensions.promptVersion,
-                },
-                { asType: 'generation' },
-              )
-            : undefined
-        return {
-          request: startedRequest,
-          generation: startedGeneration,
-        }
-      },
-    )
-
-    let ended = false
-    let markedFirstToken = false
-
-    const finishError = (error: unknown) => {
-      if (ended) return
-      ended = true
-
-      try {
-        const statusMessage = safeErrorStatus(error)
-        const errorMetadata = {
-          outcome: 'error',
-          providerUsageKnown: 'false',
-          providerCostKnown: 'false',
-        }
-        generation
-          ?.update({
-            level: 'ERROR',
-            statusMessage,
-            metadata: errorMetadata,
-          })
-          .end()
-        request
-          .update({
-            level: 'ERROR',
-            statusMessage,
-            metadata: errorMetadata,
-          })
-          .end()
-      } catch (telemetryError) {
-        warnOnce(
-          'trace update failed; translations will continue',
-          telemetryError,
-        )
-      }
-    }
-
-    const finishCanceled = () => {
-      if (ended) return
-      ended = true
-
-      try {
-        const canceledMetadata = {
-          outcome: 'canceled',
-          canceledBeforeFirstToken: String(!markedFirstToken),
-          providerUsageKnown: 'false',
-          providerCostKnown: 'false',
-        }
-        const canceledUpdate = {
-          statusMessage: 'Client request canceled',
-          metadata: canceledMetadata,
-        }
-        generation?.update(canceledUpdate).end()
-        request.update(canceledUpdate).end()
-      } catch (telemetryError) {
-        warnOnce(
-          'trace cancellation update failed; translations will continue',
-          telemetryError,
-        )
-      }
-    }
-
-    const finishSuccess = (result: TranslationResult) => {
-      if (ended) return
-      ended = true
-
-      try {
-        const resultMetadata: Record<string, string> = {
-          resolvedSourceLanguage: result.resolvedSourceLanguage,
-          resolvedTargetLanguage: result.resolvedTargetLanguage,
-          outputLengthBucket: result.outputLengthBucket,
-          alternativeCount: String(result.alternativeCount),
-          hasLearningTips: String(result.hasLearningTips),
-          outcome: 'success',
-          providerUsageKnown: String(Boolean(result.tokens)),
-          providerCostKnown: String(Boolean(result.costDetails)),
-        }
-        const safeOutput = {
-          resolvedSourceLanguage: result.resolvedSourceLanguage,
-          resolvedTargetLanguage: result.resolvedTargetLanguage,
-          outputLengthBucket: result.outputLengthBucket,
-          alternativeCount: result.alternativeCount,
-          hasLearningTips: result.hasLearningTips,
-        }
-
-        generation
-          ?.update({
-            model,
-            input: safeInput,
-            output: safeOutput,
-            metadata: resultMetadata,
-            ...(result.tokens
-              ? { usageDetails: langfuseUsageDetails(result.tokens) }
-              : {}),
-            ...(result.costDetails ? { costDetails: result.costDetails } : {}),
-          })
-          .end()
-        request.update({ output: safeOutput, metadata: resultMetadata }).end()
-      } catch (telemetryError) {
-        warnOnce(
-          'trace update failed; translations will continue',
-          telemetryError,
-        )
-      }
-    }
-
-    return {
-      markFirstToken() {
-        if (!generation || markedFirstToken || ended) return
-        markedFirstToken = true
-        try {
-          generation.update({ completionStartTime: new Date() })
-        } catch (error) {
-          warnOnce('first-token update failed', error)
-        }
-      },
-      succeed(result) {
-        finishSuccess(result)
-      },
-      cancel() {
-        finishCanceled()
-      },
-      fail(error) {
-        finishError(error)
-      },
-      async flush() {
-        try {
-          await runtime.forceFlush()
-        } catch (error) {
-          warnOnce('trace flush failed; translations will continue', error)
-        }
-      },
-    }
-  } catch (error) {
-    warnOnce(
-      'trace creation failed; translations will continue untraced',
-      error,
-    )
-    return noopTelemetry
+  return {
+    intent: data.intent,
+    mode: data.mode,
+    sourceLanguage: data.source,
+    targetLanguage: data.target,
+    uiLanguage: data.uiLang,
+    hasContext: Boolean(data.context),
+    refinementCount: data.refinements.length,
+    requestKind,
+    inputLengthBucket: characterCountBucket(data.text.length),
+    isPolish: data.source === data.target,
+    promptVersion,
+    requestedModel: model,
+    gatewayCacheMode: 'auto',
+    trigger: data.analyticsTrigger,
+    analyticsSessionId: data.analyticsSessionId ?? '',
+    clientRunId: data.analyticsRunId ?? '',
+    supersedesRunId: data.analyticsSupersedesRunId ?? '',
+    inputRevision: data.analyticsInputRevision ?? -1,
   }
+}
+
+async function loadNativeTelemetry(
+  env: LangfuseEnvironment,
+): Promise<LoadedTelemetry> {
+  const [ai, langfuse, otel, nodeSdk] = await Promise.all([
+    import('ai'),
+    import('@langfuse/vercel-ai-sdk'),
+    import('@langfuse/otel'),
+    import('@opentelemetry/sdk-node'),
+  ])
+
+  const processor = new otel.LangfuseSpanProcessor({
+    publicKey: env.LANGFUSE_PUBLIC_KEY,
+    secretKey: env.LANGFUSE_SECRET_KEY,
+    baseUrl: env.LANGFUSE_BASE_URL,
+    exportMode: 'immediate',
+    mediaUploadEnabled: false,
+  })
+  const sdk = new nodeSdk.NodeSDK({ spanProcessors: [processor] })
+  const integration = new langfuse.LangfuseVercelAiSdkIntegration()
+
+  return {
+    registerTelemetry(value) {
+      ai.registerTelemetry(value as Telemetry)
+    },
+    integration,
+    start: () => sdk.start(),
+    forceFlush: () => processor.forceFlush(),
+  }
+}
+
+export async function prepareTranslationTelemetry(
+  options: PrepareTranslationTelemetryOptions = {},
+): Promise<PreparedTranslationTelemetry> {
+  const env = options.env ?? process.env
+  if (!isLangfuseConfigured(env)) return disabledTelemetry
+
+  telemetryGlobal[GLOBAL_STATE_KEY] ??= (async () => {
+    try {
+      const loaded = await (options.load ?? loadNativeTelemetry)(env)
+      await loaded.start()
+      loaded.registerTelemetry(loaded.integration)
+
+      return {
+        enabled: true,
+        async flush() {
+          try {
+            await loaded.forceFlush()
+          } catch {
+            warnOnce('trace flush failed; translations will continue')
+          }
+        },
+      }
+    } catch {
+      warnOnce('initialization failed; translations will continue untraced')
+      return disabledTelemetry
+    }
+  })()
+
+  return telemetryGlobal[GLOBAL_STATE_KEY]
+}
+
+export function resetTranslationTelemetryForTests(): void {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('Telemetry reset is test-only.')
+  }
+  delete telemetryGlobal[GLOBAL_STATE_KEY]
+  warned = false
 }

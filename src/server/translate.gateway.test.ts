@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SAFE_TRANSLATION_CONTEXT_KEYS } from './telemetry'
 import { handleTranslate, type TranslateChunk } from './translate'
 
 const validSentenceResult = {
@@ -55,10 +56,16 @@ describe('handleTranslate via AI Gateway', () => {
     }))
     const cache = cacheDouble()
     const requestSignal = new AbortController().signal
+    const flush = vi.fn().mockResolvedValue(undefined)
+    const prepareTelemetry = vi.fn().mockResolvedValue({
+      enabled: true,
+      flush,
+    })
 
     const stream = await handleTranslate(data, requestSignal, {
       streamText: streamText as never,
       cache,
+      prepareTelemetry,
     })
 
     await expect(readChunks(stream)).resolves.toEqual([
@@ -85,6 +92,18 @@ describe('handleTranslate via AI Gateway', () => {
           expect.objectContaining({ role: 'user' }),
         ],
         output: expect.anything(),
+        runtimeContext: expect.objectContaining({
+          intent: 'sentence',
+          requestedModel: 'openai/gpt-5.6-luna',
+          gatewayCacheMode: 'auto',
+        }),
+        telemetry: {
+          isEnabled: true,
+          recordInputs: false,
+          recordOutputs: false,
+          functionId: 'translation',
+          includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
+        },
         providerOptions: {
           gateway: {
             caching: 'auto',
@@ -109,7 +128,38 @@ describe('handleTranslate via AI Gateway', () => {
     }
     expect(sdkRequest.providerOptions.gateway).not.toHaveProperty('models')
     expect(sdkRequest).not.toHaveProperty('allowSystemInMessages')
+    expect(sdkRequest).not.toHaveProperty('include')
+    expect(sdkRequest).not.toHaveProperty('metadata')
     expect(cache.set).toHaveBeenCalledTimes(1)
+    expect(flush).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns local cache hits without initializing native telemetry', async () => {
+    const cached = {
+      intent: 'sentence' as const,
+      data: validSentenceResult,
+    }
+    const cache = {
+      get: vi.fn(() => cached),
+      set: vi.fn(),
+    }
+    const streamText = vi.fn()
+    const prepareTelemetry = vi.fn()
+    const stream = await handleTranslate(
+      data,
+      new AbortController().signal,
+      {
+        streamText: streamText as never,
+        cache,
+        prepareTelemetry,
+      },
+    )
+
+    await expect(readChunks(stream)).resolves.toEqual([
+      { type: 'cache', done: cached },
+    ])
+    expect(streamText).not.toHaveBeenCalled()
+    expect(prepareTelemetry).not.toHaveBeenCalled()
   })
 
   it('does not cache or emit a terminal result when validation rejects', async () => {

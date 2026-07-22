@@ -17,10 +17,8 @@
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
     "@langfuse/otel": "^5.9.1",
-    "@langfuse/tracing": "^5.9.1",
     "@langfuse/vercel-ai-sdk": "^5.9.1",
     "@opentelemetry/sdk-node": "^0.221.0",
-    "@opentelemetry/sdk-trace-node": "^2.9.0",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-router": "latest",
