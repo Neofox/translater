@@ -51,8 +51,20 @@ export const STRINGS = {
     backToTranslator: 'Back to translator',
     stack: 'Stack',
     errorEnvHint:
-      'Check .env — either OPENAI_API_KEY for cloud or a loaded LM Studio model for local.',
+      'Check AI_GATEWAY_API_KEY and TRANSLATE_MODEL in the deployment environment.',
     translationFailed: 'Translation failed.',
+    gatewayConfigurationFailed:
+      'AI Gateway is not configured for this deployment.',
+    gatewayAuthenticationFailed:
+      'AI Gateway authentication failed. Check AI_GATEWAY_API_KEY.',
+    gatewayBudgetUnavailable:
+      'AI Gateway capacity is currently unavailable.',
+    gatewayRateLimited:
+      'AI Gateway is temporarily rate limited. Please retry.',
+    gatewayModelInvalid:
+      'The configured AI Gateway model or provider options are unsupported.',
+    gatewayStructuredOutputInvalid:
+      'The selected model returned an invalid translation result.',
     inputTooLong: 'Text is too long to translate.',
     inputTooLongHint:
       'Limit is {max} characters; current is {count}. Try shortening or splitting the text.',
@@ -118,8 +130,20 @@ export const STRINGS = {
     backToTranslator: '번역기로 돌아가기',
     stack: '스택',
     errorEnvHint:
-      '.env를 확인하세요 — 클라우드는 OPENAI_API_KEY, 로컬은 LM Studio 모델이 로드되어 있어야 합니다.',
+      '배포 환경의 AI_GATEWAY_API_KEY와 TRANSLATE_MODEL을 확인하세요.',
     translationFailed: '번역에 실패했습니다.',
+    gatewayConfigurationFailed:
+      '이 배포 환경에 AI Gateway가 설정되어 있지 않습니다.',
+    gatewayAuthenticationFailed:
+      'AI Gateway 인증에 실패했습니다. AI_GATEWAY_API_KEY를 확인하세요.',
+    gatewayBudgetUnavailable:
+      '현재 AI Gateway 용량을 사용할 수 없습니다.',
+    gatewayRateLimited:
+      'AI Gateway 요청이 일시적으로 제한되었습니다. 다시 시도하세요.',
+    gatewayModelInvalid:
+      '설정된 AI Gateway 모델 또는 제공자 옵션을 지원하지 않습니다.',
+    gatewayStructuredOutputInvalid:
+      '선택한 모델이 올바른 번역 결과를 반환하지 않았습니다.',
     inputTooLong: '입력이 너무 깁니다.',
     inputTooLongHint:
       '최대 {max}자까지 가능하며, 현재 {count}자입니다. 내용을 줄이거나 나눠서 번역하세요.',
