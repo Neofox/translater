@@ -4,7 +4,6 @@ import { Output, streamText } from 'ai'
 import { translationCache } from './cache'
 import { CACHE_VERSION, cacheKeyFor, promptCacheKeyFor } from './cacheKey'
 import {
-  assertGatewayAuthentication,
   gatewayProviderOptions,
   gatewayTags,
   resolveTranslateModel,
@@ -74,7 +73,6 @@ export async function handleTranslate(
     })
   }
 
-  assertGatewayAuthentication()
   const nativeTelemetry = await runtime.prepareTelemetry()
 
   const isWord = data.intent === 'word'

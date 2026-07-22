@@ -50,6 +50,26 @@ describe('handleTranslate via AI Gateway', () => {
   beforeEach(() => vi.stubEnv('AI_GATEWAY_API_KEY', 'test-gateway-key'))
   afterEach(() => vi.unstubAllEnvs())
 
+  it('lets the AI SDK resolve request-scoped OIDC without auth env vars', async () => {
+    vi.stubEnv('AI_GATEWAY_API_KEY', '')
+    vi.stubEnv('VERCEL_OIDC_TOKEN', '')
+    const streamText = vi.fn(() => ({
+      textStream: deltas(),
+      output: Promise.resolve(validSentenceResult),
+    }))
+
+    const stream = await handleTranslate(data, new AbortController().signal, {
+      streamText: streamText as never,
+      cache: cacheDouble(),
+    })
+
+    await expect(readChunks(stream)).resolves.toContainEqual({
+      type: 'done',
+      done: { intent: 'sentence', data: validSentenceResult },
+    })
+    expect(streamText).toHaveBeenCalledTimes(1)
+  })
+
   it('sends one exact-model structured request and preserves raw deltas', async () => {
     const streamText = vi.fn((_request: Record<string, unknown>) => ({
       textStream: deltas(),
