@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_TRANSLATE_MODEL,
   GatewayConfigurationError,
-  assertGatewayApiKey,
+  assertGatewayAuthentication,
   gatewayProviderOptions,
   gatewayTags,
   resolveTranslateModel,
@@ -32,14 +32,22 @@ describe('resolveTranslateModel', () => {
   )
 })
 
-describe('assertGatewayApiKey', () => {
-  it('fails closed when the server key is missing', () => {
-    expect(() => assertGatewayApiKey({})).toThrow(GatewayConfigurationError)
+describe('assertGatewayAuthentication', () => {
+  it('fails closed when neither Gateway credential is configured', () => {
+    expect(() => assertGatewayAuthentication({})).toThrow(
+      GatewayConfigurationError,
+    )
   })
 
-  it('accepts a non-empty server key', () => {
+  it('accepts a non-empty API key', () => {
     expect(() =>
-      assertGatewayApiKey({ AI_GATEWAY_API_KEY: 'test-key' }),
+      assertGatewayAuthentication({ AI_GATEWAY_API_KEY: 'test-key' }),
+    ).not.toThrow()
+  })
+
+  it('accepts a Vercel OIDC token', () => {
+    expect(() =>
+      assertGatewayAuthentication({ VERCEL_OIDC_TOKEN: 'test-oidc-token' }),
     ).not.toThrow()
   })
 })
@@ -61,6 +69,10 @@ describe('gatewayProviderOptions', () => {
         reasoningEffort: 'none',
         store: false,
         promptCacheKey: 'nt:v12:sentence:en:en:ko:casual',
+        promptCacheOptions: {
+          mode: 'explicit',
+          ttl: '30m',
+        },
       },
     })
   })

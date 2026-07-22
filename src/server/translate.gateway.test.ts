@@ -114,6 +114,10 @@ describe('handleTranslate via AI Gateway', () => {
             reasoningEffort: 'none',
             store: false,
             promptCacheKey: expect.stringContaining('nt:v12-ai-gateway'),
+            promptCacheOptions: {
+              mode: 'explicit',
+              ttl: '30m',
+            },
           },
         },
       }),

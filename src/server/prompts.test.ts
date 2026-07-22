@@ -15,6 +15,31 @@ function textOf(content: PromptBundle['messages'][number]['content']): string {
   return content
 }
 
+function textPartsOf(
+  content: PromptBundle['messages'][number]['content'],
+): Array<{
+  type: 'text'
+  text: string
+  providerOptions?: Record<string, Record<string, unknown>>
+}> {
+  if (!Array.isArray(content)) {
+    throw new Error('final translation message must use separate text parts')
+  }
+  return content as Array<{
+    type: 'text'
+    text: string
+    providerOptions?: Record<string, Record<string, unknown>>
+  }>
+}
+
+function finalUserParts(prompt: PromptBundle) {
+  return textPartsOf(prompt.messages.at(-1)!.content)
+}
+
+function liveTextOf(prompt: PromptBundle): string {
+  return finalUserParts(prompt).at(-1)!.text
+}
+
 function assistantOf(prompt: PromptBundle): unknown {
   const m = prompt.messages.find((message) => message.role === 'assistant')
   if (!m) throw new Error('no assistant few-shot in prompt')
@@ -105,11 +130,19 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
         'assistant',
         'user',
       ])
-      const finalUser = textOf(prompt.messages.at(-1)!.content)
-      expect(finalUser).toContain('<source>')
-      expect(finalUser.indexOf('(Reminder:')).toBeLessThan(
-        finalUser.indexOf('<source>'),
-      )
+      const parts = finalUserParts(prompt)
+      expect(parts).toHaveLength(2)
+      const stable = parts[0]!
+      const live = parts[1]!
+      expect(stable.text).toContain('(Reminder:')
+      expect(stable.text).not.toContain('<source>')
+      expect(stable.providerOptions).toEqual({
+        openai: {
+          promptCacheBreakpoint: { mode: 'explicit' },
+        },
+      })
+      expect(live.text).toContain('<source>')
+      expect(live.providerOptions).toBeUndefined()
     }
   })
 
@@ -143,7 +176,7 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
       refinements: ['make it softer', 'make it shorter'],
       previousMain: '내일 봐요',
     })
-    const user = textOf(msgs.messages.at(-1)!.content)
+    const user = liveTextOf(msgs)
     expect(user).toContain('<context>\nctx here\n</context>')
     expect(user).toContain(
       '<adjustments>\nprevious: 내일 봐요\n- make it softer\n- make it shorter\n</adjustments>',
@@ -155,33 +188,25 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
   })
 
   it('bare sentence requests omit both blocks', () => {
-    const user = textOf(sentencePrompt(base).messages.at(-1)!.content)
+    const user = liveTextOf(sentencePrompt(base))
     expect(user).not.toContain('<context>')
     expect(user).not.toContain('<adjustments>')
   })
 
   it('word user message carries <context> when set, omits it when empty', () => {
-    const withCtx = textOf(
-      wordPrompt({
-        ...base,
-        text: '배',
-        context: '배 타고 왔어',
-      }).messages.at(-1)!.content,
+    const withCtx = liveTextOf(
+      wordPrompt({ ...base, text: '배', context: '배 타고 왔어' }),
     )
     expect(withCtx).toContain('<context>\n배 타고 왔어\n</context>')
     expect(withCtx.indexOf('<context>')).toBeLessThan(
       withCtx.indexOf('<source>'),
     )
-    const bare = textOf(
-      wordPrompt({ ...base, text: '배' }).messages.at(-1)!.content,
-    )
+    const bare = liveTextOf(wordPrompt({ ...base, text: '배' }))
     expect(bare).not.toContain('<context>')
   })
 
   it('whitespace-only context is treated as absent', () => {
-    const user = textOf(
-      sentencePrompt({ ...base, context: '   ' }).messages.at(-1)!.content,
-    )
+    const user = liveTextOf(sentencePrompt({ ...base, context: '   ' }))
     expect(user).not.toContain('<context>')
   })
 })

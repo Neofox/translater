@@ -4,14 +4,14 @@ import { SentenceResult, WordResult } from '../src/server/schemas.ts'
 import { sentencePrompt, wordPrompt } from '../src/server/prompts.ts'
 import { CACHE_VERSION, promptCacheKeyFor } from '../src/server/cacheKey.ts'
 import {
-  assertGatewayApiKey,
+  assertGatewayAuthentication,
   gatewayProviderOptions,
   gatewayTags,
   resolveTranslateModel,
 } from '../src/server/gateway.ts'
 
 const MODEL = resolveTranslateModel()
-assertGatewayApiKey()
+assertGatewayAuthentication()
 console.log(`[smoke] model=${MODEL}`)
 
 async function callStructured(intent, args) {

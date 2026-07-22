@@ -1,4 +1,4 @@
-import type { ModelMessage, SystemModelMessage } from 'ai'
+import type { ModelMessage, SystemModelMessage, UserModelMessage } from 'ai'
 import { promptNameFor } from '../lib/languages'
 import type { Mode } from '../lib/types'
 import type { UiLang } from '../lib/i18n'
@@ -12,15 +12,29 @@ export type TranslationPrompt = {
 
 // Stable instructions and few-shot messages stay before live content so
 // Gateway/provider prefix caching can reuse the longest possible prefix.
-function finalUserContent(instruction: string, liveInput: string): string {
-  return `${instruction}\n${liveInput}`
+function finalUserContent(
+  instruction: string,
+  liveInput: string,
+): UserModelMessage['content'] {
+  return [
+    {
+      type: 'text',
+      text: instruction,
+      providerOptions: {
+        openai: {
+          promptCacheBreakpoint: { mode: 'explicit' },
+        },
+      },
+    },
+    { type: 'text', text: liveInput },
+  ]
 }
 
 function translationPrompt(
   languageRule: string,
   system: string,
   fewshot: { user: string; assistant: string },
-  finalUser: string,
+  finalUser: UserModelMessage['content'],
 ): TranslationPrompt {
   return {
     instructions: [

@@ -11,6 +11,7 @@ export class GatewayConfigurationError extends Error {
 
 type TranslationEnvironment = {
   AI_GATEWAY_API_KEY?: string
+  VERCEL_OIDC_TOKEN?: string
   TRANSLATE_MODEL?: string
 }
 
@@ -26,11 +27,13 @@ export function resolveTranslateModel(
   return model
 }
 
-export function assertGatewayApiKey(
+export function assertGatewayAuthentication(
   env: TranslationEnvironment = process.env,
 ): void {
-  if (!env.AI_GATEWAY_API_KEY?.trim()) {
-    throw new GatewayConfigurationError('AI_GATEWAY_API_KEY is not configured.')
+  if (!env.AI_GATEWAY_API_KEY?.trim() && !env.VERCEL_OIDC_TOKEN?.trim()) {
+    throw new GatewayConfigurationError(
+      'AI Gateway authentication is not configured.',
+    )
   }
 }
 
@@ -56,6 +59,10 @@ export function gatewayProviderOptions(input: {
     reasoningEffort: 'none',
     store: false,
     promptCacheKey: input.promptCacheKey,
+    promptCacheOptions: {
+      mode: 'explicit',
+      ttl: '30m',
+    },
   }
   return options
 }

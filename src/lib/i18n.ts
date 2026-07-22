@@ -51,12 +51,12 @@ export const STRINGS = {
     backToTranslator: 'Back to translator',
     stack: 'Stack',
     errorEnvHint:
-      'Check AI_GATEWAY_API_KEY and TRANSLATE_MODEL in the deployment environment.',
+      'Check Vercel OIDC or AI_GATEWAY_API_KEY authentication and TRANSLATE_MODEL in the deployment environment.',
     translationFailed: 'Translation failed.',
     gatewayConfigurationFailed:
       'AI Gateway is not configured for this deployment.',
     gatewayAuthenticationFailed:
-      'AI Gateway authentication failed. Check AI_GATEWAY_API_KEY.',
+      'AI Gateway authentication failed. Check Vercel OIDC or AI_GATEWAY_API_KEY.',
     gatewayBudgetUnavailable: 'AI Gateway capacity is currently unavailable.',
     gatewayRateLimited: 'AI Gateway is temporarily rate limited. Please retry.',
     gatewayModelInvalid:
@@ -128,12 +128,12 @@ export const STRINGS = {
     backToTranslator: '번역기로 돌아가기',
     stack: '스택',
     errorEnvHint:
-      '배포 환경의 AI_GATEWAY_API_KEY와 TRANSLATE_MODEL을 확인하세요.',
+      '배포 환경의 Vercel OIDC 또는 AI_GATEWAY_API_KEY 인증과 TRANSLATE_MODEL을 확인하세요.',
     translationFailed: '번역에 실패했습니다.',
     gatewayConfigurationFailed:
       '이 배포 환경에 AI Gateway가 설정되어 있지 않습니다.',
     gatewayAuthenticationFailed:
-      'AI Gateway 인증에 실패했습니다. AI_GATEWAY_API_KEY를 확인하세요.',
+      'AI Gateway 인증에 실패했습니다. Vercel OIDC 또는 AI_GATEWAY_API_KEY를 확인하세요.',
     gatewayBudgetUnavailable: '현재 AI Gateway 용량을 사용할 수 없습니다.',
     gatewayRateLimited:
       'AI Gateway 요청이 일시적으로 제한되었습니다. 다시 시도하세요.',

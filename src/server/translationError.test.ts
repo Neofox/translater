@@ -57,6 +57,7 @@ describe('classifyTranslationError', () => {
       classifyTranslationError(error),
       'en',
     )
+    expect(publicError.message).toContain('OIDC')
     expect(publicError.message).toContain('AI_GATEWAY_API_KEY')
     expect(publicError.message).not.toContain('private')
     expect(publicError).not.toHaveProperty('cause')
