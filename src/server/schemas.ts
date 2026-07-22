@@ -1,9 +1,8 @@
 import { z } from 'zod'
 
-// All fields are required: these schemas are sent to the OpenAI Responses API
-// as strict structured outputs (via `zodTextFormat`), which guarantees every
-// field is present. "Not applicable" is an empty string / empty array, never
-// a missing key — so no `.optional()` / `.default()` here.
+// All fields are required: these schemas are passed to AI SDK `Output.object`
+// for strict final validation. "Not applicable" is an empty string / empty
+// array, never a missing key — so no `.optional()` / `.default()` here.
 
 const LearningTips = z
   .object({

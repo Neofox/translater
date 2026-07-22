@@ -2,7 +2,7 @@
 
 ## Project
 
-Translator app built with **TanStack Start** (React SSR) + **Vite** + **TailwindCSS v4** + **Nitro** (deployed to Vercel). Uses the OpenAI Responses API with strict structured output (`zodTextFormat` from `openai/helpers/zod`). OpenAI is the only provider; model comes from `TRANSLATE_MODEL` (default `gpt-5.6-luna`).
+Translator app built with **TanStack Start** (React SSR) + **Vite** + **TailwindCSS v4** + **Nitro** (deployed to Vercel). Uses Vercel AI SDK v7 through Vercel AI Gateway with strict structured output (`streamText` + `Output.object`). `TRANSLATE_MODEL` is one exact deployment-controlled `provider/model` identifier (default `openai/gpt-5.6-luna`); there is no fallback model.
 
 ## Key Files
 
@@ -10,9 +10,9 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `src/server/prompts.ts`             | All LLM prompt templates and few-shot examples (sentence + word mode, per-mode register guidance)         |
 | `src/server/schemas.ts`             | Zod schemas for LLM output (`SentenceResult`, `WordResult`). Strict-mode compliant: every field required. |
-| `src/server/translate.ts`           | Server function — cache check, OpenAI client, streaming via `responses.stream` + `zodTextFormat` (strict) |
+| `src/server/translate.ts`           | Server function — cache check, AI Gateway `streamText`, raw JSON deltas, and final `Output.object` validation |
 | `src/server/cache.ts`               | In-memory LRU cache (max 50 entries)                                                                      |
-| `src/server/telemetry.ts`           | Optional metadata-only Langfuse traces for requests, OpenAI generations, cache, usage, cost, and errors   |
+| `src/server/telemetry.ts`           | Optional AI SDK v7 telemetry registration for content-free Langfuse generation traces                     |
 | `src/hooks/useTranslate.ts`         | Client hook — streams translation, returns `LiveResult`                                                   |
 | `src/lib/detectIntent.ts`           | Heuristic: ≤3 tokens AND ≤24 chars → `word`, else `sentence`                                              |
 | `src/components/SentenceView.tsx`   | Renders sentence-mode results (main, rationale, alternatives, formalityNote)                              |
@@ -25,9 +25,11 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - Three tone modes: `friends` (slang/반말), `casual` (해요체), `professional` (하십시오체).
 - Prompts are multi-message conversations: `developer` (language rule) → `system` (instructions) → few-shot `user`/`assistant` → actual `user` input.
 - LLM responses are streamed as incremental JSON fragments (server sends each delta, client accumulates) and parsed via `partial-json`.
-- Latency: `reasoning: { effort: 'none' }` (no `temperature` — the API rejects it) plus GPT-5.6 explicit prompt caching. The final user message has a stable reminder block ending in `prompt_cache_breakpoint`, followed by a separate live source/context/refinement block; requests use `prompt_cache_options: { mode: 'explicit', ttl: '30m' }` and a key covering every prompt-shape field. Keep system-prompt lines ordered stable-first / mode-dependent-last and keep all live content after the breakpoint when editing `prompts.ts`.
-- Responses use `store: false`. Server-side usage metadata tracks ordinary input, cached reads, cache writes, and output separately so Langfuse cost telemetry applies GPT-5.6's distinct cache prices. All four pricing environment variables are required; there is no legacy pricing fallback.
-- Langfuse is optional and activates only when both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` exist. It uses manual v5 generation instrumentation because the OpenAI wrapper would capture full prompts and completions. Traces contain only privacy-safe structured I/O summaries and short string metadata: ephemeral page session, request kind, operational dimensions, character-count buckets, resolved language pair, result shape, latency/TTFT, exclusive token buckets, cost, cache layer, and sanitized errors. It must never receive source text, context, refinements, prompt bodies, or translation output, and analytics metadata is not streamed back to the browser. Configure environment/release through `LANGFUSE_TRACING_ENVIRONMENT` and `LANGFUSE_RELEASE`; serverless requests force-flush after spans end. Telemetry failures must remain non-fatal. Local LRU hits are request spans with no OpenAI generation or provider cost.
+- Runtime: AI SDK v7 requires ESM and Node.js 22+. The project declares `"type": "module"`, and Vercel Functions use `nodejs22.x`.
+- Gateway routing: `AI_GATEWAY_API_KEY` is the only model-provider credential. `TRANSLATE_MODEL` must be one exact `provider/model`; the app never sends a fallback model list and sets `maxRetries: 0` so a paid retry requires explicit user action.
+- Caching and provider options: Gateway caching is `auto`. Stable instructions and few-shot messages stay before all live source/context/refinement content to maximize provider prefix caching. OpenAI-only options (`reasoningEffort: 'none'`, `store: false`, and `promptCacheKey`) are sent only for `openai/*` models.
+- Langfuse is optional and activates only when both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` exist. It uses AI SDK v7's `telemetry` option and `@langfuse/vercel-ai-sdk`, with `recordInputs: false`, `recordOutputs: false`, and an explicit safe `runtimeContext` allowlist. Source text, context, refinements, prompts, outputs, raw bodies, and provider metadata must never be added to telemetry. Configure environment/release through `LANGFUSE_TRACING_ENVIRONMENT` and `LANGFUSE_RELEASE`; serverless requests force-flush after native spans end. Telemetry failures remain non-fatal. Local LRU hits do not call AI SDK and create no Langfuse trace.
+- Billing: AI Gateway is authoritative for billed usage and cost. The application does not normalize usage or calculate cost; Langfuse may show its own estimate when its model catalog recognizes the selected model.
 - Client debounce is 800ms; paste skips it (`queueImmediate`) and Enter/blur flush a pending run (`flush`). Plain Enter is a newline when nothing is pending; Shift+Enter always newline; Cmd/Ctrl+Enter force-runs.
 - Refine + context: `TranslateInput` carries optional `context` (sentence + word), `refinements` + `previousMain` (sentence only, max 3 refinements of which at most one is free-text). They are injected only into the FINAL user message as `<context>`/`<adjustments>` blocks; the explaining system lines are UNCONDITIONAL so the prefix cache stays intact — keep them that way. Refine chips are toggles (`aria-pressed`); toggling one off removes that adjustment and re-runs (LRU makes it cheap). A failed refine rolls back via an internal snapshot stack (no user-facing undo control). Editing the input clears refinements; context is sessionStorage-sticky.
 

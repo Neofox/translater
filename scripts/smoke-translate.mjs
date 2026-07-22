@@ -1,44 +1,67 @@
 import 'dotenv/config'
-import OpenAI from 'openai'
-import { zodTextFormat } from 'openai/helpers/zod'
+import { Output, streamText } from 'ai'
 import { SentenceResult, WordResult } from '../src/server/schemas.ts'
 import { sentencePrompt, wordPrompt } from '../src/server/prompts.ts'
-import { promptCacheKeyFor } from '../src/server/cacheKey.ts'
+import {
+  CACHE_VERSION,
+  promptCacheKeyFor,
+} from '../src/server/cacheKey.ts'
+import {
+  assertGatewayApiKey,
+  gatewayProviderOptions,
+  gatewayTags,
+  resolveTranslateModel,
+} from '../src/server/gateway.ts'
 
-const MODEL = process.env.TRANSLATE_MODEL ?? 'gpt-5.6-luna'
+const MODEL = resolveTranslateModel()
+assertGatewayApiKey()
 console.log(`[smoke] model=${MODEL}`)
-
-const client = new OpenAI()
 
 async function callStructured(intent, args) {
   const promptArgs = { uiLang: 'en', ...args, intent }
-  const messages =
+  const prompt =
     intent === 'word' ? wordPrompt(promptArgs) : sentencePrompt(promptArgs)
-  const format =
-    intent === 'word'
-      ? zodTextFormat(WordResult, 'word_translation')
-      : zodTextFormat(SentenceResult, 'sentence_translation')
   const t0 = Date.now()
-  const response = await client.responses.parse({
+  const result = streamText({
     model: MODEL,
-    input: messages,
-    reasoning: { effort: 'none' },
-    store: false,
-    prompt_cache_key: promptCacheKeyFor(promptArgs),
-    prompt_cache_options: { mode: 'explicit', ttl: '30m' },
-    text: { format },
+    instructions: prompt.instructions,
+    messages: prompt.messages,
+    output: Output.object({
+      schema: intent === 'word' ? WordResult : SentenceResult,
+      name: intent === 'word' ? 'word_translation' : 'sentence_translation',
+    }),
+    maxRetries: 0,
+    providerOptions: gatewayProviderOptions({
+      model: MODEL,
+      promptCacheKey: promptCacheKeyFor(promptArgs),
+      tags: gatewayTags({
+        intent,
+        requestKind:
+          promptArgs.refinements?.length > 0
+            ? 'refinement'
+            : promptArgs.context
+              ? 'context'
+              : 'initial',
+        promptVersion: CACHE_VERSION,
+      }),
+    }),
   })
+
+  for await (const _delta of result.textStream) {
+    // Drain the stream; production renders each delta in the browser.
+  }
+  const [data, usage] = await Promise.all([result.output, result.usage])
   return {
-    data: response.output_parsed,
+    data,
     ms: Date.now() - t0,
-    usage: response.usage,
+    usage,
   }
 }
 
 async function run(label, intent, args) {
   const { data, ms, usage } = await callStructured(intent, args)
   console.log(
-    `\n=== ${label} ===  ${ms} ms | in=${usage?.input_tokens} cached=${usage?.input_tokens_details?.cached_tokens ?? 0} write=${usage?.input_tokens_details?.cache_write_tokens ?? 0} out=${usage?.output_tokens} total=${usage?.total_tokens}`,
+    `\n=== ${label} ===  ${ms} ms | in=${usage?.inputTokens} cached=${usage?.inputTokenDetails?.cacheReadTokens ?? 0} write=${usage?.inputTokenDetails?.cacheWriteTokens ?? 0} out=${usage?.outputTokens} total=${usage?.totalTokens}`,
   )
   console.log(JSON.stringify(data, null, 2))
   return { data, ms, usage }
