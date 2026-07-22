@@ -5,13 +5,13 @@
 
 ## Summary
 
-Migrate neotranslate from the OpenAI Node SDK to Vercel AI SDK v6 and route every paid translation through Vercel AI Gateway. The selected model remains a deployment concern, configured through `TRANSLATE_MODEL` as an exact `provider/model` identifier. The application will not expose model selection in the UI and will not fall back to a different model.
+Migrate neotranslate from the OpenAI Node SDK to Vercel AI SDK v7 and route every paid translation through Vercel AI Gateway. The selected model remains a deployment concern, configured through `TRANSLATE_MODEL` as an exact `provider/model` identifier. The application will not expose model selection in the UI and will not fall back to a different model.
 
 The migration must preserve the current product behavior: strict Zod-validated sentence and word results, incremental rendering, request cancellation, local LRU caching, privacy-safe Langfuse traces, and deployment-controlled cost metadata.
 
 ## Goals
 
-- Replace the direct OpenAI SDK integration with Vercel AI SDK v6.
+- Replace the direct OpenAI SDK integration with Vercel AI SDK v7.
 - Authenticate AI Gateway requests with `AI_GATEWAY_API_KEY`.
 - Allow model trials by changing only deployment configuration and model-specific pricing configuration.
 - Preserve the current browser streaming contract and rendered translation experience.
@@ -31,7 +31,9 @@ The migration must preserve the current product behavior: strict Zod-validated s
 
 ### SDK and Gateway routing
 
-Add the `ai` v6 package and remove the `openai` package. Translation requests will use `streamText()` with a plain `provider/model` string. In AI SDK, that string selects AI Gateway as the global provider and the Gateway provider reads `AI_GATEWAY_API_KEY` from the environment.
+Add the `ai` v7 package and remove the `openai` package. Translation requests will use `streamText()` with a plain `provider/model` string. In AI SDK, that string selects AI Gateway as the global provider and the Gateway provider reads `AI_GATEWAY_API_KEY` from the environment.
+
+AI SDK v7 requires ESM and Node.js 22 or later. The project already declares `"type": "module"`, uses `.mjs` for the smoke harness, runs locally on a newer Node release, and configures Vercel Functions with `nodejs22.x`; no runtime downgrade or CommonJS compatibility layer is needed.
 
 `TRANSLATE_MODEL` must contain a slash and represent one exact Gateway model, for example `openai/gpt-5.6-luna`. The default will become `openai/gpt-5.6-luna`. No `providerOptions.gateway.models` fallback list will be configured. Gateway may route the same model across its available hosting providers, but it must not change the model identifier.
 
@@ -43,10 +45,10 @@ AI SDK retries will be disabled with `maxRetries: 0`. A transient failure will s
 
 ### Prompt representation
 
-`sentencePrompt()` and `wordPrompt()` will return AI SDK `ModelMessage[]` rather than OpenAI Responses input objects.
+`sentencePrompt()` and `wordPrompt()` will return an AI SDK prompt bundle with `instructions` and `messages` rather than OpenAI Responses input objects. AI SDK v7 renamed the top-level system setting to `instructions`; system messages will not be placed inside `messages`, so `allowSystemInMessages` is unnecessary.
 
-- The current developer language rule becomes the first system-level instruction.
-- The existing system instructions follow it in the same stable order.
+- The current developer language rule becomes the first entry in the `instructions` array.
+- The existing system instructions follow it as the second `instructions` entry in the same stable order.
 - Few-shot user and assistant messages remain in their current order and retain their exact textual JSON examples.
 - The final user input continues to place stable instructions before live source, context, and refinement content.
 - OpenAI-specific `input_text`, `output_text`, and `prompt_cache_breakpoint` objects are removed.
@@ -94,7 +96,7 @@ The current cache key does not contain the model. Add the exact `TRANSLATE_MODEL
 
 ### Langfuse
 
-Retain the existing manual Langfuse v5 instrumentation. Do not enable AI SDK experimental telemetry.
+Retain the existing manual Langfuse v5 instrumentation. Do not enable AI SDK v7's `telemetry` option or register a global AI SDK telemetry integration.
 
 Rename the provider generation from `openai.responses` to `vercel.ai-gateway`. Traces may include only the existing privacy-safe dimensions plus:
 

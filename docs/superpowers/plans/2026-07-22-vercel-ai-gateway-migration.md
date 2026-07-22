@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the direct OpenAI Responses integration with Vercel AI SDK v6 routed exclusively through Vercel AI Gateway, while preserving strict structured streaming, cancellation, local caching, and content-free telemetry.
+**Goal:** Replace the direct OpenAI Responses integration with Vercel AI SDK v7 routed exclusively through Vercel AI Gateway, while preserving strict structured streaming, cancellation, local caching, and content-free telemetry.
 
 **Architecture:** Keep `translate.ts` as the server-side orchestrator and the existing `{ type: 'delta', raw }` browser protocol. Add a small Gateway adapter for model/configuration/provider options and usage normalization, plus a pure error classifier and a pure structured-stream consumer so the risky provider boundary can be unit-tested without paid requests. Deployment selects one exact `provider/model`; there is no UI selector, provider bypass, retry, or fallback-model list.
 
-**Tech Stack:** TypeScript 6, TanStack Start server functions, Vercel AI SDK v6 (`ai`), AI Gateway, Zod 4, Vitest 4, Langfuse v5, pnpm.
+**Tech Stack:** TypeScript 6, TanStack Start server functions, Vercel AI SDK v7 (`ai`), AI Gateway, Zod 4, Vitest 4, Langfuse v5, pnpm, Node.js 22+ with ESM.
 
 ## Global Constraints
 
@@ -16,6 +16,7 @@
 - Preserve the client wire contract: raw JSON text deltas followed by one validated terminal object.
 - Never send a fallback model list through `providerOptions.gateway.models`.
 - Set `maxRetries: 0`; a request is paid and retried only after an explicit user action.
+- Use AI SDK v7's top-level `instructions` option for system instructions; keep system-role messages out of `messages` and do not enable `allowSystemInMessages`.
 - Keep source text, prompt text, context, refinements, raw output, parsed output, provider response bodies, and provider metadata out of Langfuse.
 - Keep `AI_GATEWAY_API_KEY` server-only. Never add a real key to a file or command.
 - Commit only files named in the current task. Do not include unrelated worktree changes.
@@ -23,7 +24,7 @@
 
 ---
 
-### Task 1: Establish the dependency baseline and install AI SDK v6
+### Task 1: Establish the dependency baseline and install AI SDK v7
 
 **Files:**
 
@@ -42,15 +43,18 @@ rtk npx tsc --noEmit
 
 Expected: the existing suite and typecheck pass. If they do not, stop and record the pre-existing failure before changing dependencies.
 
-- [ ] **Step 2: Add AI SDK v6 alongside the current SDK**
+- [ ] **Step 2: Confirm v7 runtime prerequisites and add AI SDK v7**
 
 Run:
 
 ```bash
-rtk env CI=true pnpm add ai@^6
+rtk node --version
+rtk node -e "const p=require('./package.json'); if (p.type !== 'module') throw new Error('package must be ESM'); console.log('ESM verified')"
+rtk rg -n "nodejs22\.x" vite.config.ts
+rtk env CI=true pnpm add ai@^7
 ```
 
-Expected: `package.json` contains the `ai` dependency at major version 6 and `pnpm-lock.yaml` is updated. Keep `openai` temporarily so the staged migration remains installable; Task 7 removes it in the same commit that removes its runtime imports.
+Expected: Node is at least v22, the project reports `ESM verified`, Vercel uses `nodejs22.x`, `package.json` contains the `ai` dependency at major version 7, and `pnpm-lock.yaml` is updated. Keep `openai` temporarily so the staged migration remains installable; Task 7 removes it in the same commit that removes its runtime imports.
 
 - [ ] **Step 3: Verify the expected SDK exports before using them**
 
@@ -508,7 +512,7 @@ rtk git commit -m "feat: isolate translation cache and pricing by model"
 
 ---
 
-### Task 4: Convert prompts to AI SDK `ModelMessage[]`
+### Task 4: Convert prompts to AI SDK v7 instruction/message bundles
 
 **Files:**
 
@@ -517,10 +521,14 @@ rtk git commit -m "feat: isolate translation cache and pricing by model"
 
 - [ ] **Step 1: Replace OpenAI-content assertions with AI SDK message assertions**
 
-Update the test helper to accept strings only:
+Update the prompt aliases and test helper to accept the new bundle and text-only messages:
 
 ```ts
-function textOf(content: PromptMessages[number]['content']): string {
+type PromptBundle =
+  | ReturnType<typeof sentencePrompt>
+  | ReturnType<typeof wordPrompt>
+
+function textOf(content: PromptBundle['messages'][number]['content']): string {
   if (typeof content !== 'string') {
     throw new Error('translation prompts must use text-only model messages')
   }
@@ -532,15 +540,17 @@ Replace the explicit `prompt_cache_breakpoint` test with:
 
 ```ts
 it('keeps stable instructions before all live content', () => {
-  for (const msgs of [sentencePrompt(base), wordPrompt(base)]) {
-    expect(msgs.map((message) => message.role)).toEqual([
+  for (const prompt of [sentencePrompt(base), wordPrompt(base)]) {
+    expect(prompt.instructions.map((message) => message.role)).toEqual([
       'system',
       'system',
+    ])
+    expect(prompt.messages.map((message) => message.role)).toEqual([
       'user',
       'assistant',
       'user',
     ])
-    const finalUser = textOf(msgs.at(-1)!.content)
+    const finalUser = textOf(prompt.messages.at(-1)!.content)
     expect(finalUser).toContain('<source>')
     expect(finalUser.indexOf('(Reminder:')).toBeLessThan(
       finalUser.indexOf('<source>'),
@@ -548,15 +558,17 @@ it('keeps stable instructions before all live content', () => {
   }
 })
 
-it('puts the metadata-language rule in the first system message', () => {
+it('puts the metadata-language rule first in v7 instructions', () => {
   const english = sentencePrompt(base)
   const korean = sentencePrompt({ ...base, uiLang: 'ko' })
-  expect(english[0]?.role).toBe('system')
-  expect(korean[0]?.role).toBe('system')
-  expect(textOf(english[0]!.content)).not.toBe(textOf(korean[0]!.content))
+  expect(english.instructions[0]?.role).toBe('system')
+  expect(korean.instructions[0]?.role).toBe('system')
+  expect(english.instructions[0]!.content).not.toBe(
+    korean.instructions[0]!.content,
+  )
 })
 
-it('keeps every pre-live message byte-identical across live inputs', () => {
+it('keeps instructions and every pre-live message byte-identical', () => {
   const bare = sentencePrompt(base)
   const live = sentencePrompt({
     ...base,
@@ -565,11 +577,12 @@ it('keeps every pre-live message byte-identical across live inputs', () => {
     refinements: ['make it softer'],
     previousMain: 'previous result',
   })
-  expect(live.slice(0, -1)).toEqual(bare.slice(0, -1))
+  expect(live.instructions).toEqual(bare.instructions)
+  expect(live.messages.slice(0, -1)).toEqual(bare.messages.slice(0, -1))
 })
 ```
 
-Update the existing prefix-invariant tests to compare both system messages instead of only index zero.
+Update `assistantOf` and every existing user-message lookup to use `prompt.messages`. Update the prefix-invariant tests to compare both `instructions` entries.
 
 - [ ] **Step 2: Run prompt tests and confirm they fail**
 
@@ -586,7 +599,12 @@ Expected: FAIL because prompt content still contains OpenAI Responses content pa
 At the top of `src/server/prompts.ts`:
 
 ```ts
-import type { ModelMessage } from 'ai'
+import type { ModelMessage, SystemModelMessage } from 'ai'
+
+export type TranslationPrompt = {
+  instructions: SystemModelMessage[]
+  messages: ModelMessage[]
+}
 ```
 
 Replace `cacheableUserContent` with a string-only helper:
@@ -597,15 +615,62 @@ function finalUserContent(instruction: string, liveInput: string): string {
 }
 ```
 
-Keep each function's existing inline argument object type and add `: ModelMessage[]` after its closing `})`. Do not introduce a second copy of the argument types.
+Keep each function's existing inline argument object type and add `: TranslationPrompt` after its closing `})`. Do not introduce a second copy of the argument types.
 
-For each function, return five messages in this order:
+Add one builder that keeps the v7 system instructions out of `messages`:
 
-1. `{ role: 'system', content: metadataLanguageRule(uiLang) }`
-2. `{ role: 'system', content: existingInstructionsWithoutTheLanguageRule }`
-3. The existing few-shot user message as a string.
-4. The existing few-shot assistant JSON as a string.
-5. The existing stable final reminder and live `<context>`, `<adjustments>`, and `<source>` blocks joined by `finalUserContent`.
+```ts
+function translationPrompt(
+  languageRule: string,
+  system: string,
+  fewshot: { user: string; assistant: string },
+  finalUser: string,
+): TranslationPrompt {
+  return {
+    instructions: [
+      { role: 'system', content: languageRule },
+      { role: 'system', content: system },
+    ],
+    messages: [
+      { role: 'user', content: fewshot.user },
+      { role: 'assistant', content: fewshot.assistant },
+      { role: 'user', content: finalUser },
+    ],
+  }
+}
+```
+
+Use it in sentence mode:
+
+```ts
+return translationPrompt(
+  metadataLanguageRule(uiLang),
+  system,
+  sentenceFewshot,
+  finalUserContent(
+    `(Reminder: ${isPolish ? `polish the upcoming source content in ${langName(target)} — never echo it verbatim` : 'translate the upcoming source content literally'}; rationale/note/formalityNote in ${metaLang}.${pairInvolvesForeign && !isPolish ? ' Populate `learningTips` with a grammar or vocab note (and, for CJK pairs, a character breakdown) useful for a learner — do not leave it empty unless the sentence is genuinely trivial.' : ''})`,
+    `${userBlocks({ context, refinements, previousMain })}<source>\n${text}\n</source>`,
+  ),
+)
+```
+
+Use it in word mode:
+
+```ts
+return translationPrompt(
+  metadataLanguageRule(uiLang),
+  system,
+  fewshot,
+  finalUserContent(
+    `(Reminder: treat the upcoming source content as the literal headword to ${isPolish ? 'find in-register synonyms for' : 'define'}; all metadata fields in ${metaLang}; stay in the ${mode.toUpperCase()} register band for primaryTranslation and alternativeTranslations.${pairInvolvesForeign && !isPolish ? ' Populate `learningTips` with a grammar or vocab note (and, for CJK pairs, a character breakdown) useful for a learner — do not leave it empty unless the headword is genuinely trivial.' : ''})`,
+    `${userBlocks({ context })}<source>\n${text}\n</source>`,
+  ),
+)
+```
+
+The language rule must be the first `instructions` entry and the remaining stable system prompt the second. The three conversation messages remain few-shot user, few-shot assistant, and final live user.
+
+Remove `metadataLanguageRule(uiLang)` from the beginning of each local `system` array so it appears exactly once through the first `instructions` entry.
 
 Remove all `input_text`, `output_text`, and `prompt_cache_breakpoint` objects. Do not alter prompt wording, examples, register rules, or the ordering of context/refinement/source blocks.
 
@@ -626,7 +691,7 @@ Expected: prompt tests pass. Remaining type errors should be limited to the not-
 
 ```bash
 rtk git add src/server/prompts.ts src/server/prompts.test.ts
-rtk git commit -m "refactor: emit AI SDK model messages"
+rtk git commit -m "refactor: emit AI SDK v7 prompt bundles"
 ```
 
 ---
@@ -919,6 +984,15 @@ expect(streamText).toHaveBeenCalledWith(expect.objectContaining({
   model: 'openai/gpt-5.6-luna',
   maxRetries: 0,
   abortSignal: expect.any(AbortSignal),
+  instructions: [
+    expect.objectContaining({ role: 'system' }),
+    expect.objectContaining({ role: 'system' }),
+  ],
+  messages: [
+    expect.objectContaining({ role: 'user' }),
+    expect.objectContaining({ role: 'assistant' }),
+    expect.objectContaining({ role: 'user' }),
+  ],
   output: expect.anything(),
   providerOptions: {
     gateway: {
@@ -935,6 +1009,7 @@ expect(streamText).toHaveBeenCalledWith(expect.objectContaining({
 expect(streamText).toHaveBeenCalledTimes(1)
 expect(streamText.mock.calls[0]![0].providerOptions.gateway)
   .not.toHaveProperty('models')
+expect(streamText.mock.calls[0]![0]).not.toHaveProperty('allowSystemInMessages')
 ```
 
 The fake AI SDK result must provide:
@@ -1019,9 +1094,11 @@ Immediately before `streamText`, call `assertGatewayApiKey()`. Construct the req
 
 ```ts
 const requestKind = dimensions.requestKind
+const prompt = isWord ? wordPrompt(data) : sentencePrompt(data)
 const result = streamText({
   model: MODEL,
-  messages: isWord ? wordPrompt(data) : sentencePrompt(data),
+  instructions: prompt.instructions,
+  messages: prompt.messages,
   output: Output.object({
     schema: isWord ? WordResult : SentenceResult,
     name: isWord ? 'word_translation' : 'sentence_translation',
@@ -1174,7 +1251,7 @@ modelParameters: {
 - Extend successful result metadata with optional `responseModel`, fixed `gatewayCacheMode: 'auto'`, and sorted unique `warningCategories`.
 - Update `safeErrorStatus` to read AI SDK's numeric `statusCode` as well as the existing `status` field; retain only class name, HTTP status, and a token-shaped safe code.
 - Keep `input` and `output` as the existing privacy-safe summaries, never actual content.
-- Do not enable AI SDK `experimental_telemetry`.
+- Do not enable AI SDK v7's `telemetry` option or register a global AI SDK telemetry integration; retain the existing manual content-free Langfuse path.
 
 Implement warning normalization using only warning `type` values that match a short safe token pattern; map every absent or unsafe type to `other`, deduplicate, and sort. Never retain warning messages, setting values, provider metadata, or raw objects.
 
@@ -1238,12 +1315,15 @@ import {
 } from '../src/server/cacheKey.ts'
 ```
 
-Resolve and validate the model/key, then replace `client.responses.parse` with:
+Resolve and validate the model/key, then replace the existing `messages` assignment and `client.responses.parse` call with:
 
 ```js
+const prompt =
+  intent === 'word' ? wordPrompt(promptArgs) : sentencePrompt(promptArgs)
 const result = streamText({
   model: MODEL,
-  messages,
+  instructions: prompt.instructions,
+  messages: prompt.messages,
   output: Output.object({
     schema: intent === 'word' ? WordResult : SentenceResult,
     name: intent === 'word' ? 'word_translation' : 'sentence_translation',
@@ -1301,7 +1381,8 @@ Do not include a plausible secret value.
 
 Update `AGENTS.md` and any matching README sections so they state:
 
-- Vercel AI SDK v6 and AI Gateway are the only production provider path.
+- Vercel AI SDK v7 and AI Gateway are the only production provider path.
+- AI SDK v7 requires ESM and Node.js 22+; Vercel Functions remain on `nodejs22.x`.
 - `TRANSLATE_MODEL` is one exact `provider/model` string and defaults to `openai/gpt-5.6-luna`.
 - There is no model fallback.
 - Structured results use `streamText` plus `Output.object`.
@@ -1378,7 +1459,7 @@ Expected: all commands exit zero. If formatting fails, use the repository format
 Run:
 
 ```bash
-rtk rg -n "gateway.*models|models.*gateway|maxRetries:\s*[1-9]|experimental_telemetry|OPENAI_API_KEY|providerMetadata|responseBody" src scripts .env.example AGENTS.md
+rtk rg -n "gateway.*models|models.*gateway|maxRetries:\s*[1-9]|experimental_telemetry|\btelemetry\s*:|OPENAI_API_KEY|providerMetadata|responseBody" src scripts .env.example AGENTS.md
 rtk git diff --check
 rtk git status --short
 ```
@@ -1445,7 +1526,8 @@ The user is responsible for adding the secret. If verification required a code f
 ## Final Acceptance Checklist
 
 - [ ] `openai` is absent from runtime dependencies and imports.
-- [ ] Every paid translation uses AI SDK `streamText` through AI Gateway.
+- [ ] Every paid translation uses AI SDK v7 `streamText` through AI Gateway on the Node.js 22+ ESM runtime.
+- [ ] System instructions use the v7 `instructions` option and do not require `allowSystemInMessages`.
 - [ ] `TRANSLATE_MODEL` is deployment-controlled and validated as one exact `provider/model`.
 - [ ] No fallback-model list or non-Gateway provider client exists.
 - [ ] `maxRetries` is zero.
