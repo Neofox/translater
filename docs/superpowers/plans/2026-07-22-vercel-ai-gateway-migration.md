@@ -4,9 +4,9 @@
 
 **Goal:** Replace the direct OpenAI Responses integration with Vercel AI SDK v7 routed exclusively through Vercel AI Gateway, while preserving strict structured streaming, cancellation, local caching, and content-free telemetry.
 
-**Architecture:** Keep `translate.ts` as the server-side orchestrator and the existing `{ type: 'delta', raw }` browser protocol. Add a small Gateway adapter for model/configuration/provider options and usage normalization, plus a pure error classifier and a pure structured-stream consumer so the risky provider boundary can be unit-tested without paid requests. Deployment selects one exact `provider/model`; there is no UI selector, provider bypass, retry, or fallback-model list.
+**Architecture:** Keep `translate.ts` as the server-side orchestrator and the existing `{ type: 'delta', raw }` browser protocol. Add a small Gateway adapter for model/configuration/provider options, a pure error classifier, and a pure structured-stream consumer so the risky provider boundary can be unit-tested without paid requests. Replace manual Langfuse spans with AI SDK v7 telemetry registered through Langfuse's official integration; deployment still selects one exact `provider/model` with no UI selector, provider bypass, retry, or fallback-model list.
 
-**Tech Stack:** TypeScript 6, TanStack Start server functions, Vercel AI SDK v7 (`ai`), AI Gateway, Zod 4, Vitest 4, Langfuse v5, pnpm, Node.js 22+ with ESM.
+**Tech Stack:** TypeScript 6, TanStack Start server functions, Vercel AI SDK v7 (`ai`), AI Gateway, Zod 4, Vitest 4, `@langfuse/vercel-ai-sdk` 5.9+, Langfuse v5, OpenTelemetry Node SDK, pnpm, Node.js 22+ with ESM.
 
 ## Global Constraints
 
@@ -18,6 +18,9 @@
 - Set `maxRetries: 0`; a request is paid and retried only after an explicit user action.
 - Use AI SDK v7's top-level `instructions` option for system instructions; keep system-role messages out of `messages` and do not enable `allowSystemInMessages`.
 - Keep source text, prompt text, context, refinements, raw output, parsed output, provider response bodies, and provider metadata out of Langfuse.
+- Enable AI SDK telemetry with `recordInputs: false`, `recordOutputs: false`, and an explicit safe runtime-context allowlist.
+- Keep AI SDK request/response body capture and the integration's supplemental provider metadata, headers, schema, and blanket runtime-context export disabled.
+- Do not create manual Langfuse request/generation spans or application-side cost records alongside native telemetry.
 - Keep `AI_GATEWAY_API_KEY` server-only. Never add a real key to a file or command.
 - Commit only files named in the current task. Do not include unrelated worktree changes.
 - Run the focused failing test before implementation and the same focused test after implementation for every behavior-changing task.
@@ -51,20 +54,20 @@ Run:
 rtk node --version
 rtk node -e "const p=require('./package.json'); if (p.type !== 'module') throw new Error('package must be ESM'); console.log('ESM verified')"
 rtk rg -n "nodejs22\.x" vite.config.ts
-rtk env CI=true pnpm add ai@^7
+rtk env CI=true pnpm add ai@^7 @langfuse/vercel-ai-sdk@^5.9.1 @opentelemetry/sdk-node@^0.221.0
 ```
 
-Expected: Node is at least v22, the project reports `ESM verified`, Vercel uses `nodejs22.x`, `package.json` contains the `ai` dependency at major version 7, and `pnpm-lock.yaml` is updated. Keep `openai` temporarily so the staged migration remains installable; Task 7 removes it in the same commit that removes its runtime imports.
+Expected: Node is at least v22, the project reports `ESM verified`, Vercel uses `nodejs22.x`, and `package.json` contains AI SDK 7 plus the Langfuse AI SDK integration and OpenTelemetry Node SDK. Keep `openai` and `@opentelemetry/sdk-trace-node` temporarily; Tasks 7 and 8 remove them with their final runtime imports.
 
 - [ ] **Step 3: Verify the expected SDK exports before using them**
 
 Run:
 
 ```bash
-rtk node -e "import('ai').then(m => { for (const k of ['streamText','Output','APICallError','NoObjectGeneratedError','NoSuchProviderError']) if (!(k in m)) throw new Error('missing '+k); console.log('AI SDK exports verified') })"
+rtk node -e "Promise.all([import('ai'), import('@langfuse/vercel-ai-sdk'), import('@opentelemetry/sdk-node')]).then(([ai, langfuse, otel]) => { for (const k of ['streamText','Output','registerTelemetry','APICallError','NoObjectGeneratedError','NoSuchProviderError']) if (!(k in ai)) throw new Error('missing ai.'+k); if (!('LangfuseVercelAiSdkIntegration' in langfuse)) throw new Error('missing Langfuse integration'); if (!('NodeSDK' in otel)) throw new Error('missing NodeSDK'); console.log('AI SDK telemetry exports verified') })"
 ```
 
-Expected: `AI SDK exports verified`.
+Expected: `AI SDK telemetry exports verified`.
 
 - [ ] **Step 4: Confirm only the expected dependency files changed**
 
@@ -90,12 +93,11 @@ rtk git commit -m "build: add Vercel AI SDK"
 - Create: `src/server/gateway.ts`
 - Create: `src/server/gateway.test.ts`
 
-- [ ] **Step 1: Write failing configuration, routing, and usage tests**
+- [ ] **Step 1: Write failing configuration and routing tests**
 
 Create `src/server/gateway.test.ts` with coverage equivalent to:
 
 ```ts
-import type { LanguageModelUsage } from 'ai'
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_TRANSLATE_MODEL,
@@ -103,7 +105,6 @@ import {
   assertGatewayApiKey,
   gatewayProviderOptions,
   gatewayTags,
-  normalizeLanguageModelUsage,
   resolveTranslateModel,
 } from './gateway'
 
@@ -181,39 +182,6 @@ describe('gatewayTags', () => {
   })
 })
 
-describe('normalizeLanguageModelUsage', () => {
-  it('maps AI SDK usage and defaults absent cache details to zero', () => {
-    expect(normalizeLanguageModelUsage({
-      inputTokens: 1000,
-      inputTokenDetails: {
-        noCacheTokens: 100,
-        cacheReadTokens: 600,
-        cacheWriteTokens: 300,
-      },
-      outputTokens: 120,
-      outputTokenDetails: {
-        textTokens: 120,
-        reasoningTokens: 0,
-      },
-      totalTokens: 1120,
-      raw: undefined,
-    } as LanguageModelUsage)).toEqual({
-      input: 1000,
-      cachedInput: 600,
-      cacheWriteInput: 300,
-      output: 120,
-      total: 1120,
-    })
-
-    expect(normalizeLanguageModelUsage({} as LanguageModelUsage)).toEqual({
-      input: 0,
-      cachedInput: 0,
-      cacheWriteInput: 0,
-      output: 0,
-      total: 0,
-    })
-  })
-})
 ```
 
 - [ ] **Step 2: Run the focused test and confirm it fails**
@@ -231,8 +199,6 @@ Expected: FAIL because `src/server/gateway.ts` does not exist.
 Create `src/server/gateway.ts` with these public contracts and behavior:
 
 ```ts
-import type { LanguageModelUsage } from 'ai'
-
 export const DEFAULT_TRANSLATE_MODEL = 'openai/gpt-5.6-luna'
 
 export class GatewayConfigurationError extends Error {
@@ -298,25 +264,6 @@ export function gatewayProviderOptions(input: {
   }
 }
 
-export type NormalizedTokenUsage = {
-  input: number
-  cachedInput: number
-  cacheWriteInput: number
-  output: number
-  total: number
-}
-
-export function normalizeLanguageModelUsage(
-  usage: LanguageModelUsage,
-): NormalizedTokenUsage {
-  return {
-    input: usage.inputTokens ?? 0,
-    cachedInput: usage.inputTokenDetails?.cacheReadTokens ?? 0,
-    cacheWriteInput: usage.inputTokenDetails?.cacheWriteTokens ?? 0,
-    output: usage.outputTokens ?? 0,
-    total: usage.totalTokens ?? 0,
-  }
-}
 ```
 
 If the installed AI SDK types require read-only arrays or a narrower provider-options annotation, adapt the annotations only; do not change the tested runtime object shape.
@@ -341,17 +288,15 @@ rtk git commit -m "feat: add Vercel AI Gateway adapter"
 
 ---
 
-### Task 3: Isolate local cache entries and cost estimates by exact model
+### Task 3: Isolate local cache entries by exact model
 
 **Files:**
 
 - Modify: `src/server/cacheKey.ts`
 - Modify: `src/server/cacheKey.test.ts`
-- Modify: `src/server/pricing.ts`
-- Modify: `src/server/pricing.test.ts`
-- Modify: `src/server/translate.ts` (two compatibility call sites only)
+- Modify: `src/server/translate.ts` (one compatibility call site only)
 
-- [ ] **Step 1: Add failing model-isolation and fail-closed pricing tests**
+- [ ] **Step 1: Add a failing model-isolation test**
 
 In `src/server/cacheKey.test.ts`, add:
 
@@ -365,42 +310,15 @@ it('differs when the exact deployment model differs', () => {
 
 Update every existing `cacheKeyFor` test call to pass `'openai/gpt-5.6-luna'` as the second argument.
 
-In `src/server/pricing.test.ts`, pass the selected model to configured pricing helpers and add:
-
-```ts
-it('omits cost when the pricing model does not exactly match', () => {
-  vi.stubEnv('TRANSLATE_PRICING_MODEL', 'openai/gpt-5.6-luna')
-  vi.stubEnv('TRANSLATE_PRICE_INPUT_PER_1M', '1')
-  vi.stubEnv('TRANSLATE_PRICE_CACHED_INPUT_PER_1M', '0.1')
-  vi.stubEnv('TRANSLATE_PRICE_CACHE_WRITE_INPUT_PER_1M', '1.25')
-  vi.stubEnv('TRANSLATE_PRICE_OUTPUT_PER_1M', '6')
-
-  expect(configuredTokenCostDetailsUsd({
-    input: 100,
-    cachedInput: 0,
-    cacheWriteInput: 0,
-    output: 20,
-  }, 'anthropic/claude-sonnet-4.5')).toBeUndefined()
-})
-```
-
-Update the existing successful configured-pricing test to set:
-
-```ts
-vi.stubEnv('TRANSLATE_PRICING_MODEL', 'openai/gpt-5.6-luna')
-```
-
-and pass `'openai/gpt-5.6-luna'` as the selected-model argument. Add a separate assertion that a missing `TRANSLATE_PRICING_MODEL` also returns `undefined`.
-
 - [ ] **Step 2: Confirm the focused tests fail**
 
 Run:
 
 ```bash
-rtk npx vitest run src/server/cacheKey.test.ts src/server/pricing.test.ts
+rtk npx vitest run src/server/cacheKey.test.ts
 ```
 
-Expected: FAIL because response cache inputs do not contain a model and pricing does not verify model identity.
+Expected: FAIL because response cache inputs do not contain a model.
 
 - [ ] **Step 3: Implement exact-model cache isolation**
 
@@ -446,68 +364,22 @@ export function cacheKeyFor(d: CacheKeyInput, model: string): string {
 
 Update the current orchestrator to call `cacheKeyFor(data, MODEL)`. Do not add the model to `promptCacheKeyFor`; that key remains a prompt-shape identifier used inside an already selected model request.
 
-- [ ] **Step 4: Implement fail-closed configured pricing**
-
-Change both configured helpers to accept the selected model:
-
-```ts
-export function configuredTokenCostDetailsUsd(
-  usage: UsageForPricing,
-  selectedModel: string,
-) {
-  const pricingModel = process.env.TRANSLATE_PRICING_MODEL?.trim()
-  if (!pricingModel || pricingModel !== selectedModel) return undefined
-
-  const inputPer1M = configuredPrice('TRANSLATE_PRICE_INPUT_PER_1M')
-  const cachedInputPer1M = configuredPrice(
-    'TRANSLATE_PRICE_CACHED_INPUT_PER_1M',
-  )
-  const cacheWriteInputPer1M = configuredPrice(
-    'TRANSLATE_PRICE_CACHE_WRITE_INPUT_PER_1M',
-  )
-  const outputPer1M = configuredPrice('TRANSLATE_PRICE_OUTPUT_PER_1M')
-
-  if (
-    inputPer1M === undefined ||
-    cachedInputPer1M === undefined ||
-    cacheWriteInputPer1M === undefined ||
-    outputPer1M === undefined
-  ) {
-    return undefined
-  }
-
-  return calculateTokenCostDetailsUsd(usage, {
-    inputPer1M,
-    cachedInputPer1M,
-    cacheWriteInputPer1M,
-    outputPer1M,
-  })
-}
-
-export function configuredTokenCostUsd(
-  usage: UsageForPricing,
-  selectedModel: string,
-) {
-  return configuredTokenCostDetailsUsd(usage, selectedModel)?.total
-}
-```
-
-- [ ] **Step 5: Re-run focused tests and typecheck**
+- [ ] **Step 4: Re-run focused tests and typecheck**
 
 Run:
 
 ```bash
-rtk npx vitest run src/server/cacheKey.test.ts src/server/pricing.test.ts
+rtk npx vitest run src/server/cacheKey.test.ts
 rtk npx tsc --noEmit
 ```
 
-Expected: pricing and cache tests and typecheck pass after updating the two current `translate.ts` calls to `cacheKeyFor(data, MODEL)` and `configuredTokenCostDetailsUsd(tokens, MODEL)`.
+Expected: cache tests and typecheck pass after updating the current `translate.ts` call to `cacheKeyFor(data, MODEL)`.
 
-- [ ] **Step 6: Commit the cache and pricing contracts**
+- [ ] **Step 5: Commit the cache contract**
 
 ```bash
-rtk git add src/server/cacheKey.ts src/server/cacheKey.test.ts src/server/pricing.ts src/server/pricing.test.ts src/server/translate.ts
-rtk git commit -m "feat: isolate translation cache and pricing by model"
+rtk git add src/server/cacheKey.ts src/server/cacheKey.test.ts src/server/translate.ts
+rtk git commit -m "feat: isolate translation cache by model"
 ```
 
 ---
@@ -1018,15 +890,12 @@ The fake AI SDK result must provide:
 {
   textStream: deltas(),
   output: Promise.resolve(validSentenceResult),
-  usage: Promise.resolve(fakeLanguageModelUsage),
-  response: Promise.resolve({ modelId: 'openai/gpt-5.6-luna' }),
-  warnings: Promise.resolve([]),
 }
 ```
 
-Read the returned `ReadableStream` and assert two `delta` chunks are followed by one `done` chunk. Add a second test whose `output` rejects and assert no `done` chunk is emitted or cached. Add a cancellation test that aborts the exact signal passed to `streamText`, then asserts telemetry `cancel()` runs, telemetry `fail()` does not run, no terminal result is cached, and the user-facing stream does not expose an upstream body.
+Read the returned `ReadableStream` and assert two `delta` chunks are followed by one `done` chunk. Add a second test whose `output` rejects and assert no `done` chunk is emitted or cached. Add a cancellation test that aborts the exact signal passed to `streamText`, then asserts no terminal result is cached and the user-facing stream does not expose an upstream body. Task 8 verifies the native telemetry lifecycle.
 
-If direct invocation of the TanStack server-function wrapper is cumbersome, export an unregistered `handleTranslate(data, requestSignal, dependencies)` function from `translate.ts`; keep `translate` itself as the thin `createServerFn(...).handler` registration. Inject only `streamText`, cache, and telemetry in tests.
+If direct invocation of the TanStack server-function wrapper is cumbersome, export an unregistered `handleTranslate(data, requestSignal, dependencies)` function from `translate.ts`; keep `translate` itself as the thin `createServerFn(...).handler` registration. Inject only `streamText` and cache in tests.
 
 - [ ] **Step 2: Run the production migration test and confirm it fails**
 
@@ -1061,7 +930,6 @@ import {
   assertGatewayApiKey,
   gatewayProviderOptions,
   gatewayTags,
-  normalizeLanguageModelUsage,
   resolveTranslateModel,
 } from './gateway'
 import { consumeStructuredStream } from './structuredStream'
@@ -1078,6 +946,8 @@ Delete the lazy OpenAI client. Resolve the deployment model once:
 const MODEL = resolveTranslateModel()
 ```
 
+Also remove `configuredTokenCostDetailsUsd`, `startTranslationTelemetry`, `characterCountBucket`, `telemetryDimensions`, `resultAnalytics`, and their call sites from this staged provider migration. Task 8 adds the native telemetry bootstrap and safe runtime context back through the AI SDK request; do not keep the old manual implementation temporarily wired alongside it.
+
 - [ ] **Step 4: Keep local hits provider-free and isolate the response key**
 
 Build the key as:
@@ -1086,7 +956,7 @@ Build the key as:
 const cacheKey = cacheKeyFor(data, MODEL)
 ```
 
-Retain the existing local-hit behavior and return before checking Gateway credentials. Change the provider cache layer argument from `'openai'` to `'gateway'` only for misses.
+Retain the existing local-hit behavior and return before checking Gateway credentials. Delete all manual telemetry creation and updates from the local-hit path; native AI SDK telemetry intentionally produces no trace when no model call occurs.
 
 - [ ] **Step 5: Start one exact-model structured generation**
 
@@ -1127,7 +997,7 @@ Use:
 const parsed = await consumeStructuredStream({
   textStream: result.textStream,
   output: result.output,
-  onFirstToken: telemetry.markFirstToken,
+  onFirstToken() {},
   onDelta(raw) {
     controller.enqueue({ type: 'delta', raw })
   },
@@ -1136,12 +1006,9 @@ const parsed = await consumeStructuredStream({
 
 Only after this resolves:
 
-1. Await `result.usage`.
-2. Normalize usage with `normalizeLanguageModelUsage`.
-3. Construct `TranslateDone` using the request intent.
-4. Call telemetry success with safe result analytics, normalized tokens, and matching-model cost details. Task 8 adds response-model and warning metadata after extending the telemetry contract.
-5. Store the final object in `translationCache`.
-6. Emit the one `done` chunk and close.
+1. Construct `TranslateDone` using the request intent.
+2. Store the final object in `translationCache`.
+3. Emit the one `done` chunk and close.
 
 Never cache a partial object or emit a terminal chunk before `result.output` resolves.
 
@@ -1151,21 +1018,19 @@ In the catch path:
 
 ```ts
 if (isTranslationAbort(error, requestSignal)) {
-  telemetry.cancel()
   try {
     controller.close()
   } catch {
     // The browser may already have canceled its reader.
   }
 } else {
-  telemetry.fail(error)
   controller.error(
     publicTranslationError(classifyTranslationError(error), data.uiLang),
   )
 }
 ```
 
-The raw error may go only to `telemetry.fail`, whose sanitizer records class/status/code but not message/body. Always flush in `finally`.
+Do not attach the raw error to any custom telemetry object. Task 8 adds a provider-owned flush in `finally`; browser errors remain sanitized here.
 
 - [ ] **Step 8: Run migration, browser-contract, and type tests**
 
@@ -1173,9 +1038,10 @@ Run:
 
 ```bash
 rtk npx vitest run src/server/translate.gateway.test.ts src/server/structuredStream.test.ts src/hooks/useTranslate.test.tsx
+rtk npx tsc --noEmit
 ```
 
-Expected: focused tests pass, with exactly one mocked SDK request per translation miss. The full typecheck is intentionally deferred to Task 8 because the staged `'gateway'` telemetry layer is added to the telemetry type there.
+Expected: focused tests and typecheck pass, with exactly one mocked SDK request per translation miss.
 
 - [ ] **Step 9: Commit the production path**
 
@@ -1186,93 +1052,290 @@ rtk git commit -m "feat: route translations through Vercel AI Gateway"
 
 ---
 
-### Task 8: Update content-free Langfuse telemetry for Gateway
+### Task 8: Replace manual Langfuse spans with AI SDK v7 telemetry
 
 **Files:**
 
-- Modify: `src/server/telemetry.ts`
-- Modify: `src/server/telemetry.test.ts`
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
+- Rewrite: `src/server/telemetry.ts`
+- Rewrite: `src/server/telemetry.test.ts`
 - Modify: `src/server/translate.ts`
+- Create: `src/server/translateTypes.ts`
+- Create: `src/server/translationDimensions.ts`
+- Create: `src/server/translationDimensions.test.ts`
+- Delete: `src/server/pricing.ts`
+- Delete: `src/server/pricing.test.ts`
 
-- [ ] **Step 1: Add failing telemetry metadata tests**
+- [ ] **Step 1: Write failing native-telemetry privacy and lifecycle tests**
 
-Export pure helpers for safe warning categories and provider metadata, then test:
-
-```ts
-expect(gatewayWarningCategories([
-  { type: 'unsupported-setting', setting: 'temperature', details: 'private' },
-  { type: 'other', message: 'private provider text' },
-])).toEqual(['other', 'unsupported-setting'])
-
-expect(gatewayWarningCategories(undefined)).toEqual([])
-```
-
-Add a source-level or factored-config assertion that the generation name is `vercel.ai-gateway`, the provider cache layer is `gateway`, cache mode is `auto`, and the safe metadata object contains no keys named `prompt`, `messages`, `text`, `context`, `refinements`, `raw`, `providerMetadata`, or `responseBody`.
-
-Keep the existing `langfuseUsageDetails` test and add a clamp assertion:
+Replace the manual-span tests in `src/server/telemetry.test.ts` with tests for these public contracts:
 
 ```ts
-expect(langfuseUsageDetails({
-  input: 100,
-  cachedInput: 90,
-  cacheWriteInput: 30,
-  output: 5,
-  total: 105,
-}).input).toBe(0)
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  SAFE_TRANSLATION_CONTEXT_KEYS,
+  isLangfuseConfigured,
+  prepareTranslationTelemetry,
+  translationRuntimeContext,
+  translationTelemetryOptions,
+} from './telemetry'
+
+describe('translationTelemetryOptions', () => {
+  it('enables native telemetry without recording translation content', () => {
+    expect(translationTelemetryOptions(true)).toEqual({
+      isEnabled: true,
+      recordInputs: false,
+      recordOutputs: false,
+      functionId: 'translation',
+      includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
+    })
+  })
+
+  it('disables telemetry when Langfuse is not configured', () => {
+    expect(translationTelemetryOptions(false).isEnabled).toBe(false)
+  })
+})
+
+describe('translationRuntimeContext', () => {
+  it('contains only allowlisted operational dimensions', () => {
+    const context = translationRuntimeContext({
+      intent: 'sentence',
+      mode: 'casual',
+      source: 'en',
+      target: 'ko',
+      uiLang: 'en',
+      text: 'private source text',
+      context: 'private reply context',
+      refinements: ['private adjustment'],
+      analyticsTrigger: 'refinement',
+      analyticsSessionId: 'session-id',
+      analyticsRunId: 'run-id',
+      analyticsSupersedesRunId: 'old-run-id',
+      analyticsInputRevision: 3,
+    }, 'openai/gpt-5.6-luna', 'v12-ai-gateway')
+
+    expect(Object.keys(context).sort()).toEqual(
+      Object.keys(SAFE_TRANSLATION_CONTEXT_KEYS).sort(),
+    )
+    expect(JSON.stringify(context)).not.toContain('private source text')
+    expect(JSON.stringify(context)).not.toContain('private reply context')
+    expect(JSON.stringify(context)).not.toContain('private adjustment')
+  })
+})
+
+describe('isLangfuseConfigured', () => {
+  it('requires both credentials', () => {
+    expect(isLangfuseConfigured({})).toBe(false)
+    expect(isLangfuseConfigured({ LANGFUSE_PUBLIC_KEY: 'pk' })).toBe(false)
+    expect(isLangfuseConfigured({
+      LANGFUSE_PUBLIC_KEY: 'pk',
+      LANGFUSE_SECRET_KEY: 'sk',
+    })).toBe(true)
+  })
+})
+
+describe('prepareTranslationTelemetry', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('registers the official integration once and exposes forceFlush', async () => {
+    const registerTelemetry = vi.fn()
+    const start = vi.fn()
+    const forceFlush = vi.fn().mockResolvedValue(undefined)
+    const first = await prepareTranslationTelemetry({
+      env: { LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' },
+      load: async () => ({
+        registerTelemetry,
+        integration: {},
+        start,
+        forceFlush,
+      }),
+    })
+    const second = await prepareTranslationTelemetry({
+      env: { LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' },
+      load: async () => { throw new Error('must not initialize twice') },
+    })
+
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(registerTelemetry).toHaveBeenCalledTimes(1)
+    expect(first.enabled).toBe(true)
+    expect(second.enabled).toBe(true)
+    await first.flush()
+    expect(forceFlush).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails open when telemetry initialization fails', async () => {
+    const telemetry = await prepareTranslationTelemetry({
+      env: { LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' },
+      load: async () => { throw new Error('telemetry unavailable') },
+    })
+    expect(telemetry.enabled).toBe(false)
+    await expect(telemetry.flush()).resolves.toBeUndefined()
+  })
+})
 ```
 
-- [ ] **Step 2: Confirm telemetry tests fail**
+Reset the module/global singleton between the two initialization tests through an exported test-only reset guarded by `process.env.NODE_ENV === 'test'`, or isolate each test with `vi.resetModules()`. Do not expose a production reset path.
 
-Run:
-
-```bash
-rtk npx vitest run src/server/telemetry.test.ts
-```
-
-Expected: FAIL because Gateway naming and warning normalization do not exist.
-
-- [ ] **Step 3: Change the provider span contract**
-
-In `src/server/telemetry.ts`:
-
-- Export `TokenUsage` for the Gateway normalizer contract.
-- Change `cacheLayer` from `'local' | 'openai'` to `'local' | 'gateway'`.
-- Set `providerRequest` from `cacheLayer === 'gateway'`.
-- Rename the generation to `vercel.ai-gateway`.
-- Replace OpenAI Responses parameters with safe parameters:
+In `src/server/translate.gateway.test.ts`, extend the expected `streamText` call with:
 
 ```ts
-modelParameters: {
+runtimeContext: expect.objectContaining({
+  intent: 'sentence',
+  requestedModel: 'openai/gpt-5.6-luna',
   gatewayCacheMode: 'auto',
-  maxRetries: 0,
-}
+}),
+telemetry: {
+  isEnabled: true,
+  recordInputs: false,
+  recordOutputs: false,
+  functionId: 'translation',
+  includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
+},
 ```
 
-- Extend successful result metadata with optional `responseModel`, fixed `gatewayCacheMode: 'auto'`, and sorted unique `warningCategories`.
-- Update `safeErrorStatus` to read AI SDK's numeric `statusCode` as well as the existing `status` field; retain only class name, HTTP status, and a token-shaped safe code.
-- Keep `input` and `output` as the existing privacy-safe summaries, never actual content.
-- Do not enable AI SDK v7's `telemetry` option or register a global AI SDK telemetry integration; retain the existing manual content-free Langfuse path.
+Assert the request has no telemetry `metadata`, `include` body-capture option, input/output payload, raw error, or provider-metadata field. Assert local LRU hits never initialize telemetry or call `streamText`.
 
-Implement warning normalization using only warning `type` values that match a short safe token pattern; map every absent or unsafe type to `other`, deduplicate, and sort. Never retain warning messages, setting values, provider metadata, or raw objects.
-
-In `src/server/translate.ts`, await `result.response` and `result.warnings` after validated output, then pass only `response.modelId`, `gatewayCacheMode: 'auto'`, and `gatewayWarningCategories(warnings)` into telemetry success. Do not pass the response or warning objects themselves.
-
-- [ ] **Step 4: Run telemetry tests and typecheck**
+- [ ] **Step 2: Confirm the focused tests fail**
 
 Run:
 
 ```bash
 rtk npx vitest run src/server/telemetry.test.ts src/server/translate.gateway.test.ts
+```
+
+Expected: FAIL because the current module still creates manual Langfuse observations and the AI SDK request has no native telemetry configuration.
+
+- [ ] **Step 3: Rewrite telemetry as an optional official integration bootstrap**
+
+Replace `src/server/telemetry.ts` with:
+
+```ts
+import type { TranslateInputData } from './translateTypes'
+import { characterCountBucket } from './translationDimensions'
+
+export const SAFE_TRANSLATION_CONTEXT_KEYS = {
+  intent: true,
+  mode: true,
+  sourceLanguage: true,
+  targetLanguage: true,
+  uiLanguage: true,
+  hasContext: true,
+  refinementCount: true,
+  requestKind: true,
+  inputLengthBucket: true,
+  isPolish: true,
+  promptVersion: true,
+  requestedModel: true,
+  gatewayCacheMode: true,
+  trigger: true,
+  analyticsSessionId: true,
+  clientRunId: true,
+  supersedesRunId: true,
+  inputRevision: true,
+} as const
+
+export function isLangfuseConfigured(
+  env: Pick<NodeJS.ProcessEnv, 'LANGFUSE_PUBLIC_KEY' | 'LANGFUSE_SECRET_KEY'>,
+): boolean {
+  return Boolean(
+    env.LANGFUSE_PUBLIC_KEY?.trim() && env.LANGFUSE_SECRET_KEY?.trim(),
+  )
+}
+
+export function translationTelemetryOptions(enabled: boolean) {
+  return {
+    isEnabled: enabled,
+    recordInputs: false,
+    recordOutputs: false,
+    functionId: 'translation',
+    includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
+  }
+}
+```
+
+Move the existing `TranslateInput` inference into a small `src/server/translateTypes.ts` export, and move `characterCountBucket` plus its type/test into `src/server/translationDimensions.ts`. This avoids importing the registered TanStack server function from the telemetry bootstrap.
+
+Implement `translationRuntimeContext(data, model, promptVersion)` with exactly the allowlisted keys above. Values must be strings, numbers, or booleans; use empty strings for absent analytics IDs so the runtime object has a stable key set. Compute `requestKind` from refinements/context exactly as the current manual telemetry does. Never include `text`, context content, refinement values, `previousMain`, prompts, outputs, errors, warnings, or provider metadata.
+
+Implement `prepareTranslationTelemetry()` as a process-global lazy singleton. Its default loader must:
+
+```ts
+const [{ registerTelemetry }, { LangfuseVercelAiSdkIntegration }, { LangfuseSpanProcessor }, { NodeSDK }] =
+  await Promise.all([
+    import('ai'),
+    import('@langfuse/vercel-ai-sdk'),
+    import('@langfuse/otel'),
+    import('@opentelemetry/sdk-node'),
+  ])
+
+const processor = new LangfuseSpanProcessor({
+  publicKey: env.LANGFUSE_PUBLIC_KEY,
+  secretKey: env.LANGFUSE_SECRET_KEY,
+  baseUrl: env.LANGFUSE_BASE_URL,
+  exportMode: 'immediate',
+  mediaUploadEnabled: false,
+})
+const sdk = new NodeSDK({ spanProcessors: [processor] })
+sdk.start()
+registerTelemetry(new LangfuseVercelAiSdkIntegration())
+```
+
+Do not pass a custom tracer or enable the integration delegate's supplemental provider metadata, headers, schema, blanket runtime context, or request/response body capture. Return `{ enabled: true, flush: () => processor.forceFlush() }`. Preserve `LANGFUSE_BASE_URL`, `LANGFUSE_TRACING_ENVIRONMENT`, and `LANGFUSE_RELEASE` through the processor's supported environment configuration. If either credential is absent, return a disabled no-op without loading any telemetry package. If initialization or flush fails, warn once with a fixed message and return/continue; never log the rejected error object because it may contain environment or exporter details.
+
+Use a process-global singleton key such as `__neotranslateAiTelemetry` so dev HMR cannot register the integration twice. The injectable loader exists only to test registration and failure behavior.
+
+- [ ] **Step 4: Enable native telemetry on the Gateway call**
+
+In `src/server/translate.ts`, after a local-cache miss and before `streamText`:
+
+```ts
+const nativeTelemetry = await prepareTranslationTelemetry()
+```
+
+Add to `streamText`:
+
+```ts
+runtimeContext: translationRuntimeContext(data, MODEL, CACHE_VERSION),
+telemetry: translationTelemetryOptions(nativeTelemetry.enabled),
+```
+
+In the stream `finally`, call:
+
+```ts
+await nativeTelemetry.flush()
+```
+
+Do not manually create a request span, generation span, first-token timestamp, usage object, success/failure/cancel outcome, output summary, warning summary, or cost details. AI SDK and `LangfuseVercelAiSdkIntegration` own those model-call lifecycle events.
+
+- [ ] **Step 5: Remove superseded manual observability and pricing code**
+
+Run:
+
+```bash
+rtk rg -n "@langfuse/tracing" src scripts
+rtk env CI=true pnpm remove @opentelemetry/sdk-trace-node @langfuse/tracing
+```
+
+Expected before removal: no `@langfuse/tracing` source or script imports remain after the telemetry rewrite. If another legitimate use is found, retain that package and remove only `@opentelemetry/sdk-trace-node`. Delete `src/server/pricing.ts` and `src/server/pricing.test.ts`. Remove all imports/calls for `startTranslationTelemetry`, `langfuseUsageDetails`, `configuredTokenCostDetailsUsd`, result analytics, manual token normalization, and custom warning normalization.
+
+- [ ] **Step 6: Run telemetry, translation, and type tests**
+
+Run:
+
+```bash
+rtk npx vitest run src/server/telemetry.test.ts src/server/translate.gateway.test.ts src/server/translationDimensions.test.ts
 rtk npx tsc --noEmit
 ```
 
-Expected: PASS.
+Expected: PASS. The native telemetry request explicitly disables content recording, the official integration registers once, local hits remain untraced, and initialization/export failures are non-fatal.
 
-- [ ] **Step 5: Commit telemetry changes**
+- [ ] **Step 7: Commit native telemetry migration**
 
 ```bash
-rtk git add src/server/telemetry.ts src/server/telemetry.test.ts src/server/translate.ts
-rtk git commit -m "feat: attribute content-free telemetry to AI Gateway"
+rtk git add package.json pnpm-lock.yaml src/server/telemetry.ts src/server/telemetry.test.ts src/server/translate.ts src/server/translateTypes.ts src/server/translationDimensions.ts src/server/translationDimensions.test.ts
+rtk git add -u src/server/pricing.ts src/server/pricing.test.ts
+rtk git commit -m "feat: use AI SDK telemetry with Langfuse"
 ```
 
 ---
@@ -1306,7 +1369,6 @@ import {
   assertGatewayApiKey,
   gatewayProviderOptions,
   gatewayTags,
-  normalizeLanguageModelUsage,
   resolveTranslateModel,
 } from '../src/server/gateway.ts'
 import {
@@ -1352,11 +1414,11 @@ const [data, usage] = await Promise.all([result.output, result.usage])
 return {
   data,
   ms: Date.now() - t0,
-  usage: normalizeLanguageModelUsage(usage),
+  usage,
 }
 ```
 
-Update the usage log to the normalized field names. Keep all existing translation-quality assertions.
+Update the usage log to print AI SDK's native usage fields, including `inputTokens`, `inputTokenDetails.cacheReadTokens`, `inputTokenDetails.cacheWriteTokens`, `outputTokens`, and `totalTokens` when present. Do not add an application usage normalizer or cost calculation. Keep all existing translation-quality assertions.
 
 - [ ] **Step 3: Update `.env.example`**
 
@@ -1367,12 +1429,9 @@ Document:
 AI_GATEWAY_API_KEY=
 TRANSLATE_MODEL=openai/gpt-5.6-luna
 
-# Cost estimates are emitted only when this exactly matches TRANSLATE_MODEL.
-TRANSLATE_PRICING_MODEL=openai/gpt-5.6-luna
-TRANSLATE_PRICE_INPUT_PER_1M=1.00
-TRANSLATE_PRICE_CACHED_INPUT_PER_1M=0.10
-TRANSLATE_PRICE_CACHE_WRITE_INPUT_PER_1M=1.25
-TRANSLATE_PRICE_OUTPUT_PER_1M=6.00
+# Optional content-free AI SDK telemetry export to Langfuse.
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
 ```
 
 Do not include a plausible secret value.
@@ -1387,8 +1446,9 @@ Update `AGENTS.md` and any matching README sections so they state:
 - There is no model fallback.
 - Structured results use `streamText` plus `Output.object`.
 - Gateway caching is `auto`; OpenAI-only options are conditional.
-- Langfuse remains manual and content-free; Gateway billing is authoritative.
-- Cost estimates require `TRANSLATE_PRICING_MODEL === TRANSLATE_MODEL` plus all four rates.
+- Langfuse uses AI SDK v7 telemetry through `@langfuse/vercel-ai-sdk`, with `recordInputs: false`, `recordOutputs: false`, and an explicit safe runtime-context allowlist.
+- Local LRU hits do not call AI SDK and therefore create no Langfuse generation.
+- AI Gateway billing is authoritative; the application does not normalize usage or calculate cost. Langfuse may show its own catalog estimate when it recognizes the model.
 
 - [ ] **Step 5: Verify stale provider assumptions are gone**
 
@@ -1396,7 +1456,7 @@ Run:
 
 ```bash
 rtk rg -n "OPENAI_API_KEY|from 'openai'|openai/helpers|responses\.(stream|parse)|prompt_cache_breakpoint|prompt_cache_options|openai\.responses" . --glob '!docs/superpowers/**' --glob '!pnpm-lock.yaml'
-rtk rg -n "AI_GATEWAY_API_KEY|TRANSLATE_PRICING_MODEL|openai/gpt-5.6-luna|vercel.ai-gateway" .env.example AGENTS.md scripts src
+rtk rg -n "AI_GATEWAY_API_KEY|LANGFUSE_PUBLIC_KEY|openai/gpt-5.6-luna|recordInputs|recordOutputs|vercel.ai-gateway" .env.example AGENTS.md scripts src
 ```
 
 Expected: the first command returns no matches; the second finds the intended Gateway setup and instrumentation references.
@@ -1435,7 +1495,7 @@ If `README.md` has no provider-related changes, omit it from `git add`.
 Run:
 
 ```bash
-rtk npx vitest run src/server/gateway.test.ts src/server/cacheKey.test.ts src/server/pricing.test.ts src/server/prompts.test.ts src/server/translationError.test.ts src/server/structuredStream.test.ts src/server/translate.gateway.test.ts src/server/telemetry.test.ts src/hooks/useTranslate.test.tsx
+rtk npx vitest run src/server/gateway.test.ts src/server/cacheKey.test.ts src/server/prompts.test.ts src/server/translationError.test.ts src/server/structuredStream.test.ts src/server/translate.gateway.test.ts src/server/telemetry.test.ts src/server/translationDimensions.test.ts src/hooks/useTranslate.test.tsx
 ```
 
 Expected: PASS.
@@ -1459,12 +1519,13 @@ Expected: all commands exit zero. If formatting fails, use the repository format
 Run:
 
 ```bash
-rtk rg -n "gateway.*models|models.*gateway|maxRetries:\s*[1-9]|experimental_telemetry|\btelemetry\s*:|OPENAI_API_KEY|providerMetadata|responseBody" src scripts .env.example AGENTS.md
+rtk rg -n "gateway.*models|models.*gateway|maxRetries:\s*[1-9]|experimental_telemetry|OPENAI_API_KEY|TRANSLATE_PRICING_MODEL|TRANSLATE_PRICE_|providerMetadata|responseBody|startTranslationTelemetry|langfuseUsageDetails|configuredTokenCostDetailsUsd" src scripts .env.example AGENTS.md package.json
+rtk rg -n "telemetry:\s*translationTelemetryOptions|recordInputs:\s*false|recordOutputs:\s*false|includeRuntimeContext:\s*SAFE_TRANSLATION_CONTEXT_KEYS" src/server
 rtk git diff --check
 rtk git status --short
 ```
 
-Expected: no fallback model list, no automatic retry, no AI SDK telemetry, no OpenAI credential, no raw provider metadata/body capture, no whitespace errors, and only intentional files changed.
+Expected: the first search finds no fallback model list, automatic retry, legacy telemetry API, OpenAI credential, pricing variables/helpers, manual Langfuse helpers, or raw provider metadata/body capture. The second search finds the required native telemetry privacy configuration. The worktree has no whitespace errors and only intentional files changed.
 
 - [ ] **Step 4: Run the paid Gateway smoke harness when credentials are available**
 
@@ -1476,7 +1537,7 @@ Run:
 rtk npx tsx scripts/smoke-translate.mjs
 ```
 
-Expected: sentence, word, tone, direction, context, refinement, and same-language polish checks complete through `openai/gpt-5.6-luna`; usage is printed with normalized cache-read/cache-write buckets.
+Expected: sentence, word, tone, direction, context, refinement, and same-language polish checks complete through `openai/gpt-5.6-luna`; AI SDK's native usage fields are printed without application-side normalization or cost calculation.
 
 - [ ] **Step 5: Verify one browser request end-to-end**
 
@@ -1493,7 +1554,7 @@ In a browser session at width at least 1024px:
 3. Enter one sentence through `[data-testid='input-textarea']`.
 4. Confirm partial output appears before the terminal result.
 5. Correlate the action with exactly one AI Gateway request and one Langfuse `vercel.ai-gateway` generation.
-6. Confirm requested model, response model, TTFT, latency, cache usage, and the fail-closed cost policy.
+6. Confirm requested model, response model, TTFT, latency, provider usage, and any Langfuse catalog cost are attributed through native AI SDK telemetry.
 7. Inspect Langfuse and confirm it contains no source, context, refinement, prompt, raw output, or parsed translation text.
 
 - [ ] **Step 6: Verify cancellation**
@@ -1502,7 +1563,7 @@ Start a sufficiently long translation, then clear or replace the input before co
 
 - the browser shows no cancellation error;
 - the Gateway request stops;
-- Langfuse records `outcome=canceled`;
+- the native AI SDK/Langfuse generation closes as canceled or aborted, without an orphaned span;
 - no `done` result from the canceled run is cached or displayed.
 
 - [ ] **Step 7: Review deployment configuration and commit any verification-only fix**
@@ -1512,14 +1573,11 @@ Before deployment, confirm the target Vercel environment defines:
 ```text
 AI_GATEWAY_API_KEY
 TRANSLATE_MODEL
-TRANSLATE_PRICING_MODEL
-TRANSLATE_PRICE_INPUT_PER_1M
-TRANSLATE_PRICE_CACHED_INPUT_PER_1M
-TRANSLATE_PRICE_CACHE_WRITE_INPUT_PER_1M
-TRANSLATE_PRICE_OUTPUT_PER_1M
+LANGFUSE_PUBLIC_KEY
+LANGFUSE_SECRET_KEY
 ```
 
-The user is responsible for adding the secret. If verification required a code fix, repeat its focused test and the full quality gate, then commit only that fix. Otherwise, do not create an empty verification commit.
+The user is responsible for adding `AI_GATEWAY_API_KEY`; both Langfuse keys are optional and must be present together to enable export. If verification required a code fix, repeat its focused test and the full quality gate, then commit only that fix. Otherwise, do not create an empty verification commit.
 
 ---
 
@@ -1536,6 +1594,7 @@ The user is responsible for adding the secret. If verification required a code f
 - [ ] Local LRU entries are isolated by model and local hits make no Gateway request.
 - [ ] OpenAI-only provider options are absent for non-OpenAI model identifiers.
 - [ ] Gateway tags and Langfuse traces contain operational metadata only.
-- [ ] AI SDK usage maps into mutually exclusive Langfuse token buckets.
-- [ ] Langfuse cost is omitted unless the pricing model exactly matches the selected model and all four rates are valid.
+- [ ] AI SDK telemetry uses the official Langfuse integration with input/output recording disabled and an explicit runtime-context allowlist.
+- [ ] No manual Langfuse spans, application usage normalizer, pricing module, or pricing environment variables remain.
+- [ ] AI Gateway remains the authoritative billing surface; any Langfuse cost is its own model-catalog estimate.
 - [ ] Smoke, full test suite, typecheck, build, lint, format, browser streaming, telemetry privacy, and cancellation checks pass.

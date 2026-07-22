@@ -7,16 +7,17 @@
 
 Migrate neotranslate from the OpenAI Node SDK to Vercel AI SDK v7 and route every paid translation through Vercel AI Gateway. The selected model remains a deployment concern, configured through `TRANSLATE_MODEL` as an exact `provider/model` identifier. The application will not expose model selection in the UI and will not fall back to a different model.
 
-The migration must preserve the current product behavior: strict Zod-validated sentence and word results, incremental rendering, request cancellation, local LRU caching, privacy-safe Langfuse traces, and deployment-controlled cost metadata.
+The migration must preserve the current product behavior: strict Zod-validated sentence and word results, incremental rendering, request cancellation, local LRU caching, and privacy-safe Langfuse traces.
 
 ## Goals
 
 - Replace the direct OpenAI SDK integration with Vercel AI SDK v7.
 - Authenticate AI Gateway requests with `AI_GATEWAY_API_KEY`.
-- Allow model trials by changing only deployment configuration and model-specific pricing configuration.
+- Allow model trials by changing only deployment configuration.
 - Preserve the current browser streaming contract and rendered translation experience.
 - Keep one exact configured model per deployment, with no alternative-model fallback.
-- Keep telemetry content-free and make stale Langfuse cost estimates fail closed.
+- Replace the manual Langfuse span implementation with AI SDK v7 telemetry and Langfuse's official AI SDK integration.
+- Keep AI SDK telemetry content-free with input and output recording disabled.
 
 ## Non-goals
 
@@ -24,7 +25,7 @@ The migration must preserve the current product behavior: strict Zod-validated s
 - No automatic fallback to another model.
 - No prompt redesign, schema redesign, or translation UX changes.
 - No adoption of AI SDK UI hooks or AI SDK transport protocols.
-- No replacement of the existing Langfuse instrumentation with AI SDK telemetry.
+- No custom Langfuse generation spans, usage normalization, or application-side cost calculation.
 - No unrelated refactoring of translation, caching, or client state.
 
 ## Decisions
@@ -63,7 +64,7 @@ The server will consume `result.textStream`. These are the generated text deltas
 
 After the stream ends, the server will await `result.output`. AI SDK validates that complete object against the selected Zod schema. Only this validated object may be cached or emitted in the terminal `{ type: 'done' }` chunk.
 
-The active TanStack request signal will be passed as `abortSignal`. Aborts must stop Gateway work, close the translation stream, and mark the Langfuse request as canceled without producing a user-facing error.
+The active TanStack request signal will be passed as `abortSignal`. Aborts must stop Gateway work, close the translation stream, and allow the AI SDK telemetry lifecycle to end the model call as aborted without producing a user-facing error.
 
 ### Provider-neutral and provider-specific options
 
@@ -94,50 +95,82 @@ The current cache key does not contain the model. Add the exact `TRANSLATE_MODEL
 
 ## Telemetry and cost
 
-### Langfuse
+### AI SDK v7 telemetry with Langfuse
 
-Retain the existing manual Langfuse v5 instrumentation. Do not enable AI SDK v7's `telemetry` option or register a global AI SDK telemetry integration.
+Replace the manual `startTranslationTelemetry()` request/generation spans with the official AI SDK v7 integration:
 
-Rename the provider generation from `openai.responses` to `vercel.ai-gateway`. Traces may include only the existing privacy-safe dimensions plus:
+- add `@langfuse/vercel-ai-sdk` and `@opentelemetry/sdk-node`;
+- retain `@langfuse/otel` as the exporter;
+- remove the direct `@opentelemetry/sdk-trace-node` setup and all manual Langfuse observations;
+- initialize one `NodeSDK` with `LangfuseSpanProcessor` and register one `LangfuseVercelAiSdkIntegration` through AI SDK's `registerTelemetry()` before the first model call;
+- retain a serverless `forceFlush()` path after each completed, failed, or aborted request;
+- keep Langfuse optional when either credential is absent.
 
-- requested model;
-- response model ID;
-- prompt version;
-- Gateway cache mode;
-- sanitized Gateway warning categories, when present.
+Every Gateway `streamText()` call will set:
 
-Prompt text, source text, context, refinements, prompt bodies, raw model output, parsed translation output, raw request bodies, and raw provider metadata must never be sent to Langfuse.
+```ts
+telemetry: {
+  isEnabled: telemetryEnabled,
+  recordInputs: false,
+  recordOutputs: false,
+  functionId: 'translation',
+  includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
+}
+```
+
+The corresponding `runtimeContext` contains only privacy-safe operational dimensions:
+
+- intent, mode, and request kind;
+- source, target, and UI language codes;
+- context presence and refinement count, never their content;
+- input-length bucket, polish flag, trigger, and prompt version;
+- requested model and Gateway cache mode;
+- ephemeral analytics/run identifiers already used for request correlation.
+
+AI SDK v7 excludes runtime-context keys unless they are explicitly enabled, so `SAFE_TRANSLATION_CONTEXT_KEYS` is an allowlist rather than a dynamic pass-through.
+
+Prompt text, source text, context, refinements, prompt bodies, raw model output, parsed translation output, raw request bodies, and raw provider metadata must never be sent to Langfuse. `recordInputs: false` and `recordOutputs: false` are mandatory and covered by request-shape tests. Do not attach raw AI SDK result/error objects to `runtimeContext` or telemetry.
+
+Keep the official integration's OpenTelemetry supplemental fields at their privacy-preserving defaults: provider metadata, request headers, schema content, and runtime-context passthrough remain disabled. The explicit `includeRuntimeContext` allowlist is the only path for application dimensions. AI SDK v7's separate request/response body inclusion is also left off.
+
+AI SDK/Langfuse automatically owns the generation lifecycle, including:
+
+- requested and response model attribution;
+- provider call duration and first-chunk timing;
+- finish reason, errors, and abort lifecycle;
+- normalized token usage exposed by the provider;
+- generation/span naming and hierarchy.
+
+The application will no longer manually mark first token, success, failure, or cancellation. It will also no longer build safe output summaries such as resolved language or output-length bucket after completion, because adding post-generation manual observations would recreate the implementation this migration removes.
+
+Local LRU hits do not call AI SDK and therefore do not create Langfuse traces. They remain visible only through application behavior and have zero Gateway usage.
 
 Gateway tags may contain only low-cardinality operational values such as `translation`, intent, request kind, and prompt version. The ephemeral browser analytics session ID will not be sent as a Gateway user identifier.
 
-### Usage normalization
-
-Normalize AI SDK `LanguageModelUsage` into the existing exclusive buckets:
-
-- `input`: total input tokens;
-- `cachedInput`: `inputTokenDetails.cacheReadTokens`;
-- `cacheWriteInput`: `inputTokenDetails.cacheWriteTokens`;
-- `output`: output tokens;
-- `total`: total tokens.
-
-Missing optional usage details become zero. Ordinary input remains `input - cachedInput - cacheWriteInput`, clamped at zero. This preserves the current Langfuse usage schema and cost breakdown.
-
 ### Pricing integrity
 
-AI Gateway is the authoritative source for billed cost. Keep the current four `TRANSLATE_PRICE_*` variables for Langfuse estimates and add `TRANSLATE_PRICING_MODEL`.
+AI Gateway is the authoritative source for billed usage and cost. Remove `src/server/pricing.ts`, its tests, `TRANSLATE_PRICING_MODEL`, and the four `TRANSLATE_PRICE_*` variables.
 
-Langfuse cost details are emitted only when:
+The official Langfuse integration receives model and token usage from AI SDK and may calculate an estimated cost when its own model catalog recognizes the exact model. The application will neither override nor synthesize that value. If Langfuse does not recognize a model, its cost may remain absent; the server must not fetch model catalog pricing or publish a stale custom estimate.
 
-1. all four pricing variables are valid; and
-2. `TRANSLATE_PRICING_MODEL` exactly equals `TRANSLATE_MODEL`.
+### Privacy and failure isolation
 
-If either condition fails, usage is still recorded but estimated cost is omitted. The server must not fetch model catalog pricing on the translation request path and must not report a potentially stale estimate.
+Telemetry initialization and export failures remain non-fatal. They may emit one sanitized server warning but must never interrupt translation.
+
+The `LangfuseSpanProcessor` keeps its default LLM-focused export filter. Input/output recording is disabled at the AI SDK call boundary. Live verification must inspect successful, failed, and aborted traces for accidental content before deployment.
+
+The previous manual usage buckets and generation metadata are removed rather than duplicated. In particular, the application no longer manually stores:
+
+- output-length/result-shape summaries;
+- warning categories;
+- custom exclusive cache-read/cache-write token buckets;
+- application-calculated cost details.
 
 ## Error handling
 
 The server will distinguish these outcomes without exposing upstream response bodies:
 
-- **Canceled:** mark telemetry canceled; do not show an error.
+- **Canceled:** let AI SDK emit its abort lifecycle; do not show an error.
 - **Missing or malformed configuration:** return a concise Gateway configuration message.
 - **Authentication failure:** advise checking `AI_GATEWAY_API_KEY`.
 - **Budget or credit failure:** report that Gateway capacity is unavailable without exposing account details.
@@ -146,21 +179,21 @@ The server will distinguish these outcomes without exposing upstream response bo
 - **Structured-output failure:** report that the selected model did not return a valid translation result.
 - **Other provider or network failure:** retain the generic translated failure message.
 
-Sanitized error telemetry may retain an error class, safe code, and HTTP status. It must not retain provider messages that could echo request content.
+The browser receives only the application's sanitized errors. The application must not attach raw exceptions, response bodies, or provider messages to telemetry/runtime context; the official integration owns its standard error lifecycle.
 
 ## File-level impact
 
-- `package.json` and lockfile: add `ai`, remove `openai`.
+- `package.json` and lockfile: add `ai`, `@langfuse/vercel-ai-sdk`, and `@opentelemetry/sdk-node`; remove `openai` and `@opentelemetry/sdk-trace-node`.
 - `src/server/translate.ts`: replace OpenAI Responses streaming with `streamText()` and `Output.object()`; preserve chunking, cancellation, local caching, and terminal validation.
 - `src/server/prompts.ts`: emit AI SDK model messages and remove OpenAI-only content parts and cache markers.
 - `src/server/cacheKey.ts`: add exact-model isolation to the local response key, bump the cache version, and retain the OpenAI prompt cache key for OpenAI models.
-- `src/server/telemetry.ts`: rename the generation, normalize AI SDK usage, and retain content-free metadata.
-- `src/server/pricing.ts`: require the pricing-model match before calculating Langfuse estimates.
+- `src/server/telemetry.ts`: replace manual spans with optional, singleton AI SDK/Langfuse integration initialization, a safe runtime-context allowlist, and serverless flush.
+- `src/server/pricing.ts` and its tests: remove application-side cost calculation.
 - `src/lib/i18n.ts`: replace OpenAI credential hints with Gateway-specific hints.
 - `scripts/smoke-translate.mjs`: exercise the same AI SDK/Gateway structured-output path as production.
-- `.env.example`: document `AI_GATEWAY_API_KEY`, `provider/model` syntax, `TRANSLATE_PRICING_MODEL`, and model-specific rates.
+- `.env.example`: document `AI_GATEWAY_API_KEY`, `provider/model` syntax, and optional Langfuse credentials; remove application pricing variables.
 - `AGENTS.md`: update architecture, caching, telemetry, and commands documentation.
-- Relevant tests: update prompt fixtures and add Gateway-specific request, usage, pricing, error, and cancellation coverage.
+- Relevant tests: update prompt fixtures and add Gateway-specific request, telemetry privacy/configuration, error, and cancellation coverage.
 
 ## Verification strategy
 
@@ -172,9 +205,11 @@ Sanitized error telemetry may retain an error class, safe code, and HTTP status.
 - Assert OpenAI-only options appear only for `openai/*` models.
 - Assert raw structured text deltas preserve the current browser chunk contract.
 - Assert only a fully validated final object is cached and committed.
-- Assert aborts cancel generation and produce canceled telemetry.
-- Assert AI SDK usage maps into mutually exclusive Langfuse buckets.
-- Assert mismatched or incomplete pricing configuration omits cost.
+- Assert aborts reach AI SDK and do not produce a browser error.
+- Assert AI SDK telemetry is enabled only with complete Langfuse credentials.
+- Assert `recordInputs` and `recordOutputs` are always false.
+- Assert the runtime-context allowlist contains only privacy-safe dimensions.
+- Assert telemetry initialization/export failures do not fail translation.
 - Assert safe error mapping for authentication, rate limits, budget errors, invalid models, and schema failures.
 - Run the full Vitest suite, `npx tsc --noEmit`, and the production build.
 
@@ -186,13 +221,13 @@ With `AI_GATEWAY_API_KEY` configured:
 2. Validate representative sentence, word, tone, language-direction, and same-language polish cases.
 3. Drive one browser translation and correlate it with exactly one Gateway request and one Langfuse generation.
 4. Confirm streaming renders before the final object completes.
-5. Confirm model, TTFT, latency, cache-read/write usage, and cost policy are correct.
+5. Confirm model, TTFT, latency, provider usage, and any Langfuse catalog cost are correctly attributed.
 6. Confirm Langfuse contains no source, prompt, context, refinement, or output content.
-7. Cancel one in-flight translation and confirm Gateway work stops and Langfuse records a canceled outcome.
+7. Cancel one in-flight translation and confirm Gateway work stops and the native telemetry lifecycle closes without an orphaned generation.
 
 ## Rollout and rollback
 
-This is a direct provider-path migration rather than a dual-write rollout. The production environment must define `AI_GATEWAY_API_KEY`, `TRANSLATE_MODEL`, `TRANSLATE_PRICING_MODEL`, and the four matching price variables before deployment.
+This is a direct provider-path migration rather than a dual-write rollout. The production environment must define `AI_GATEWAY_API_KEY` and `TRANSLATE_MODEL`. Langfuse export remains optional and requires both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`.
 
 Deployment fails closed when Gateway configuration is missing or invalid. Rollback is performed by reverting the migration commit and restoring `OPENAI_API_KEY`; there is no runtime switch that silently bypasses Gateway.
 
@@ -202,8 +237,8 @@ Deployment fails closed when Gateway configuration is missing or invalid. Rollba
 - Changing `TRANSLATE_MODEL` to another supported `provider/model` requires no application code change.
 - A request never falls back to a different model.
 - Sentence and word output remains strictly schema-validated and progressively rendered.
-- Client cancellation reaches the Gateway request and is recorded as canceled.
+- Client cancellation reaches the Gateway request and closes native telemetry cleanly.
 - Local LRU behavior remains intact.
 - Gateway and Langfuse usage are attributable without storing translation content.
-- Langfuse cost is present only when pricing explicitly matches the selected model.
+- No manual Langfuse spans, token normalization, or application-side pricing remain.
 - Automated checks and the live smoke/cancellation verification pass.
