@@ -1,9 +1,6 @@
-import {
-  APICallError,
-  NoObjectGeneratedError,
-  NoSuchProviderError,
-} from 'ai'
-import { STRINGS, type UiLang } from '../lib/i18n'
+import { APICallError, NoObjectGeneratedError, NoSuchProviderError } from 'ai'
+import { STRINGS } from '../lib/i18n'
+import type { UiLang } from '../lib/i18n'
 import { GatewayConfigurationError } from './gateway'
 
 export type TranslationErrorKind =
@@ -15,9 +12,7 @@ export type TranslationErrorKind =
   | 'structured_output'
   | 'provider'
 
-export function classifyTranslationError(
-  error: unknown,
-): TranslationErrorKind {
+export function classifyTranslationError(error: unknown): TranslationErrorKind {
   if (error instanceof GatewayConfigurationError) return 'configuration'
   if (NoSuchProviderError.isInstance(error)) return 'model_configuration'
   if (NoObjectGeneratedError.isInstance(error)) return 'structured_output'

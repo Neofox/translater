@@ -22,9 +22,11 @@ import {
   isTranslationAbort,
   publicTranslationError,
 } from './translationError'
-import { TranslateInput, type TranslateInputData } from './translateTypes'
+import { TranslateInput } from './translateTypes'
+import type { TranslateInputData } from './translateTypes'
 
-export { TranslateInput, type TranslateInputData } from './translateTypes'
+export { TranslateInput } from './translateTypes'
+export type { TranslateInputData } from './translateTypes'
 
 export type TranslateDone =
   | { intent: 'sentence'; data: SentenceResult }
@@ -36,8 +38,8 @@ export type TranslateChunk =
   | { type: 'done'; done: TranslateDone }
 
 type TranslationCache = {
-  get(key: string): unknown
-  set(key: string, value: unknown): void
+  get: (key: string) => unknown
+  set: (key: string, value: unknown) => void
 }
 
 type TranslationDependencies = {
@@ -106,11 +108,7 @@ export async function handleTranslate(
               promptVersion: CACHE_VERSION,
             }),
           }),
-          runtimeContext: translationRuntimeContext(
-            data,
-            MODEL,
-            CACHE_VERSION,
-          ),
+          runtimeContext: translationRuntimeContext(data, MODEL, CACHE_VERSION),
           telemetry: translationTelemetryOptions(nativeTelemetry.enabled),
         })
 

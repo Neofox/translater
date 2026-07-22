@@ -1,8 +1,4 @@
-import {
-  APICallError,
-  NoObjectGeneratedError,
-  NoSuchProviderError,
-} from 'ai'
+import { APICallError, NoObjectGeneratedError, NoSuchProviderError } from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   classifyTranslationError,
@@ -48,9 +44,7 @@ describe('classifyTranslationError', () => {
       (candidate): candidate is NoObjectGeneratedError =>
         candidate === objectError,
     )
-    expect(classifyTranslationError(providerError)).toBe(
-      'model_configuration',
-    )
+    expect(classifyTranslationError(providerError)).toBe('model_configuration')
     expect(classifyTranslationError(objectError)).toBe('structured_output')
   })
 

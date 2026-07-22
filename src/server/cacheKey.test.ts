@@ -39,25 +39,16 @@ describe('cacheKeyFor', () => {
 
   it('differs when previousMain differs (sentence)', () => {
     expect(
-      cacheKeyFor(
-        { ...base, refinements: ['x'], previousMain: 'a' },
-        model,
-      ),
+      cacheKeyFor({ ...base, refinements: ['x'], previousMain: 'a' }, model),
     ).not.toBe(
-      cacheKeyFor(
-        { ...base, refinements: ['x'], previousMain: 'b' },
-        model,
-      ),
+      cacheKeyFor({ ...base, refinements: ['x'], previousMain: 'b' }, model),
     )
   })
 
   it('ignores refinements and previousMain for word intent', () => {
     const word = { ...base, intent: 'word' as const, text: '배' }
     expect(cacheKeyFor(word, model)).toBe(
-      cacheKeyFor(
-        { ...word, refinements: ['x'], previousMain: 'y' },
-        model,
-      ),
+      cacheKeyFor({ ...word, refinements: ['x'], previousMain: 'y' }, model),
     )
   })
 

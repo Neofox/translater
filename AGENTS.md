@@ -6,18 +6,18 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 
 ## Key Files
 
-| File                                | Role                                                                                                      |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `src/server/prompts.ts`             | All LLM prompt templates and few-shot examples (sentence + word mode, per-mode register guidance)         |
-| `src/server/schemas.ts`             | Zod schemas for LLM output (`SentenceResult`, `WordResult`). Strict-mode compliant: every field required. |
+| File                                | Role                                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `src/server/prompts.ts`             | All LLM prompt templates and few-shot examples (sentence + word mode, per-mode register guidance)             |
+| `src/server/schemas.ts`             | Zod schemas for LLM output (`SentenceResult`, `WordResult`). Strict-mode compliant: every field required.     |
 | `src/server/translate.ts`           | Server function — cache check, AI Gateway `streamText`, raw JSON deltas, and final `Output.object` validation |
-| `src/server/cache.ts`               | In-memory LRU cache (max 50 entries)                                                                      |
-| `src/server/telemetry.ts`           | Optional AI SDK v7 telemetry registration for content-free Langfuse generation traces                     |
-| `src/hooks/useTranslate.ts`         | Client hook — streams translation, returns `LiveResult`                                                   |
-| `src/lib/detectIntent.ts`           | Heuristic: ≤3 tokens AND ≤24 chars → `word`, else `sentence`                                              |
-| `src/components/SentenceView.tsx`   | Renders sentence-mode results (main, rationale, alternatives, formalityNote)                              |
-| `src/components/WordView.tsx`       | Renders word-mode results (primaryTranslation, alternatives, register tags)                               |
-| `src/components/WordSourceMeta.tsx` | Dictionary metadata panel (POS, definitions, etymology, synonyms)                                         |
+| `src/server/cache.ts`               | In-memory LRU cache (max 50 entries)                                                                          |
+| `src/server/telemetry.ts`           | Optional AI SDK v7 telemetry registration for content-free Langfuse generation traces                         |
+| `src/hooks/useTranslate.ts`         | Client hook — streams translation, returns `LiveResult`                                                       |
+| `src/lib/detectIntent.ts`           | Heuristic: ≤3 tokens AND ≤24 chars → `word`, else `sentence`                                                  |
+| `src/components/SentenceView.tsx`   | Renders sentence-mode results (main, rationale, alternatives, formalityNote)                                  |
+| `src/components/WordView.tsx`       | Renders word-mode results (primaryTranslation, alternatives, register tags)                                   |
+| `src/components/WordSourceMeta.tsx` | Dictionary metadata panel (POS, definitions, etymology, synonyms)                                             |
 
 ## Architecture Notes
 

@@ -115,15 +115,19 @@ describe('resolveTranslateModel', () => {
   })
 
   it('accepts one exact provider/model id', () => {
-    expect(resolveTranslateModel({ TRANSLATE_MODEL: 'anthropic/claude-sonnet-4.5' }))
-      .toBe('anthropic/claude-sonnet-4.5')
+    expect(
+      resolveTranslateModel({ TRANSLATE_MODEL: 'anthropic/claude-sonnet-4.5' }),
+    ).toBe('anthropic/claude-sonnet-4.5')
   })
 
-  it.each(['gpt-5.6-luna', 'openai/', '/gpt-5.6-luna', 'openai/model/extra'])
-    ('rejects malformed model id %s', (model) => {
-      expect(() => resolveTranslateModel({ TRANSLATE_MODEL: model }))
-        .toThrow(GatewayConfigurationError)
-    })
+  it.each(['gpt-5.6-luna', 'openai/', '/gpt-5.6-luna', 'openai/model/extra'])(
+    'rejects malformed model id %s',
+    (model) => {
+      expect(() => resolveTranslateModel({ TRANSLATE_MODEL: model })).toThrow(
+        GatewayConfigurationError,
+      )
+    },
+  )
 })
 
 describe('assertGatewayApiKey', () => {
@@ -132,18 +136,21 @@ describe('assertGatewayApiKey', () => {
   })
 
   it('accepts a non-empty server key', () => {
-    expect(() => assertGatewayApiKey({ AI_GATEWAY_API_KEY: 'test-key' }))
-      .not.toThrow()
+    expect(() =>
+      assertGatewayApiKey({ AI_GATEWAY_API_KEY: 'test-key' }),
+    ).not.toThrow()
   })
 })
 
 describe('gatewayProviderOptions', () => {
   it('uses auto caching and OpenAI-only options for openai models', () => {
-    expect(gatewayProviderOptions({
-      model: 'openai/gpt-5.6-luna',
-      promptCacheKey: 'nt:v12:sentence:en:en:ko:casual',
-      tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
-    })).toEqual({
+    expect(
+      gatewayProviderOptions({
+        model: 'openai/gpt-5.6-luna',
+        promptCacheKey: 'nt:v12:sentence:en:en:ko:casual',
+        tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
+      }),
+    ).toEqual({
       gateway: {
         caching: 'auto',
         tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
@@ -174,14 +181,15 @@ describe('gatewayProviderOptions', () => {
 
 describe('gatewayTags', () => {
   it('contains only low-cardinality operational values', () => {
-    expect(gatewayTags({
-      intent: 'sentence',
-      requestKind: 'refinement',
-      promptVersion: 'v12-ai-gateway',
-    })).toEqual(['translation', 'sentence', 'refinement', 'v12-ai-gateway'])
+    expect(
+      gatewayTags({
+        intent: 'sentence',
+        requestKind: 'refinement',
+        promptVersion: 'v12-ai-gateway',
+      }),
+    ).toEqual(['translation', 'sentence', 'refinement', 'v12-ai-gateway'])
   })
 })
-
 ```
 
 - [ ] **Step 2: Run the focused test and confirm it fails**
@@ -238,12 +246,7 @@ export function gatewayTags(input: {
   requestKind: 'initial' | 'context' | 'refinement'
   promptVersion: string
 }): string[] {
-  return [
-    'translation',
-    input.intent,
-    input.requestKind,
-    input.promptVersion,
-  ]
+  return ['translation', input.intent, input.requestKind, input.promptVersion]
 }
 
 export function gatewayProviderOptions(input: {
@@ -263,7 +266,6 @@ export function gatewayProviderOptions(input: {
     },
   }
 }
-
 ```
 
 If the installed AI SDK types require read-only arrays or a narrower provider-options annotation, adapt the annotations only; do not change the tested runtime object shape.
@@ -397,8 +399,7 @@ Update the prompt aliases and test helper to accept the new bundle and text-only
 
 ```ts
 type PromptBundle =
-  | ReturnType<typeof sentencePrompt>
-  | ReturnType<typeof wordPrompt>
+  ReturnType<typeof sentencePrompt> | ReturnType<typeof wordPrompt>
 
 function textOf(content: PromptBundle['messages'][number]['content']): string {
   if (typeof content !== 'string') {
@@ -581,11 +582,7 @@ rtk git commit -m "refactor: emit AI SDK v7 prompt bundles"
 Create tests covering:
 
 ```ts
-import {
-  APICallError,
-  NoObjectGeneratedError,
-  NoSuchProviderError,
-} from 'ai'
+import { APICallError, NoObjectGeneratedError, NoSuchProviderError } from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   classifyTranslationError,
@@ -624,10 +621,12 @@ describe('classifyTranslationError', () => {
     const providerError = { name: 'AI_NoSuchProviderError' }
     const objectError = { name: 'AI_NoObjectGeneratedError' }
     vi.spyOn(NoSuchProviderError, 'isInstance').mockImplementation(
-      (candidate): candidate is NoSuchProviderError => candidate === providerError,
+      (candidate): candidate is NoSuchProviderError =>
+        candidate === providerError,
     )
     vi.spyOn(NoObjectGeneratedError, 'isInstance').mockImplementation(
-      (candidate): candidate is NoObjectGeneratedError => candidate === objectError,
+      (candidate): candidate is NoObjectGeneratedError =>
+        candidate === objectError,
     )
     expect(classifyTranslationError(providerError)).toBe('model_configuration')
     expect(classifyTranslationError(objectError)).toBe('structured_output')
@@ -652,11 +651,15 @@ describe('isTranslationAbort', () => {
   it('recognizes the request signal and AbortError', () => {
     const controller = new AbortController()
     controller.abort()
-    expect(isTranslationAbort(new Error('anything'), controller.signal)).toBe(true)
-    expect(isTranslationAbort(
-      new DOMException('Aborted', 'AbortError'),
-      new AbortController().signal,
-    )).toBe(true)
+    expect(isTranslationAbort(new Error('anything'), controller.signal)).toBe(
+      true,
+    )
+    expect(
+      isTranslationAbort(
+        new DOMException('Aborted', 'AbortError'),
+        new AbortController().signal,
+      ),
+    ).toBe(true)
   })
 })
 ```
@@ -763,22 +766,21 @@ describe('consumeStructuredStream', () => {
       onFirstToken,
     })
 
-    expect(onDelta.mock.calls).toEqual([
-      ['{"main":"hel'],
-      ['lo"}'],
-    ])
+    expect(onDelta.mock.calls).toEqual([['{"main":"hel'], ['lo"}']])
     expect(onFirstToken).toHaveBeenCalledTimes(1)
     expect(result).toBe(validated)
   })
 
   it('does not produce a terminal value when validation rejects', async () => {
     const validationError = new Error('invalid structured output')
-    await expect(consumeStructuredStream({
-      textStream: deltas(),
-      output: Promise.reject(validationError),
-      onDelta: vi.fn(),
-      onFirstToken: vi.fn(),
-    })).rejects.toBe(validationError)
+    await expect(
+      consumeStructuredStream({
+        textStream: deltas(),
+        output: Promise.reject(validationError),
+        onDelta: vi.fn(),
+        onFirstToken: vi.fn(),
+      }),
+    ).rejects.toBe(validationError)
   })
 })
 ```
@@ -852,35 +854,38 @@ rtk git commit -m "test: codify structured streaming contract"
 Create `src/server/translate.gateway.test.ts` and mock `streamText` before importing the production module. The test must assert the request supplied to the SDK has:
 
 ```ts
-expect(streamText).toHaveBeenCalledWith(expect.objectContaining({
-  model: 'openai/gpt-5.6-luna',
-  maxRetries: 0,
-  abortSignal: expect.any(AbortSignal),
-  instructions: [
-    expect.objectContaining({ role: 'system' }),
-    expect.objectContaining({ role: 'system' }),
-  ],
-  messages: [
-    expect.objectContaining({ role: 'user' }),
-    expect.objectContaining({ role: 'assistant' }),
-    expect.objectContaining({ role: 'user' }),
-  ],
-  output: expect.anything(),
-  providerOptions: {
-    gateway: {
-      caching: 'auto',
-      tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
+expect(streamText).toHaveBeenCalledWith(
+  expect.objectContaining({
+    model: 'openai/gpt-5.6-luna',
+    maxRetries: 0,
+    abortSignal: expect.any(AbortSignal),
+    instructions: [
+      expect.objectContaining({ role: 'system' }),
+      expect.objectContaining({ role: 'system' }),
+    ],
+    messages: [
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'assistant' }),
+      expect.objectContaining({ role: 'user' }),
+    ],
+    output: expect.anything(),
+    providerOptions: {
+      gateway: {
+        caching: 'auto',
+        tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
+      },
+      openai: {
+        reasoningEffort: 'none',
+        store: false,
+        promptCacheKey: expect.stringContaining('nt:v12-ai-gateway'),
+      },
     },
-    openai: {
-      reasoningEffort: 'none',
-      store: false,
-      promptCacheKey: expect.stringContaining('nt:v12-ai-gateway'),
-    },
-  },
-}))
+  }),
+)
 expect(streamText).toHaveBeenCalledTimes(1)
-expect(streamText.mock.calls[0]![0].providerOptions.gateway)
-  .not.toHaveProperty('models')
+expect(streamText.mock.calls[0]![0].providerOptions.gateway).not.toHaveProperty(
+  'models',
+)
 expect(streamText.mock.calls[0]![0]).not.toHaveProperty('allowSystemInMessages')
 ```
 
@@ -1099,21 +1104,25 @@ describe('translationTelemetryOptions', () => {
 
 describe('translationRuntimeContext', () => {
   it('contains only allowlisted operational dimensions', () => {
-    const context = translationRuntimeContext({
-      intent: 'sentence',
-      mode: 'casual',
-      source: 'en',
-      target: 'ko',
-      uiLang: 'en',
-      text: 'private source text',
-      context: 'private reply context',
-      refinements: ['private adjustment'],
-      analyticsTrigger: 'refinement',
-      analyticsSessionId: 'session-id',
-      analyticsRunId: 'run-id',
-      analyticsSupersedesRunId: 'old-run-id',
-      analyticsInputRevision: 3,
-    }, 'openai/gpt-5.6-luna', 'v12-ai-gateway')
+    const context = translationRuntimeContext(
+      {
+        intent: 'sentence',
+        mode: 'casual',
+        source: 'en',
+        target: 'ko',
+        uiLang: 'en',
+        text: 'private source text',
+        context: 'private reply context',
+        refinements: ['private adjustment'],
+        analyticsTrigger: 'refinement',
+        analyticsSessionId: 'session-id',
+        analyticsRunId: 'run-id',
+        analyticsSupersedesRunId: 'old-run-id',
+        analyticsInputRevision: 3,
+      },
+      'openai/gpt-5.6-luna',
+      'v12-ai-gateway',
+    )
 
     expect(Object.keys(context).sort()).toEqual(
       Object.keys(SAFE_TRANSLATION_CONTEXT_KEYS).sort(),
@@ -1128,10 +1137,12 @@ describe('isLangfuseConfigured', () => {
   it('requires both credentials', () => {
     expect(isLangfuseConfigured({})).toBe(false)
     expect(isLangfuseConfigured({ LANGFUSE_PUBLIC_KEY: 'pk' })).toBe(false)
-    expect(isLangfuseConfigured({
-      LANGFUSE_PUBLIC_KEY: 'pk',
-      LANGFUSE_SECRET_KEY: 'sk',
-    })).toBe(true)
+    expect(
+      isLangfuseConfigured({
+        LANGFUSE_PUBLIC_KEY: 'pk',
+        LANGFUSE_SECRET_KEY: 'sk',
+      }),
+    ).toBe(true)
   })
 })
 
@@ -1153,7 +1164,9 @@ describe('prepareTranslationTelemetry', () => {
     })
     const second = await prepareTranslationTelemetry({
       env: { LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' },
-      load: async () => { throw new Error('must not initialize twice') },
+      load: async () => {
+        throw new Error('must not initialize twice')
+      },
     })
 
     expect(start).toHaveBeenCalledTimes(1)
@@ -1167,7 +1180,9 @@ describe('prepareTranslationTelemetry', () => {
   it('fails open when telemetry initialization fails', async () => {
     const telemetry = await prepareTranslationTelemetry({
       env: { LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' },
-      load: async () => { throw new Error('telemetry unavailable') },
+      load: async () => {
+        throw new Error('telemetry unavailable')
+      },
     })
     expect(telemetry.enabled).toBe(false)
     await expect(telemetry.flush()).resolves.toBeUndefined()
@@ -1261,13 +1276,17 @@ Implement `translationRuntimeContext(data, model, promptVersion)` with exactly t
 Implement `prepareTranslationTelemetry()` as a process-global lazy singleton. Its default loader must:
 
 ```ts
-const [{ registerTelemetry }, { LangfuseVercelAiSdkIntegration }, { LangfuseSpanProcessor }, { NodeSDK }] =
-  await Promise.all([
-    import('ai'),
-    import('@langfuse/vercel-ai-sdk'),
-    import('@langfuse/otel'),
-    import('@opentelemetry/sdk-node'),
-  ])
+const [
+  { registerTelemetry },
+  { LangfuseVercelAiSdkIntegration },
+  { LangfuseSpanProcessor },
+  { NodeSDK },
+] = await Promise.all([
+  import('ai'),
+  import('@langfuse/vercel-ai-sdk'),
+  import('@langfuse/otel'),
+  import('@opentelemetry/sdk-node'),
+])
 
 const processor = new LangfuseSpanProcessor({
   publicKey: env.LANGFUSE_PUBLIC_KEY,
@@ -1371,10 +1390,7 @@ import {
   gatewayTags,
   resolveTranslateModel,
 } from '../src/server/gateway.ts'
-import {
-  CACHE_VERSION,
-  promptCacheKeyFor,
-} from '../src/server/cacheKey.ts'
+import { CACHE_VERSION, promptCacheKeyFor } from '../src/server/cacheKey.ts'
 ```
 
 Resolve and validate the model/key, then replace the existing `messages` assignment and `client.responses.parse` call with:

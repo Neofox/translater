@@ -22,16 +22,14 @@ describe('resolveTranslateModel', () => {
     ).toBe('anthropic/claude-sonnet-4.5')
   })
 
-  it.each([
-    'gpt-5.6-luna',
-    'openai/',
-    '/gpt-5.6-luna',
-    'openai/model/extra',
-  ])('rejects malformed model id %s', (model) => {
-    expect(() => resolveTranslateModel({ TRANSLATE_MODEL: model })).toThrow(
-      GatewayConfigurationError,
-    )
-  })
+  it.each(['gpt-5.6-luna', 'openai/', '/gpt-5.6-luna', 'openai/model/extra'])(
+    'rejects malformed model id %s',
+    (model) => {
+      expect(() => resolveTranslateModel({ TRANSLATE_MODEL: model })).toThrow(
+        GatewayConfigurationError,
+      )
+    },
+  )
 })
 
 describe('assertGatewayApiKey', () => {

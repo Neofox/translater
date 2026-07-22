@@ -2,10 +2,7 @@ import 'dotenv/config'
 import { Output, streamText } from 'ai'
 import { SentenceResult, WordResult } from '../src/server/schemas.ts'
 import { sentencePrompt, wordPrompt } from '../src/server/prompts.ts'
-import {
-  CACHE_VERSION,
-  promptCacheKeyFor,
-} from '../src/server/cacheKey.ts'
+import { CACHE_VERSION, promptCacheKeyFor } from '../src/server/cacheKey.ts'
 import {
   assertGatewayApiKey,
   gatewayProviderOptions,

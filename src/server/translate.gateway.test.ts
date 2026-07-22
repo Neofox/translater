@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SAFE_TRANSLATION_CONTEXT_KEYS } from './telemetry'
-import { handleTranslate, type TranslateChunk } from './translate'
+import { handleTranslate } from './translate'
+import type { TranslateChunk } from './translate'
 
 const validSentenceResult = {
   sourceLang: 'en' as const,
@@ -107,12 +108,7 @@ describe('handleTranslate via AI Gateway', () => {
         providerOptions: {
           gateway: {
             caching: 'auto',
-            tags: [
-              'translation',
-              'sentence',
-              'initial',
-              'v12-ai-gateway',
-            ],
+            tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
           },
           openai: {
             reasoningEffort: 'none',
@@ -145,15 +141,11 @@ describe('handleTranslate via AI Gateway', () => {
     }
     const streamText = vi.fn()
     const prepareTelemetry = vi.fn()
-    const stream = await handleTranslate(
-      data,
-      new AbortController().signal,
-      {
-        streamText: streamText as never,
-        cache,
-        prepareTelemetry,
-      },
-    )
+    const stream = await handleTranslate(data, new AbortController().signal, {
+      streamText: streamText as never,
+      cache,
+      prepareTelemetry,
+    })
 
     await expect(readChunks(stream)).resolves.toEqual([
       { type: 'cache', done: cached },
@@ -169,11 +161,10 @@ describe('handleTranslate via AI Gateway', () => {
       output: Promise.reject(validationError),
     }))
     const cache = cacheDouble()
-    const stream = await handleTranslate(
-      data,
-      new AbortController().signal,
-      { streamText: streamText as never, cache },
-    )
+    const stream = await handleTranslate(data, new AbortController().signal, {
+      streamText: streamText as never,
+      cache,
+    })
 
     await expect(readChunks(stream)).rejects.toThrow('Translation failed.')
     expect(cache.set).not.toHaveBeenCalled()
@@ -187,10 +178,14 @@ describe('handleTranslate via AI Gateway', () => {
         await new Promise<void>((_resolve, reject) => {
           request.abortSignal.addEventListener('abort', () => {
             reject(
-              new DOMException('private provider cancellation body', 'AbortError'),
+              new DOMException(
+                'private provider cancellation body',
+                'AbortError',
+              ),
             )
           })
         })
+        yield ''
       })(),
       output: Promise.resolve(validSentenceResult),
     }))

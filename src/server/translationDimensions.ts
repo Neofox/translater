@@ -1,10 +1,5 @@
 export type CharacterCountBucket =
-  | '0'
-  | '1-24'
-  | '25-100'
-  | '101-500'
-  | '501-2000'
-  | '2001+'
+  '0' | '1-24' | '25-100' | '101-500' | '501-2000' | '2001+'
 
 export function characterCountBucket(count: number): CharacterCountBucket {
   if (count === 0) return '0'

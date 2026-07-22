@@ -39,12 +39,7 @@ export function gatewayTags(input: {
   requestKind: 'initial' | 'context' | 'refinement'
   promptVersion: string
 }): string[] {
-  return [
-    'translation',
-    input.intent,
-    input.requestKind,
-    input.promptVersion,
-  ]
+  return ['translation', input.intent, input.requestKind, input.promptVersion]
 }
 
 export function gatewayProviderOptions(input: {

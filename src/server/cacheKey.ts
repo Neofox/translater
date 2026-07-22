@@ -38,9 +38,9 @@ export function cacheKeyFor(d: CacheKeyInput, model: string): string {
   ])
 }
 
-// Route requests with an identical stable system + few-shot prefix to the same
-// prompt cache. Live text/context/refinements occur after the explicit cache
-// breakpoint and therefore do not belong in this key.
+// Route requests with an identical stable instructions + few-shot prefix to
+// the same provider prompt cache. Live text/context/refinements only occur in
+// the final user message and therefore do not belong in this key.
 export function promptCacheKeyFor(
   d: Pick<CacheKeyInput, 'intent' | 'mode' | 'source' | 'target' | 'uiLang'>,
 ): string {

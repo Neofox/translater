@@ -158,6 +158,8 @@ async function loadNativeTelemetry(
     publicKey: env.LANGFUSE_PUBLIC_KEY,
     secretKey: env.LANGFUSE_SECRET_KEY,
     baseUrl: env.LANGFUSE_BASE_URL,
+    environment: env.LANGFUSE_TRACING_ENVIRONMENT,
+    release: env.LANGFUSE_RELEASE,
     exportMode: 'immediate',
     mediaUploadEnabled: false,
   })
