@@ -4,11 +4,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_TRANSLATE_DEBOUNCE_MS, useTranslate } from './useTranslate'
 import type { LiveResult, TranslateArgs } from './useTranslate'
 import { UiLangProvider } from './useUiLang'
+import type { SetStateAction } from 'react'
+import type * as ReactModule from 'react'
 import type { TranslateChunk, TranslateDone } from '../server/translate'
+
+const reactStateInstrumentation = vi.hoisted(() => ({
+  nextNullState: 0,
+  onLiveSet: undefined as undefined | (() => void),
+}))
 
 // Only the network layer is mocked — `useTranslate` itself runs for real, so
 // the debounce effect, the `restore` suppression flag, and the error path
 // are all exercised end to end.
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactModule>()
+
+  return {
+    ...actual,
+    useState: (<TState,>(initialState: TState | (() => TState)) => {
+      const state = actual.useState(initialState)
+      const isLiveState =
+        initialState === null && reactStateInstrumentation.nextNullState++ === 0
+
+      if (!isLiveState) return state
+
+      return [
+        state[0],
+        (value: SetStateAction<TState>) => {
+          reactStateInstrumentation.onLiveSet?.()
+          state[1](value)
+        },
+      ] as typeof state
+    }) as typeof actual.useState,
+  }
+})
+
 vi.mock('@tanstack/react-start', () => ({
   useServerFn: (fn: unknown) => fn,
 }))
@@ -20,11 +50,20 @@ vi.mock('../server/translate', () => ({
 function makeCacheStream(main: string): ReadableStream<TranslateChunk> {
   const done: TranslateDone = {
     intent: 'sentence',
-    data: { main } as unknown as TranslateDone['data'],
+    data: { main, sourceLang: 'fr' } as unknown as TranslateDone['data'],
   } as TranslateDone
   return new ReadableStream<TranslateChunk>({
     start(controller) {
       controller.enqueue({ type: 'cache', done })
+      controller.close()
+    },
+  })
+}
+
+function makeStream(chunks: TranslateChunk[]): ReadableStream<TranslateChunk> {
+  return new ReadableStream<TranslateChunk>({
+    start(controller) {
+      chunks.forEach((chunk) => controller.enqueue(chunk))
       controller.close()
     },
   })
@@ -50,6 +89,8 @@ describe('useTranslate', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers()
+    reactStateInstrumentation.nextNullState = 0
+    reactStateInstrumentation.onLiveSet = undefined
     const mod = (await import('../server/translate')) as unknown as {
       translate: ReturnType<typeof vi.fn>
     }
@@ -63,6 +104,7 @@ describe('useTranslate', () => {
   afterEach(() => {
     cleanup()
     vi.useRealTimers()
+    reactStateInstrumentation.onLiveSet = undefined
     vi.restoreAllMocks()
   })
 
@@ -81,6 +123,68 @@ describe('useTranslate', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(translateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves Auto request provenance and reports a streaming sourceLang', async () => {
+    const trace: string[] = []
+    const onSourceDetected = vi.fn(() => trace.push('source'))
+    translateMock.mockResolvedValueOnce(
+      makeStream([{ type: 'delta', raw: '{"sourceLang":"fr"}' }]),
+    )
+    reactStateInstrumentation.nextNullState = 0
+    reactStateInstrumentation.onLiveSet = () => trace.push('live')
+    const { result } = renderHook(
+      (props: TranslateArgs) =>
+        useTranslate(props, { debounceMs: 0, onSourceDetected }),
+      { initialProps: { ...baseArgs, source: 'auto' }, wrapper },
+    )
+    trace.length = 0
+
+    await act(async () => {
+      await result.current.run()
+    })
+
+    expect(trace).toEqual(['live', 'source', 'live'])
+    expect(result.current.live).toMatchObject({
+      done: false,
+      requestSource: 'auto',
+      text: 'see you tomorrow',
+      partial: { sourceLang: 'fr' },
+    })
+    expect(onSourceDetected).toHaveBeenCalledWith({
+      text: 'see you tomorrow',
+      requestSource: 'auto',
+      sourceLang: 'fr',
+    })
+  })
+
+  it('reports sourceLang from a cache-only final result before publishing it', async () => {
+    const trace: string[] = []
+    const onSourceDetected = vi.fn(() => trace.push('source'))
+    reactStateInstrumentation.nextNullState = 0
+    reactStateInstrumentation.onLiveSet = () => trace.push('live')
+    const { result } = renderHook(
+      (props: TranslateArgs) =>
+        useTranslate(props, { debounceMs: 0, onSourceDetected }),
+      { initialProps: { ...baseArgs, source: 'auto' }, wrapper },
+    )
+    trace.length = 0
+
+    await act(async () => {
+      await result.current.run()
+    })
+
+    expect(trace).toEqual(['live', 'source', 'live'])
+    expect(result.current.live).toMatchObject({
+      done: true,
+      requestSource: 'auto',
+      text: 'see you tomorrow',
+    })
+    expect(onSourceDetected).toHaveBeenCalledWith({
+      text: 'see you tomorrow',
+      requestSource: 'auto',
+      sourceLang: 'fr',
+    })
   })
 
   it('aborts an in-flight request when the input changes', async () => {
@@ -210,6 +314,7 @@ describe('useTranslate', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
+      requestSource: 'en',
       text: 'see you tomorrow',
     }
 

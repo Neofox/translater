@@ -31,6 +31,8 @@ vi.mock('../hooks/useTranslate', async () => {
   const liveListeners = new Set<(v: unknown) => void>()
   let currentError: unknown = null
   const errorListeners = new Set<(v: unknown) => void>()
+  const calls: Array<{ source: string; target: string; text: string }> = []
+  let onSourceDetected: ((report: unknown) => void) | undefined
 
   function applyMockLive(v: unknown) {
     currentLive = v
@@ -42,7 +44,12 @@ vi.mock('../hooks/useTranslate', async () => {
     errorListeners.forEach((fn) => fn(v))
   }
 
-  function useTranslate() {
+  function useTranslate(
+    args: { source: string; target: string; text: string },
+    options?: { onSourceDetected?: (report: unknown) => void },
+  ) {
+    calls.push(args)
+    onSourceDetected = options?.onSourceDetected
     const [live, setLive] = React.useState(currentLive)
     React.useEffect(() => {
       liveListeners.add(setLive)
@@ -77,6 +84,11 @@ vi.mock('../hooks/useTranslate', async () => {
     useTranslate,
     __setMockLive: applyMockLive,
     __setMockError: applyMockError,
+    __reportSource: (report: unknown) => onSourceDetected?.(report),
+    __getCalls: () => calls,
+    __clearCalls: () => {
+      calls.length = 0
+    },
   }
 })
 
@@ -98,6 +110,22 @@ async function setMockError(v: unknown) {
   })
 }
 
+type SourceReport = {
+  text: string
+  requestSource: 'auto' | 'fr'
+  sourceLang: 'en' | 'fr'
+}
+
+async function mockControls() {
+  const mod = (await import('../hooks/useTranslate')) as unknown as {
+    __reportSource: (report: SourceReport) => void
+    __setMockLive: (v: unknown) => void
+    __getCalls: () => Array<{ source: string; target: string; text: string }>
+    __clearCalls: () => void
+  }
+  return mod
+}
+
 function Consumer({
   capture,
 }: {
@@ -108,18 +136,162 @@ function Consumer({
   return <div data-testid="target">{ctx.target}</div>
 }
 
-describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
-  beforeEach(() => {
+describe('TranslatorContext source detection routing', () => {
+  beforeEach(async () => {
     window.localStorage.clear()
     // jsdom doesn't implement matchMedia; TranslatorProvider's focus-on-mount
     // effect calls it unconditionally.
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never
+    await setMockLive(null)
   })
 
   afterEach(() => {
     cleanup()
     window.localStorage.clear()
     vi.restoreAllMocks()
+  })
+
+  function setup(source: 'auto' | 'fr' = 'auto', target = 'ko') {
+    window.localStorage.setItem('nt.target', JSON.stringify(target))
+    window.localStorage.setItem('nt.source', JSON.stringify(source))
+    const holder: { current: ReturnType<typeof useTranslatorContext> | null } =
+      {
+        current: null,
+      }
+    render(
+      <UiLangProvider>
+        <TranslatorProvider>
+          <Consumer capture={(c) => (holder.current = c)} />
+        </TranslatorProvider>
+      </UiLangProvider>,
+    )
+    return holder
+  }
+
+  async function reportSource(text: string, sourceLang: 'en' | 'fr') {
+    const controls = await mockControls()
+    act(() => {
+      controls.__reportSource({ text, requestSource: 'auto', sourceLang })
+      controls.__setMockLive({
+        intent: 'sentence',
+        partial: { sourceLang },
+        done: true,
+        requestSource: 'auto',
+        text,
+      })
+    })
+  }
+
+  async function setInput(holder: ReturnType<typeof setup>, text: string) {
+    act(() => {
+      holder.current?.setInput(text)
+    })
+    await waitFor(() => expect(holder.current?.input).toBe(text))
+  }
+
+  it('keeps English selected after a current French model report', async () => {
+    const holder = setup()
+    await setInput(holder, 'merci beaucoup')
+    await reportSource('merci beaucoup', 'fr')
+    await waitFor(() => expect(holder.current?.detected).toBe('fr'))
+
+    act(() => holder.current?.setTarget('en'))
+
+    await waitFor(() => expect(holder.current?.target).toBe('en'))
+  })
+
+  it('keeps an explicit English selection during the synchronous report/live race', async () => {
+    const holder = setup()
+    await setInput(holder, 'merci beaucoup')
+    const controls = await mockControls()
+    controls.__clearCalls()
+
+    act(() => {
+      controls.__reportSource({
+        text: 'merci beaucoup',
+        requestSource: 'auto',
+        sourceLang: 'fr',
+      })
+      controls.__setMockLive({
+        intent: 'sentence',
+        partial: { sourceLang: 'fr' },
+        done: false,
+        requestSource: 'auto',
+        text: 'merci beaucoup',
+      })
+      holder.current?.setTarget('en')
+    })
+
+    await waitFor(() => expect(holder.current?.target).toBe('en'))
+    expect(controls.__getCalls().every((call) => call.target !== 'ko')).toBe(
+      true,
+    )
+  })
+
+  it('falls back away from the authoritative French source', async () => {
+    const holder = setup()
+    await setInput(holder, 'merci beaucoup')
+    await reportSource('merci beaucoup', 'fr')
+    await waitFor(() => expect(holder.current?.detected).toBe('fr'))
+
+    act(() => holder.current?.setTarget('fr'))
+
+    await waitFor(() => expect(holder.current?.target).toBe('en'))
+  })
+
+  it('ignores a model report retained for a different input', async () => {
+    const holder = setup()
+    await setInput(holder, 'merci beaucoup')
+    await reportSource('merci beaucoup', 'fr')
+    await waitFor(() => expect(holder.current?.detected).toBe('fr'))
+    await setInput(holder, 'different input')
+
+    act(() => holder.current?.setTarget('en'))
+
+    await waitFor(() => expect(holder.current?.target).toBe('ko'))
+  })
+
+  it('allows a manual French source to target English', async () => {
+    const holder = setup('fr')
+    await setInput(holder, 'merci beaucoup')
+
+    act(() => holder.current?.setTarget('en'))
+
+    await waitFor(() => expect(holder.current?.target).toBe('en'))
+  })
+
+  it('does not retain a manual French polish report when switching to Auto', async () => {
+    const holder = setup('fr', 'fr')
+    await setInput(holder, 'merci beaucoup')
+    await setMockLive({
+      intent: 'sentence',
+      partial: { sourceLang: 'fr' },
+      done: true,
+      requestSource: 'fr',
+      text: 'merci beaucoup',
+    })
+    const controls = await mockControls()
+    controls.__clearCalls()
+
+    act(() => holder.current?.setSource('auto'))
+
+    await waitFor(() => expect(holder.current?.source).toBe('auto'))
+    expect(controls.__getCalls()[0]).toMatchObject({
+      source: 'auto',
+      target: 'fr',
+      text: 'merci beaucoup',
+    })
+  })
+
+  it('falls back when a current model report identifies English', async () => {
+    const holder = setup()
+    await setInput(holder, 'merci beaucoup')
+    await reportSource('merci beaucoup', 'en')
+    await waitFor(() => expect(holder.current?.detected).toBe('en'))
+
+    act(() => holder.current?.setTarget('en'))
+
+    await waitFor(() => expect(holder.current?.target).toBe('ko'))
   })
 
   it('does not cascade the safety-net flip back through the pre-flight heuristic', async () => {
@@ -157,6 +329,7 @@ describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
       intent: 'sentence',
       partial: { sourceLang: 'fr' },
       done: true,
+      requestSource: 'auto',
       text: 'merci beaucoup',
     })
 
@@ -188,6 +361,36 @@ describe('TranslatorContext safety-net flip (Critical 1 regression)', () => {
     await waitFor(() => expect(holder.current?.input).toBe('merci beaucoup '))
 
     expect(holder.current?.target).toBe('en')
+  })
+
+  it('routes again after clearing and re-entering safety-flipped text', async () => {
+    const holder = setup('auto', 'fr')
+    const controls = await mockControls()
+    const text = 'merci beaucoup'
+
+    await setInput(holder, text)
+    await setMockLive({
+      intent: 'sentence',
+      partial: { sourceLang: 'fr' },
+      done: true,
+      requestSource: 'auto',
+      text,
+    })
+
+    await waitFor(() => expect(holder.current?.target).toBe('en'))
+    controls.__clearCalls()
+
+    await setInput(holder, '')
+    await setInput(holder, text)
+
+    await waitFor(() => expect(holder.current?.target).toBe('ko'))
+    expect(controls.__getCalls()).toContainEqual(
+      expect.objectContaining({
+        source: 'auto',
+        target: 'ko',
+        text,
+      }),
+    )
   })
 })
 
@@ -230,6 +433,7 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main },
       done: true,
+      requestSource: 'auto',
       text,
     })
   }
@@ -275,6 +479,7 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요~' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
     act(() => holder.current!.addRefinement('more formal'))
@@ -282,6 +487,7 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main: '내일 뵙겠습니다' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
     expect(holder.current?.refinements).toEqual([
@@ -339,6 +545,7 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: {},
       done: false,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
 
@@ -357,6 +564,7 @@ describe('refine + context state', () => {
       intent: 'sentence',
       partial: { main: '새 결과' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
 

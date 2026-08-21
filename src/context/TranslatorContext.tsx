@@ -8,7 +8,11 @@ import {
 } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { useTranslate } from '../hooks/useTranslate'
-import type { LiveResult, TranslateError } from '../hooks/useTranslate'
+import type {
+  LiveResult,
+  SourceDetectedReport,
+  TranslateError,
+} from '../hooks/useTranslate'
 import { useTranslationPrefs } from '../hooks/useTranslationPrefs'
 import { detectIntent } from '../lib/detectIntent'
 import { detectLanguage } from '../lib/detectLanguage'
@@ -28,6 +32,11 @@ type RefineSnapshot = {
   live: LiveResult
   refinements: string[]
   previousMain: string
+}
+
+type DetectedSourceSnapshot = {
+  text: string
+  lang: LangCode
 }
 
 // Streaming partials can carry a truncated sourceLang (partial-json cuts
@@ -99,6 +108,8 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const [refinements, setRefinements] = useState<string[]>([])
   const [previousMain, setPreviousMain] = useState('')
   const [undoStack, setUndoStack] = useState<RefineSnapshot[]>([])
+  const modelDetectedSnapshotRef = useRef<DetectedSourceSnapshot | null>(null)
+  const [, setModelDetectedRevision] = useState(0)
   // Set by the error-rollback effect when a refine run fails; cleared by any
   // refine action, an input edit, or a genuinely new completed result. See
   // `refineError` on TranslatorContextValue for the rendering contract.
@@ -127,6 +138,22 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const rawDetected = source === 'auto' ? detectLanguage(input) : null
   const isPolish = source !== 'auto' && source === target
 
+  const onSourceDetected = useCallback((report: SourceDetectedReport) => {
+    if (
+      report.requestSource !== 'auto' ||
+      !report.text ||
+      report.text !== report.text.trim() ||
+      !VALID_DETECTED.includes(report.sourceLang as LangCode)
+    ) {
+      return
+    }
+    const next = { text: report.text, lang: report.sourceLang as LangCode }
+    const previous = modelDetectedSnapshotRef.current
+    if (previous?.text === next.text && previous.lang === next.lang) return
+    modelDetectedSnapshotRef.current = next
+    setModelDetectedRevision((revision) => revision + 1)
+  }, [])
+
   // Safety net: the model says the source language IS the current target
   // (something the client heuristic missed). Flip the target once and let the
   // debounced effect re-run. Guarded per input text — max one extra call.
@@ -137,10 +164,16 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   // fallback) can immediately flip the freshly-corrected target a second
   // time — see the merci-beaucoup/fr/en/ko cascade this guards against.
   const flipGuardRef = useRef<string | null>(null)
+  const retainedModelDetected =
+    trimmedInput && modelDetectedSnapshotRef.current?.text === trimmedInput
+      ? modelDetectedSnapshotRef.current.lang
+      : null
+  const routingDetected =
+    source === 'auto' ? (retainedModelDetected ?? rawDetected) : null
   const translationTarget = resolveTranslationTarget({
     source,
     target,
-    detected: flipGuardRef.current === trimmedInput ? null : rawDetected,
+    detected: flipGuardRef.current === trimmedInput ? null : routingDetected,
   })
 
   // Auto-swap target when source=auto and the detected input language matches the
@@ -148,9 +181,9 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!input.trim()) return
     if (source !== 'auto') return
-    if (!rawDetected) return
+    if (!routingDetected) return
     if (translationTarget !== target) setTarget(translationTarget)
-  }, [source, rawDetected, target, translationTarget, input, setTarget])
+  }, [source, routingDetected, target, translationTarget, input, setTarget])
 
   const {
     live,
@@ -162,30 +195,40 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     flush,
     queueImmediate,
     restore,
-  } = useTranslate({
-    text: input,
-    source,
-    target: translationTarget,
-    mode,
-    intent,
-    context,
-    refinements,
-    previousMain,
-  })
+  } = useTranslate(
+    {
+      text: input,
+      source,
+      target: translationTarget,
+      mode,
+      intent,
+      context,
+      refinements,
+      previousMain,
+    },
+    { onSourceDetected },
+  )
 
   // Only trust the model's reported source language while `live` still
   // corresponds to the current input — `live` deliberately outlives input
   // changes (to keep the old translation visible while typing), so a stale
   // `live.partial.sourceLang` must not leak into the heuristic here.
-  const liveMatchesInput = live?.text === input.trim()
-  const reportedSource = liveMatchesInput ? live.partial.sourceLang : undefined
+  const liveMatchesInput = Boolean(trimmedInput) && live?.text === trimmedInput
+  const reportedSource =
+    liveMatchesInput && live.requestSource === 'auto'
+      ? live.partial.sourceLang
+      : undefined
   const modelDetected = VALID_DETECTED.includes(reportedSource as LangCode)
     ? (reportedSource as LangCode)
     : null
-  const detected = source === 'auto' ? (modelDetected ?? rawDetected) : null
+  const detected =
+    source === 'auto'
+      ? (modelDetected ?? retainedModelDetected ?? rawDetected)
+      : null
 
   useEffect(() => {
-    if (!live?.done || source !== 'auto') return
+    if (!live?.done || live.requestSource !== 'auto' || source !== 'auto')
+      return
     if (live.text !== input.trim()) return
     const reported = live.partial.sourceLang
     if (!reported || reported === 'other') return
@@ -212,6 +255,7 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
   const setInputWithRefineReset = useCallback(
     (next: string) => {
       if (next.trim() !== input.trim()) {
+        flipGuardRef.current = null
         refinementsRef.current = []
         setRefinements([])
         setPreviousMain('')

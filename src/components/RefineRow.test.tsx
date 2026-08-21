@@ -113,6 +113,7 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
     const chip = await screen.findByTestId('refine-chip-softer')
@@ -133,6 +134,7 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
     const input = (await screen.findByTestId(
@@ -159,6 +161,7 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
     fireEvent.click(await screen.findByTestId('refine-chip-softer'))
@@ -189,6 +192,7 @@ describe('RefineRow', () => {
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,
+      requestSource: 'auto',
       text: 'see you tomorrow',
     })
     const chip = await screen.findByTestId('refine-chip-softer')

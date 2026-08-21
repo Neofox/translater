@@ -21,6 +21,7 @@ export type LiveResult =
       intent: 'sentence'
       partial: Partial<SentenceResult>
       done: boolean
+      requestSource: LangCode
       /** The trimmed input text this result was produced for — lets stale
        * consumers (heuristics, safety nets) detect that `live` outlived the
        * input it was streamed for and fall back to fresh evidence. */
@@ -30,8 +31,15 @@ export type LiveResult =
       intent: 'word'
       partial: Partial<WordResult>
       done: boolean
+      requestSource: LangCode
       text: string
     }
+
+export type SourceDetectedReport = {
+  text: string
+  requestSource: LangCode
+  sourceLang: SentenceResult['sourceLang'] | WordResult['sourceLang']
+}
 
 export type TranslateArgs = {
   text: string
@@ -58,13 +66,17 @@ type ActiveRun = {
 type Options = {
   /** Debounce window for auto-run when args change. 0 disables auto-run. */
   debounceMs?: number
+  onSourceDetected?: (report: SourceDetectedReport) => void
 }
 
 export const DEFAULT_TRANSLATE_DEBOUNCE_MS = 800
 
 export function useTranslate(
   args: TranslateArgs,
-  { debounceMs = DEFAULT_TRANSLATE_DEBOUNCE_MS }: Options = {},
+  {
+    debounceMs = DEFAULT_TRANSLATE_DEBOUNCE_MS,
+    onSourceDetected,
+  }: Options = {},
 ) {
   const translateFn = useServerFn(translate)
   const { lang: uiLang } = useUiLang()
@@ -165,7 +177,13 @@ export function useTranslate(
 
       setIsPending(true)
       setError(null)
-      setLive({ intent, partial: {}, done: false, text: trimmed })
+      setLive({
+        intent,
+        partial: {},
+        done: false,
+        requestSource: source,
+        text: trimmed,
+      })
 
       // Server streams incremental JSON fragments; accumulate them here.
       let rawJson = ''
@@ -220,6 +238,13 @@ export function useTranslate(
           rawJson += chunk.raw
           const parsed = partialParse<SentenceResult | WordResult>(rawJson)
           if (!parsed) return
+          if (parsed.sourceLang) {
+            onSourceDetected?.({
+              text: trimmed,
+              requestSource: source,
+              sourceLang: parsed.sourceLang,
+            })
+          }
           setLive((prev) => (prev ? { ...prev, partial: parsed } : prev))
         } else {
           commit(chunk.done)
@@ -227,15 +252,29 @@ export function useTranslate(
       }
 
       function commit(done: TranslateDone) {
+        onSourceDetected?.({
+          text: trimmed,
+          requestSource: source,
+          sourceLang: done.data.sourceLang,
+        })
         setLive({
           intent: done.intent,
           partial: done.data,
           done: true,
+          requestSource: source,
           text: trimmed,
         })
       }
     },
-    [translateFn, args, uiLang, abortActiveRun, analyticsId, finishActiveRun],
+    [
+      translateFn,
+      args,
+      uiLang,
+      abortActiveRun,
+      analyticsId,
+      finishActiveRun,
+      onSourceDetected,
+    ],
   )
 
   const reset = useCallback(() => {
