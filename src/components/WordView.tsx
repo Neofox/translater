@@ -34,15 +34,11 @@ export default function WordView({
     <div
       className={`result-details ${hasAlternatives ? 'has-alternatives' : ''}`}
     >
-      {result.primaryUsageNote && (
-        <ResultSection title={t('usage')} className="detail-why">
-          <p>{result.primaryUsageNote}</p>
-        </ResultSection>
-      )}
       {hasAlternatives && (
         <ResultSection
           title={t('alternativeTranslations')}
           className="detail-alternatives"
+          alwaysOpen
         >
           <ul className="alternative-list">
             {settled.map((alt, index) => (
@@ -63,6 +59,11 @@ export default function WordView({
               <AlternativeItemSkeleton />
             )}
           </ul>
+        </ResultSection>
+      )}
+      {result.primaryUsageNote && (
+        <ResultSection title={t('usage')} className="detail-why">
+          <p>{result.primaryUsageNote}</p>
         </ResultSection>
       )}
       <ResultSection

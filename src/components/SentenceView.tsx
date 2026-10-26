@@ -31,20 +31,11 @@ export default function SentenceView({
     <div
       className={`result-details ${hasAlternatives ? 'has-alternatives' : ''}`}
     >
-      {(result.rationale || result.formalityNote) && (
-        <ResultSection
-          title={t('whyWording')}
-          tag={registerLabel}
-          className="detail-why"
-        >
-          {result.rationale && <p>{result.rationale}</p>}
-          {result.formalityNote && <p>{result.formalityNote}</p>}
-        </ResultSection>
-      )}
       {hasAlternatives && (
         <ResultSection
           title={t('alternatives')}
           className="detail-alternatives"
+          alwaysOpen
         >
           <ul className="alternative-list">
             {settled.map((alt, index) => (
@@ -61,6 +52,16 @@ export default function SentenceView({
               <AlternativeItemSkeleton />
             )}
           </ul>
+        </ResultSection>
+      )}
+      {(result.rationale || result.formalityNote) && (
+        <ResultSection
+          title={t('whyWording')}
+          tag={registerLabel}
+          className="detail-why"
+        >
+          {result.rationale && <p>{result.rationale}</p>}
+          {result.formalityNote && <p>{result.formalityNote}</p>}
         </ResultSection>
       )}
       <LearningTips tips={result.learningTips} />

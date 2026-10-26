@@ -13,6 +13,7 @@ import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { copyableMainText, mainText, resultIsCurrent } from '../lib/liveResult'
 import { isLongForm } from '../lib/longForm'
+import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 
 export default function OutputPanel() {
   const {
@@ -35,6 +36,7 @@ export default function OutputPanel() {
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
   const { mod, shift } = useKbd()
+  const { desktop } = useWorkspaceLayoutContext()
   const copyText = mainText(live)
   const copyReady = copyableMainText(
     live,
@@ -168,19 +170,20 @@ export default function OutputPanel() {
                     text={copyText ?? ''}
                     size="md"
                     primary
+                    compact={!desktop}
                     disabled={!copyReady}
                   />
                   {speech && copyText?.trim() && (
-                    <ListenButton {...speech} text={copyText} label />
+                    <ListenButton {...speech} text={copyText} label={desktop} />
+                  )}
+                  {live.intent === 'word' && live.partial.posList?.[0]?.pos && (
+                    <Tag tone="warm">{live.partial.posList[0].pos}</Tag>
                   )}
                   <kbd className="result-shortcut">
                     {mod}
                     {shift}C
                   </kbd>
                 </div>
-                {live.intent === 'word' && live.partial.posList?.[0]?.pos && (
-                  <Tag tone="warm">{live.partial.posList[0].pos}</Tag>
-                )}
                 <RefineRow />
               </div>
               {streaming && (

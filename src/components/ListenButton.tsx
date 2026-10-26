@@ -36,7 +36,7 @@ export default function ListenButton({
         aria-busy={status === 'loading'}
         aria-describedby={error ? errorId : undefined}
         data-testid="listen-button"
-        className="listen-button disabled:cursor-not-allowed disabled:opacity-50"
+        className={`listen-button ${!showLabel ? 'icon-action' : ''} disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {status === 'loading' ? (
           <Loader2

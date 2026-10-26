@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import CopyButton from './CopyButton'
 import ListenButton from './ListenButton'
 import type { SpeechOptions } from '../hooks/useSpeech'
+import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 
 type Props = {
   text?: string
@@ -20,6 +21,7 @@ export default function AlternativeItem({
   speech,
   copyDisabled,
 }: Props) {
+  const { desktop } = useWorkspaceLayoutContext()
   return (
     <li
       data-testid="alternative-item"
@@ -29,7 +31,7 @@ export default function AlternativeItem({
       {text && (
         <div className="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
           {speech && <ListenButton {...speech} text={text} size="sm" />}
-          <CopyButton text={text} disabled={copyDisabled} />
+          <CopyButton text={text} disabled={copyDisabled} compact={!desktop} />
         </div>
       )}
       {children ? (

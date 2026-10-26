@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { Clipboard, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Clipboard, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import LanguageChipBar from './LanguageChipBar'
 import { ContextTextarea, ContextToggle } from './ContextField'
@@ -9,12 +9,18 @@ import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
 import { STRINGS } from '../lib/i18n'
 import { useKbd } from '../hooks/useKbd'
+import { copyableMainText } from '../lib/liveResult'
 
 export default function InputPanel() {
   const {
     input,
     setInput,
     source,
+    target,
+    mode,
+    refinements,
+    live,
+    isPending,
     setSource,
     detected,
     clearInput,
@@ -27,6 +33,28 @@ export default function InputPanel() {
   const layout = useWorkspaceLayoutContext()
   const { mod } = useKbd()
   const [contextOpen, setContextOpen] = useState(false)
+  const [contextEditing, setContextEditing] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [hadResult, setHadResult] = useState(false)
+  const overLimit = input.length > MAX_INPUT_CHARS
+  const showLimit = input.length >= INPUT_WARN_THRESHOLD
+  const eligible =
+    layout.mode === 'stack' && layout.resultFirst && !layout.desktop
+  const ready = Boolean(
+    copyableMainText(
+      live,
+      { text: input, source, target, mode, context, refinements, uiLang: lang },
+      isPending,
+    ),
+  )
+  const canCondense = eligible && Boolean(input.trim()) && (ready || hadResult)
+  const compact = canCondense && !expanded && !contextEditing && !showLimit
+  useEffect(() => {
+    if (!input.trim()) {
+      setHadResult(false)
+      setExpanded(false)
+    } else if (ready) setHadResult(true)
+  }, [input, ready])
   useEffect(() => {
     if (context.trim()) setContextOpen(true)
   }, [context])
@@ -57,10 +85,8 @@ export default function InputPanel() {
           })
     if (textarea.parentElement) observer?.observe(textarea.parentElement)
     return () => observer?.disconnect()
-  }, [input, contextOpen, layout, textareaRef])
+  }, [input, contextOpen, layout, compact, textareaRef])
 
-  const overLimit = input.length > MAX_INPUT_CHARS
-  const showLimit = input.length >= INPUT_WARN_THRESHOLD
   const count = (showLimit ? STRINGS[lang].charCount : STRINGS[lang].inputCount)
     .replace('{count}', String(input.length))
     .replace('{max}', String(MAX_INPUT_CHARS))
@@ -78,7 +104,11 @@ export default function InputPanel() {
   }
 
   return (
-    <section className="input-panel" aria-label={t('sourceText')}>
+    <section
+      className="input-panel"
+      aria-label={t('sourceText')}
+      data-source-compact={compact || undefined}
+    >
       <div className="composer">
         <div className="composer-header">
           <LanguageChipBar
@@ -90,7 +120,14 @@ export default function InputPanel() {
           />
         </div>
         {contextOpen && (
-          <div className="composer-context">
+          <div
+            className="composer-context"
+            onFocusCapture={() => setContextEditing(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget))
+                setContextEditing(false)
+            }}
+          >
             <ContextTextarea />
           </div>
         )}
@@ -153,11 +190,44 @@ export default function InputPanel() {
             <X size={16} aria-hidden />
             <span>{t('clear')}</span>
           </Pill>
+          {canCondense && (
+            <Pill
+              size="md"
+              tone={context.trim() ? 'active' : 'neutral'}
+              className="source-expand-button"
+              data-testid="source-expand"
+              data-context={Boolean(context.trim()) || undefined}
+              data-input-action
+              aria-label={compact ? t('expandSource') : t('collapseSource')}
+              title={compact ? t('expandSource') : t('collapseSource')}
+              aria-expanded={!compact}
+              aria-description={context.trim() ? t('contextActive') : undefined}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => {
+                if (compact) setExpanded(true)
+                else {
+                  setExpanded(false)
+                  setContextOpen(false)
+                  setContextEditing(false)
+                }
+                textareaRef.current?.focus({ preventScroll: true })
+              }}
+            >
+              {compact ? (
+                <ChevronUp size={18} aria-hidden />
+              ) : (
+                <ChevronDown size={18} aria-hidden />
+              )}
+            </Pill>
+          )}
         </div>
         <div className="composer-meta">
           <ContextToggle
             open={contextOpen}
-            onToggle={() => setContextOpen((value) => !value)}
+            onToggle={() => {
+              if (contextOpen) setContextEditing(false)
+              setContextOpen((value) => !value)
+            }}
           />
           <span
             className={`input-count ${showLimit ? 'input-count-visible' : ''} ${overLimit ? 'text-red-400' : 'text-ink-dim'}`}

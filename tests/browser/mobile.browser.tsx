@@ -193,6 +193,11 @@ function assertWithinViewport(element: Element) {
   expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight + 1)
 }
 
+async function expandSourceIfNeeded() {
+  if (document.querySelector('.input-panel[data-source-compact]'))
+    await page.getByTestId('source-expand').click()
+}
+
 test('Paste Clear and the main result actions remain visible and touch sized', async () => {
   await render(<Fixture />)
   await expect
@@ -218,8 +223,150 @@ test('Paste Clear and the main result actions remain visible and touch sized', a
   })
 })
 
+test.each([false, true])(
+  'finished folded translation gives space back to results (keyboard %s)',
+  async (keyboard) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    const viewport = Object.assign(new EventTarget(), {
+      height: 640,
+      width: 440,
+      offsetTop: 0,
+      scale: 1,
+    })
+    try {
+      await page.viewport(440, 640)
+      vi.stubGlobal('visualViewport', viewport)
+      const initial: LiveResult = {
+        ...word,
+        text: 'Hello world',
+        requestKey: requestKey('Hello world'),
+        done: true,
+        partial: {
+          ...word.partial,
+          headword: 'Hello world',
+          primaryTranslation: '안녕하세요, 여러분',
+          alternativeTranslations: [
+            {
+              text: '안녕, 여러분',
+              register: ['casual'],
+              note: 'More relaxed and suitable for friends or an informal audience.',
+            },
+            {
+              text: '안녕하세요, 다들',
+              register: [],
+              note: 'A natural greeting for a group.',
+            },
+          ],
+        },
+      }
+      await render(
+        <Fixture
+          initial={{
+            ...initial,
+            done: false,
+            partial: {
+              ...initial.partial,
+              primaryTranslation: '',
+              alternativeTranslations: [],
+            },
+          }}
+        />,
+      )
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      shell.style.setProperty('--safe-area-right', '80px')
+      shell.style.setProperty('--safe-area-bottom', '34px')
+      window.dispatchEvent(new Event('resize'))
+      const input = page
+        .getByTestId('input-textarea')
+        .element() as HTMLTextAreaElement
+      input.focus({ preventScroll: true })
+      input.setSelectionRange(3, 6)
+      if (keyboard) {
+        viewport.height = 300
+        viewport.dispatchEvent(new Event('resize'))
+      }
+      updateUrgent({ live: initial })
+      const source = document.querySelector<HTMLElement>('.input-panel')!
+      await expect
+        .poll(() => source.hasAttribute('data-source-compact'))
+        .toBe(true)
+      expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(104)
+      expect(page.getByTestId('input-textarea').element()).toBe(input)
+      expect(document.activeElement).toBe(input)
+      expect([input.selectionStart, input.selectionEnd]).toEqual([3, 6])
+      const composer = document
+        .querySelector('.composer')!
+        .getBoundingClientRect()
+      expect(composer.left).toBeGreaterThanOrEqual(12)
+      expect(composer.height).toBeLessThanOrEqual(56)
+      expect(composer.bottom).toBeLessThanOrEqual(
+        source.getBoundingClientRect().bottom,
+      )
+      expect(composer.right).toBeLessThanOrEqual(440 - 80 - 12)
+      const primary = page.getByTestId('output-toolbar')
+      for (const control of [
+        primary.getByRole('button', { name: 'Copy', exact: true }).element(),
+        primary.getByTestId('listen-button').element(),
+      ]) {
+        expect(control.textContent.trim()).toBe('')
+        expect(control.getBoundingClientRect().width).toBeLessThanOrEqual(48)
+        expect(control.getBoundingClientRect().width).toBeGreaterThanOrEqual(44)
+      }
+      const first = page.getByTestId('alternative-item').elements()[0]!
+      await expect
+        .element(page.getByText('안녕, 여러분', { exact: true }))
+        .toBeVisible()
+      expect(
+        page
+          .getByText('안녕, 여러분', { exact: true })
+          .element()
+          .getBoundingClientRect().bottom,
+      ).toBeLessThanOrEqual(
+        page.getByTestId('translation-result').element().getBoundingClientRect()
+          .bottom,
+      )
+      expect(first.closest('[hidden]')).toBeNull()
+      expect(
+        document.querySelector('.detail-alternatives')!.getBoundingClientRect()
+          .top,
+      ).toBeLessThan(
+        document.querySelector('.detail-why')?.getBoundingClientRect().top ??
+          Infinity,
+      )
+      expect(first.querySelector('.copy-button')!.textContent.trim()).toBe('')
+      await page.screenshot({
+        path: `../../test-results/folded-result-first-${keyboard ? 'keyboard' : 'closed'}.png`,
+      })
+      await page.getByTestId('source-expand').click()
+      await expect
+        .poll(() => source.hasAttribute('data-source-compact'))
+        .toBe(false)
+      expect(page.getByTestId('input-textarea').element()).toBe(input)
+      await page.getByTestId('context-toggle').click()
+      await page.getByTestId('context-textarea').fill('A friendly greeting.')
+      await page.getByTestId('source-expand').click()
+      await expect
+        .poll(() => source.hasAttribute('data-source-compact'))
+        .toBe(true)
+      expect(document.activeElement).toBe(input)
+      await page.getByTestId('source-expand').click()
+      await page.getByTestId('context-toggle').click()
+      await expect
+        .element(page.getByTestId('context-textarea'))
+        .toHaveValue('A friendly greeting.')
+      await page.getByTestId('clear-input').click()
+      await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
+      expect(document.activeElement).toBe(input)
+    } finally {
+      vi.unstubAllGlobals()
+      await page.viewport(...original)
+    }
+  },
+)
+
 test('language menus stay within the viewport and support keyboard selection', async () => {
   await render(<Fixture />)
+  await expandSourceIfNeeded()
   for (const name of ['Source language', 'Target language']) {
     const trigger = page
       .getByRole('group', { name })
@@ -247,6 +394,7 @@ test('language menus stay within the viewport and support keyboard selection', a
 
 test('context and learner details remain usable without a popup', async () => {
   await render(<Fixture />)
+  await expandSourceIfNeeded()
   await page.getByTestId('context-toggle').click()
   await page
     .getByTestId('context-textarea')
@@ -447,18 +595,6 @@ test.each(['sentence', 'word'] as const)(
           }
         : word
     await render(<Fixture initial={initial} />)
-    if (
-      !document.querySelector(
-        '.translator-panels[data-desktop], .translator-panels[data-layout="split"]',
-      )
-    )
-      await page
-        .getByRole('button', {
-          name:
-            intent === 'sentence' ? 'Alternatives' : 'Alternative translations',
-          exact: true,
-        })
-        .click()
     const main = page.getByTestId('output-toolbar').getByTestId('listen-button')
     const row = page.getByTestId('alternative-item')
     const alternative = row.getByTestId('listen-button')
@@ -604,6 +740,7 @@ test('long text uses both learner columns and the result has no focus ring', asy
 
 test('source grows for a long turn then shrinks again without losing Clear', async () => {
   await render(<Fixture />)
+  await expandSourceIfNeeded()
   const input = page.getByTestId('input-textarea')
   const textarea = input.element() as HTMLTextAreaElement
   await input.fill('Hi')
@@ -950,6 +1087,7 @@ test.each([
       await expect
         .poll(() => shell.getBoundingClientRect().top)
         .toBe(offset + 20)
+      await expandSourceIfNeeded()
       await page.getByTestId('context-toggle').click()
       await page
         .getByTestId('context-textarea')
@@ -1179,7 +1317,7 @@ test.each([
   [1024, 600],
   [736, 594],
 ] as const)(
-  'wide shallow %i × %i keeps the dictionary details visible',
+  'landscape %i × %i prioritizes alternatives and keeps dictionary details readable',
   async (width, height) => {
     const original = [window.innerWidth, window.innerHeight] as const
     try {
@@ -1262,10 +1400,9 @@ test.each([
       const alternative = page
         .getByText('to have butterflies', { exact: true })
         .element()
-      assertWithinViewport(usage)
       assertWithinViewport(alternative)
-      expect(usage.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-        document.querySelector('.output-panel')!.getBoundingClientRect().bottom,
+      expect(alternative.getBoundingClientRect().top).toBeLessThan(
+        usage.getBoundingClientRect().top,
       )
       for (const selector of ['paste-input', 'clear-input'])
         assertWithinViewport(page.getByTestId(selector).element())
@@ -1281,6 +1418,8 @@ test.each([
       await page.screenshot({
         path: `../../test-results/dictionary-density-${width}x${height}.png`,
       })
+      usage.scrollIntoView({ block: 'center' })
+      assertWithinViewport(usage)
       const meaning = page.getByText(definition, { exact: true }).element()
       meaning.scrollIntoView({ block: 'center' })
       assertWithinViewport(meaning)

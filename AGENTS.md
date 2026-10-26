@@ -134,7 +134,8 @@ physical viewport segments where available; no device-name detection.
 
 Desktop details stay open: alternatives left, Why this wording and Learning tips
 right. Without alternatives the two learner sections share the available width.
-Split-pane details remain open in one readable column; compact stacked details
+Alternatives are always open and come before longer usage/wording notes in DOM order.
+Split-pane details remain open in one readable column; other compact stacked details
 are accessible disclosures. Dictionary metadata and synonym
 lookup live with the result. The target scroll surface has no focus ring;
 buttons, menus and selects retain visible keyboard focus.
@@ -147,6 +148,16 @@ even while details stream, and remains disabled for stale results/settings debou
 request settings in page memory; `resultIsCurrent` guards main/alternative actions
 and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
 being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
+
+Completed compact stacked turns condense the source into one editable row with
+Paste, Clear and an expand control. Preserve the same textarea node/cursor and
+keyboard focus when the main result becomes ready. Keep that compact state while
+the next edit is pending; Clear resets it, explicit expansion exposes languages
+and reply context, and input-limit warnings bypass condensing. Close paths must
+reset the context-focus state before unmounting a focused context field. Applied
+reply context remains indicated on the compact expand control. Phone result
+Copy/Listen controls use 44px icon targets with accessible names/tooltips;
+desktop main actions retain labels. Keep the composer inset from safe-area edges.
 
 The framed composer and open detail columns start at 700px of usable width and
 480px of unoccluded height in a stacked, source-first workspace. Below 700px of

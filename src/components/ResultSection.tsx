@@ -8,14 +8,16 @@ export default function ResultSection({
   children,
   className = '',
   tag,
+  alwaysOpen = false,
 }: {
   title: string
   children: ReactNode
   className?: string
   tag?: string
+  alwaysOpen?: boolean
 }) {
   const { desktop, mode } = useWorkspaceLayoutContext()
-  const expanded = desktop || mode === 'split'
+  const expanded = alwaysOpen || desktop || mode === 'split'
   const [open, setOpen] = useState(false)
   const id = useId()
   return (

@@ -245,12 +245,12 @@ it.each(['sentence', 'word'] as const)(
     fixture.streaming = false
     fixture.live.done = true
     rerender(<OutputPanel />)
-    fireEvent.click(
-      screen.getByRole('button', {
+    expect(
+      screen.getByRole('heading', {
         name:
           intent === 'sentence' ? 'Alternatives' : 'Alternative translations',
       }),
-    )
+    ).toBeTruthy()
     const buttons = screen.getAllByRole<HTMLButtonElement>('button', {
       name: 'Listen in ko',
     })
@@ -346,12 +346,12 @@ it.each(['sentence', 'word'] as const)(
             },
           }
     const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
-    fireEvent.click(
-      screen.getByRole('button', {
+    expect(
+      screen.getByRole('heading', {
         name:
           intent === 'sentence' ? 'Alternatives' : 'Alternative translations',
       }),
-    )
+    ).toBeTruthy()
     const copies = () =>
       screen.getAllByRole<HTMLButtonElement>('button', { name: 'Copy' })
     expect(copies()).toHaveLength(3)
