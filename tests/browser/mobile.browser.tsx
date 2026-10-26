@@ -785,3 +785,101 @@ test('dictionary metadata stays with the result and synonyms start a new lookup'
     .element(page.getByTestId('input-textarea'))
     .toHaveValue('reading room')
 })
+
+test.each([
+  { width: 440, height: 640, right: 80, bottom: 34 },
+  { width: 382, height: 580, right: 48, bottom: 34 },
+  { width: 640, height: 382, right: 0, bottom: 34 },
+  { width: 640, height: 320, right: 0, bottom: 34 },
+  { width: 640, height: 320, right: 80, bottom: 34 },
+  { width: 440, height: 320, right: 80, bottom: 34 },
+])(
+  'Safari safe areas keep backgrounds full width and actions reachable at $width × $height',
+  async ({ width, height, right, bottom }) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    try {
+      await page.viewport(width, height)
+      await render(
+        <Fixture
+          initial={{
+            ...sentence,
+            text: longSource,
+            requestKey: requestKey(longSource),
+            partial: { ...sentence.partial, main: longTranslation },
+          }}
+        />,
+      )
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      shell.style.setProperty('--safe-area-top', '12px')
+      shell.style.setProperty('--safe-area-right', `${right}px`)
+      shell.style.setProperty('--safe-area-bottom', `${bottom}px`)
+      shell.style.setProperty('--safe-area-left', '0px')
+      await expect
+        .poll(() =>
+          Math.max(
+            ...[...document.querySelectorAll('.input-panel,.output-panel')].map(
+              (panel) => panel.getBoundingClientRect().right,
+            ),
+          ),
+        )
+        .toBe(width)
+      expect(shell.getBoundingClientRect().right).toBe(width)
+      for (const selector of [
+        '[data-testid="paste-input"]',
+        '[data-testid="clear-input"]',
+        '.app-settings',
+        '[data-testid="output-toolbar"] .copy-button',
+      ]) {
+        const bounds = document.querySelector(selector)!.getBoundingClientRect()
+        expect(bounds.right).toBeLessThanOrEqual(width - right)
+        expect(bounds.bottom).toBeLessThanOrEqual(height - bottom)
+        expect(bounds.left).toBeGreaterThanOrEqual(0)
+        const contextBounds = page
+          .getByTestId('context-toggle')
+          .element()
+          .getBoundingClientRect()
+        if (selector.includes('clear-input'))
+          expect(
+            Math.max(
+              0,
+              Math.min(bounds.right, contextBounds.right) -
+                Math.max(bounds.left, contextBounds.left),
+            ) *
+              Math.max(
+                0,
+                Math.min(bounds.bottom, contextBounds.bottom) -
+                  Math.max(bounds.top, contextBounds.top),
+              ),
+          ).toBe(0)
+      }
+      expect(document.documentElement.scrollWidth).toBe(width)
+      const copy = document
+        .querySelector('[data-testid="output-toolbar"] .copy-button')!
+        .getBoundingClientRect()
+      expect(copy.bottom).toBeLessThanOrEqual(
+        Math.min(
+          height - bottom,
+          document.querySelector('.output-panel')!.getBoundingClientRect()
+            .bottom,
+        ),
+      )
+      await page.screenshot({
+        path: `../../test-results/safari-safe-area-${width}x${height}.png`,
+      })
+      await page.getByTestId('clear-input').click()
+      await expect
+        .element(
+          page.getByText('Your translation appears here.', { exact: true }),
+        )
+        .toBeVisible()
+      expect(
+        page.getByRole('button', { name: /try a|sample/i }).query(),
+      ).toBeNull()
+      await page.screenshot({
+        path: `../../test-results/safari-safe-area-${width}x${height}-empty.png`,
+      })
+    } finally {
+      await page.viewport(...original)
+    }
+  },
+)

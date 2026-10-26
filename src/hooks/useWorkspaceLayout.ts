@@ -23,7 +23,14 @@ export function useWorkspaceLayout() {
     const measure = () => {
       const visibleHeight = viewport?.height || window.innerHeight
       shell?.style.setProperty('--app-height', `${visibleHeight}px`)
-      const width = panels.clientWidth || window.innerWidth
+      const safeArea = getComputedStyle(shell ?? panels)
+      const sideInsets =
+        (parseFloat(safeArea.getPropertyValue('--safe-area-left')) || 0) +
+        (parseFloat(safeArea.getPropertyValue('--safe-area-right')) || 0)
+      const width = Math.max(
+        0,
+        (panels.clientWidth || window.innerWidth) - sideInsets,
+      )
       const height = panels.clientHeight || visibleHeight
       panels.style.setProperty('--workspace-height', `${height}px`)
       const mode: WorkspaceLayout['mode'] = laptop.matches

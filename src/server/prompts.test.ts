@@ -210,3 +210,30 @@ describe('context/adjustments blocks (prefix-cache invariant)', () => {
     expect(user).not.toContain('<context>')
   })
 })
+
+describe('punctuation preference', () => {
+  for (const uiLang of UI_LANGS) {
+    it.each([sentencePrompt, wordPrompt])(
+      'avoids adding em dashes in generated prose for ' + uiLang,
+      (build) => {
+        const prompt = build({
+          text: 'thank you',
+          source: 'en',
+          target: 'ko',
+          mode: 'casual',
+          uiLang,
+        })
+        expect(
+          prompt.instructions
+            .map((message) => message.content)
+            .join('\n')
+            .match(/Avoid em dashes in generated prose/g),
+        ).toHaveLength(1)
+      },
+    )
+  }
+})
+
+it('keeps the model schema usage example consistent with the punctuation preference', () => {
+  expect(WordResult.shape.primaryUsageNote.description).not.toContain('—')
+})

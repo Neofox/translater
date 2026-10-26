@@ -207,29 +207,7 @@ export default function OutputPanel() {
           )}
           {!error && !live && !isPending && (
             <div className="result-empty">
-              <p className="state-title">{t('emptyTitle')}</p>
-              <p className="state-body">{t('emptyBody')}</p>
-              <div className="state-actions">
-                <Pill
-                  size="md"
-                  onClick={() =>
-                    setInput(
-                      'I had a really lovely time with you. Let’s do this again soon.',
-                    )
-                  }
-                >
-                  {t('sampleSentence')}
-                </Pill>
-                <Pill
-                  size="md"
-                  onClick={() => {
-                    setTarget('en')
-                    setInput('설레다')
-                  }}
-                >
-                  {t('sampleWord')}
-                </Pill>
-              </div>
+              <p>{t('emptyMain')}</p>
             </div>
           )}
         </div>

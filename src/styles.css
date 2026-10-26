@@ -26,6 +26,13 @@
   --color-warm-soft: rgb(233 182 90 / 12%);
 }
 
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -76,7 +83,6 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
 }
 .app-header {
   display: flex;
@@ -85,7 +91,11 @@ textarea:focus-visible {
   gap: 12px;
   min-height: 64px;
   flex-shrink: 0;
-  padding: calc(8px + env(safe-area-inset-top)) 24px 8px;
+  --header-gutter: 24px;
+  container: header / inline-size;
+  padding-block: max(8px, var(--safe-area-top)) 8px;
+  padding-inline: max(var(--header-gutter), var(--safe-area-left))
+    max(var(--header-gutter), var(--safe-area-right));
   border-bottom: 1px solid var(--color-border);
 }
 .app-brand,
@@ -179,7 +189,7 @@ textarea:focus-visible {
   display: none;
   flex-shrink: 0;
   gap: 20px;
-  padding: 5px 20px calc(5px + env(safe-area-inset-bottom));
+  padding: 5px 20px calc(5px + var(--safe-area-bottom));
   color: var(--color-ink-dim);
   font-size: 10px;
 }
@@ -195,7 +205,7 @@ textarea:focus-visible {
 @media (max-width: 559px) {
   .app-header {
     min-height: 60px;
-    padding-inline: 12px;
+    --header-gutter: 12px;
     gap: 8px;
   }
   .brand-glyph {
@@ -236,7 +246,10 @@ textarea:focus-visible {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 12px 24px;
+  --panel-gutter: 24px;
+  padding-block: 12px;
+  padding-inline: max(var(--panel-gutter), var(--safe-area-left))
+    max(var(--panel-gutter), var(--safe-area-right));
 }
 .composer {
   display: grid;
@@ -284,6 +297,8 @@ textarea:focus-visible {
 }
 .paste-button {
   grid-area: paste;
+  gap: 2px;
+  padding-block: 0;
   width: 94px;
   flex-direction: column;
   align-self: stretch;
@@ -365,12 +380,12 @@ textarea:focus-visible {
 .translator-panels[data-result-first] .input-panel {
   border-top: 1px solid var(--color-border);
   padding-top: 10px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  padding-bottom: calc(10px + var(--safe-area-bottom));
 }
 
 /* One complete composer on laptops: language header, editable body, action footer. */
 [data-desktop] .input-panel {
-  padding: 12px 24px 16px;
+  padding-block: 12px 16px;
 }
 [data-desktop] .composer {
   grid-template-columns: auto minmax(0, 1fr);
@@ -406,6 +421,7 @@ textarea:focus-visible {
 [data-desktop] .paste-button,
 [data-desktop] .clear-button {
   width: auto;
+  gap: 8px;
   flex-direction: row;
 }
 [data-desktop] .composer-meta {
@@ -434,9 +450,15 @@ textarea:focus-visible {
   align-items: center;
   gap: 12px;
   width: 100%;
-  max-width: calc(64rem + 48px);
+  --panel-gutter: 24px;
+  max-width: calc(
+    64rem + max(var(--panel-gutter), var(--safe-area-left)) +
+      max(var(--panel-gutter), var(--safe-area-right))
+  );
   margin-inline: auto;
-  padding: 12px 24px 0;
+  padding-block: 12px 0;
+  padding-inline: max(var(--panel-gutter), var(--safe-area-left))
+    max(var(--panel-gutter), var(--safe-area-right));
   flex-shrink: 0;
   min-width: 0;
 }
@@ -453,7 +475,10 @@ textarea:focus-visible {
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
-  padding: 0 24px 20px;
+  --panel-gutter: 24px;
+  padding-block: 0 20px;
+  padding-inline: max(var(--panel-gutter), var(--safe-area-left))
+    max(var(--panel-gutter), var(--safe-area-right));
   overscroll-behavior: contain;
 }
 /* Text panels intentionally have no focus ring; their interactive controls do. */
@@ -668,12 +693,22 @@ textarea:focus-visible {
 }
 
 /* Short landscape and keyboard layouts keep the important actions in view. */
+/* Share usable width at 1.35:1, then return each outer inset to its pane. */
 .translator-panels[data-layout='split'] {
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(
+      0,
+      calc(
+        (100% - var(--safe-area-left) - var(--safe-area-right)) * 0.5744680851 +
+          var(--safe-area-left)
+      )
+    )
+    minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 .translator-panels[data-layout='split'] .input-panel {
-  padding: 8px 12px;
+  --panel-gutter: 12px;
+  padding-block: 8px;
   border-top: 0;
   border-left: 1px solid var(--color-border);
 }
@@ -683,12 +718,14 @@ textarea:focus-visible {
 }
 .translator-panels[data-layout='split'] .composer-actions {
   display: flex;
+  flex-wrap: wrap;
   grid-area: actions;
   gap: 6px;
 }
 .translator-panels[data-layout='split'] .paste-button,
 .translator-panels[data-layout='split'] .clear-button {
   flex-direction: row;
+  gap: 8px;
   width: auto;
   padding-inline: 8px;
 }
@@ -706,7 +743,8 @@ textarea:focus-visible {
   row-gap: 4px;
 }
 .translator-panels[data-tight] .translation-input {
-  max-height: 72px;
+  min-height: 52px;
+  max-height: 52px;
 }
 .translator-panels[data-tight] .input-count {
   display: none;
@@ -719,11 +757,11 @@ textarea:focus-visible {
 }
 @media (max-width: 359px) {
   .input-panel {
-    padding-inline: 12px;
+    --panel-gutter: 12px;
   }
   .target-toolbar,
   .result-scroll {
-    padding-inline: 12px;
+    --panel-gutter: 12px;
   }
   .context-toggle-label {
     max-width: 60px;
@@ -738,11 +776,11 @@ textarea:focus-visible {
 }
 .translator-panels[data-layout='book'] .input-panel {
   border: 0;
-  padding-inline: 16px;
+  --panel-gutter: 16px;
 }
 .translator-panels[data-layout='book'] .target-toolbar,
 .translator-panels[data-layout='book'] .result-scroll {
-  padding-inline: 16px;
+  --panel-gutter: 16px;
 }
 .translator-panels[data-layout='laptop'] {
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
@@ -765,14 +803,8 @@ textarea:focus-visible {
 @media (device-posture: folded) and (horizontal-viewport-segments: 2) {
   .translator-panels[data-layout='book'] {
     grid-template-columns:
-      minmax(
-        0,
-        calc(env(viewport-segment-width 0 0, 50vw) - env(safe-area-inset-left))
-      )
-      minmax(
-        0,
-        calc(env(viewport-segment-width 1 0, 50vw) - env(safe-area-inset-right))
-      );
+      minmax(0, env(viewport-segment-width 0 0, 50vw))
+      minmax(0, env(viewport-segment-width 1 0, 50vw));
     column-gap: max(
       0px,
       calc(
@@ -1145,7 +1177,7 @@ textarea:focus-visible {
 }
 @media (max-width: 559px) {
   .app-header {
-    padding-inline: 16px;
+    --header-gutter: 16px;
   }
   .app-brand h1 {
     font-size: 18px;
@@ -1238,7 +1270,7 @@ textarea:focus-visible {
 }
 .app-shell[data-short] .app-header {
   min-height: 52px;
-  padding-top: 4px;
+  padding-top: max(4px, var(--safe-area-top));
   padding-bottom: 4px;
 }
 .app-shell[data-short] .app-brand h1 {
@@ -1249,7 +1281,7 @@ textarea:focus-visible {
 }
 .translator-panels[data-short] .input-panel {
   padding-top: 6px;
-  padding-bottom: 8px;
+  padding-bottom: max(8px, var(--safe-area-bottom));
 }
 .translator-panels[data-short] .composer {
   gap: 4px 6px;
@@ -1298,4 +1330,49 @@ textarea:focus-visible {
 [data-desktop] .composer:has(.translation-input:focus) {
   border-color: var(--color-focus);
   box-shadow: inset 0 0 0 1px var(--color-focus);
+}
+
+/* Paint to the viewport edges while keeping controls inside browser safe areas. */
+.translator-panels[data-layout='book'] .input-panel {
+  --safe-area-right: 0px;
+}
+.translator-panels[data-layout='book'] .output-panel {
+  --safe-area-left: 0px;
+}
+.translator-panels[data-layout='split'] .input-panel {
+  --safe-area-left: 0px;
+}
+.translator-panels[data-layout='split'] .output-panel {
+  --safe-area-right: 0px;
+}
+.translator-panels:not([data-result-first]) .input-panel {
+  padding-bottom: max(12px, var(--safe-area-bottom));
+}
+.translator-panels:not([data-result-first]) .result-scroll,
+.translator-panels[data-layout='split'] .result-scroll {
+  padding-bottom: calc(20px + var(--safe-area-bottom));
+}
+.result-empty {
+  padding-block: 16px;
+  gap: 0;
+  color: var(--color-ink-dim);
+  font-size: 14px;
+}
+@container header (max-width:320px) {
+  .app-brand h1 {
+    font-size: 15px;
+  }
+  .app-settings {
+    gap: 6px;
+  }
+  .mode-select {
+    max-width: 108px;
+    padding-inline: 10px 26px;
+    font-size: 13px;
+  }
+  .app-settings [aria-label='UI language'] button {
+    min-width: 44px;
+    padding-inline: 8px;
+    font-size: 13px;
+  }
 }

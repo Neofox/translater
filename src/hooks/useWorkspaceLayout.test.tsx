@@ -57,3 +57,36 @@ it('tracks the visible keyboard height and releases viewport listeners on unmoun
   expect(remove).toHaveBeenCalledWith('resize', expect.any(Function))
   expect(shell.style.getPropertyValue('--app-height')).toBe('')
 })
+
+it('chooses the compact layout from usable width when the background extends into side insets', () => {
+  vi.stubGlobal(
+    'visualViewport',
+    Object.assign(new EventTarget(), { height: 736 }),
+  )
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(736)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(672)
+  function Workspace() {
+    const { panelsRef, layout } = useWorkspaceLayout()
+    return (
+      <main
+        className="app-shell"
+        ref={(element) => {
+          element?.style.setProperty('--safe-area-right', '160px')
+        }}
+      >
+        <div
+          ref={panelsRef}
+          data-testid="panels"
+          data-result-first={layout.resultFirst}
+        />
+      </main>
+    )
+  }
+  const { getByTestId } = render(<Workspace />)
+  expect(getByTestId('panels').getAttribute('data-result-first')).toBe('true')
+})

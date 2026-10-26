@@ -141,6 +141,14 @@ request settings in page memory; `resultIsCurrent` guards main/alternative actio
 and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
 being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
 
+Safe-area padding belongs on the header/composer/result controls, never on the
+whole `.app-shell`: backgrounds must still cover the viewport. The `--safe-area-*`
+variables alias browser `env()` values and allow nonzero-inset browser tests.
+Responsive breakpoints use the width left after side insets. Split columns share
+that usable width before adding their outer insets; both split panes protect the
+bottom edge. Keep sticky Copy safe with long results and the software keyboard,
+not just with one-line fixtures.
+
 ### Page structure snapshot (high-level)
 
 ```
