@@ -90,3 +90,106 @@ it('chooses the compact layout from usable width when the background extends int
   const { getByTestId } = render(<Workspace />)
   expect(getByTestId('panels').getAttribute('data-result-first')).toBe('true')
 })
+
+it('keeps landscape split before and during a panned Safari keyboard viewport', () => {
+  const viewport = Object.assign(new EventTarget(), {
+    height: 548,
+    offsetTop: 0,
+    scale: 1,
+  })
+  vi.stubGlobal('visualViewport', viewport)
+  vi.stubGlobal('innerHeight', 548)
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    () => viewport.height - 64,
+  )
+  function Workspace() {
+    const { panelsRef, layout } = useWorkspaceLayout()
+    return (
+      <main className="app-shell" data-testid="shell">
+        <div
+          ref={panelsRef}
+          data-testid="panels"
+          data-layout={layout.mode}
+          data-keyboard={layout.keyboard}
+        >
+          <textarea aria-label="Draft" />
+        </div>
+      </main>
+    )
+  }
+  const { getByTestId, getByRole } = render(<Workspace />)
+  expect(getByTestId('panels').getAttribute('data-layout')).toBe('split')
+  act(() => {
+    getByRole('textbox').focus()
+  })
+  act(() => {
+    viewport.height = 210
+    viewport.offsetTop = 90
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  expect(getByTestId('panels').getAttribute('data-layout')).toBe('split')
+  expect(getByTestId('panels').getAttribute('data-keyboard')).toBe('true')
+  expect(getByTestId('shell').style.getPropertyValue('--app-top')).toBe('90px')
+  act(() => {
+    viewport.offsetTop = 120
+    viewport.dispatchEvent(new Event('scroll'))
+  })
+  expect(getByTestId('shell').style.getPropertyValue('--app-top')).toBe('120px')
+  act(() => {
+    viewport.height = 548
+    viewport.dispatchEvent(new Event('resize'))
+  })
+  expect(getByTestId('panels').getAttribute('data-keyboard')).toBe('false')
+  expect(getByTestId('shell').style.getPropertyValue('--app-top')).toBe('0px')
+})
+
+it('keeps a portrait workspace stacked when its focused keyboard reduces visible height', () => {
+  const viewport = Object.assign(new EventTarget(), {
+    height: 736,
+    offsetTop: 0,
+    scale: 1,
+  })
+  vi.stubGlobal('visualViewport', viewport)
+  vi.stubGlobal('innerHeight', 736)
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(594)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    () => viewport.height - 64,
+  )
+  function Workspace() {
+    const { panelsRef, layout } = useWorkspaceLayout()
+    return (
+      <main className="app-shell">
+        <div
+          ref={panelsRef}
+          data-testid="panels"
+          data-layout={layout.mode}
+          data-keyboard={layout.keyboard}
+        >
+          <textarea aria-label="Draft" />
+        </div>
+      </main>
+    )
+  }
+  const { getByTestId, getByRole } = render(<Workspace />)
+  act(() => {
+    getByRole('textbox').focus()
+  })
+  for (const height of [686, 636, 586, 536, 486, 436, 386, 336, 320])
+    act(() => {
+      viewport.height = height
+      viewport.dispatchEvent(new Event('resize'))
+    })
+  expect(getByTestId('panels').getAttribute('data-layout')).toBe('stack')
+  expect(getByTestId('panels').getAttribute('data-keyboard')).toBe('true')
+})

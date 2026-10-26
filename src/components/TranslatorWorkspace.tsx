@@ -19,6 +19,7 @@ export default function TranslatorWorkspace() {
         data-desktop={layout.desktop || undefined}
         data-short={layout.short || undefined}
         data-tight={layout.tight || undefined}
+        data-keyboard={layout.keyboard || undefined}
       >
         <header className="app-header">
           <div className="app-brand">
@@ -40,6 +41,7 @@ export default function TranslatorWorkspace() {
           data-desktop={layout.desktop || undefined}
           data-short={layout.short || undefined}
           data-tight={layout.tight || undefined}
+          data-keyboard={layout.keyboard || undefined}
         >
           {panels}
         </div>

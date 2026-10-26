@@ -122,33 +122,39 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 
 `TranslatorWorkspace` owns the shell and shares `useWorkspaceLayout` through
 `WorkspaceLayoutContext`. Desktop uses a framed, auto-growing source composer
-above the result. Breakpoints use the visible app height, with the measured
-panel height retained for sizing. Compact portrait places the result first and composer below;
-short landscape splits them. The hook tracks visualViewport height for the
-keyboard and preserves focus/drafts when keyed panels reorder. Fold media use
+above the result. Layout selection uses the unoccluded viewport, with the measured
+panel height retained for sizing. Compact portrait places the result first and composer below.
+Landscape at 560–1099px of usable width stays split before, during and after typing;
+wider windows split only below 480px of unoccluded height. The hook retains the
+pre-keyboard height through incremental resize events while editing, and tracks
+visualViewport height and offsetTop on both resize and scroll. The fixed shell
+follows the visible area without introducing root scroll. Keyboard entry resets
+the result scroll to its main translation and preserves focus/drafts. Fold media use
 physical viewport segments where available; no device-name detection.
 
 Desktop details stay open: alternatives left, Why this wording and Learning tips
 right. Without alternatives the two learner sections share the available width.
-Compact details are accessible disclosures. Dictionary metadata and synonym
+Split-pane details remain open in one readable column; compact stacked details
+are accessible disclosures. Dictionary metadata and synonym
 lookup live with the result. The target scroll surface has no focus ring;
 buttons, menus and selects retain visible keyboard focus.
 
 Main result text is `[data-testid="main-translation"]`, its scroll surface is
 `[data-testid="translation-result"]`, and its Copy/Listen/refinements are inside
-`[data-testid="output-toolbar"]`. Copy is disabled for partial, pending or stale
-results, including the settings debounce. `LiveResult.requestKey` captures the
+`[data-testid="output-toolbar"]`. Main Copy is enabled once its JSON string is complete,
+even while details stream, and remains disabled for stale results/settings debounce.
+`LiveResult.requestKey` captures the
 request settings in page memory; `resultIsCurrent` guards main/alternative actions
 and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
 being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
 
 The framed composer and open detail columns start at 700px of usable width and
-480px of visible height in a stacked, source-first workspace. Below 700px of
+480px of unoccluded height in a stacked, source-first workspace. Below 700px of
 height that presentation puts source languages/actions in one toolbar, lets short
 input shrink to one line, and puts word Copy/Listen beside the main translation.
 Keep long-result actions reachable and retain the calmer tall-window layout.
 Ordinary language menus may extend beyond a short composer into the viewport;
-only book/laptop/split panes constrain popups to their physical segment. Popup
+book/laptop/split panes constrain popups to their own pane. Popup
 padding must still include the applicable safe-area insets.
 
 Safe-area padding belongs on the header/composer/result controls, never on the
@@ -156,8 +162,12 @@ whole `.app-shell`: backgrounds must still cover the viewport. The `--safe-area-
 variables alias browser `env()` values and allow nonzero-inset browser tests.
 Responsive breakpoints use the width left after side insets. Split columns share
 that usable width before adding their outer insets; both split panes protect the
-bottom edge. Keep sticky Copy safe with long results and the software keyboard,
-not just with one-line fixtures.
+bottom edge. A tight keyboard hides the header; transfer its remaining top safe
+inset to the shell, accounting for visualViewport offsetTop. The compact typing
+composer keeps Paste/Clear reachable without reserving an extra bottom inset
+already excluded by the keyboard. Keep sticky Copy safe with long results and
+the software keyboard, not just with one-line fixtures. Keyboard tests must
+simulate incremental visual-viewport shrink/pan separately from layout viewport size.
 
 ### Page structure snapshot (high-level)
 

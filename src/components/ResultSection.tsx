@@ -14,7 +14,8 @@ export default function ResultSection({
   className?: string
   tag?: string
 }) {
-  const { desktop } = useWorkspaceLayoutContext()
+  const { desktop, mode } = useWorkspaceLayoutContext()
+  const expanded = desktop || mode === 'split'
   const [open, setOpen] = useState(false)
   const id = useId()
   return (
@@ -23,7 +24,7 @@ export default function ResultSection({
       aria-labelledby={`${id}-title`}
     >
       <h3 id={`${id}-title`} className="result-section-title">
-        {desktop ? (
+        {expanded ? (
           <>
             <span>{title}</span>
             {tag && <span className="section-tag"> · {tag}</span>}
@@ -47,7 +48,7 @@ export default function ResultSection({
       </h3>
       <div
         id={`${id}-body`}
-        hidden={!desktop && !open}
+        hidden={!expanded && !open}
         className="result-section-body"
       >
         {children}

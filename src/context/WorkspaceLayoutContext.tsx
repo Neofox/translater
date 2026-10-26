@@ -6,6 +6,7 @@ export type WorkspaceLayout = {
   desktop: boolean
   short: boolean
   tight: boolean
+  keyboard: boolean
 }
 
 export const COMPACT_LAYOUT: WorkspaceLayout = {
@@ -14,6 +15,7 @@ export const COMPACT_LAYOUT: WorkspaceLayout = {
   desktop: false,
   short: false,
   tight: false,
+  keyboard: false,
 }
 
 export const WorkspaceLayoutContext = createContext(COMPACT_LAYOUT)

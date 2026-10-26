@@ -258,7 +258,9 @@ test('context and learner details remain usable without a popup', async () => {
   await expect.element(page.getByTestId('context-textarea')).toHaveValue('')
   await page.getByTestId('context-toggle').click()
   const desktop = Boolean(
-    document.querySelector('.translator-panels[data-desktop]'),
+    document.querySelector(
+      '.translator-panels[data-desktop], .translator-panels[data-layout="split"]',
+    ),
   )
   if (!desktop)
     await page
@@ -445,7 +447,11 @@ test.each(['sentence', 'word'] as const)(
           }
         : word
     await render(<Fixture initial={initial} />)
-    if (!document.querySelector('.translator-panels[data-desktop]'))
+    if (
+      !document.querySelector(
+        '.translator-panels[data-desktop], .translator-panels[data-layout="split"]',
+      )
+    )
       await page
         .getByRole('button', {
           name:
@@ -739,12 +745,17 @@ test('landscape sentence notes use the card width without reserving bottom inset
     const shell = document.querySelector<HTMLElement>('.app-shell')!
     shell.style.setProperty('--safe-area-bottom', '34px')
     window.dispatchEvent(new Event('resize'))
-    const editor = document.querySelector('.composer')!.getBoundingClientRect()
+    const editor = document
+      .querySelector('.input-panel')!
+      .getBoundingClientRect()
     const target = page
       .getByTestId('target-toolbar')
       .element()
       .getBoundingClientRect()
-    expect(target.top - editor.bottom).toBeLessThanOrEqual(16)
+    expect(
+      document.querySelector('.translator-panels')!.getAttribute('data-layout'),
+    ).toBe('split')
+    expect(target.right).toBeLessThanOrEqual(editor.left)
     const card = page.getByTestId('alternative-item').elements()[0]!
     const note = card
       .querySelector('.alternative-note')!
@@ -765,6 +776,7 @@ test('landscape sentence notes use the card width without reserving bottom inset
     const secondTranslation = page
       .getByText('안녕하세요, 잘 지내세요?', { exact: true })
       .element()
+    secondTranslation.scrollIntoView({ block: 'center' })
     assertWithinViewport(secondTranslation)
     const copy = page
       .getByTestId('output-toolbar')
@@ -794,6 +806,178 @@ test('Korean controls and a full input keep the conversation actions reachable',
   await page.getByTestId('clear-input').click()
   await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
 })
+
+test.each([
+  {
+    width: 440,
+    height: 640,
+    visible: 300,
+    offset: 80,
+    right: 80,
+    expected: 'stack',
+  },
+  {
+    width: 594,
+    height: 736,
+    visible: 320,
+    offset: 80,
+    right: 0,
+    expected: 'stack',
+  },
+  {
+    width: 960,
+    height: 548,
+    visible: 210,
+    offset: 110,
+    right: 0,
+    expected: 'split',
+  },
+  {
+    width: 440,
+    height: 640,
+    visible: 300,
+    offset: 0,
+    right: 80,
+    top: 47,
+    expected: 'stack',
+  },
+  {
+    width: 960,
+    height: 548,
+    visible: 210,
+    offset: 0,
+    right: 0,
+    top: 47,
+    expected: 'split',
+  },
+])(
+  'Safari keyboard keeps $width × $height in $expected with the main translation visible',
+  async ({ width, height, visible, offset, right, expected, top = 0 }) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    const viewport = Object.assign(new EventTarget(), {
+      height,
+      width,
+      offsetTop: 0,
+      offsetLeft: 0,
+      scale: 1,
+    })
+    try {
+      await page.viewport(width, height)
+      vi.stubGlobal('visualViewport', viewport)
+      await render(
+        <Fixture
+          initial={{
+            ...sentence,
+            partial: {
+              ...sentence.partial,
+              rationale: 'A natural polite expression. '.repeat(40),
+            },
+          }}
+        />,
+      )
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      shell.style.setProperty('--safe-area-right', `${right}px`)
+      shell.style.setProperty('--safe-area-bottom', '34px')
+      shell.style.setProperty('--safe-area-top', `${top}px`)
+      window.dispatchEvent(new Event('resize'))
+      const panels = document.querySelector<HTMLElement>('.translator-panels')!
+      await expect.poll(() => panels.dataset.layout).toBe(expected)
+      const order = [...panels.children]
+      if (expected === 'stack')
+        await page.getByRole('button', { name: /^Why this wording/ }).click()
+      const scroll = page
+        .getByTestId('translation-result')
+        .element() as HTMLElement
+      scroll.scrollTop = 250
+      const input = page
+        .getByTestId('input-textarea')
+        .element() as HTMLTextAreaElement
+      input.focus({ preventScroll: true })
+      input.setSelectionRange(5, 10)
+      for (
+        let heightStep = height - 50;
+        heightStep > visible;
+        heightStep -= 50
+      ) {
+        viewport.height = heightStep
+        viewport.dispatchEvent(new Event('resize'))
+        await expect
+          .poll(() => parseFloat(shell.style.getPropertyValue('--app-height')))
+          .toBe(heightStep)
+        expect(panels.dataset.layout).toBe(expected)
+      }
+      viewport.height = visible
+      viewport.offsetTop = offset
+      viewport.dispatchEvent(new Event('resize'))
+      await expect.poll(() => shell.hasAttribute('data-keyboard')).toBe(true)
+      expect(panels.dataset.layout).toBe(expected)
+      expect([...panels.children]).toEqual(order)
+      expect(page.getByTestId('input-textarea').element()).toBe(input)
+      expect(document.activeElement).toBe(input)
+      expect([input.selectionStart, input.selectionEnd]).toEqual([5, 10])
+      await expect.poll(() => shell.getBoundingClientRect().top).toBe(offset)
+      expect(shell.getBoundingClientRect().height).toBe(visible)
+      await expect.poll(() => scroll.scrollTop).toBe(0)
+      const main = page
+        .getByTestId('main-translation')
+        .element()
+        .getBoundingClientRect()
+      const copy = page
+        .getByTestId('output-toolbar')
+        .getByRole('button', { name: 'Copy', exact: true })
+        .element()
+        .getBoundingClientRect()
+      expect(main.top).toBeGreaterThanOrEqual(Math.max(offset, top))
+      expect(main.bottom).toBeLessThanOrEqual(copy.top)
+      for (const bounds of [
+        copy,
+        input.getBoundingClientRect(),
+        page.getByTestId('paste-input').element().getBoundingClientRect(),
+        page.getByTestId('clear-input').element().getBoundingClientRect(),
+      ]) {
+        expect(bounds.top).toBeGreaterThanOrEqual(Math.max(offset, top))
+        expect(bounds.bottom).toBeLessThanOrEqual(offset + visible)
+        expect(bounds.right).toBeLessThanOrEqual(width - right)
+      }
+      expect(document.scrollingElement!.scrollHeight).toBeLessThanOrEqual(
+        height,
+      )
+      await page.screenshot({
+        path: `../../test-results/safari-keyboard-${width}x${height}.png`,
+      })
+      viewport.offsetTop += 20
+      viewport.dispatchEvent(new Event('scroll'))
+      await expect
+        .poll(() => shell.getBoundingClientRect().top)
+        .toBe(offset + 20)
+      await page.getByTestId('context-toggle').click()
+      await page
+        .getByTestId('context-textarea')
+        .fill('A friend is checking in.')
+      const reply = page.getByTestId('context-textarea').element()
+      reply.scrollIntoView({ block: 'nearest' })
+      for (const element of [
+        reply,
+        page.getByTestId('paste-input').element(),
+        page.getByTestId('clear-input').element(),
+      ]) {
+        const bounds = element.getBoundingClientRect()
+        expect(bounds.top).toBeGreaterThanOrEqual(Math.max(offset + 20, top))
+        expect(bounds.bottom).toBeLessThanOrEqual(offset + 20 + visible)
+      }
+      viewport.height = height
+      viewport.offsetTop = 0
+      viewport.dispatchEvent(new Event('resize'))
+      await expect.poll(() => shell.hasAttribute('data-keyboard')).toBe(false)
+      expect(panels.dataset.layout).toBe(expected)
+      expect(page.getByTestId('input-textarea').element()).toBe(input)
+      await expect.poll(() => shell.getBoundingClientRect().top).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+      await page.viewport(...original)
+    }
+  },
+)
 
 test.each(['book', 'laptop'] as const)(
   'fold posture %s preserves the turn and reachable controls',
@@ -870,7 +1054,11 @@ test.each(['book', 'laptop'] as const)(
 
 test('dictionary metadata stays with the result and synonyms start a new lookup', async () => {
   await render(<Fixture initial={word} />)
-  if (!document.querySelector('[data-desktop]'))
+  if (
+    !document.querySelector(
+      '[data-desktop], .translator-panels[data-layout="split"]',
+    )
+  )
     await page
       .getByRole('button', { name: 'About · library', exact: true })
       .click()
@@ -1059,11 +1247,14 @@ test.each([
       const source = document
         .querySelector('.input-panel')!
         .getBoundingClientRect()
-      expect(source.height).toBeLessThanOrEqual(140)
+      const output = document
+        .querySelector('.output-panel')!
+        .getBoundingClientRect()
+      expect(output.right).toBeLessThanOrEqual(source.left)
       expect(
         page.getByTestId('input-textarea').element().getBoundingClientRect()
           .height,
-      ).toBeLessThanOrEqual(60)
+      ).toBeLessThanOrEqual(120)
       await expect
         .element(page.getByRole('heading', { name: 'Usage', exact: true }))
         .toBeVisible()
@@ -1073,9 +1264,6 @@ test.each([
         .element()
       assertWithinViewport(usage)
       assertWithinViewport(alternative)
-      assertWithinViewport(
-        page.getByText(definition, { exact: true }).element(),
-      )
       expect(usage.getBoundingClientRect().bottom).toBeLessThanOrEqual(
         document.querySelector('.output-panel')!.getBoundingClientRect().bottom,
       )
@@ -1093,6 +1281,12 @@ test.each([
       await page.screenshot({
         path: `../../test-results/dictionary-density-${width}x${height}.png`,
       })
+      const meaning = page.getByText(definition, { exact: true }).element()
+      meaning.scrollIntoView({ block: 'center' })
+      assertWithinViewport(meaning)
+      expect(
+        parseFloat(getComputedStyle(meaning).fontSize),
+      ).toBeGreaterThanOrEqual(16)
       await page
         .getByRole('group', { name: 'Source language' })
         .getByTestId('lang-more-trigger')
