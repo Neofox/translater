@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- Streamed JSON can omit nested fields until final schema validation. */
 import type { WordResult } from '../server/schemas'
 import type { Mode } from '../lib/types'
 import AlternativeItem from './AlternativeItem'

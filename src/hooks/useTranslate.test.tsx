@@ -11,6 +11,7 @@ import type { TranslateChunk, TranslateDone } from '../server/translate'
 const reactStateInstrumentation = vi.hoisted(() => ({
   nextNullState: 0,
   onLiveSet: undefined as undefined | (() => void),
+  transitionDepth: 0,
 }))
 
 // Only the network layer is mocked — `useTranslate` itself runs for real, so
@@ -21,6 +22,14 @@ vi.mock('react', async (importOriginal) => {
 
   return {
     ...actual,
+    startTransition: ((scope) => {
+      reactStateInstrumentation.transitionDepth += 1
+      try {
+        return actual.startTransition(scope)
+      } finally {
+        reactStateInstrumentation.transitionDepth -= 1
+      }
+    }) as typeof actual.startTransition,
     useState: (<TState,>(initialState: TState | (() => TState)) => {
       const state = actual.useState(initialState)
       const isLiveState =
@@ -91,6 +100,7 @@ describe('useTranslate', () => {
     vi.useFakeTimers()
     reactStateInstrumentation.nextNullState = 0
     reactStateInstrumentation.onLiveSet = undefined
+    reactStateInstrumentation.transitionDepth = 0
     const mod = (await import('../server/translate')) as unknown as {
       translate: ReturnType<typeof vi.fn>
     }
@@ -123,6 +133,40 @@ describe('useTranslate', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(translateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps new-run and streamed text updates urgent while completed results can animate', async () => {
+    const phases: string[] = []
+    translateMock.mockResolvedValueOnce(
+      makeStream([
+        { type: 'delta', raw: '{"main":"안녕"}' },
+        {
+          type: 'done',
+          done: {
+            intent: 'sentence',
+            data: { main: '안녕', sourceLang: 'en', targetLang: 'ko' },
+          } as TranslateDone,
+        },
+      ]),
+    )
+    reactStateInstrumentation.onLiveSet = () => {
+      phases.push(
+        reactStateInstrumentation.transitionDepth ? 'transition' : 'urgent',
+      )
+    }
+    const { result } = renderHook(
+      (props: TranslateArgs) => useTranslate(props, { debounceMs: 0 }),
+      { initialProps: baseArgs, wrapper },
+    )
+    await act(async () => {
+      await result.current.run()
+    })
+    expect(phases).toEqual(['urgent', 'urgent', 'transition'])
+    expect(result.current.live).toMatchObject({
+      done: true,
+      partial: { main: '안녕' },
+      text: baseArgs.text,
+    })
   })
 
   it('preserves Auto request provenance and reports a streaming sourceLang', async () => {

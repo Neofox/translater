@@ -33,6 +33,14 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - Client debounce is 800ms; paste skips it (`queueImmediate`) and Enter/blur flush a pending run (`flush`). Plain Enter is a newline when nothing is pending; Shift+Enter always newline; Cmd/Ctrl+Enter force-runs.
 - Refine + context: `TranslateInput` carries optional `context` (sentence + word), `refinements` + `previousMain` (sentence only, max 3 refinements of which at most one is free-text). They are injected only into the FINAL user message as `<context>`/`<adjustments>` blocks; the explaining system lines are UNCONDITIONAL so the prefix cache stays intact — keep them that way. Refine chips are toggles (`aria-pressed`); toggling one off removes that adjustment and re-runs (LRU makes it cheap). A failed refine rolls back via an internal snapshot stack (no user-facing undo control). Editing the input clears refinements; context is sessionStorage-sticky.
 
+## Pronunciation and result transitions
+
+- `src/server/speech.ts` is the thin server-function boundary; it dynamically imports `speech.server.ts`. Keep provider code server-only. That module uses `generateSpeech` with `maxRetries: 0` and explicit `telemetry.isEnabled: false` so globally registered translation telemetry cannot record speech. It validates WAV framing/format, discards metadata, and delivers PCM chunks after generation completes.
+- `SPEECH_MODEL` chooses one exact Gateway speech model (default `google/gemini-3.8-flash-lite-tts`). `SPEECH_VOICE` is optional; Google defaults to `Kore`. Change deployment env, redeploy, and reload to switch. No fallback or automatic retry. Swaps must support HTTPS `generateSpeech` with mono PCM16 WAV output (8–48 kHz). Gateway currently does not support its experimental WebSocket speech surface.
+- `useSpeech` unlocks Web Audio synchronously on tap, streams through `PcmPlayer`, stops on edits/settings changes/unmount/pagehide, and caches only completed audio in a bounded page-memory LRU. Preserve the layout-effect reset: passive cleanup can cancel an immediate tap on a newly completed result.
+- Speech limits: 4,000 input characters, 8 MiB audio, 90-second server timeout. Never log source text, raw provider errors, or audio; speech does not register telemetry. `aiSdkWarnings.server.ts` installs a permanent process-wide SDK warning suppression policy because provider warnings have no per-call warning hook; do not temporarily toggle it around requests.
+- `OutputPanel` exposes Listen only on completed non-error results. Result `ViewTransition` updates are scheduled at completion/error; run initialization and token deltas stay urgent to preserve live-result provenance. Respect reduced motion.
+
 ## Styling
 
 Tailwind v4 with a bi-accent palette defined in `src/styles.css`:
@@ -125,7 +133,15 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 
 ## Commands
 
-- Typecheck: `mise exec -- aube exec tsc --noEmit`
-- Dev server: `mise exec -- aubr dev`
-- Smoke test: `mise exec -- aubx tsx scripts/smoke-translate.mjs`
-- Vercel: `vercel.json` bootstraps pinned mise through `scripts/vercel-install.sh`, installs the aube version/checksum from `mise.lock`, then installs dependencies with `--frozen-lockfile`. The build runs through the same pinned tools with `--no-install`, so dashboard install overrides cannot resolve a different dependency tree.
+Use npm for this project. Commit `package-lock.json` with dependency changes; use `npm ci` for reproducible installs.
+
+- Typecheck: `npm run typecheck`
+- Dev server: `npm run dev`
+- Unit tests: `npm test`
+- Browser dependencies: `npx playwright install chromium webkit`
+- Browser matrix: `npm run test:browser` (Chromium/WebKit at 382×580 and 594×368, synthetic speech; no paid calls)
+- Replay report: `npm run test:browser:report` (serves `test-results/browser/index.html`)
+- Interactive browser tests: `npm run test:browser:ui`
+- Translation smoke test: `npx tsx scripts/smoke-translate.mjs` (real, potentially billed Gateway request)
+- Speech smoke test: `npx tsx scripts/smoke-speech.mjs` (one real, potentially billed request; optional output WAV path argument; `DOTENV_CONFIG_PATH` selects local credentials)
+- Vercel: `vercel.json` runs `npm ci` followed by `npm run build`, using the committed npm lockfile.
