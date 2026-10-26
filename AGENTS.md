@@ -125,6 +125,7 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 
 ## Commands
 
-- Typecheck: `npx tsc --noEmit`
-- Dev server: `npm run dev`
-- Smoke test: `npx tsx scripts/smoke-translate.mjs`
+- Typecheck: `mise exec -- aube exec tsc --noEmit`
+- Dev server: `mise exec -- aubr dev`
+- Smoke test: `mise exec -- aubx tsx scripts/smoke-translate.mjs`
+- Vercel: `vercel.json` bootstraps pinned mise through `scripts/vercel-install.sh`, installs the aube version/checksum from `mise.lock`, then installs dependencies with `--frozen-lockfile`. The build runs through the same pinned tools with `--no-install`, so dashboard install overrides cannot resolve a different dependency tree.

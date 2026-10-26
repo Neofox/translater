@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "sh scripts/vercel-install.sh",
+  "buildCommand": "./.vercel/tools/mise --locked exec -- aube run --no-install build"
+}
