@@ -25,7 +25,9 @@ export function ContextToggle({
       data-testid="context-toggle"
     >
       <MessageSquareQuote size={14} />
-      <span className="hidden sm:inline">{t('contextToggle')}</span>
+      <span className="hidden @min-[42rem]/input-toolbar:inline">
+        {t('contextToggle')}
+      </span>
     </Pill>
   )
 }

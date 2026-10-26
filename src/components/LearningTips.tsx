@@ -12,11 +12,12 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react'
-import { ChevronDown } from 'lucide-react'
+import { BookOpen, ChevronDown } from 'lucide-react'
 import type { LearningTips as LearningTipsType } from '../server/schemas'
 import Pill from './ui/Pill'
 import { useUiLang } from '../hooks/useUiLang'
 import type { StringKey } from '../lib/i18n'
+import { floatingPanelBoundary } from '../lib/floatingPanelBoundary'
 
 type Props = {
   tips?: Partial<LearningTipsType>
@@ -45,17 +46,17 @@ export default function LearningTips({ tips }: Props) {
     whileElementsMounted: autoUpdate,
     middleware: [
       offset({ mainAxis: 8 }),
-      flip({ padding: 8 }),
-      shift({ padding: 8 }),
-      size({
+      flip(floatingPanelBoundary),
+      shift(floatingPanelBoundary),
+      size((state) => ({
+        ...floatingPanelBoundary(state),
         apply({ availableWidth, availableHeight, elements }) {
           Object.assign(elements.floating.style, {
-            maxWidth: `${Math.min(availableWidth, 448)}px`,
-            maxHeight: `${availableHeight}px`,
+            maxWidth: `${Math.max(0, Math.min(availableWidth, 448))}px`,
+            maxHeight: `${Math.max(0, availableHeight)}px`,
           })
         },
-        padding: 8,
-      }),
+      })),
     ],
   })
 
@@ -84,10 +85,15 @@ export default function LearningTips({ tips }: Props) {
         ref={refs.setReference}
         tone="warm"
         size="md"
+        aria-label={t('learningTips')}
+        title={t('learningTips')}
         aria-expanded={open}
         {...getReferenceProps()}
       >
-        <span>{t('learningTips')}</span>
+        <BookOpen size={14} className="@min-[20rem]/output-toolbar:hidden" />
+        <span className="hidden @min-[20rem]/output-toolbar:inline">
+          {t('learningTips')}
+        </span>
         <ChevronDown
           size={12}
           className={`transition-transform ${open ? 'rotate-180' : ''}`}

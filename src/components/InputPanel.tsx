@@ -49,11 +49,11 @@ export default function InputPanel() {
 
   return (
     <section
-      className={`flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r xl:py-6 2xl:py-12 ${
+      className={`input-panel flex min-h-0 min-w-0 flex-col border-b border-border md:border-b-0 md:border-r xl:py-6 2xl:py-12 ${
         input ? '' : 'flex-1'
       }`}
     >
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-ink-soft sm:px-4 xl:px-10 2xl:px-16">
+      <div className="@container/input-toolbar shrink-0 flex min-w-0 items-center justify-between gap-1.5 px-3 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16">
         <LanguageChipBar
           kind="source"
           value={source}
@@ -61,19 +61,11 @@ export default function InputPanel() {
           detected={detected}
           aria-label={t('sourceLanguage')}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
           <ContextToggle
             open={contextOpen}
             onToggle={() => setContextOpen((v) => !v)}
           />
-          {showCounter && (
-            <span
-              className={`text-xs font-medium tabular-nums ${counterTone}`}
-              aria-live="polite"
-            >
-              {counterText}
-            </span>
-          )}
           {input && <CopyButton text={input} compact size="md" />}
           {input && (
             <Pill
@@ -127,7 +119,7 @@ export default function InputPanel() {
             placeholder={t('placeholder')}
             aria-label={t('inputText')}
             data-testid="input-textarea"
-            className="field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl xl:px-12 2xl:px-18"
+            className="translation-input field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl xl:px-12 2xl:px-18"
             spellCheck
             autoComplete="off"
             autoCorrect="on"
@@ -152,6 +144,14 @@ export default function InputPanel() {
             </button>
           )}
         </div>
+        {showCounter && (
+          <p
+            className={`px-4 pb-2 text-right text-xs font-medium tabular-nums sm:px-6 xl:px-12 2xl:px-18 ${counterTone}`}
+            aria-live="polite"
+          >
+            {counterText}
+          </p>
+        )}
         {!error && live?.intent === 'word' && (
           <WordSourceMeta
             result={live.partial}

@@ -38,7 +38,7 @@ export default function Pill({
       ref={ref}
       type="button"
       {...rest}
-      className={`inline-flex cursor-pointer items-center rounded-md border text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
+      className={`inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md border text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
     >
       {children}
     </button>

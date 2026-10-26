@@ -18,38 +18,41 @@ import {
 } from '@floating-ui/react'
 import { Check, ChevronDown } from 'lucide-react'
 import Pill from './Pill'
+import { floatingPanelBoundary } from '../../lib/floatingPanelBoundary'
 
 type Tone = 'neutral' | 'accent' | 'warm' | 'active'
 
-export type SelectOption<V extends string> = {
-  value: V
+export type SelectOption<TValue extends string> = {
+  value: TValue
   label: ReactNode
   /** String used for keyboard typeahead matching. Defaults to `label` if it's a string, else `value`. */
   searchLabel?: string
 }
 
-type Props<V extends string> = {
-  value: V
-  onChange: (next: V) => void
-  options: ReadonlyArray<SelectOption<V>>
+type Props<TValue extends string> = {
+  value: TValue
+  onChange: (next: TValue) => void
+  options: ReadonlyArray<SelectOption<TValue>>
   tone?: Tone
   size?: 'sm' | 'md'
   /** Trigger content when `value` is not among `options` (chip-bar "more" trigger). */
   placeholder?: ReactNode
+  showChevron?: boolean
   'aria-label'?: string
   'data-testid'?: string
 }
 
-export default function Select<V extends string>({
+export default function Select<TValue extends string>({
   value,
   onChange,
   options,
   tone = 'neutral',
   size: pillSize = 'sm',
   placeholder,
+  showChevron = true,
   'aria-label': ariaLabel,
   'data-testid': testId = 'select-trigger',
-}: Props<V>) {
+}: Props<TValue>) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
@@ -74,17 +77,17 @@ export default function Select<V extends string>({
     whileElementsMounted: autoUpdate,
     middleware: [
       offset({ mainAxis: 6 }),
-      flip({ padding: 8 }),
-      shift({ padding: 8 }),
-      size({
+      flip(floatingPanelBoundary),
+      shift(floatingPanelBoundary),
+      size((state) => ({
+        ...floatingPanelBoundary(state),
         apply({ availableHeight, elements, rects }) {
           Object.assign(elements.floating.style, {
-            maxHeight: `${Math.min(availableHeight, 320)}px`,
+            maxHeight: `${Math.max(0, Math.min(availableHeight, 320))}px`,
             minWidth: `${rects.reference.width}px`,
           })
         },
-        padding: 8,
-      }),
+      })),
     ],
   })
 
@@ -128,10 +131,12 @@ export default function Select<V extends string>({
         {...getReferenceProps()}
       >
         <span>{selected?.label ?? placeholder ?? value}</span>
-        <ChevronDown
-          size={12}
-          className={`transition-transform ${open ? 'rotate-180' : ''}`}
-        />
+        {showChevron && (
+          <ChevronDown
+            size={12}
+            className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        )}
       </Pill>
       {open && (
         <FloatingPortal>

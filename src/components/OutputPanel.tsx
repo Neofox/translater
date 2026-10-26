@@ -26,15 +26,15 @@ export default function OutputPanel() {
   const copyText = mainText(live)
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col xl:pt-6 2xl:pt-12">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16">
+    <section className="output-panel flex min-h-0 min-w-0 flex-1 flex-col xl:pt-6 2xl:pt-12">
+      <div className="@container/output-toolbar flex min-w-0 items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16">
         <LanguageChipBar
           kind="target"
           value={target}
           onChange={setTarget}
           aria-label={t('targetLanguage')}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
           {streaming && (
             <span className="inline-flex items-center gap-1.5 text-xs text-accent">
               <Loader2 size={12} className="animate-spin" />

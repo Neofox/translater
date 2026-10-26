@@ -37,6 +37,102 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Let the page background fill the viewport while controls clear iOS cutouts. */
+.app-shell {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Only the language choices scroll; the more menu and toolbar actions stay put. */
+.language-chip-scroll {
+  scrollbar-width: none;
+}
+
+.language-chip-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Short landscape windows should show the translation without a tall input. */
+@media (max-height: 500px) {
+  .translation-input {
+    min-height: 4rem;
+  }
+}
+
+/* Optional Safari fold features; unsupported browsers retain the normal layout. */
+@media (device-posture: folded) and (horizontal-viewport-segments: 2) {
+  .app-shell {
+    height: 100dvh;
+  }
+
+  .translator-panels {
+    display: grid;
+    min-height: 0;
+    grid-template-columns:
+      minmax(
+        0,
+        calc(env(viewport-segment-width 0 0, 50vw) - env(safe-area-inset-left))
+      )
+      minmax(
+        0,
+        calc(env(viewport-segment-width 1 0, 50vw) - env(safe-area-inset-right))
+      );
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: max(
+      0px,
+      calc(
+        env(viewport-segment-left 1 0, 50vw) -
+          env(viewport-segment-right 0 0, 50vw)
+      )
+    );
+    overflow: hidden;
+  }
+
+  .input-panel {
+    border-bottom: 0;
+    border-right: 1px solid var(--color-border);
+  }
+}
+
+/* Laptop posture: the result sits above the fold, with input below it. */
+@media (device-posture: folded) and (vertical-viewport-segments: 2) {
+  .app-shell {
+    height: 100dvh;
+  }
+
+  .translator-panels {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows:
+      minmax(
+        0,
+        calc(env(viewport-segment-bottom 0 0, 50dvh) - var(--panels-top, 0px))
+      )
+      minmax(0, 1fr);
+    row-gap: max(
+      0px,
+      calc(
+        env(viewport-segment-top 0 1, 50dvh) -
+          env(viewport-segment-bottom 0 0, 50dvh)
+      )
+    );
+    overflow: hidden;
+  }
+
+  .input-panel {
+    grid-row: 2;
+    border: 0;
+    padding-block: 0;
+  }
+
+  .output-panel {
+    grid-row: 1;
+    border-bottom: 1px solid var(--color-border);
+    padding-top: 0;
+  }
+}
+
 ::selection {
   background: var(--color-accent-soft);
 }

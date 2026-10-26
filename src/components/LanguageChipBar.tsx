@@ -1,8 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LANGUAGES } from '../lib/languages'
 import type { LangCode } from '../lib/languages'
 import { usePersistentState } from '../lib/usePersistentState'
-import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useUiLang } from '../hooks/useUiLang'
 import Pill from './ui/Pill'
 import Select from './ui/Select'
@@ -17,12 +16,6 @@ type Props = {
   detected?: LangCode | null
   'aria-label'?: string
 }
-
-// Expanded only when the panel is wide: full-width panels on small screens
-// (640-767px) or two wide columns (>=1024px). In the 768-1023px band the
-// two-column layout makes each panel too narrow for the full chip set.
-const EXPANDED_QUERY =
-  '(min-width: 640px) and (max-width: 767px), (min-width: 1024px)'
 
 const FIXED: Record<Kind, ReadonlyArray<LangCode>> = {
   source: ['auto', 'en', 'ko'],
@@ -45,7 +38,20 @@ export default function LanguageChipBar({
     kind === 'source' ? 'nt.recentSource' : 'nt.recentTarget',
     null,
   )
-  const isExpanded = useMediaQuery(EXPANDED_QUERY)
+  const barRef = useRef<HTMLDivElement>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Measure the space left after toolbar actions. Viewport width alone cannot
+  // describe a panel inside columns, split windows, or a folded display.
+  useEffect(() => {
+    if (!barRef.current || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return
+      setIsExpanded(entry.contentRect.width >= (kind === 'source' ? 448 : 320))
+    })
+    observer.observe(barRef.current)
+    return () => observer.disconnect()
+  }, [kind])
 
   // A language picked from the "more" dropdown earns a persistent 4th chip so
   // it stays one click away next time.
@@ -65,34 +71,38 @@ export default function LanguageChipBar({
 
   return (
     <div
+      ref={barRef}
       role="group"
       aria-label={ariaLabel}
-      className="flex flex-wrap items-center gap-1.5"
+      className="flex min-w-0 flex-1 items-center gap-1.5"
     >
-      {chips.map((code) => {
-        const selected = value === code
-        return (
-          <Pill
-            key={code}
-            size="md"
-            tone={selected ? 'active' : 'neutral'}
-            aria-pressed={selected}
-            data-testid="lang-chip"
-            data-value={code}
-            onClick={() => onChange(code)}
-          >
-            {code === 'auto' && selected && detected ? (
-              <>
-                {labelFor('auto')}
-                <span className="text-ink-dim">·</span>
-                <span>{labelFor(detected)}</span>
-              </>
-            ) : (
-              labelFor(code)
-            )}
-          </Pill>
-        )
-      })}
+      <div className="language-chip-scroll flex min-w-0 items-center gap-1.5 overflow-x-auto">
+        {chips.map((code) => {
+          const selected = value === code
+          return (
+            <Pill
+              key={code}
+              size="md"
+              tone={selected ? 'active' : 'neutral'}
+              aria-pressed={selected}
+              data-testid="lang-chip"
+              data-value={code}
+              className="px-2!"
+              onClick={() => onChange(code)}
+            >
+              {code === 'auto' && selected && detected ? (
+                <>
+                  {labelFor('auto')}
+                  <span className="text-ink-dim">·</span>
+                  <span>{labelFor(detected)}</span>
+                </>
+              ) : (
+                labelFor(code)
+              )}
+            </Pill>
+          )
+        })}
+      </div>
       <Select
         value={value}
         onChange={onChange}
@@ -100,6 +110,7 @@ export default function LanguageChipBar({
         size="md"
         tone={moreSelected ? 'active' : 'neutral'}
         placeholder="⋯"
+        showChevron={false}
         aria-label={t('moreLanguages')}
         data-testid="lang-more-trigger"
       />

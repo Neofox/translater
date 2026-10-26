@@ -1,24 +1,28 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import LanguageChipBar from './LanguageChipBar'
 import { UiLangProvider } from '../hooks/useUiLang'
 
-type Listener = (e: { matches: boolean }) => void
-
-function stubMatchMedia(initial: boolean) {
-  const listeners = new Set<Listener>()
-  const mql = {
-    matches: initial,
-    media: '',
-    addEventListener: (_: string, cb: Listener) => listeners.add(cb),
-    removeEventListener: (_: string, cb: Listener) => listeners.delete(cb),
-  }
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mql))
+function stubWidth(initial: number) {
+  let notify: (
+    entries: Array<{ contentRect: { width: number } }>,
+  ) => void = () => {}
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: typeof notify) {
+        notify = callback
+      }
+      observe() {
+        notify([{ contentRect: { width: initial } }])
+      }
+      disconnect() {}
+    },
+  )
   return {
-    fire(matches: boolean) {
-      mql.matches = matches
-      listeners.forEach((cb) => cb({ matches }))
+    fire(width: number) {
+      act(() => notify([{ contentRect: { width } }]))
     },
   }
 }
@@ -45,7 +49,12 @@ const chip = (code: string) =>
 
 beforeEach(() => {
   window.localStorage.clear()
-  stubMatchMedia(true)
+  vi.stubGlobal('matchMedia', () => ({
+    matches: true,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  stubWidth(600)
 })
 afterEach(() => {
   cleanup()
@@ -53,6 +62,22 @@ afterEach(() => {
 })
 
 describe('LanguageChipBar', () => {
+  it('keeps the selected language visible and puts other chips in the menu after a panel narrows', () => {
+    const width = stubWidth(600)
+    renderBar({ value: 'ko' })
+    expect(chip('en')).toBeTruthy()
+    width.fire(180)
+    expect(chip('ko')).toBeTruthy()
+    expect(chip('en')).toBeNull()
+    width.fire(600)
+    expect(chip('en')).toBeTruthy()
+    width.fire(180)
+    fireEvent.mouseDown(screen.getByTestId('lang-more-trigger'))
+    expect(
+      document.querySelector('[data-testid="select-option"][data-value="en"]'),
+    ).toBeTruthy()
+  })
+
   it('source bar renders Auto, English, 한국어 chips and a more trigger', () => {
     renderBar()
     expect(chip('auto')).toBeTruthy()
@@ -90,7 +115,7 @@ describe('LanguageChipBar', () => {
   })
 
   it('collapsed mode renders only the selected chip plus the more trigger', () => {
-    stubMatchMedia(false)
+    stubWidth(220)
     renderBar({ value: 'en' })
     expect(chip('en')).toBeTruthy()
     expect(chip('auto')).toBeNull()
@@ -99,7 +124,7 @@ describe('LanguageChipBar', () => {
   })
 
   it('collapsed source bar offers auto in the more listbox when not selected', () => {
-    stubMatchMedia(false)
+    stubWidth(220)
     renderBar({ value: 'en' })
     fireEvent.mouseDown(screen.getByTestId('lang-more-trigger'))
     expect(
@@ -110,7 +135,7 @@ describe('LanguageChipBar', () => {
   })
 
   it('collapsed target bar never offers auto', () => {
-    stubMatchMedia(false)
+    stubWidth(220)
     renderBar({ kind: 'target', value: 'ko' })
     fireEvent.mouseDown(screen.getByTestId('lang-more-trigger'))
     expect(

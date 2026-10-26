@@ -102,7 +102,9 @@ cmux browser --surface <s> click --selector "[aria-label='Source language'] [dat
 cmux browser --surface <s> click --selector "[aria-label='Target language'] [data-testid='lang-more-trigger']"
 ```
 
-**Narrow panels collapse the bar.** Below 640px viewport width — and in the 768–1023px band where the two-column layout makes panels narrow — only the SELECTED chip renders plus the `⋯` trigger; the other languages (including `auto` for the source bar) move into the `⋯` listbox. Automation that clicks `[data-testid="lang-chip"][data-value="..."]` for a non-selected language must either run at ≥1024px (or 640–767px) viewport width, or go through `lang-more-trigger` + `select-option` instead.
+**Narrow panels collapse the bar.** A ResizeObserver measures the language group's available width after toolbar actions: source chips expand at 448px, target chips at 320px. Below those widths, only the SELECTED chip renders plus the `⋯` trigger; other languages (including `auto` for the source bar) move into the listbox. This also handles split windows and folded displays. Automation should check whether a chip is rendered and otherwise use `lang-more-trigger` + `select-option`, rather than assuming viewport width guarantees an expanded bar.
+
+**Optional fold layouts.** With Safari's Device Posture and Viewport Segments feature flags enabled, book posture places source and result in separate horizontal segments. Laptop posture places the result above the fold and input below it; `useFoldLayout` measures the header offset so the boundary matches the physical fold. Unsupported browsers keep the standard responsive layout. These layouts use CSS feature queries, never device-name detection.
 
 ### Page structure snapshot (high-level)
 

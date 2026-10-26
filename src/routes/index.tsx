@@ -8,6 +8,7 @@ import {
   useTranslatorContext,
 } from '../context/TranslatorContext'
 import { useKbd } from '../hooks/useKbd'
+import { useFoldLayout } from '../hooks/useFoldLayout'
 import { useTranslatorShortcuts } from '../hooks/useTranslatorShortcuts'
 import { useUiLang } from '../hooks/useUiLang'
 import { mainText } from '../lib/liveResult'
@@ -15,12 +16,16 @@ import { mainText } from '../lib/liveResult'
 export const Route = createFileRoute('/')({ component: Translator })
 
 function Translator() {
+  const panelsRef = useFoldLayout()
   return (
     <TranslatorProvider>
       <TranslatorShortcuts />
-      <main className="flex min-h-[100dvh] flex-col md:h-[100dvh]">
+      <main className="app-shell flex min-h-[100dvh] flex-col md:h-[100dvh]">
         <Header />
-        <div className="relative flex flex-1 flex-col md:grid md:grid-cols-2 md:overflow-hidden">
+        <div
+          ref={panelsRef}
+          className="translator-panels relative flex flex-1 flex-col md:grid md:grid-cols-2 md:overflow-hidden"
+        >
           <InputPanel />
           <OutputPanel />
         </div>
@@ -33,7 +38,7 @@ function Translator() {
 function Header() {
   const { mode, setMode } = useTranslatorContext()
   return (
-    <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-3">
+    <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-3 sm:pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <div className="flex items-center gap-2">
         <span className="hidden h-2 w-2 rounded-full bg-accent sm:inline-block" />
         <svg
@@ -63,7 +68,7 @@ function Header() {
 
 function Footer() {
   return (
-    <footer className="border-t border-border px-3 py-1.5 text-[11px] text-white/80 sm:px-4">
+    <footer className="border-t border-border px-3 py-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] text-[11px] text-white/80 sm:px-4">
       <ShortcutHints />
     </footer>
   )
