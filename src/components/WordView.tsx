@@ -14,11 +14,17 @@ import { useTranslatorContext } from '../context/TranslatorContext'
 type Props = {
   result: Partial<WordResult>
   mode: Mode
+  copyDisabled?: boolean
   streaming?: boolean
   speech?: Omit<SpeechOptions, 'text'>
 }
 
-export default function WordView({ result, streaming, speech }: Props) {
+export default function WordView({
+  result,
+  streaming,
+  speech,
+  copyDisabled,
+}: Props) {
   const { t } = useUiLang()
   const { lookupWord } = useTranslatorContext()
   const all = result.alternativeTranslations ?? []
@@ -28,6 +34,11 @@ export default function WordView({ result, streaming, speech }: Props) {
     <div
       className={`result-details ${hasAlternatives ? 'has-alternatives' : ''}`}
     >
+      {result.primaryUsageNote && (
+        <ResultSection title={t('usage')} className="detail-why">
+          <p>{result.primaryUsageNote}</p>
+        </ResultSection>
+      )}
       {hasAlternatives && (
         <ResultSection
           title={t('alternativeTranslations')}
@@ -41,6 +52,7 @@ export default function WordView({ result, streaming, speech }: Props) {
                 text={alt.text}
                 note={alt.note}
                 speech={speech}
+                copyDisabled={copyDisabled}
               >
                 {(alt.register ?? []).map((register) => (
                   <Tag key={register}>{register}</Tag>
@@ -53,19 +65,17 @@ export default function WordView({ result, streaming, speech }: Props) {
           </ul>
         </ResultSection>
       )}
-      {result.primaryUsageNote && (
-        <ResultSection title={t('usage')} className="detail-why">
-          <p>{result.primaryUsageNote}</p>
-        </ResultSection>
-      )}
-      <LearningTips tips={result.learningTips} />
-      <div className="detail-word-meta">
+      <ResultSection
+        title={`${t('aboutWord')}${result.headword ? ` · ${result.headword}` : ''}`}
+        className="detail-about"
+      >
         <WordSourceMeta
           result={result}
           streaming={streaming}
           onLookup={lookupWord}
         />
-      </div>
+      </ResultSection>
+      <LearningTips tips={result.learningTips} />
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const viewports = [
   { label: 'portrait', width: 382, height: 580 },
-  { label: 'landscape', width: 594, height: 368 },
+  { label: 'landscape', width: 580, height: 382 },
   { label: 'unfolded-portrait', width: 594, height: 736 },
   { label: 'unfolded-landscape', width: 736, height: 594 },
   { label: 'macbook-14', width: 1512, height: 982 },

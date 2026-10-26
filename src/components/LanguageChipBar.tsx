@@ -36,7 +36,7 @@ export default function LanguageChipBar({
   const fixed = FIXED[kind]
   const [recent, setRecent] = usePersistentState<LangCode | null>(
     kind === 'source' ? 'nt.recentSource' : 'nt.recentTarget',
-    null,
+    'ja',
   )
   const barRef = useRef<HTMLDivElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -47,7 +47,7 @@ export default function LanguageChipBar({
     if (!barRef.current || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return
-      setIsExpanded(entry.contentRect.width >= (kind === 'source' ? 288 : 240))
+      setIsExpanded(entry.contentRect.width >= (kind === 'source' ? 320 : 280))
     })
     observer.observe(barRef.current)
     return () => observer.disconnect()
@@ -92,7 +92,7 @@ export default function LanguageChipBar({
                   ? `${labelFor('auto')} · ${labelFor(detected)}`
                   : labelFor(code)
               }
-              className="px-2!"
+              className="language-chip"
               onClick={() => onChange(code)}
             >
               <span className="sr-only">
@@ -103,7 +103,7 @@ export default function LanguageChipBar({
               </span>
               <span aria-hidden>
                 {code === 'auto'
-                  ? `Auto${selected && detected ? ` · ${detected.toUpperCase()}` : ''}`
+                  ? `Auto${selected && detected ? `·${detected.toUpperCase()}` : ''}`
                   : code.toUpperCase()}
               </span>
             </Pill>
@@ -116,8 +116,8 @@ export default function LanguageChipBar({
         options={moreOptions}
         size="md"
         tone={moreSelected ? 'active' : 'neutral'}
-        placeholder="⋯"
-        showChevron={false}
+        placeholder={t('moreLabel')}
+        showChevron
         aria-label={t('moreLanguages')}
         data-testid="lang-more-trigger"
       />

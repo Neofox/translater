@@ -7,10 +7,12 @@ export default function ResultSection({
   title,
   children,
   className = '',
+  tag,
 }: {
   title: string
   children: ReactNode
   className?: string
+  tag?: string
 }) {
   const { desktop } = useWorkspaceLayoutContext()
   const [open, setOpen] = useState(false)
@@ -22,7 +24,10 @@ export default function ResultSection({
     >
       <h3 id={`${id}-title`} className="result-section-title">
         {desktop ? (
-          title
+          <>
+            <span>{title}</span>
+            {tag && <span className="section-tag"> · {tag}</span>}
+          </>
         ) : (
           <button
             type="button"
@@ -31,6 +36,7 @@ export default function ResultSection({
             onClick={() => setOpen((value) => !value)}
           >
             <span>{title}</span>
+            {tag && <span className="section-tag">{tag}</span>}
             <ChevronDown
               size={14}
               aria-hidden

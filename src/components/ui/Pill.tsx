@@ -20,9 +20,7 @@ const toneClass: Record<Tone, string> = {
 
 const sizeClass: Record<Size, string> = {
   sm: 'gap-1.5 px-2 py-1 text-xs min-h-11 min-w-11',
-  // min-h keeps icon-only pills (copy, clear) as tall as text pills: a 14px
-  // svg doesn't establish the 20px text-sm line-height, so they'd render 28px
-  // instead of the 34px a labeled md pill computes to.
+  // Keep icon-only and labelled controls at the same 44px touch target.
   md: 'gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11',
 }
 
@@ -39,7 +37,7 @@ export default function Pill({
       ref={ref}
       type="button"
       {...rest}
-      className={`inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition ${tone !== 'primary' ? 'text-ink' : ''} ${toneClass[tone]} ${sizeClass[size]} ${className}`}
+      className={`ui-pill inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition ${tone !== 'primary' ? 'text-ink' : ''} ${toneClass[tone]} ${sizeClass[size]} ${className}`}
     >
       {children}
     </button>

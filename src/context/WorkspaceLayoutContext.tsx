@@ -4,6 +4,7 @@ export type WorkspaceLayout = {
   mode: 'stack' | 'split' | 'book' | 'laptop'
   resultFirst: boolean
   desktop: boolean
+  short: boolean
   tight: boolean
 }
 
@@ -11,6 +12,7 @@ export const COMPACT_LAYOUT: WorkspaceLayout = {
   mode: 'stack',
   resultFirst: true,
   desktop: false,
+  short: false,
   tight: false,
 }
 

@@ -15,6 +15,7 @@ import type { LangCode } from '../lib/languages'
 import { useUiLang } from './useUiLang'
 import { STRINGS } from '../lib/i18n'
 import { MAX_INPUT_CHARS } from '../lib/limits'
+import { translationRequestKey } from '../lib/translationRequestKey'
 
 export type TranslateError = {
   message: string
@@ -24,6 +25,7 @@ export type TranslateError = {
 
 export type LiveResult =
   | {
+      requestKey?: string
       intent: 'sentence'
       partial: Partial<SentenceResult>
       done: boolean
@@ -34,6 +36,7 @@ export type LiveResult =
       text: string
     }
   | {
+      requestKey?: string
       intent: 'word'
       partial: Partial<WordResult>
       done: boolean
@@ -181,6 +184,15 @@ export function useTranslate(
       supersededRunIdRef.current = null
       activeRunRef.current = { controller: ctrl, id: runId }
 
+      const requestKey = translationRequestKey({
+        text: trimmed,
+        source,
+        target,
+        mode,
+        context,
+        refinements,
+        uiLang,
+      })
       setIsPending(true)
       setError(null)
       setLive({
@@ -188,6 +200,7 @@ export function useTranslate(
         partial: {},
         done: false,
         requestSource: source,
+        requestKey,
         text: trimmed,
       })
 
@@ -274,6 +287,7 @@ export function useTranslate(
             partial: done.data,
             done: true,
             requestSource: source,
+            requestKey,
             text: trimmed,
           })
         })

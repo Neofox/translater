@@ -137,6 +137,7 @@ describe('RefineRow', () => {
       requestSource: 'auto',
       text: 'see you tomorrow',
     })
+    fireEvent.click(await screen.findByTestId('refine-custom-trigger'))
     const input = (await screen.findByTestId(
       'refine-freeform',
     )) as unknown as HTMLInputElement

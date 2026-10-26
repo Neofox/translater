@@ -65,7 +65,7 @@ className})` with static desktop headings and compact accessible disclosure.
       actions and existing sentence/word metadata. Run targeted tests.
       Expected: PASS for the new behavioral tests.
 - [x] Extend the full-workspace browser fixture and matrix to cover 382×580,
-      594×368, 594×736, 736×594, 1512×982, 1728×1117 and 1488×700. Add tests for
+      580×382, 594×736, 736×594, 1512×982, 1728×1117 and 1488×700. Add tests for
       desktop static columns, source growth/shrink, focus/order on resize, clipboard
       loop, 300-character text, no target focus ring, accessible compact details and
       Korean labels. Run new tests before completing layout polish.
@@ -79,3 +79,16 @@ className})` with static desktop headings and compact accessible disclosure.
       findings and rerun affected/full checks. Update project instructions for the
       actual layout/selectors. Commit the implementation on the feature branch.
       Expected: a concrete, verified local implementation with no server changes.
+
+## Verification
+
+- 256 unit tests and 266 browser checks pass (Chromium and WebKit, seven sizes).
+- Typecheck, lint, scoped formatting and production build pass.
+- Fresh review findings about alternative Copy, settings debounce and destructive
+  blur flushing were reproduced and fixed with regression tests.
+- Dictionary synonym lookup and selection preservation have browser coverage.
+- 42 reference/implementation image pairs cover short text, 300-character text,
+  dictionary, empty, streaming and error states. Computed main typography and
+  Copy/More-control styles match the approved reference at the compared sizes.
+- Target text surfaces have no focus ring; interactive keyboard focus remains.
+- Services, models, authentication and telemetry remain unchanged. No paid calls.

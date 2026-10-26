@@ -5,7 +5,8 @@ import {
   useTranslatorContext,
 } from '../context/TranslatorContext'
 import { useTranslatorShortcuts } from '../hooks/useTranslatorShortcuts'
-import { mainText } from '../lib/liveResult'
+import { mainText, resultIsCurrent } from '../lib/liveResult'
+import { useUiLang } from '../hooks/useUiLang'
 
 export const Route = createFileRoute('/')({ component: Translator })
 
@@ -19,8 +20,21 @@ function Translator() {
 }
 
 function TranslatorShortcuts() {
-  const { input, live, isPending, error, run, clearInput, textareaRef } =
-    useTranslatorContext()
+  const {
+    input,
+    source,
+    target,
+    mode,
+    context,
+    refinements,
+    live,
+    isPending,
+    error,
+    run,
+    clearInput,
+    textareaRef,
+  } = useTranslatorContext()
+  const { lang } = useUiLang()
   useTranslatorShortcuts({
     hasInput: Boolean(input),
     live,
@@ -32,7 +46,15 @@ function TranslatorShortcuts() {
         live?.done &&
         !isPending &&
         !error &&
-        live.text === input.trim()
+        resultIsCurrent(live, {
+          text: input,
+          source,
+          target,
+          mode,
+          context,
+          refinements,
+          uiLang: lang,
+        })
       )
         void navigator.clipboard.writeText(text)
     },

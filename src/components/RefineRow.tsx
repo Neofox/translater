@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
 import Pill from './ui/Pill'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
@@ -38,6 +39,8 @@ export default function RefineRow() {
   } = useTranslatorContext()
   const { t } = useUiLang()
   const [freeform, setFreeform] = useState('')
+  const [customOpen, setCustomOpen] = useState(false)
+  const freeformRef = useRef<HTMLInputElement>(null)
 
   // Only meaningful under a completed sentence result.
   if (error || streaming) return null
@@ -73,6 +76,7 @@ export default function RefineRow() {
         </p>
       )}
       <div className="refine-controls">
+        <span className="refine-label">{t('refineLabel')}</span>
         {CHIPS.map((c) => {
           const active = refinements.includes(c.instruction)
           return (
@@ -94,7 +98,10 @@ export default function RefineRow() {
           <Pill
             size="sm"
             tone="active"
-            onClick={() => removeRefinement(refinements.indexOf(custom))}
+            onClick={() => {
+              removeRefinement(refinements.indexOf(custom))
+              setCustomOpen(true)
+            }}
             aria-pressed
             aria-label={`${t('refineRemove')}: ${custom}`}
             title={custom}
@@ -105,22 +112,41 @@ export default function RefineRow() {
               : custom}
           </Pill>
         ) : (
-          <input
-            value={freeform}
-            maxLength={MAX_REFINEMENT_CHARS}
-            disabled={atCap}
-            onChange={(e) => setFreeform(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                submitFreeform()
-              }
-            }}
-            placeholder={t('refinePlaceholder')}
-            aria-label={t('refinePlaceholder')}
-            data-testid="refine-freeform"
-            className="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-          />
+          <>
+            <Pill
+              size="sm"
+              className="refine-custom-trigger"
+              aria-expanded={customOpen}
+              disabled={atCap}
+              onClick={() => {
+                setCustomOpen(!customOpen)
+                if (!customOpen)
+                  requestAnimationFrame(() => freeformRef.current?.focus())
+              }}
+              data-testid="refine-custom-trigger"
+            >
+              <Plus size={16} aria-hidden />
+              {t('refineCustom')}
+            </Pill>
+            <input
+              ref={freeformRef}
+              hidden={!customOpen}
+              value={freeform}
+              maxLength={MAX_REFINEMENT_CHARS}
+              disabled={atCap}
+              onChange={(e) => setFreeform(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault()
+                  submitFreeform()
+                }
+              }}
+              placeholder={t('refinePlaceholder')}
+              aria-label={t('refinePlaceholder')}
+              data-testid="refine-freeform"
+              className="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            />
+          </>
         )}
       </div>
     </div>

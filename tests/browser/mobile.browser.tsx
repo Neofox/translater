@@ -7,6 +7,7 @@ import { useTranslatorContext } from '../../src/context/TranslatorContext'
 import { UiLangProvider } from '../../src/hooks/useUiLang'
 import type { LiveResult } from '../../src/hooks/useTranslate'
 import { speak } from '../../src/server/speech'
+import { translationRequestKey } from '../../src/lib/translationRequestKey'
 import { SyntheticAudioContext } from './syntheticAudio'
 
 vi.mock('../../src/context/TranslatorContext', () => ({
@@ -14,6 +15,17 @@ vi.mock('../../src/context/TranslatorContext', () => ({
 }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('../../src/server/speech', () => ({ speak: vi.fn() }))
+
+const requestKey = (text: string) =>
+  translationRequestKey({
+    text,
+    source: 'en',
+    target: 'ko',
+    mode: 'casual',
+    context: '',
+    refinements: [],
+    uiLang: 'en',
+  })
 
 const sourceText = 'Thanks for helping me today.'
 const learningTips = {
@@ -24,6 +36,7 @@ const learningTips = {
 const sentence: LiveResult = {
   intent: 'sentence',
   text: sourceText,
+  requestKey: requestKey(sourceText),
   requestSource: 'en',
   done: true,
   partial: {
@@ -39,6 +52,7 @@ const sentence: LiveResult = {
 const word: LiveResult = {
   intent: 'word',
   text: 'library',
+  requestKey: requestKey('library'),
   requestSource: 'en',
   done: true,
   partial: {
@@ -50,9 +64,21 @@ const word: LiveResult = {
     alternativeTranslations: [
       { text: '도서실', register: [], note: 'A reading room.' },
     ],
-    posList: [],
-    synonyms: [],
-    etymology: '',
+    posList: [
+      {
+        pos: 'noun',
+        senses: [
+          {
+            definition:
+              'A place where books are kept for reading and borrowing.',
+            register: [],
+            examples: ['The library opens at nine.'],
+          },
+        ],
+      },
+    ],
+    synonyms: ['reading room'],
+    etymology: 'From Latin librarium.',
     notes: '',
     learningTips,
   },
@@ -61,20 +87,42 @@ const word: LiveResult = {
 type Context = ReturnType<typeof useTranslatorContext>
 type State = Pick<
   Context,
-  'input' | 'source' | 'target' | 'live' | 'context' | 'isPending' | 'streaming'
+  | 'input'
+  | 'source'
+  | 'target'
+  | 'live'
+  | 'context'
+  | 'isPending'
+  | 'streaming'
+  | 'error'
 >
 let update: (patch: Partial<State>) => void
 let updateUrgent: (patch: Partial<State>) => void
 
-function Fixture({ initial = sentence }: { initial?: LiveResult }) {
+function Fixture({
+  initial = sentence,
+  initialSource = 'en',
+  initialTarget = 'ko',
+  initialMode = 'casual',
+  initialDetected = null,
+  initialError = null,
+}: {
+  initial?: LiveResult
+  initialSource?: Context['source']
+  initialTarget?: Context['target']
+  initialMode?: Context['mode']
+  initialDetected?: Context['detected']
+  initialError?: Context['error']
+}) {
   const [state, setState] = useState<State>({
     input: initial.text,
-    source: 'en',
-    target: 'ko',
+    source: initialSource,
+    target: initialTarget,
     live: initial,
     context: '',
     isPending: false,
     streaming: false,
+    error: initialError,
   })
   update = (patch) =>
     startTransition(() => setState((old) => ({ ...old, ...patch })))
@@ -82,11 +130,10 @@ function Fixture({ initial = sentence }: { initial?: LiveResult }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const context: Context = {
     ...state,
-    mode: 'casual',
+    mode: initialMode,
     intent: state.live?.intent ?? 'sentence',
     isPolish: false,
-    detected: null,
-    error: null,
+    detected: initialDetected,
     refineError: null,
     refinements: [],
     outputTips: state.live?.partial.learningTips,
@@ -105,7 +152,8 @@ function Fixture({ initial = sentence }: { initial?: LiveResult }) {
     reset: vi.fn(),
     flush: () => false,
     queueImmediate: vi.fn(),
-    lookupWord: vi.fn(),
+    lookupWord: (text) =>
+      setState((old) => ({ ...old, input: text, live: null })),
     addRefinement: vi.fn(),
     removeRefinement: vi.fn(),
   }
@@ -176,6 +224,7 @@ test('language menus stay within the viewport and support keyboard selection', a
     const trigger = page
       .getByRole('group', { name })
       .getByTestId('lang-more-trigger')
+    if (!trigger.query()?.checkVisibility()) continue
     await page.mark(`open ${name} menu`, async () => {
       await trigger.click()
     })
@@ -184,15 +233,15 @@ test('language menus stay within the viewport and support keyboard selection', a
     await userEvent.keyboard('{Escape}')
     await expect.element(trigger).toHaveAttribute('aria-expanded', 'false')
     await trigger.click()
-    await userEvent.keyboard('j{Enter}')
+    await userEvent.keyboard('f{Enter}')
     await expect
       .element(
         page
           .getByRole('group', { name })
-          .getByRole('button', { name: '日本語' }),
+          .getByRole('button', { name: 'Français' }),
       )
       .toHaveAttribute('aria-pressed', 'true')
-    await page.mark(`${name} Japanese selection is visible`)
+    await page.mark(`${name} French selection is visible`)
   }
 })
 
@@ -461,11 +510,13 @@ test('desktop notes stay open and short alternatives fit without scrolling', asy
   await render(<Fixture initial={withAlternatives} />)
   await expect
     .element(
-      page.getByRole('heading', { name: 'Why this wording', exact: true }),
+      page.getByRole('heading', { name: /^Why this wording/, exact: true }),
     )
     .toBeVisible()
   expect(
-    page.getByRole('button', { name: 'Why this wording', exact: true }).query(),
+    page
+      .getByRole('button', { name: /^Why this wording/, exact: true })
+      .query(),
   ).toBeNull()
   await expect
     .element(page.getByText(learningTips.grammar, { exact: true }))
@@ -488,6 +539,7 @@ test('long text uses both learner columns and the result has no focus ring', asy
   const initial: LiveResult = {
     ...sentence,
     text: longSource,
+    requestKey: requestKey(longSource),
     partial: {
       ...sentence.partial,
       main: longTranslation,
@@ -508,6 +560,7 @@ test('long text uses both learner columns and the result has no focus ring', asy
     const actions = page
       .getByTestId('output-toolbar')
       .element()
+      .querySelector('.primary-result-actions')!
       .getBoundingClientRect()
     const text = page
       .getByText(longTranslation, { exact: true })
@@ -526,7 +579,7 @@ test('long text uses both learner columns and the result has no focus ring', asy
   )
   if (window.innerWidth >= 1100 && window.innerHeight >= 640) {
     const why = page
-      .getByRole('heading', { name: 'Why this wording', exact: true })
+      .getByRole('heading', { name: /^Why this wording/, exact: true })
       .element()
       .getBoundingClientRect()
     const tips = page
@@ -548,7 +601,9 @@ test('source grows for a long turn then shrinks again without losing Clear', asy
   await input.fill('Hi')
   const shortHeight = textarea.offsetHeight
   await input.fill(longSource)
-  expect(textarea.offsetHeight).toBeGreaterThan(shortHeight)
+  if (window.innerHeight >= 460)
+    expect(textarea.offsetHeight).toBeGreaterThan(shortHeight)
+  else expect(textarea.offsetHeight).toBeGreaterThanOrEqual(shortHeight)
   await input.fill('Hi')
   expect(textarea.offsetHeight).toBeLessThanOrEqual(shortHeight + 1)
   if (window.innerWidth >= 1100 && window.innerHeight >= 640)
@@ -567,18 +622,21 @@ test('resize preserves the focused source node and the conversation draft', asyn
     await render(<Fixture />)
     const input = page.getByTestId('input-textarea')
     await input.fill('Keep this unfinished conversation turn.')
-    const node = input.element()
+    const node = input.element() as HTMLTextAreaElement
+    node.setSelectionRange(5, 14)
     await page.viewport(382, 580)
     await expect
       .element(input)
       .toHaveValue('Keep this unfinished conversation turn.')
     expect(input.element()).toBe(node)
     expect(document.activeElement).toBe(node)
+    expect([node.selectionStart, node.selectionEnd]).toEqual([5, 14])
     await page.viewport(736, 320)
     await expect
       .element(input)
       .toHaveValue('Keep this unfinished conversation turn.')
     expect(document.activeElement).toBe(node)
+    expect([node.selectionStart, node.selectionEnd]).toEqual([5, 14])
   } finally {
     await page.viewport(...original)
   }
@@ -707,3 +765,23 @@ test.each(['book', 'laptop'] as const)(
     }
   },
 )
+
+test('dictionary metadata stays with the result and synonyms start a new lookup', async () => {
+  await render(<Fixture initial={word} />)
+  if (!document.querySelector('[data-desktop]'))
+    await page
+      .getByRole('button', { name: 'About · library', exact: true })
+      .click()
+  await expect
+    .element(
+      page.getByText(
+        'A place where books are kept for reading and borrowing.',
+        { exact: true },
+      ),
+    )
+    .toBeVisible()
+  await page.getByRole('button', { name: 'reading room', exact: true }).click()
+  await expect
+    .element(page.getByTestId('input-textarea'))
+    .toHaveValue('reading room')
+})

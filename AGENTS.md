@@ -66,19 +66,19 @@ The project includes browser-friendly `data-testid` attributes on key interactiv
 
 ### Stable selectors
 
-| Element                    | Selector                                         | Notes                                                                           |
-| -------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| Language chip (by value)   | `[data-testid="lang-chip"][data-value="en"]`     | Big chip buttons; source bar has `auto`, both have `en`/`ko` + recent           |
-| More-languages trigger     | `[data-testid="lang-more-trigger"]`              | Opens the Floating-UI listbox with the remaining languages                      |
-| Dropdown option (by value) | `[data-testid="select-option"][data-value="en"]` | Works for any language code: `auto`, `en`, `ko`, `ja`, `fr`, `es`, `zh`         |
-| Input textarea             | `[data-testid="input-textarea"]`                 | React controlled input; do **not** clear by direct `.value` mutation            |
-| Paste clipboard button     | `[data-testid="paste-input"]`                    | Always available; replaces the current turn                                     |
-| Clear input button         | `[data-testid="clear-input"]`                    | Always available; clears the current turn, preserves context and focuses source |
-| Context toggle             | `[data-testid="context-toggle"]`                 | Input panel meta row; opens the "Replying to…" textarea                         |
-| Context textarea           | `[data-testid="context-textarea"]`               | Session-sticky; has `[data-testid="context-clear"]` when non-empty              |
-| Refine chip (by id)        | `[data-testid="refine-chip-softer"]`             | ids: `softer`, `direct`, `shorter`, `playful`; TOGGLES (`aria-pressed`)         |
-| Refine free-text           | `[data-testid="refine-freeform"]`                | Enter submits; hidden while a custom adjustment is active                       |
-| Refine custom button       | `[data-testid="refine-custom"]`                  | Replaces the free-text input (label ≤20 chars); click removes it                |
+| Element                    | Selector                                         | Notes                                                                                       |
+| -------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Language chip (by value)   | `[data-testid="lang-chip"][data-value="en"]`     | Big chip buttons; source bar has `auto`, both have `en`/`ko` + recent (Japanese by default) |
+| More-languages trigger     | `[data-testid="lang-more-trigger"]`              | Opens the Floating-UI listbox with the remaining languages                                  |
+| Dropdown option (by value) | `[data-testid="select-option"][data-value="en"]` | Works for any language code: `auto`, `en`, `ko`, `ja`, `fr`, `es`, `zh`                     |
+| Input textarea             | `[data-testid="input-textarea"]`                 | React controlled input; do **not** clear by direct `.value` mutation                        |
+| Paste clipboard button     | `[data-testid="paste-input"]`                    | Always available; replaces the current turn                                                 |
+| Clear input button         | `[data-testid="clear-input"]`                    | Always available; clears the current turn, preserves context and focuses source             |
+| Context toggle             | `[data-testid="context-toggle"]`                 | Input panel meta row; opens the "Replying to…" textarea                                     |
+| Context textarea           | `[data-testid="context-textarea"]`               | Session-sticky; has `[data-testid="context-clear"]` when non-empty                          |
+| Refine chip (by id)        | `[data-testid="refine-chip-softer"]`             | ids: `softer`, `direct`, `shorter`, `playful`; TOGGLES (`aria-pressed`)                     |
+| Refine free-text           | `[data-testid="refine-freeform"]`                | Enter submits; hidden while a custom adjustment is active                                   |
+| Refine custom button       | `[data-testid="refine-custom"]`                  | Replaces the free-text input (label ≤20 chars); click removes it                            |
 
 Main pronunciation is `[data-testid="output-toolbar"] [data-testid="listen-button"]`; alternatives are `[data-testid="alternative-item"] [data-testid="listen-button"]`. Scope queries to the row or toolbar because completed results have several Listen buttons.
 
@@ -88,7 +88,7 @@ The textarea is a React controlled component (`value={input}` + `onChange={(e) =
 
 ### Driving the language chip bars
 
-Each panel renders a `LanguageChipBar`: a `role="group"` of big `Pill` chips (source bar = `auto`/`en`/`ko` + one persisted "recent" chip; target bar = `en`/`ko` + recent) plus a trailing `⋯` more-languages trigger. Click a chip directly by `data-value` — no dropdown needed for the fixed languages:
+Each panel renders a `LanguageChipBar`: a `role="group"` of big `Pill` chips (source bar = `auto`/`en`/`ko` + one persisted "recent" chip; target bar = `en`/`ko` + recent) plus a trailing `More…` dropdown trigger. Click a chip directly by `data-value` — no dropdown needed for the fixed languages:
 
 ```bash
 cmux browser --surface <s> click --selector "[data-testid='lang-chip'][data-value='ko']"
@@ -113,7 +113,7 @@ cmux browser --surface <s> click --selector "[aria-label='Source language'] [dat
 cmux browser --surface <s> click --selector "[aria-label='Target language'] [data-testid='lang-more-trigger']"
 ```
 
-**Narrow panels collapse the bar.** A ResizeObserver measures the language group's available width after toolbar actions: source chips expand at 288px, target chips at 240px. Below those widths, only the SELECTED chip renders plus the `⋯` trigger; other languages (including `auto` for the source bar) move into the listbox. This also handles split windows and folded displays. Automation should check whether a chip is rendered and otherwise use `lang-more-trigger` + `select-option`, rather than assuming viewport width guarantees an expanded bar.
+**Narrow panels collapse the bar.** A ResizeObserver measures the language group's available width after toolbar actions: source chips expand at 320px, target chips at 280px. Below those widths, only the SELECTED chip renders plus the `More…` trigger; other languages (including `auto` for the source bar) move into the listbox. This also handles split windows and folded displays. Automation should check whether a chip is rendered and otherwise use `lang-more-trigger` + `select-option`, rather than assuming viewport width guarantees an expanded bar.
 
 **Optional fold layouts.** With Safari's Device Posture and Viewport Segments feature flags enabled, book posture places source and result in separate horizontal segments. Laptop posture places the result above the fold and input below it; `useFoldLayout` measures the header offset so the boundary matches the physical fold. Unsupported browsers keep the standard responsive layout. These layouts use CSS feature queries, never device-name detection.
 
@@ -121,7 +121,8 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 
 `TranslatorWorkspace` owns the shell and shares `useWorkspaceLayout` through
 `WorkspaceLayoutContext`. Desktop uses a framed, auto-growing source composer
-above the result. Compact portrait places the result first and composer below;
+above the result. Breakpoints use the visible app height, with the measured
+panel height retained for sizing. Compact portrait places the result first and composer below;
 short landscape splits them. The hook tracks visualViewport height for the
 keyboard and preserves focus/drafts when keyed panels reorder. Fold media use
 physical viewport segments where available; no device-name detection.
@@ -135,7 +136,10 @@ buttons, menus and selects retain visible keyboard focus.
 Main result text is `[data-testid="main-translation"]`, its scroll surface is
 `[data-testid="translation-result"]`, and its Copy/Listen/refinements are inside
 `[data-testid="output-toolbar"]`. Copy is disabled for partial, pending or stale
-results. Both source actions remain visible and labelled on empty and filled input.
+results, including the settings debounce. `LiveResult.requestKey` captures the
+request settings in page memory; `resultIsCurrent` guards main/alternative actions
+and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
+being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
 
 ### Page structure snapshot (high-level)
 

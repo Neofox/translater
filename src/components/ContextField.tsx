@@ -1,4 +1,4 @@
-import { MessageSquareQuote, X } from 'lucide-react'
+import { Reply, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
@@ -25,7 +25,7 @@ export function ContextToggle({
       data-testid="context-toggle"
       className="context-toggle"
     >
-      <MessageSquareQuote size={14} />
+      <Reply size={18} />
       <span className="context-toggle-label">{t('contextToggle')}</span>
     </Pill>
   )

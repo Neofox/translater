@@ -8,8 +8,11 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import InputPanel from './InputPanel'
+import OutputPanel from './OutputPanel'
 import { TranslatorProvider } from '../context/TranslatorContext'
 import { UiLangProvider } from '../hooks/useUiLang'
+
+const flushDraft = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('../hooks/useTranslate', () => ({
   useTranslate: () => ({
@@ -19,13 +22,14 @@ vi.mock('../hooks/useTranslate', () => ({
     error: null,
     run: () => Promise.resolve(),
     reset: () => {},
-    flush: () => false,
+    flush: flushDraft,
     queueImmediate: () => {},
     restore: () => {},
   }),
 }))
 
 beforeEach(() => {
+  flushDraft.mockClear()
   localStorage.clear()
   sessionStorage.clear()
   vi.stubGlobal('matchMedia', () => ({
@@ -100,4 +104,33 @@ it('retains the current input if clipboard access is denied', async () => {
   fireEvent.change(input, { target: { value: 'Keep this draft.' } })
   fireEvent.click(screen.getByRole('button', { name: 'Paste clipboard' }))
   await waitFor(() => expect(input.value).toBe('Keep this draft.'))
+})
+
+it.each(['paste-input', 'clear-input'])(
+  'does not flush a discarded draft when focus moves to %s',
+  (action) => {
+    renderInput()
+    const input = screen.getByRole('textbox', { name: 'Input text' })
+    fireEvent.change(input, { target: { value: 'An unfinished draft' } })
+    fireEvent.blur(input, { relatedTarget: screen.getByTestId(action) })
+    expect(flushDraft).not.toHaveBeenCalled()
+    fireEvent.blur(input, { relatedTarget: null })
+    expect(flushDraft).toHaveBeenCalledWith('blur')
+  },
+)
+
+it('offers working source samples in the empty result state', () => {
+  render(
+    <UiLangProvider>
+      <TranslatorProvider>
+        <InputPanel />
+        <OutputPanel />
+      </TranslatorProvider>
+    </UiLangProvider>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Try a word: 설레다' }))
+  expect(
+    screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Input text' })
+      .value,
+  ).toBe('설레다')
 })

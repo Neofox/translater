@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { ClipboardPaste, X } from 'lucide-react'
+import { Clipboard, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import LanguageChipBar from './LanguageChipBar'
 import { ContextTextarea, ContextToggle } from './ContextField'
@@ -8,6 +8,7 @@ import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
 import { STRINGS } from '../lib/i18n'
+import { useKbd } from '../hooks/useKbd'
 
 export default function InputPanel() {
   const {
@@ -24,6 +25,7 @@ export default function InputPanel() {
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
   const layout = useWorkspaceLayoutContext()
+  const { mod } = useKbd()
   const [contextOpen, setContextOpen] = useState(false)
   useEffect(() => {
     if (context.trim()) setContextOpen(true)
@@ -68,6 +70,7 @@ export default function InputPanel() {
       if (text) {
         queueImmediate('paste')
         setInput(text)
+        textareaRef.current?.focus({ preventScroll: true })
       }
     } catch {
       /* Keep the current draft when clipboard access is unavailable. */
@@ -97,7 +100,13 @@ export default function InputPanel() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onPaste={() => queueImmediate('paste')}
-          onBlur={() => flush('blur')}
+          onBlur={(event) => {
+            const next = event.relatedTarget
+            if (!(
+              next instanceof Element && next.closest('[data-input-action]')
+            ))
+              flush('blur')
+          }}
           onKeyDown={(event) => {
             if (
               event.key === 'Enter' &&
@@ -125,8 +134,10 @@ export default function InputPanel() {
             onClick={() => void paste()}
             aria-label={t('pasteClipboard')}
             data-testid="paste-input"
+            data-input-action
+            onPointerDown={(event) => event.preventDefault()}
           >
-            <ClipboardPaste size={16} aria-hidden />
+            <Clipboard size={16} aria-hidden />
             <span>{t('paste')}</span>
           </Pill>
           <Pill
@@ -136,6 +147,8 @@ export default function InputPanel() {
             title={t('clearInputTitle')}
             aria-label={t('clearInput')}
             data-testid="clear-input"
+            data-input-action
+            onPointerDown={(event) => event.preventDefault()}
           >
             <X size={16} aria-hidden />
             <span>{t('clear')}</span>
@@ -152,6 +165,7 @@ export default function InputPanel() {
           >
             {count}
           </span>
+          <kbd className="composer-shortcut">{mod}↵</kbd>
         </div>
       </div>
     </section>
