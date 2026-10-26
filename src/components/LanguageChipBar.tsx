@@ -47,7 +47,7 @@ export default function LanguageChipBar({
     if (!barRef.current || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return
-      setIsExpanded(entry.contentRect.width >= (kind === 'source' ? 448 : 320))
+      setIsExpanded(entry.contentRect.width >= (kind === 'source' ? 288 : 240))
     })
     observer.observe(barRef.current)
     return () => observer.disconnect()
@@ -74,7 +74,7 @@ export default function LanguageChipBar({
       ref={barRef}
       role="group"
       aria-label={ariaLabel}
-      className="flex min-w-0 flex-1 items-center gap-1.5"
+      className="language-chip-bar flex min-w-0 flex-1 items-center gap-1.5"
     >
       <div className="language-chip-scroll flex min-w-0 items-center gap-1.5 overflow-x-auto">
         {chips.map((code) => {
@@ -87,18 +87,25 @@ export default function LanguageChipBar({
               aria-pressed={selected}
               data-testid="lang-chip"
               data-value={code}
+              aria-label={
+                code === 'auto' && selected && detected
+                  ? `${labelFor('auto')} · ${labelFor(detected)}`
+                  : labelFor(code)
+              }
               className="px-2!"
               onClick={() => onChange(code)}
             >
-              {code === 'auto' && selected && detected ? (
-                <>
-                  {labelFor('auto')}
-                  <span className="text-ink-dim">·</span>
-                  <span>{labelFor(detected)}</span>
-                </>
-              ) : (
-                labelFor(code)
-              )}
+              <span className="sr-only">
+                {labelFor(code)}
+                {code === 'auto' && selected && detected
+                  ? ` · ${labelFor(detected)}`
+                  : ''}
+              </span>
+              <span aria-hidden>
+                {code === 'auto'
+                  ? `Auto${selected && detected ? ` · ${detected.toUpperCase()}` : ''}`
+                  : code.toUpperCase()}
+              </span>
             </Pill>
           )
         })}

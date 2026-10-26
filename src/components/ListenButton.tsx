@@ -5,9 +5,13 @@ import { useSpeech } from '../hooks/useSpeech'
 import type { SpeechOptions } from '../hooks/useSpeech'
 import { useUiLang } from '../hooks/useUiLang'
 
-type Props = SpeechOptions & { size?: 'sm' | 'md' }
+type Props = SpeechOptions & { size?: 'sm' | 'md'; label?: boolean }
 
-export default function ListenButton({ size = 'md', ...props }: Props) {
+export default function ListenButton({
+  size = 'md',
+  label: showLabel = false,
+  ...props
+}: Props) {
   const { t } = useUiLang()
   const { status, error, toggle } = useSpeech(props)
   const errorId = useId()
@@ -45,6 +49,7 @@ export default function ListenButton({ size = 'md', ...props }: Props) {
         ) : (
           <Volume2 size={14} aria-hidden="true" />
         )}
+        {showLabel && <span>{label}</span>}
       </Pill>
       {error && (
         <span

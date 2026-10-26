@@ -66,13 +66,13 @@ export default function RefineRow() {
   }
 
   return (
-    <div className="shrink-0 border-t border-border px-2 py-2 xl:px-8 xl:py-3 2xl:px-14">
+    <div className="refine-row">
       {refineError && (
         <p data-testid="refine-error" className="mb-2 text-xs text-red-400">
           {t('refineFailed')}: {refineError.message}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="refine-controls">
         {CHIPS.map((c) => {
           const active = refinements.includes(c.instruction)
           return (
@@ -119,7 +119,7 @@ export default function RefineRow() {
             placeholder={t('refinePlaceholder')}
             aria-label={t('refinePlaceholder')}
             data-testid="refine-freeform"
-            className="min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           />
         )}
       </div>

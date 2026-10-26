@@ -8,6 +8,8 @@ type Props = {
   label?: string
   compact?: boolean
   size?: 'sm' | 'md'
+  disabled?: boolean
+  primary?: boolean
 }
 
 export default function CopyButton({
@@ -15,6 +17,8 @@ export default function CopyButton({
   label,
   compact = false,
   size = 'sm',
+  disabled = false,
+  primary = false,
 }: Props) {
   const { t } = useUiLang()
   const [copied, setCopied] = useState(false)
@@ -31,7 +35,14 @@ export default function CopyButton({
 
   const label_ = copied ? t('copied') : (label ?? t('copy'))
   return (
-    <Pill tone="neutral" size={size} onClick={handleCopy} aria-label={label_}>
+    <Pill
+      tone={primary ? 'primary' : 'neutral'}
+      size={size}
+      onClick={handleCopy}
+      aria-label={label_}
+      disabled={disabled}
+      className="copy-button disabled:cursor-not-allowed disabled:opacity-45"
+    >
       {copied ? <Check size={14} /> : <Copy size={14} />}
       {!compact && <span>{label_}</span>}
     </Pill>

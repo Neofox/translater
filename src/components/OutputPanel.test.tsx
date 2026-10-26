@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OutputPanel from './OutputPanel'
 import type { LiveResult } from '../hooks/useTranslate'
 import { UiLangProvider } from '../hooks/useUiLang'
+import {
+  COMPACT_LAYOUT,
+  WorkspaceLayoutContext,
+} from '../context/WorkspaceLayoutContext'
 
 const fixture = vi.hoisted(() => ({
   input: 'Hello there',
@@ -30,7 +34,6 @@ vi.mock('../context/TranslatorContext', () => ({
   useTranslatorContext: () => fixture,
 }))
 vi.mock('./LanguageChipBar', () => ({ default: () => null }))
-vi.mock('./LearningTips', () => ({ default: () => null }))
 vi.mock('./RefineRow', () => ({ default: () => null }))
 vi.mock('./ListenButton', () => ({
   default: ({
@@ -108,6 +111,74 @@ it('removes pronunciation when the result fails', () => {
   expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
 })
 
+it('disables Copy until the current translation is complete', () => {
+  const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
+  ).toBe(true)
+  fixture.live.done = true
+  rerender(<OutputPanel />)
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
+  ).toBe(false)
+  fixture.input = 'An edited source'
+  rerender(<OutputPanel />)
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
+  ).toBe(true)
+  fixture.input = fixture.live.text
+  fixture.isPending = true
+  rerender(<OutputPanel />)
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
+  ).toBe(true)
+})
+
+it('does not offer a successful Copy action for a failed result', () => {
+  fixture.live.done = true
+  fixture.error = { kind: 'server', message: 'Unavailable' }
+  render(<OutputPanel />, { wrapper: UiLangProvider })
+  expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
+})
+
+it('keeps desktop explanation and learning content open with static headings', () => {
+  fixture.live.done = true
+  fixture.live.partial = {
+    ...fixture.live.partial,
+    rationale: 'The wording avoids a literal idiom.',
+    formalityNote: 'A polite ending.',
+    learningTips: { grammar: 'A useful ending.', vocab: '', characters: [] },
+  }
+  render(
+    <WorkspaceLayoutContext.Provider
+      value={{ ...COMPACT_LAYOUT, desktop: true }}
+    >
+      <OutputPanel />
+    </WorkspaceLayoutContext.Provider>,
+    { wrapper: UiLangProvider },
+  )
+  expect(screen.getByRole('heading', { name: 'Why this wording' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Learning tips' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Why this wording' })).toBeNull()
+  expect(screen.getByText('A useful ending.').closest('[hidden]')).toBeNull()
+})
+
+it('tucks compact wording notes behind a keyboard-accessible disclosure', () => {
+  fixture.live.done = true
+  fixture.live.partial = {
+    ...fixture.live.partial,
+    rationale: 'An idiomatic expression.',
+    formalityNote: 'A polite ending.',
+  }
+  render(<OutputPanel />, { wrapper: UiLangProvider })
+  const toggle = screen.getByRole('button', { name: 'Why this wording' })
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(screen.getByText('A polite ending.').closest('[hidden]')).toBeTruthy()
+  fireEvent.click(toggle)
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(screen.getByText('A polite ending.').closest('[hidden]')).toBeNull()
+})
+
 it.each(['sentence', 'word'] as const)(
   'adds pronunciation for completed %s alternatives with the same stale-result guards',
   (intent) => {
@@ -150,6 +221,12 @@ it.each(['sentence', 'word'] as const)(
     fixture.streaming = false
     fixture.live.done = true
     rerender(<OutputPanel />)
+    fireEvent.click(
+      screen.getByRole('button', {
+        name:
+          intent === 'sentence' ? 'Alternatives' : 'Alternative translations',
+      }),
+    )
     const buttons = screen.getAllByRole<HTMLButtonElement>('button', {
       name: 'Listen in ko',
     })

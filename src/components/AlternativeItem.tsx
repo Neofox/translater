@@ -21,11 +21,11 @@ export default function AlternativeItem({
   return (
     <li
       data-testid="alternative-item"
-      className="animate-settle group flow-root rounded-lg border border-border bg-panel px-3 py-2"
+      className="alternative-item animate-settle group flow-root rounded-lg border border-border bg-panel px-3 py-2"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {text && (
-        <div className="float-right ml-2 inline-flex items-center gap-1.5 transition sm:opacity-60 sm:group-hover:opacity-100">
+        <div className="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
           {speech && <ListenButton {...speech} text={text} size="sm" />}
           <CopyButton text={text} compact />
         </div>

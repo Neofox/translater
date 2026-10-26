@@ -52,7 +52,7 @@ export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
     : null
 
   return (
-    <div className="shrink-0 border-t border-border px-4 py-4 text-sm text-ink-soft sm:px-6 xl:px-12 2xl:px-18">
+    <div className="word-source-meta shrink-0 border-t border-border py-4 text-sm text-ink-soft">
       {posList.length > 1 && (
         <PosTabs
           posList={posList}
