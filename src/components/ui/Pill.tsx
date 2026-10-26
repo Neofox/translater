@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
-type Tone = 'neutral' | 'accent' | 'warm' | 'active'
+type Tone = 'neutral' | 'accent' | 'warm' | 'active' | 'primary'
 type Size = 'sm' | 'md'
 
 type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
@@ -11,6 +11,7 @@ type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
 }
 
 const toneClass: Record<Tone, string> = {
+  primary: 'border-transparent bg-accent text-bg hover:brightness-110',
   neutral: 'border-border bg-panel hover:border-accent/60',
   accent: 'border-border bg-panel hover:border-accent/60 [&>svg]:text-accent',
   warm: 'border-border bg-panel hover:border-warm/60 [&>svg]:text-warm',
@@ -18,11 +19,9 @@ const toneClass: Record<Tone, string> = {
 }
 
 const sizeClass: Record<Size, string> = {
-  sm: 'gap-1.5 px-2 py-1 text-xs',
-  // min-h keeps icon-only pills (copy, clear) as tall as text pills: a 14px
-  // svg doesn't establish the 20px text-sm line-height, so they'd render 28px
-  // instead of the 34px a labeled md pill computes to.
-  md: 'gap-2 px-3 py-1.5 text-sm min-h-8.5',
+  sm: 'gap-1.5 px-2 py-1 text-xs min-h-11 min-w-11',
+  // Keep icon-only and labelled controls at the same 44px touch target.
+  md: 'gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11',
 }
 
 export default function Pill({
@@ -38,7 +37,7 @@ export default function Pill({
       ref={ref}
       type="button"
       {...rest}
-      className={`inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md border text-ink transition ${toneClass[tone]} ${sizeClass[size]} ${className}`}
+      className={`ui-pill inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition ${tone !== 'primary' ? 'text-ink' : ''} ${toneClass[tone]} ${sizeClass[size]} ${className}`}
     >
       {children}
     </button>

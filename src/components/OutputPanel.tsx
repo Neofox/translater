@@ -1,15 +1,17 @@
 import { ViewTransition } from 'react'
-import { Loader2 } from 'lucide-react'
+import { ArrowRightLeft, RotateCcw, TriangleAlert, Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
 import ListenButton from './ListenButton'
-import LearningTips from './LearningTips'
 import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
+import Pill from './ui/Pill'
+import Tag from './ui/Tag'
+import { useKbd } from '../hooks/useKbd'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
-import { mainText } from '../lib/liveResult'
+import { mainText, resultIsCurrent } from '../lib/liveResult'
 import { isLongForm } from '../lib/longForm'
 
 export default function OutputPanel() {
@@ -18,22 +20,37 @@ export default function OutputPanel() {
     source,
     target,
     setTarget,
+    setSource,
+    setInput,
+    detected,
+    run,
     mode,
     isPolish,
     live,
     isPending,
     streaming,
     error,
-    outputTips,
     context,
     refinements,
   } = useTranslatorContext()
-  const { t } = useUiLang()
+  const { t, lang } = useUiLang()
+  const { mod, shift } = useKbd()
   const copyText = mainText(live)
+  const stale =
+    isPending ||
+    !resultIsCurrent(live, {
+      text: input,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+      uiLang: lang,
+    })
   const speech = live?.done
     ? {
         language: live.partial.targetLang ?? target,
-        disabled: isPending || input.trim() !== live.text,
+        disabled: stale,
         resetKey: JSON.stringify([
           input,
           source,
@@ -46,89 +63,177 @@ export default function OutputPanel() {
     : undefined
 
   return (
-    <section className="output-panel flex min-h-0 min-w-0 flex-1 flex-col xl:pt-6 2xl:pt-12">
-      <div
-        data-testid="output-toolbar"
-        className="@container/output-toolbar flex min-w-0 items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16"
-      >
+    <section
+      className="output-panel"
+      aria-label={t('translation')}
+      aria-busy={streaming}
+    >
+      <div className="target-toolbar" data-testid="target-toolbar">
+        <button
+          type="button"
+          className="swap-button"
+          aria-label={t('swapLanguages')}
+          onClick={() => {
+            const from = source === 'auto' ? (detected ?? 'en') : source
+            if (live?.done && !stale && copyText) {
+              setInput(copyText)
+              setSource('auto')
+              setTarget(from)
+            } else {
+              setSource(target)
+              setTarget(from)
+            }
+          }}
+        >
+          <ArrowRightLeft size={18} aria-hidden />
+        </button>
         <LanguageChipBar
           kind="target"
           value={target}
           onChange={setTarget}
           aria-label={t('targetLanguage')}
         />
-        <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-          {streaming && (
-            <span className="inline-flex items-center gap-1.5 text-xs text-accent">
-              <Loader2 size={12} className="animate-spin" />
-              {isPolish ? t('polishing') : t('streaming')}
-            </span>
-          )}
-          <span className={streaming ? 'hidden sm:contents' : 'contents'}>
-            <LearningTips tips={outputTips} />
+        {streaming && (
+          <span className="stream-state">
+            <Loader2 size={14} className="animate-spin" aria-hidden />
+            {isPolish ? t('polishing') : t('streaming')}
           </span>
-          {!error && speech && copyText?.trim() && (
-            <ListenButton {...speech} text={copyText} />
-          )}
-          {copyText && <CopyButton text={copyText} compact size="md" />}
-        </div>
+        )}
       </div>
       <ViewTransition default="result-transition">
         <div
-          className="min-h-0 flex-1 overflow-hidden"
+          className="result-scroll scrollbar-thin"
           data-testid="translation-result"
+          tabIndex={0}
+          aria-label={t('translation')}
         >
-          {error && <ErrorView error={error} />}
-          {!error && live?.intent === 'sentence' && (
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="min-h-0 flex-1 overflow-hidden">
+          {error && (
+            <div className="result-error" role="alert">
+              <TriangleAlert size={28} aria-hidden className="state-icon" />
+              <p className="state-title">{t('translationFailedTitle')}</p>
+              <p className="state-body">{error.message}</p>
+              {(error.hint || error.kind === 'server') && (
+                <p className="mt-2 text-ink-dim">
+                  {error.hint ?? t('errorEnvHint')}
+                </p>
+              )}
+              {error.kind === 'server' && (
+                <div className="state-actions">
+                  <Pill
+                    tone="accent"
+                    className="retry-button"
+                    size="md"
+                    onClick={() => void run(undefined, 'force')}
+                  >
+                    <RotateCcw size={18} aria-hidden />
+                    {t('retry')}
+                  </Pill>
+                </div>
+              )}
+            </div>
+          )}
+          {!error && live && (
+            <div className="result-content">
+              <p
+                className={`result-main ${live.intent === 'word' ? 'result-word' : ''}`}
+                lang={live.partial.targetLang ?? target}
+                data-testid="main-translation"
+              >
+                {copyText ||
+                  (streaming ? (
+                    <span className="result-cursor animate-pulse" aria-hidden />
+                  ) : (
+                    <span className="text-ink-dim">&hellip;</span>
+                  ))}
+                {streaming && copyText && (
+                  <span className="result-cursor animate-pulse" aria-hidden />
+                )}
+              </p>
+              <div className="result-actions" data-testid="output-toolbar">
+                <div className="primary-result-actions">
+                  <CopyButton
+                    text={copyText ?? ''}
+                    size="md"
+                    primary
+                    disabled={!live.done || stale || !copyText}
+                  />
+                  {speech && copyText?.trim() && (
+                    <ListenButton {...speech} text={copyText} label />
+                  )}
+                  <kbd className="result-shortcut">
+                    {mod}
+                    {shift}C
+                  </kbd>
+                </div>
+                {live.intent === 'word' && live.partial.posList?.[0]?.pos && (
+                  <Tag tone="warm">{live.partial.posList[0].pos}</Tag>
+                )}
+                <RefineRow />
+              </div>
+              {streaming && (
+                <div className="stream-skeleton" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
+              {live.intent === 'sentence' ? (
                 <SentenceView
                   result={live.partial}
                   streaming={streaming}
                   speech={speech}
+                  copyDisabled={!live.done || stale}
+                  registerLabel={
+                    live.partial.targetLang === 'ko'
+                      ? mode === 'friends'
+                        ? '반말'
+                        : mode === 'casual'
+                          ? '해요체'
+                          : '존댓말'
+                      : undefined
+                  }
                   hideAlternatives={isLongForm(live.text)}
                 />
-              </div>
-              <RefineRow />
+              ) : (
+                <WordView
+                  result={live.partial}
+                  mode={mode}
+                  streaming={streaming}
+                  speech={speech}
+                  copyDisabled={!live.done || stale}
+                />
+              )}
             </div>
           )}
-          {!error && live?.intent === 'word' && (
-            <WordView
-              result={live.partial}
-              mode={mode}
-              streaming={streaming}
-              speech={speech}
-            />
+          {!error && !live && !isPending && (
+            <div className="result-empty">
+              <p className="state-title">{t('emptyTitle')}</p>
+              <p className="state-body">{t('emptyBody')}</p>
+              <div className="state-actions">
+                <Pill
+                  size="md"
+                  onClick={() =>
+                    setInput(
+                      'I had a really lovely time with you. Let’s do this again soon.',
+                    )
+                  }
+                >
+                  {t('sampleSentence')}
+                </Pill>
+                <Pill
+                  size="md"
+                  onClick={() => {
+                    setTarget('en')
+                    setInput('설레다')
+                  }}
+                >
+                  {t('sampleWord')}
+                </Pill>
+              </div>
+            </div>
           )}
-          {!error && !live && !isPending && <EmptyState />}
         </div>
       </ViewTransition>
     </section>
-  )
-}
-
-function ErrorView({
-  error,
-}: {
-  error: { message: string; hint?: string; kind: 'input' | 'server' }
-}) {
-  const { t } = useUiLang()
-  const hint =
-    error.hint ?? (error.kind === 'server' ? t('errorEnvHint') : null)
-  return (
-    <div className="p-6 text-sm text-red-400 xl:px-12 2xl:px-18">
-      {error.message}
-      {hint && <p className="mt-2 text-ink-dim">{hint}</p>}
-    </div>
-  )
-}
-
-function EmptyState() {
-  const { t } = useUiLang()
-  return (
-    <div className="flex h-full min-h-[8rem] flex-col items-center justify-center p-6 text-center text-ink-dim">
-      <p className="text-sm">{t('emptyMain')}</p>
-      <p className="mt-1 text-xs">{t('emptySub')}</p>
-    </div>
   )
 }

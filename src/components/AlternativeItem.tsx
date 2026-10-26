@@ -6,6 +6,7 @@ import type { SpeechOptions } from '../hooks/useSpeech'
 type Props = {
   text?: string
   note?: string
+  copyDisabled?: boolean
   index: number
   children?: ReactNode
   speech?: Omit<SpeechOptions, 'text'>
@@ -17,30 +18,33 @@ export default function AlternativeItem({
   index,
   children,
   speech,
+  copyDisabled,
 }: Props) {
   return (
     <li
       data-testid="alternative-item"
-      className="animate-settle group flow-root rounded-lg border border-border bg-panel px-3 py-2"
+      className="alternative-item animate-settle group flow-root rounded-lg border border-border bg-panel px-3 py-2"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {text && (
-        <div className="float-right ml-2 inline-flex items-center gap-1.5 transition sm:opacity-60 sm:group-hover:opacity-100">
+        <div className="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
           {speech && <ListenButton {...speech} text={text} size="sm" />}
-          <CopyButton text={text} compact />
+          <CopyButton text={text} disabled={copyDisabled} />
         </div>
       )}
       {children ? (
         <div className="flex flex-wrap items-baseline gap-2">
-          <p className="min-w-0 break-words text-base text-ink">{text}</p>
+          <p className="alternative-text min-w-0 break-words text-ink">
+            {text}
+          </p>
           {children}
         </div>
       ) : (
-        <p className="whitespace-pre-wrap break-words text-base text-ink">
+        <p className="alternative-text whitespace-pre-wrap break-words text-ink">
           {text}
         </p>
       )}
-      {note && <p className="text-xs text-ink-dim">{note}</p>}
+      {note && <p className="alternative-note text-ink-soft">{note}</p>}
     </li>
   )
 }

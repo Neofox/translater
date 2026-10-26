@@ -1,68 +1,61 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-condition -- Streamed JSON can omit nested fields until final schema validation. */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- Streamed JSON can omit nested fields. */
 import type { WordResult } from '../server/schemas'
 import type { Mode } from '../lib/types'
 import AlternativeItem from './AlternativeItem'
 import type { SpeechOptions } from '../hooks/useSpeech'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 import Tag from './ui/Tag'
+import LearningTips from './LearningTips'
+import ResultSection from './ResultSection'
+import WordSourceMeta from './WordSourceMeta'
 import { useUiLang } from '../hooks/useUiLang'
-import type { StringKey } from '../lib/i18n'
-
-const MODE_KEY: Record<Mode, StringKey> = {
-  friends: 'modeFriends',
-  casual: 'modeCasual',
-  professional: 'modeProfessional',
-}
+import { useTranslatorContext } from '../context/TranslatorContext'
 
 type Props = {
   result: Partial<WordResult>
   mode: Mode
+  copyDisabled?: boolean
   streaming?: boolean
   speech?: Omit<SpeechOptions, 'text'>
 }
 
-export default function WordView({ result, mode, streaming, speech }: Props) {
+export default function WordView({
+  result,
+  streaming,
+  speech,
+  copyDisabled,
+}: Props) {
   const { t } = useUiLang()
+  const { lookupWord } = useTranslatorContext()
   const all = result.alternativeTranslations ?? []
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
-
+  const hasAlternatives = settled.length > 0 || Boolean(streaming && all.length)
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-6 scrollbar-thin xl:px-12 2xl:px-18">
-      <div>
-        <p className="text-3xl font-semibold text-ink">
-          {result.primaryTranslation || (
-            <span className="text-ink-dim">&hellip;</span>
-          )}
-          {streaming && result.primaryTranslation && (
-            <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-1 animate-pulse bg-accent align-baseline" />
-          )}
-        </p>
-        {result.primaryUsageNote && (
-          <p className="mt-2 text-sm italic text-ink-soft">
-            {result.primaryUsageNote}
-          </p>
-        )}
-      </div>
-
-      {(settled.length > 0 || (streaming && all.length > 0)) && (
-        <div>
-          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-dim">
-            {t('alternativeTranslations')}
-            <Tag tone="accent">{t(MODE_KEY[mode])}</Tag>
-          </p>
-          <ul className="space-y-1.5">
-            {settled.map((alt, i) => (
+    <div
+      className={`result-details ${hasAlternatives ? 'has-alternatives' : ''}`}
+    >
+      {result.primaryUsageNote && (
+        <ResultSection title={t('usage')} className="detail-why">
+          <p>{result.primaryUsageNote}</p>
+        </ResultSection>
+      )}
+      {hasAlternatives && (
+        <ResultSection
+          title={t('alternativeTranslations')}
+          className="detail-alternatives"
+        >
+          <ul className="alternative-list">
+            {settled.map((alt, index) => (
               <AlternativeItem
-                key={i}
-                index={i}
+                key={index}
+                index={index}
                 text={alt.text}
                 note={alt.note}
                 speech={speech}
+                copyDisabled={copyDisabled}
               >
-                {(alt.register ?? []).map((r) => (
-                  <Tag key={r} tone="neutral">
-                    {r}
-                  </Tag>
+                {(alt.register ?? []).map((register) => (
+                  <Tag key={register}>{register}</Tag>
                 ))}
               </AlternativeItem>
             ))}
@@ -70,8 +63,19 @@ export default function WordView({ result, mode, streaming, speech }: Props) {
               <AlternativeItemSkeleton />
             )}
           </ul>
-        </div>
+        </ResultSection>
       )}
+      <ResultSection
+        title={`${t('aboutWord')}${result.headword ? ` · ${result.headword}` : ''}`}
+        className="detail-about"
+      >
+        <WordSourceMeta
+          result={result}
+          streaming={streaming}
+          onLookup={lookupWord}
+        />
+      </ResultSection>
+      <LearningTips tips={result.learningTips} />
     </div>
   )
 }

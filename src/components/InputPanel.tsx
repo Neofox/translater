@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
-import CopyButton from './CopyButton'
+import { useEffect, useLayoutEffect, useState } from 'react'
+import { Clipboard, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import LanguageChipBar from './LanguageChipBar'
-import WordSourceMeta from './WordSourceMeta'
 import { ContextTextarea, ContextToggle } from './ContextField'
 import { useTranslatorContext } from '../context/TranslatorContext'
+import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
 import { STRINGS } from '../lib/i18n'
+import { useKbd } from '../hooks/useKbd'
 
 export default function InputPanel() {
   const {
@@ -17,148 +17,156 @@ export default function InputPanel() {
     source,
     setSource,
     detected,
-    live,
-    streaming,
-    error,
     clearInput,
-    lookupWord,
     textareaRef,
     flush,
     queueImmediate,
     context,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
-
+  const layout = useWorkspaceLayoutContext()
+  const { mod } = useKbd()
   const [contextOpen, setContextOpen] = useState(false)
-  // Auto-open when a sticky context hydrates from sessionStorage after reload.
   useEffect(() => {
     if (context.trim()) setContextOpen(true)
   }, [context])
 
-  const charCount = input.length
-  const showCounter = charCount >= INPUT_WARN_THRESHOLD
-  const overLimit = charCount > MAX_INPUT_CHARS
-  const counterText = STRINGS[lang].charCount
-    .replace('{count}', String(charCount))
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const resize = () => {
+      textarea.style.height = '0px'
+      const style = getComputedStyle(textarea)
+      const minimum = parseFloat(style.minHeight) || 52
+      const maximum = parseFloat(style.maxHeight) || 180
+      const border =
+        (parseFloat(style.borderTopWidth) || 0) +
+        (parseFloat(style.borderBottomWidth) || 0)
+      textarea.style.height = `${Math.max(minimum, Math.min(maximum, textarea.scrollHeight + border))}px`
+    }
+    resize()
+    let width = textarea.parentElement?.clientWidth
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver(([entry]) => {
+            if (entry && entry.contentRect.width !== width) {
+              width = entry.contentRect.width
+              resize()
+            }
+          })
+    if (textarea.parentElement) observer?.observe(textarea.parentElement)
+    return () => observer?.disconnect()
+  }, [input, contextOpen, layout, textareaRef])
+
+  const overLimit = input.length > MAX_INPUT_CHARS
+  const showLimit = input.length >= INPUT_WARN_THRESHOLD
+  const count = (showLimit ? STRINGS[lang].charCount : STRINGS[lang].inputCount)
+    .replace('{count}', String(input.length))
     .replace('{max}', String(MAX_INPUT_CHARS))
-  const counterTone = overLimit
-    ? 'text-red-400'
-    : charCount >= MAX_INPUT_CHARS * 0.95
-      ? 'text-warm'
-      : 'text-ink-dim'
+  const paste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        queueImmediate('paste')
+        setInput(text)
+        textareaRef.current?.focus({ preventScroll: true })
+      }
+    } catch {
+      /* Keep the current draft when clipboard access is unavailable. */
+    }
+  }
 
   return (
-    <section
-      className={`input-panel flex min-h-0 min-w-0 flex-col border-b border-border md:border-b-0 md:border-r xl:py-6 2xl:py-12 ${
-        input ? '' : 'flex-1'
-      }`}
-    >
-      <div className="@container/input-toolbar shrink-0 flex min-w-0 items-center justify-between gap-1.5 px-3 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16">
-        <LanguageChipBar
-          kind="source"
-          value={source}
-          onChange={setSource}
-          detected={detected}
-          aria-label={t('sourceLanguage')}
+    <section className="input-panel" aria-label={t('sourceText')}>
+      <div className="composer">
+        <div className="composer-header">
+          <LanguageChipBar
+            kind="source"
+            value={source}
+            onChange={setSource}
+            detected={detected}
+            aria-label={t('sourceLanguage')}
+          />
+        </div>
+        {contextOpen && (
+          <div className="composer-context">
+            <ContextTextarea />
+          </div>
+        )}
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onPaste={() => queueImmediate('paste')}
+          onBlur={(event) => {
+            const next = event.relatedTarget
+            if (!(
+              next instanceof Element && next.closest('[data-input-action]')
+            ))
+              flush('blur')
+          }}
+          onKeyDown={(event) => {
+            if (
+              event.key === 'Enter' &&
+              !event.shiftKey &&
+              !event.metaKey &&
+              !event.ctrlKey &&
+              !event.nativeEvent.isComposing &&
+              flush('enter')
+            )
+              event.preventDefault()
+          }}
+          placeholder={t('placeholder')}
+          aria-label={t('inputText')}
+          data-testid="input-textarea"
+          className="translation-input scrollbar-thin"
+          spellCheck
+          autoComplete="off"
+          autoCorrect="on"
         />
-        <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+        <div className="composer-actions">
+          <Pill
+            size="md"
+            tone="primary"
+            className="paste-button"
+            onClick={() => void paste()}
+            aria-label={t('pasteClipboard')}
+            data-testid="paste-input"
+            data-input-action
+            onPointerDown={(event) => event.preventDefault()}
+          >
+            <Clipboard size={16} aria-hidden />
+            <span>{t('paste')}</span>
+          </Pill>
+          <Pill
+            size="md"
+            className="clear-button"
+            onClick={clearInput}
+            title={t('clearInputTitle')}
+            aria-label={t('clearInput')}
+            data-testid="clear-input"
+            data-input-action
+            onPointerDown={(event) => event.preventDefault()}
+          >
+            <X size={16} aria-hidden />
+            <span>{t('clear')}</span>
+          </Pill>
+        </div>
+        <div className="composer-meta">
           <ContextToggle
             open={contextOpen}
-            onToggle={() => setContextOpen((v) => !v)}
+            onToggle={() => setContextOpen((value) => !value)}
           />
-          {input && <CopyButton text={input} compact size="md" />}
-          {input && (
-            <Pill
-              size="md"
-              onClick={clearInput}
-              title={t('clearInputTitle')}
-              aria-label={t('clearInput')}
-              data-testid="clear-input"
-            >
-              <X size={14} />
-            </Pill>
-          )}
-        </div>
-      </div>
-      <div
-        className="flex min-h-0 flex-1 cursor-text flex-col overflow-y-auto scrollbar-thin"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) textareaRef.current?.focus()
-        }}
-      >
-        {contextOpen && <ContextTextarea />}
-        <div
-          className="relative flex flex-col"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) textareaRef.current?.focus()
-          }}
-        >
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onPaste={() => queueImmediate('paste')}
-            onBlur={() => flush('blur')}
-            onKeyDown={(e) => {
-              // Enter fires a pending debounced translation immediately;
-              // when nothing is pending it stays a plain newline.
-              // Shift+Enter always inserts a newline; Cmd/Ctrl+Enter is the
-              // global force-run shortcut. Skip mid-IME-composition Enter
-              // (Korean/Japanese input commits the composition with Enter).
-              if (
-                e.key === 'Enter' &&
-                !e.shiftKey &&
-                !e.metaKey &&
-                !e.ctrlKey &&
-                !e.nativeEvent.isComposing &&
-                flush('enter')
-              ) {
-                e.preventDefault()
-              }
-            }}
-            placeholder={t('placeholder')}
-            aria-label={t('inputText')}
-            data-testid="input-textarea"
-            className="translation-input field-sizing-content min-h-[7rem] w-full resize-none bg-transparent px-4 py-3 text-lg leading-relaxed text-ink placeholder:text-ink-dim focus:outline-none scrollbar-thin sm:px-6 sm:py-4 sm:text-xl xl:px-12 2xl:px-18"
-            spellCheck
-            autoComplete="off"
-            autoCorrect="on"
-          />
-          {!input && (
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  const text = await navigator.clipboard.readText()
-                  if (text) {
-                    queueImmediate('paste')
-                    setInput(text)
-                  }
-                } catch {
-                  // clipboard unavailable or permission denied
-                }
-              }}
-              className="absolute left-35 text-sm top-4 sm:left-40 sm:top-5 xl:left-46 2xl:left-52 text-ink-dim cursor-pointer underline decoration-dotted underline-offset-4 transition hover:text-ink  sm:text-base"
-            >
-              {t('pasteClipboard')}
-            </button>
-          )}
-        </div>
-        {showCounter && (
-          <p
-            className={`px-4 pb-2 text-right text-xs font-medium tabular-nums sm:px-6 xl:px-12 2xl:px-18 ${counterTone}`}
-            aria-live="polite"
+          <span
+            className={`input-count ${showLimit ? 'input-count-visible' : ''} ${overLimit ? 'text-red-400' : 'text-ink-dim'}`}
+            aria-live={showLimit ? 'polite' : undefined}
           >
-            {counterText}
-          </p>
-        )}
-        {!error && live?.intent === 'word' && (
-          <WordSourceMeta
-            result={live.partial}
-            streaming={streaming}
-            onLookup={lookupWord}
-          />
-        )}
+            {count}
+          </span>
+          <kbd className="composer-shortcut">{mod}↵</kbd>
+        </div>
       </div>
     </section>
   )
