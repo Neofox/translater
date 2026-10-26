@@ -73,3 +73,11 @@ Files: vitest.browser.config.ts, tests/browser/*, package.json/lock, .gitignore,
 - Independent review found no remaining actionable issues in the HTTPS correction; 58 targeted server/playback tests independently passed.
 - Whole-repository formatting check flags seven unchanged pre-existing files (`.cta.json`, five `.superpowers/sdd` task briefs, and `prettier.config.js`). Changed feature files pass a separate formatting check.
 - User approved pushing after reviewing the real audio sample. Commit and push the verified feature branch, open a pull request against master, and inspect its Vercel preview deployment.
+
+## Alternative pronunciation follow-up
+
+- Added compact Listen/Stop beside Copy on sentence and dictionary alternatives. Only completed results offer speech, and alternative requests contain only their text in the target language.
+- Main and alternative controls share one active playback owner; switching speakers stops audio or aborts a connecting request. Existing stale-input/pending/settings guards apply to all controls.
+- 235 unit tests, 40 Chromium/WebKit browser checks, typecheck, ESLint, formatting, and Node 24 build pass. Independent review found no actionable issues.
+- Real WebKit alternative playback returned HTTP 200 with nonzero PCM24k audio that completed; replay/Stop caused no additional request, and the card had no horizontal overflow.
+- Extend PR #4 with this follow-up before merging.

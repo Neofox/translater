@@ -19,6 +19,7 @@ type ActivePlayback = {
   controller: AbortController
   player: PcmPlayer
   reader?: ReadableStreamDefaultReader<SpeechChunk>
+  stop: () => void
 }
 export type SpeechOptions = {
   text: string
@@ -35,6 +36,8 @@ const replayCache = new Map<string, CachedAudio>()
 const MAX_CACHE_BYTES = 4 * 1024 * 1024
 const MAX_CACHE_ENTRIES = 3
 let cacheBytes = 0
+// Set only by browser gestures. Main and alternative controls share one voice.
+let pagePlayback: ActivePlayback | null = null
 
 function cacheAudio(key: string, audio: CachedAudio) {
   if (audio.bytes > MAX_CACHE_BYTES) return
@@ -66,6 +69,7 @@ export function useSpeech({
     const current = active.current
     active.current = null
     if (!current) return
+    if (pagePlayback === current) pagePlayback = null
     current.controller.abort()
     void current.reader?.cancel().catch(() => {})
     current.player.stop()
@@ -124,7 +128,10 @@ export function useSpeech({
     const current: ActivePlayback = {
       player: playback,
       controller: new AbortController(),
+      stop,
     }
+    pagePlayback?.stop()
+    pagePlayback = current
     active.current = current
     setStatus('loading')
     const isCurrent = () =>
@@ -186,6 +193,7 @@ export function useSpeech({
         }
         if (isCurrent()) {
           active.current = null
+          if (pagePlayback === current) pagePlayback = null
           playback.stop()
           setStatus('idle')
         }
@@ -206,7 +214,7 @@ export function useSpeech({
         }
       }
     })()
-  }, [disabled, text, language, uiLang, speakFn, cancel])
+  }, [disabled, text, language, uiLang, speakFn, cancel, stop])
 
   const toggle = useCallback(() => {
     if (active.current) stop()

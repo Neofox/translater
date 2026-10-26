@@ -39,7 +39,7 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - `SPEECH_MODEL` chooses one exact Gateway speech model (default `google/gemini-3.8-flash-lite-tts`). `SPEECH_VOICE` is optional; Google defaults to `Kore`. Change deployment env, redeploy, and reload to switch. No fallback or automatic retry. Swaps must support HTTPS `generateSpeech` with mono PCM16 WAV output (8–48 kHz). Gateway currently does not support its experimental WebSocket speech surface.
 - `useSpeech` unlocks Web Audio synchronously on tap, streams through `PcmPlayer`, stops on edits/settings changes/unmount/pagehide, and caches only completed audio in a bounded page-memory LRU. Preserve the layout-effect reset: passive cleanup can cancel an immediate tap on a newly completed result.
 - Speech limits: 4,000 input characters, 8 MiB audio, 90-second server timeout. Never log source text, raw provider errors, or audio; speech does not register telemetry. `aiSdkWarnings.server.ts` installs a permanent process-wide SDK warning suppression policy because provider warnings have no per-call warning hook; do not temporarily toggle it around requests.
-- `OutputPanel` exposes Listen only on completed non-error results. Result `ViewTransition` updates are scheduled at completion/error; run initialization and token deltas stay urgent to preserve live-result provenance. Respect reduced motion.
+- `OutputPanel` exposes main and alternative Listen controls only on completed non-error results; both use the same language, stale/pending guard, and settings reset key. `useSpeech` shares one active playback owner across controls, so starting another voice cancels the previous loading/playing request. Keep owner cleanup guarded by identity. Result `ViewTransition` updates are scheduled at completion/error; run initialization and token deltas stay urgent to preserve live-result provenance. Respect reduced motion.
 
 ## Styling
 
@@ -78,6 +78,8 @@ The project includes browser-friendly `data-testid` attributes on key interactiv
 | Refine chip (by id)        | `[data-testid="refine-chip-softer"]`             | ids: `softer`, `direct`, `shorter`, `playful`; TOGGLES (`aria-pressed`) |
 | Refine free-text           | `[data-testid="refine-freeform"]`                | Enter submits; hidden while a custom adjustment is active               |
 | Refine custom button       | `[data-testid="refine-custom"]`                  | Replaces the free-text input (label ≤20 chars); click removes it        |
+
+Main pronunciation is `[data-testid="output-toolbar"] [data-testid="listen-button"]`; alternatives are `[data-testid="alternative-item"] [data-testid="listen-button"]`. Scope queries to the row or toolbar because completed results have several Listen buttons.
 
 ### Why direct `.value` mutation fails
 

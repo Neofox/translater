@@ -30,10 +30,27 @@ export default function OutputPanel() {
   } = useTranslatorContext()
   const { t } = useUiLang()
   const copyText = mainText(live)
+  const speech = live?.done
+    ? {
+        language: live.partial.targetLang ?? target,
+        disabled: isPending || input.trim() !== live.text,
+        resetKey: JSON.stringify([
+          input,
+          source,
+          target,
+          mode,
+          context,
+          refinements,
+        ]),
+      }
+    : undefined
 
   return (
     <section className="output-panel flex min-h-0 min-w-0 flex-1 flex-col xl:pt-6 2xl:pt-12">
-      <div className="@container/output-toolbar flex min-w-0 items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16">
+      <div
+        data-testid="output-toolbar"
+        className="@container/output-toolbar flex min-w-0 items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16"
+      >
         <LanguageChipBar
           kind="target"
           value={target}
@@ -50,20 +67,8 @@ export default function OutputPanel() {
           <span className={streaming ? 'hidden sm:contents' : 'contents'}>
             <LearningTips tips={outputTips} />
           </span>
-          {!error && live?.done && copyText?.trim() && (
-            <ListenButton
-              text={copyText}
-              language={live.partial.targetLang ?? target}
-              disabled={isPending || input.trim() !== live.text}
-              resetKey={JSON.stringify([
-                input,
-                source,
-                target,
-                mode,
-                context,
-                refinements,
-              ])}
-            />
+          {!error && speech && copyText?.trim() && (
+            <ListenButton {...speech} text={copyText} />
           )}
           {copyText && <CopyButton text={copyText} compact size="md" />}
         </div>
@@ -80,6 +85,7 @@ export default function OutputPanel() {
                 <SentenceView
                   result={live.partial}
                   streaming={streaming}
+                  speech={speech}
                   hideAlternatives={isLongForm(live.text)}
                 />
               </div>
@@ -87,7 +93,12 @@ export default function OutputPanel() {
             </div>
           )}
           {!error && live?.intent === 'word' && (
-            <WordView result={live.partial} mode={mode} streaming={streaming} />
+            <WordView
+              result={live.partial}
+              mode={mode}
+              streaming={streaming}
+              speech={speech}
+            />
           )}
           {!error && !live && !isPending && <EmptyState />}
         </div>

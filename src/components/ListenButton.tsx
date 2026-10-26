@@ -5,7 +5,9 @@ import { useSpeech } from '../hooks/useSpeech'
 import type { SpeechOptions } from '../hooks/useSpeech'
 import { useUiLang } from '../hooks/useUiLang'
 
-export default function ListenButton(props: SpeechOptions) {
+type Props = SpeechOptions & { size?: 'sm' | 'md' }
+
+export default function ListenButton({ size = 'md', ...props }: Props) {
   const { t } = useUiLang()
   const { status, error, toggle } = useSpeech(props)
   const errorId = useId()
@@ -21,7 +23,7 @@ export default function ListenButton(props: SpeechOptions) {
     <span className="relative inline-flex shrink-0">
       <Pill
         tone={active ? 'active' : 'neutral'}
-        size="md"
+        size={size}
         onClick={toggle}
         disabled={props.disabled || !props.text.trim()}
         aria-label={label}

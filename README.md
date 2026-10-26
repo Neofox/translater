@@ -42,7 +42,7 @@ Vercel AI Gateway uses request-scoped Vercel OIDC authentication. Local or exter
 
 ### Pronunciation
 
-Listen appears on completed translations and starts only when tapped. Tap Stop to cancel; editing the input, changing translation settings, or leaving the page also stops playback. Completed audio has a small in-memory replay cache for this page; reloading clears it. Listen supports up to 4,000 characters, with bounded audio delivery and no automatic retry or provider fallback. The server waits for the complete WAV over HTTPS, validates it, and sends PCM chunks to the browser; playback starts after generation completes.
+Listen appears on completed main and alternative translations and starts only when tapped. Starting another pronunciation stops the current one. Tap Stop to cancel; editing the input, changing translation settings, or leaving the page also stops playback. Completed audio has a small in-memory replay cache for this page; reloading clears it. Listen supports up to 4,000 characters, with bounded audio delivery and no automatic retry or provider fallback. The server waits for the complete WAV over HTTPS, validates it, and sends PCM chunks to the browser; playback starts after generation completes.
 
 ```sh
 SPEECH_MODEL=google/gemini-3.8-flash-lite-tts

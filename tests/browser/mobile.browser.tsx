@@ -150,7 +150,9 @@ function assertWithinViewport(element: Element) {
 
 test('all source and target actions stay on one line at the mobile viewport', async () => {
   await render(<Fixture />)
-  await expect.element(page.getByTestId('listen-button')).toBeVisible()
+  await expect
+    .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
+    .toBeVisible()
   await page.mark('completed result shows every mobile toolbar action')
   for (const selector of ['.input-panel', '.output-panel']) {
     const panel = document.querySelector(selector)!
@@ -227,7 +229,7 @@ test('context and learner popup remain usable in a short mobile viewport', async
 
 test('Listen stops explicitly, completes after audio ends, and replays without a new request', async () => {
   await render(<Fixture />)
-  const listen = page.getByTestId('listen-button')
+  const listen = page.getByTestId('output-toolbar').getByTestId('listen-button')
   expect(speak).not.toHaveBeenCalled()
   await page.mark('first explicit Listen', async () => {
     await listen.click()
@@ -257,7 +259,7 @@ test('Listen stops explicitly, completes after audio ends, and replays without a
 
 test('editing input cancels playback and switching sentence to word resets the result', async () => {
   await render(<Fixture />)
-  const listen = page.getByTestId('listen-button')
+  const listen = page.getByTestId('output-toolbar').getByTestId('listen-button')
   await listen.click()
   await expect.element(listen).toHaveAccessibleName(/stop/i)
   await page.mark('edit source while speech plays', async () => {
@@ -298,7 +300,7 @@ test('changing the target language aborts a connecting speech request', async ()
       }}
     />,
   )
-  const listen = page.getByTestId('listen-button')
+  const listen = page.getByTestId('output-toolbar').getByTestId('listen-button')
   await page.mark('Listen starts a connecting request', async () => {
     await listen.click()
   })
@@ -339,12 +341,14 @@ test('streaming deltas stay urgent and only completion starts a result transitio
     .toBeVisible()
   expect(transition).not.toHaveBeenCalled()
   await expect
-    .element(page.getByTestId('listen-button'))
+    .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
     .not.toBeInTheDocument()
   await page.mark('completed translation commits in a transition', () => {
     update({ live: sentence, isPending: false, streaming: false })
   })
-  await expect.element(page.getByTestId('listen-button')).toBeVisible()
+  await expect
+    .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
+    .toBeVisible()
   await expect.poll(() => transition.mock.calls.length).toBeGreaterThan(0)
   transition.mockRestore()
 })
@@ -374,3 +378,56 @@ test('result switches honor the browser motion preference', async () => {
   expect(rules).toContain('::view-transition-new')
   transition.mockRestore()
 })
+
+test.each(['sentence', 'word'] as const)(
+  'pronounces %s alternatives without overlapping the main voice',
+  async (intent) => {
+    const initial: LiveResult =
+      intent === 'sentence'
+        ? {
+            ...sentence,
+            partial: {
+              ...sentence.partial,
+              alternatives: [
+                { text: '정말 고마워요.', note: 'A warmer thank you.' },
+              ],
+            },
+          }
+        : word
+    await render(<Fixture initial={initial} />)
+    const main = page.getByTestId('output-toolbar').getByTestId('listen-button')
+    const row = page.getByTestId('alternative-item')
+    const alternative = row.getByTestId('listen-button')
+    await expect.element(alternative).toBeVisible()
+    const rowBounds = row.element().getBoundingClientRect()
+    for (const button of row.element().querySelectorAll('button')) {
+      const rect = button.getBoundingClientRect()
+      expect(rect.left).toBeGreaterThanOrEqual(rowBounds.left)
+      expect(rect.right).toBeLessThanOrEqual(rowBounds.right)
+    }
+    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
+      window.innerWidth,
+    )
+    await main.click()
+    await expect.element(main).toHaveAccessibleName(/stop/i)
+    await page.mark('alternative takes over pronunciation', async () => {
+      await alternative.click()
+    })
+    await expect.element(main).toHaveAccessibleName(/listen/i)
+    await expect.element(alternative).toHaveAccessibleName(/stop/i)
+    expect(SyntheticAudioContext.instances[0]?.closed).toBe(true)
+    expect(vi.mocked(speak).mock.calls.at(-1)![0].data).toMatchObject({
+      text: intent === 'sentence' ? '정말 고마워요.' : '도서실',
+      language: 'ko',
+    })
+    SyntheticAudioContext.instances.at(-1)!.finish()
+    await expect.element(alternative).toHaveAccessibleName(/listen/i)
+    const requests = vi.mocked(speak).mock.calls.length
+    await alternative.click()
+    await expect.element(alternative).toHaveAccessibleName(/stop/i)
+    expect(speak).toHaveBeenCalledTimes(requests)
+    await page.getByTestId('input-textarea').fill('Updated source')
+    await expect.element(alternative).toBeDisabled()
+    expect(SyntheticAudioContext.instances.at(-1)?.closed).toBe(true)
+  },
+)

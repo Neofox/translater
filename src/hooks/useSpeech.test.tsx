@@ -92,6 +92,60 @@ describe('useSpeech', () => {
     expect(result.current.status).toBe('idle')
   })
 
+  it('stops the current speaker when another pronunciation starts', async () => {
+    const first = renderHook(
+      () => useSpeech({ text: 'first alternative speaker', language: 'ko' }),
+      { wrapper },
+    )
+    const second = renderHook(
+      () => useSpeech({ text: 'second alternative speaker', language: 'ko' }),
+      { wrapper },
+    )
+    await act(async () => {
+      first.result.current.start()
+    })
+    expect(first.result.current.status).toBe('playing')
+    await act(async () => {
+      second.result.current.start()
+    })
+    expect(first.result.current.status).toBe('idle')
+    expect(contexts[0]!.sources[0]!.stop).toHaveBeenCalledOnce()
+    expect(second.result.current.status).toBe('playing')
+    first.unmount()
+    expect(contexts[1]!.close).not.toHaveBeenCalled()
+    await act(async () => {
+      contexts[1]!.sources[0]!.onended!()
+    })
+    expect(second.result.current.status).toBe('idle')
+  })
+
+  it('aborts an alternative still connecting when a different speaker starts', async () => {
+    let signal!: AbortSignal
+    transport.mockImplementationOnce((request) => {
+      signal = request.signal
+      return new Promise(() => {})
+    })
+    const first = renderHook(
+      () =>
+        useSpeech({ text: 'connecting alternative speaker', language: 'ko' }),
+      { wrapper },
+    )
+    const second = renderHook(
+      () =>
+        useSpeech({ text: 'replacement alternative speaker', language: 'ko' }),
+      { wrapper },
+    )
+    await act(async () => {
+      first.result.current.start()
+    })
+    await act(async () => {
+      second.result.current.start()
+    })
+    expect(signal.aborted).toBe(true)
+    expect(first.result.current.status).toBe('idle')
+    expect(second.result.current.status).toBe('playing')
+  })
+
   it('replays completed audio without another request', async () => {
     const { result } = renderHook(
       () => useSpeech({ ...base, text: 'cached speech' }),

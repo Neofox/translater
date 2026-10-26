@@ -37,3 +37,7 @@ Unit-test stream validation, cancellation, audio chunk scheduling, and playback 
 ## Gateway correction after live testing
 
 The experimental `streamSpeech` WebSocket path failed with a connection-related GatewayResponseError (500). The same model/voice succeeded over the documented HTTPS `generateSpeech` path. Gateway documentation explicitly states that streaming speech output is unsupported. Use HTTPS generation with retries and telemetry disabled; validate the complete WAV, strip its container/provenance metadata, and deliver PCM in bounded chunks. Google detects language from the text and does not support the generic `language` option, so omit that option for Google speech models. Cancellation still aborts pending generation and suppresses any late audio. This changes first-audio latency, not model choice or pronunciation.
+
+## Alternative pronunciation extension
+
+The user requested pronunciation on alternative answers before merging. Reuse the existing Listen/Stop control beside each alternative's Copy action in both sentence and word modes. Speak only the alternative text in the result's target language; never notes or register tags. Offer it only after the complete result validates, apply the same pending/stale/settings reset guards as main pronunciation, and allow only one active speaker across the page. Starting another speaker stops/aborts the previous one. Keep replay caching and deployment model selection unchanged. Use compact paired actions that remain visible on touch screens and keep long text inside its card.

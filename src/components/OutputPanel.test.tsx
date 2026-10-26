@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OutputPanel from './OutputPanel'
+import type { LiveResult } from '../hooks/useTranslate'
 import { UiLangProvider } from '../hooks/useUiLang'
 
 const fixture = vi.hoisted(() => ({
@@ -15,12 +16,13 @@ const fixture = vi.hoisted(() => ({
   isPending: false,
   streaming: false,
   error: null as { message: string; kind: 'server' } | null,
-  live: {
+  live: ((): LiveResult => ({
     intent: 'sentence',
     text: 'Hello there',
     done: false,
+    requestSource: 'en',
     partial: { main: '안녕하세요', targetLang: 'ko' },
-  },
+  }))(),
   setTarget: () => {},
 }))
 
@@ -34,15 +36,33 @@ vi.mock('./ListenButton', () => ({
   default: ({
     disabled,
     language,
+    text,
+    resetKey,
   }: {
     disabled?: boolean
     language: string
-  }) => <button disabled={disabled} aria-label={`Listen in ${language}`} />,
+    text: string
+    resetKey?: string
+  }) => (
+    <button
+      disabled={disabled}
+      aria-label={`Listen in ${language}`}
+      data-speech-text={text}
+      data-reset-key={resetKey}
+    />
+  ),
 }))
 
 beforeEach(() => {
+  fixture.context = ''
   fixture.input = 'Hello there'
-  fixture.live.done = false
+  fixture.live = {
+    intent: 'sentence',
+    text: 'Hello there',
+    requestSource: 'en',
+    done: false,
+    partial: { main: '안녕하세요', targetLang: 'ko' },
+  }
   fixture.isPending = false
   fixture.streaming = false
   fixture.error = null
@@ -87,3 +107,68 @@ it('removes pronunciation when the result fails', () => {
   rerender(<OutputPanel />)
   expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
 })
+
+it.each(['sentence', 'word'] as const)(
+  'adds pronunciation for completed %s alternatives with the same stale-result guards',
+  (intent) => {
+    const common = {
+      text: 'Hello there',
+      requestSource: 'en' as const,
+      done: false,
+    }
+    fixture.live =
+      intent === 'sentence'
+        ? {
+            ...common,
+            intent,
+            partial: {
+              targetLang: 'ko',
+              main: '안녕하세요',
+              alternatives: [{ text: '반가워요', note: 'A warm greeting.' }],
+            },
+          }
+        : {
+            ...common,
+            intent,
+            partial: {
+              targetLang: 'ko',
+              primaryTranslation: '안녕',
+              alternativeTranslations: [
+                {
+                  text: '반가워요',
+                  note: 'A warm greeting.',
+                  register: ['polite'],
+                },
+              ],
+            },
+          }
+    fixture.streaming = true
+    const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
+    expect(
+      screen.queryAllByRole('button', { name: 'Listen in ko' }),
+    ).toHaveLength(0)
+    fixture.streaming = false
+    fixture.live.done = true
+    rerender(<OutputPanel />)
+    const buttons = screen.getAllByRole<HTMLButtonElement>('button', {
+      name: 'Listen in ko',
+    })
+    expect(buttons).toHaveLength(2)
+    expect(buttons.map((button) => button.dataset.speechText)).toEqual([
+      intent === 'sentence' ? '안녕하세요' : '안녕',
+      '반가워요',
+    ])
+    expect(buttons.every((button) => !button.disabled)).toBe(true)
+    const resetKey = buttons[1]!.dataset.resetKey
+    fixture.context = 'A different reply'
+    rerender(<OutputPanel />)
+    expect(buttons[1]!.dataset.resetKey).not.toBe(resetKey)
+    fixture.input = 'Another input'
+    rerender(<OutputPanel />)
+    expect(buttons.every((button) => button.disabled)).toBe(true)
+    fixture.input = fixture.live.text
+    fixture.isPending = true
+    rerender(<OutputPanel />)
+    expect(buttons.every((button) => button.disabled)).toBe(true)
+  },
+)

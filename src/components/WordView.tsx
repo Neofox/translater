@@ -2,6 +2,7 @@
 import type { WordResult } from '../server/schemas'
 import type { Mode } from '../lib/types'
 import AlternativeItem from './AlternativeItem'
+import type { SpeechOptions } from '../hooks/useSpeech'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 import Tag from './ui/Tag'
 import { useUiLang } from '../hooks/useUiLang'
@@ -17,9 +18,10 @@ type Props = {
   result: Partial<WordResult>
   mode: Mode
   streaming?: boolean
+  speech?: Omit<SpeechOptions, 'text'>
 }
 
-export default function WordView({ result, mode, streaming }: Props) {
+export default function WordView({ result, mode, streaming, speech }: Props) {
   const { t } = useUiLang()
   const all = result.alternativeTranslations ?? []
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
@@ -55,6 +57,7 @@ export default function WordView({ result, mode, streaming }: Props) {
                 index={i}
                 text={alt.text}
                 note={alt.note}
+                speech={speech}
               >
                 {(alt.register ?? []).map((r) => (
                   <Tag key={r} tone="neutral">
