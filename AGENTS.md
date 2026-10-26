@@ -141,6 +141,15 @@ request settings in page memory; `resultIsCurrent` guards main/alternative actio
 and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
 being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
 
+The framed composer and open detail columns start at 700px of usable width and
+480px of visible height in a stacked, source-first workspace. Below 700px of
+height that presentation puts source languages/actions in one toolbar, lets short
+input shrink to one line, and puts word Copy/Listen beside the main translation.
+Keep long-result actions reachable and retain the calmer tall-window layout.
+Ordinary language menus may extend beyond a short composer into the viewport;
+only book/laptop/split panes constrain popups to their physical segment. Popup
+padding must still include the applicable safe-area insets.
+
 Safe-area padding belongs on the header/composer/result controls, never on the
 whole `.app-shell`: backgrounds must still cover the viewport. The `--safe-area-*`
 variables alias browser `env()` values and allow nonzero-inset browser tests.

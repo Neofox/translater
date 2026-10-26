@@ -257,7 +257,9 @@ test('context and learner details remain usable without a popup', async () => {
   await page.getByTestId('context-clear').click()
   await expect.element(page.getByTestId('context-textarea')).toHaveValue('')
   await page.getByTestId('context-toggle').click()
-  const desktop = window.innerWidth >= 1100 && window.innerHeight >= 640
+  const desktop = Boolean(
+    document.querySelector('.translator-panels[data-desktop]'),
+  )
   if (!desktop)
     await page
       .getByRole('button', { name: 'Learning tips', exact: true })
@@ -443,7 +445,7 @@ test.each(['sentence', 'word'] as const)(
           }
         : word
     await render(<Fixture initial={initial} />)
-    if (window.innerWidth < 1100 || window.innerHeight < 640)
+    if (!document.querySelector('.translator-panels[data-desktop]'))
       await page
         .getByRole('button', {
           name:
@@ -577,7 +579,7 @@ test('long text uses both learner columns and the result has no focus ring', asy
       .getByRole('button', { name: 'Copy', exact: true })
       .element(),
   )
-  if (window.innerWidth >= 1100 && window.innerHeight >= 640) {
+  if (document.querySelector('.translator-panels[data-desktop]')) {
     const why = page
       .getByRole('heading', { name: /^Why this wording/, exact: true })
       .element()
@@ -878,6 +880,129 @@ test.each([
       await page.screenshot({
         path: `../../test-results/safari-safe-area-${width}x${height}-empty.png`,
       })
+    } finally {
+      await page.viewport(...original)
+    }
+  },
+)
+
+test.each([
+  [920, 540],
+  [1024, 600],
+  [736, 594],
+] as const)(
+  'wide shallow %i × %i keeps the dictionary details visible',
+  async (width, height) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    try {
+      await page.viewport(width, height)
+      const usageText =
+        'Anticipatory excitement before a trip, a date, or a first day.'
+      const definition =
+        'To feel excited or nervous about something you are looking forward to.'
+      const initial: LiveResult = {
+        ...word,
+        text: '설레다',
+        requestSource: 'auto',
+        requestKey: translationRequestKey({
+          text: '설레다',
+          source: 'auto',
+          target: 'en',
+          mode: 'friends',
+          context: '',
+          refinements: [],
+          uiLang: 'en',
+        }),
+        partial: {
+          ...word.partial,
+          sourceLang: 'ko',
+          targetLang: 'en',
+          headword: '설레다',
+          primaryTranslation: 'to be excited',
+          primaryUsageNote: usageText,
+          alternativeTranslations: [
+            {
+              text: 'to have butterflies',
+              note: 'A little nervous excitement.',
+              register: [],
+            },
+            {
+              text: 'to be thrilled',
+              note: 'Stronger excitement.',
+              register: [],
+            },
+          ],
+          posList: [
+            {
+              pos: 'verb',
+              senses: [{ definition, register: [], examples: [] }],
+            },
+          ],
+          synonyms: ['두근거리다', '들뜨다'],
+          etymology: 'A native Korean word.',
+          learningTips: {
+            grammar: '설레다 becomes 설레요 in polite speech.',
+            vocab: '설렘 is the noun form.',
+            characters: [],
+          },
+        },
+      }
+      await render(
+        <Fixture
+          initial={initial}
+          initialSource="auto"
+          initialTarget="en"
+          initialMode="friends"
+          initialDetected="ko"
+        />,
+      )
+      const source = document
+        .querySelector('.input-panel')!
+        .getBoundingClientRect()
+      expect(source.height).toBeLessThanOrEqual(140)
+      expect(
+        page.getByTestId('input-textarea').element().getBoundingClientRect()
+          .height,
+      ).toBeLessThanOrEqual(60)
+      await expect
+        .element(page.getByRole('heading', { name: 'Usage', exact: true }))
+        .toBeVisible()
+      const usage = page.getByText(usageText, { exact: true }).element()
+      const alternative = page
+        .getByText('to have butterflies', { exact: true })
+        .element()
+      assertWithinViewport(usage)
+      assertWithinViewport(alternative)
+      assertWithinViewport(
+        page.getByText(definition, { exact: true }).element(),
+      )
+      expect(usage.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        document.querySelector('.output-panel')!.getBoundingClientRect().bottom,
+      )
+      for (const selector of ['paste-input', 'clear-input'])
+        assertWithinViewport(page.getByTestId(selector).element())
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation.effect?.getComputedTiming().iterations !== Infinity,
+          )
+          .map((animation) => animation.finished.catch(() => {})),
+      )
+      await page.screenshot({
+        path: `../../test-results/dictionary-density-${width}x${height}.png`,
+      })
+      await page
+        .getByRole('group', { name: 'Source language' })
+        .getByTestId('lang-more-trigger')
+        .click()
+      const menu = page.getByRole('listbox')
+      await expect.element(menu).toBeVisible()
+      expect(
+        menu.element().getBoundingClientRect().height,
+      ).toBeGreaterThanOrEqual(132)
+      assertWithinViewport(menu.element())
     } finally {
       await page.viewport(...original)
     }

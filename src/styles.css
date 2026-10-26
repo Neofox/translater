@@ -1376,3 +1376,94 @@ textarea:focus-visible {
     font-size: 13px;
   }
 }
+
+/* Wide, shallow windows need their height for results rather than composer rows. */
+@media (min-width: 700px) and (max-height: 699px) {
+  [data-desktop] .input-panel {
+    padding-block: 8px 12px;
+  }
+  [data-desktop] .composer {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'head actions meta' 'context context context' 'input input input';
+    column-gap: 0;
+  }
+  [data-desktop] .composer-header {
+    padding: 4px 6px;
+  }
+  [data-desktop] .composer-actions,
+  [data-desktop] .composer-meta {
+    padding: 4px 6px;
+    border-top: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  [data-desktop] .input-count:not(.input-count-visible),
+  [data-desktop] .composer-shortcut,
+  [data-desktop] .result-shortcut {
+    display: none;
+  }
+  [data-desktop] .translation-input {
+    font-size: 18px;
+    min-height: 52px;
+    max-height: 120px;
+    padding: 10px 14px;
+  }
+  [data-desktop] .target-toolbar {
+    padding-top: 4px;
+  }
+  [data-desktop] .result-main {
+    margin-bottom: 10px;
+  }
+  [data-desktop] .result-actions {
+    position: sticky;
+    bottom: -20px;
+    background: var(--color-bg);
+    padding-block: 8px;
+    margin-block: -8px 12px;
+  }
+  [data-desktop] .result-details {
+    column-gap: 24px;
+  }
+  [data-desktop] .result-section-title {
+    min-height: 32px;
+    padding-block: 6px;
+    font-size: 14px;
+  }
+  [data-desktop] .result-section-body {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  [data-desktop] .alternative-item .alternative-text {
+    font-size: 17px;
+  }
+  [data-desktop] .alternative-item .alternative-note {
+    font-size: 13px;
+  }
+}
+@media (min-width: 700px) and (max-width: 899px) and (max-height: 699px) {
+  [data-desktop] .composer-meta .context-toggle-label {
+    display: none;
+  }
+  [data-desktop] .composer-meta .context-toggle {
+    padding-inline: 6px;
+  }
+}
+
+@media (min-width: 700px) and (max-height: 699px) {
+  [data-desktop] .result-content:has(.result-word) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 24px;
+  }
+  [data-desktop] .result-content:has(.result-word) > .result-main {
+    margin: 0;
+  }
+  [data-desktop] .result-content:has(.result-word) > .result-actions {
+    margin: 0;
+    padding: 0;
+  }
+  [data-desktop] .result-content:has(.result-word) > .result-details,
+  [data-desktop] .result-content:has(.result-word) > .stream-skeleton {
+    grid-column: 1 / -1;
+  }
+}

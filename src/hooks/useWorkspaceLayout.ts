@@ -49,8 +49,8 @@ export function useWorkspaceLayout() {
         desktop:
           mode === 'stack' &&
           !resultFirst &&
-          width >= 1100 &&
-          visibleHeight >= 640,
+          width >= 700 &&
+          visibleHeight >= 480,
         short: visibleHeight < 460,
         tight: visibleHeight < 360,
       }
