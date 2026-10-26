@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- Streamed JSON can omit nested fields until final schema validation. */
 import { useEffect, useState } from 'react'
 import type { WordResult } from '../server/schemas'
 import Tag from './ui/Tag'

@@ -1,204 +1,72 @@
-Welcome to your new TanStack Start app! 
+# NeoTranslate
 
-# Getting Started
+A streaming translator built with TanStack Start, React, Tailwind CSS, Nitro, and Vercel AI SDK.
 
-To run this application:
+## Development
 
-```bash
-npm install
+Use Node.js 22.22.2+, 24.15.0+, or 26+, with npm. Node 24 LTS is recommended for development and matches the Vercel build runtime.
+
+```sh
+npm ci
 npm run dev
 ```
 
-# Building For Production
+The development server listens on port 3000. Vercel uses `npm ci` and `npm run build` from `vercel.json`; no tool bootstrap is needed.
 
-To build this application for production:
+## Validation
 
-```bash
+```sh
+npm run typecheck
+npm test
+npm run lint
 npm run build
 ```
 
-## Testing
+`npm run format` checks formatting. `npm run check` rewrites formatting and applies lint fixes, so review its changes before committing.
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+The optional `npx tsx scripts/smoke-translate.mjs` makes a real, potentially billed AI Gateway request. Run it only when deliberately testing the configured model and credentials.
 
-```bash
-npm run test
+## Browser regression tests
+
+```sh
+npx playwright install chromium webkit
+npm run test:browser
+npm run test:browser:report
 ```
 
-## Styling
+Open the local URL printed by the report server to replay test steps and DOM snapshots. `npm run test:browser:ui` runs the interactive test UI. Tests cover Chromium and WebKit at 382×580 and 594×368, including reduced motion, toolbar fit, speech cancellation/replay, and result transitions. Speech transport and the audio clock are synthetic, so the suite makes no paid requests. Physical iPhone audio and fold hardware still require device testing.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+## Configuration
 
-### Removing Tailwind CSS
+Vercel AI Gateway uses request-scoped Vercel OIDC authentication. Local or external runtimes can use `AI_GATEWAY_API_KEY`. `TRANSLATE_MODEL` selects one exact `provider/model` identifier; the application has no fallback model or automatic paid retries.
 
-If you prefer not to use Tailwind CSS:
+### Pronunciation
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `npm install @tailwindcss/vite tailwindcss -D`
+Listen appears on completed main and alternative translations and starts only when tapped. Starting another pronunciation stops the current one. Tap Stop to cancel; editing the input, changing translation settings, or leaving the page also stops playback. Completed audio has a small in-memory replay cache for this page; reloading clears it. Listen supports up to 4,000 characters, with bounded audio delivery and no automatic retry or provider fallback. The server waits for the complete WAV over HTTPS, validates it, and sends PCM chunks to the browser; playback starts after generation completes.
 
-## Linting & Formatting
-
-
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
-
-```bash
-npm run lint
-npm run format
-npm run check
+```sh
+SPEECH_MODEL=google/gemini-3.8-flash-lite-tts
+# Optional; Google models default to Kore:
+SPEECH_VOICE=Kore
 ```
 
+Set these in Vercel's environment settings, redeploy, and reload the page to switch the pronunciation model or voice. `SPEECH_MODEL` is independent of `TRANSLATE_MODEL` and must be one exact AI Gateway speech model identifier. An unset value uses the Flash-Lite model above. Other models must support AI SDK HTTPS speech generation with mono PCM16 WAV output at 8–48 kHz; choose a voice supported by that model. A model that cannot return this format fails visibly rather than silently switching providers. Authentication uses the same AI Gateway credentials as translation.
 
+For a deliberate, potentially billed live audio check, run `npx tsx scripts/smoke-speech.mjs`. It calls the production speech service and saves a short Korean WAV in the system temporary directory. Set `DOTENV_CONFIG_PATH` to a fresh development env file if needed; the script reports only model/audio measurements and sanitized failures.
 
-## Routing
+Result transitions use React ViewTransition for settled results, keep streaming text immediate, and respect reduced-motion preferences. Browsers without View Transition support render normal updates.
 
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+Langfuse tracing is optional and requires both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`. Langfuse SDK 6 requires Langfuse Cloud or self-hosted Langfuse 4.59.0+. Traces exclude translation inputs and outputs.
 
-### Adding A Route
+Keep credentials in ignored environment files or Vercel environment settings.
 
-To add a new route to your application just add a new file in the `./src/routes` directory.
+## Dependency updates
 
-TanStack will automatically generate the content of the route file for you.
+Direct dependencies are pinned to exact versions and `package-lock.json` records the complete dependency tree. Commit both when updating dependencies; use `npm outdated` and `npm audit` to review their status.
 
-Now that you have two routes you can use a `Link` component to navigate between them.
+Two compatibility constraints currently prevent using every latest release:
 
-### Adding Links
+- TypeScript 6.0.3 remains necessary for the compiler API used by the ESLint toolchain. TypeScript 7 CLI checking works, but its programmatic API is incompatible with those tools.
+- OpenTelemetry SDK and exporters use 0.223.0 (SDK 2). Langfuse 6.0.2 and AI SDK telemetry require the API 1.9 line; OpenTelemetry 0.300.0 (SDK 3) requires API 1.10. The exporter peer dependencies are explicit to keep npm from mixing the two SDK generations.
 
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Nitro remains on its newest published 3.x beta because the application already uses the Nitro 3 Vite integration.

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useServerFn } from '@tanstack/react-start'
 import { translate } from '../server/translate'
 import { partialParse } from '../lib/partialParse'
@@ -221,12 +227,14 @@ export function useTranslate(
         }
       } catch (err) {
         if (!ctrl.signal.aborted) {
-          setError({
-            kind: 'server',
-            message:
-              err instanceof Error
-                ? err.message
-                : STRINGS[uiLang].translationFailed,
+          startTransition(() => {
+            setError({
+              kind: 'server',
+              message:
+                err instanceof Error
+                  ? err.message
+                  : STRINGS[uiLang].translationFailed,
+            })
           })
         }
       } finally {
@@ -257,12 +265,17 @@ export function useTranslate(
           requestSource: source,
           sourceLang: done.data.sourceLang,
         })
-        setLive({
-          intent: done.intent,
-          partial: done.data,
-          done: true,
-          requestSource: source,
-          text: trimmed,
+        // Only settled results participate in view transitions. New-run state
+        // and text deltas stay urgent so a fast stream never merges with the
+        // previous result's intent, source, or text while React defers work.
+        startTransition(() => {
+          setLive({
+            intent: done.intent,
+            partial: done.data,
+            done: true,
+            requestSource: source,
+            text: trimmed,
+          })
         })
       }
     },

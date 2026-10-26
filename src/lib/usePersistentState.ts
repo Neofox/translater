@@ -19,7 +19,6 @@ function useStoredState<T>(
       /* ignore */
     }
     hydrated.current = true
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   useEffect(() => {
@@ -29,7 +28,6 @@ function useStoredState<T>(
     } catch {
       /* ignore */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, value])
 
   return [value, setValue]

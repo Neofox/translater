@@ -6,8 +6,8 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { STRINGS, UI_LANGS   } from '../lib/i18n'
-import type {StringKey, UiLang} from '../lib/i18n';
+import { STRINGS, UI_LANGS } from '../lib/i18n'
+import type { StringKey, UiLang } from '../lib/i18n'
 
 const STORAGE_KEY = 'ui-lang'
 
@@ -23,9 +23,7 @@ function readInitial(): UiLang {
   if (typeof window === 'undefined') return 'en'
   const stored = window.localStorage.getItem(STORAGE_KEY)
   if (stored && (UI_LANGS as string[]).includes(stored)) return stored as UiLang
-  return window.navigator?.language?.toLowerCase().startsWith('ko')
-    ? 'ko'
-    : 'en'
+  return window.navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en'
 }
 
 export function UiLangProvider({ children }: { children: React.ReactNode }) {

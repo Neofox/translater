@@ -1,11 +1,13 @@
 import type { SentenceResult } from '../server/schemas'
 import AlternativeItem from './AlternativeItem'
+import type { SpeechOptions } from '../hooks/useSpeech'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 import { useUiLang } from '../hooks/useUiLang'
 
 type Props = {
   result: Partial<SentenceResult>
   streaming?: boolean
+  speech?: Omit<SpeechOptions, 'text'>
   /** Long-form input (multi-line / multi-sentence) — alternatives are noise
    * there, so the section is hidden even if the model returned some. */
   hideAlternatives?: boolean
@@ -15,6 +17,7 @@ export default function SentenceView({
   result,
   streaming,
   hideAlternatives,
+  speech,
 }: Props) {
   const { t } = useUiLang()
   const all = hideAlternatives ? [] : (result.alternatives ?? [])
@@ -57,6 +60,7 @@ export default function SentenceView({
                 index={i}
                 text={alt.text}
                 note={alt.note}
+                speech={speech}
               />
             ))}
             {streaming && all.length > settled.length && (

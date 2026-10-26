@@ -1,5 +1,7 @@
+import { ViewTransition } from 'react'
 import { Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
+import ListenButton from './ListenButton'
 import LearningTips from './LearningTips'
 import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
@@ -12,6 +14,8 @@ import { isLongForm } from '../lib/longForm'
 
 export default function OutputPanel() {
   const {
+    input,
+    source,
     target,
     setTarget,
     mode,
@@ -21,13 +25,32 @@ export default function OutputPanel() {
     streaming,
     error,
     outputTips,
+    context,
+    refinements,
   } = useTranslatorContext()
   const { t } = useUiLang()
   const copyText = mainText(live)
+  const speech = live?.done
+    ? {
+        language: live.partial.targetLang ?? target,
+        disabled: isPending || input.trim() !== live.text,
+        resetKey: JSON.stringify([
+          input,
+          source,
+          target,
+          mode,
+          context,
+          refinements,
+        ]),
+      }
+    : undefined
 
   return (
     <section className="output-panel flex min-h-0 min-w-0 flex-1 flex-col xl:pt-6 2xl:pt-12">
-      <div className="@container/output-toolbar flex min-w-0 items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16">
+      <div
+        data-testid="output-toolbar"
+        className="@container/output-toolbar flex min-w-0 items-center justify-between gap-2 px-4 py-2 text-sm text-ink-soft xl:px-10 2xl:px-16"
+      >
         <LanguageChipBar
           kind="target"
           value={target}
@@ -44,28 +67,42 @@ export default function OutputPanel() {
           <span className={streaming ? 'hidden sm:contents' : 'contents'}>
             <LearningTips tips={outputTips} />
           </span>
+          {!error && speech && copyText?.trim() && (
+            <ListenButton {...speech} text={copyText} />
+          )}
           {copyText && <CopyButton text={copyText} compact size="md" />}
         </div>
       </div>
-      <div className="flex-1 overflow-hidden">
-        {error && <ErrorView error={error} />}
-        {!error && live?.intent === 'sentence' && (
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <SentenceView
-                result={live.partial}
-                streaming={streaming}
-                hideAlternatives={isLongForm(live.text)}
-              />
+      <ViewTransition default="result-transition">
+        <div
+          className="min-h-0 flex-1 overflow-hidden"
+          data-testid="translation-result"
+        >
+          {error && <ErrorView error={error} />}
+          {!error && live?.intent === 'sentence' && (
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <SentenceView
+                  result={live.partial}
+                  streaming={streaming}
+                  speech={speech}
+                  hideAlternatives={isLongForm(live.text)}
+                />
+              </div>
+              <RefineRow />
             </div>
-            <RefineRow />
-          </div>
-        )}
-        {!error && live?.intent === 'word' && (
-          <WordView result={live.partial} mode={mode} streaming={streaming} />
-        )}
-        {!error && !live && !isPending && <EmptyState />}
-      </div>
+          )}
+          {!error && live?.intent === 'word' && (
+            <WordView
+              result={live.partial}
+              mode={mode}
+              streaming={streaming}
+              speech={speech}
+            />
+          )}
+          {!error && !live && !isPending && <EmptyState />}
+        </div>
+      </ViewTransition>
     </section>
   )
 }
