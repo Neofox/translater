@@ -125,12 +125,14 @@ it('removes pronunciation when the result fails', () => {
   expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
 })
 
-it('disables Copy until the current translation is complete', () => {
+it('enables Copy when the current main text is complete while details still stream', () => {
   const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
   ).toBe(true)
-  fixture.live.done = true
+  fixture.live = { ...fixture.live, mainReady: true }
+  fixture.isPending = true
+  fixture.streaming = true
   rerender(<OutputPanel />)
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
@@ -141,7 +143,8 @@ it('disables Copy until the current translation is complete', () => {
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
   ).toBe(true)
   fixture.input = fixture.live.text
-  fixture.isPending = true
+  fixture.live.done = true
+  fixture.streaming = false
   rerender(<OutputPanel />)
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,

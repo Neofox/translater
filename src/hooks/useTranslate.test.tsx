@@ -202,6 +202,49 @@ describe('useTranslate', () => {
     })
   })
 
+  it.each(['sentence', 'word'] as const)(
+    'marks the %s main text ready at its closing quote before the response ends',
+    async (intent) => {
+      let controller!: ReadableStreamDefaultController<TranslateChunk>
+      translateMock.mockResolvedValueOnce(
+        new ReadableStream<TranslateChunk>({
+          start(next) {
+            controller = next
+          },
+        }),
+      )
+      const { result } = renderHook(
+        () => useTranslate({ ...baseArgs, intent }, { debounceMs: 0 }),
+        { wrapper },
+      )
+      let running!: Promise<void>
+      await act(async () => {
+        running = result.current.run()
+      })
+      const field = intent === 'sentence' ? 'main' : 'primaryTranslation'
+      await act(async () => {
+        controller.enqueue({ type: 'delta', raw: `{"${field}":"안녕` })
+      })
+      expect(result.current.live?.mainReady).toBe(false)
+      await act(async () => {
+        controller.enqueue({
+          type: 'delta',
+          raw: '하세요","rationale":"More details',
+        })
+      })
+      expect(result.current.live).toMatchObject({
+        mainReady: true,
+        done: false,
+        partial: { [field]: '안녕하세요' },
+      })
+      expect(result.current.isPending).toBe(true)
+      await act(async () => {
+        controller.close()
+        await running
+      })
+    },
+  )
+
   it('reports sourceLang from a cache-only final result before publishing it', async () => {
     const trace: string[] = []
     const onSourceDetected = vi.fn(() => trace.push('source'))

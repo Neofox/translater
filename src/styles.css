@@ -1345,7 +1345,8 @@ textarea:focus-visible {
 .translator-panels[data-layout='split'] .output-panel {
   --safe-area-right: 0px;
 }
-.translator-panels:not([data-result-first]) .input-panel {
+.translator-panels[data-layout='split'] .input-panel,
+.translator-panels[data-layout='book'] .input-panel {
   padding-bottom: max(12px, var(--safe-area-bottom));
 }
 .translator-panels:not([data-result-first]) .result-scroll,
@@ -1380,7 +1381,7 @@ textarea:focus-visible {
 /* Wide, shallow windows need their height for results rather than composer rows. */
 @media (min-width: 700px) and (max-height: 699px) {
   [data-desktop] .input-panel {
-    padding-block: 8px 12px;
+    padding-block: 8px;
   }
   [data-desktop] .composer {
     grid-template-columns: minmax(0, 1fr) auto auto;
@@ -1388,11 +1389,11 @@ textarea:focus-visible {
     column-gap: 0;
   }
   [data-desktop] .composer-header {
-    padding: 4px 6px;
+    padding: 0 6px;
   }
   [data-desktop] .composer-actions,
   [data-desktop] .composer-meta {
-    padding: 4px 6px;
+    padding: 0 6px;
     border-top: 0;
     border-bottom: 1px solid var(--color-border);
   }
@@ -1403,29 +1404,29 @@ textarea:focus-visible {
   }
   [data-desktop] .translation-input {
     font-size: 18px;
-    min-height: 52px;
+    min-height: 44px;
     max-height: 120px;
-    padding: 10px 14px;
+    padding: 8px 14px;
   }
   [data-desktop] .target-toolbar {
-    padding-top: 4px;
+    padding-top: 0;
   }
   [data-desktop] .result-main {
-    margin-bottom: 10px;
+    margin-bottom: 4px;
   }
   [data-desktop] .result-actions {
     position: sticky;
     bottom: -20px;
     background: var(--color-bg);
     padding-block: 8px;
-    margin-block: -8px 12px;
+    margin-block: -8px 0;
   }
   [data-desktop] .result-details {
     column-gap: 24px;
   }
   [data-desktop] .result-section-title {
-    min-height: 32px;
-    padding-block: 6px;
+    min-height: 28px;
+    padding-block: 4px;
     font-size: 14px;
   }
   [data-desktop] .result-section-body {
@@ -1437,6 +1438,10 @@ textarea:focus-visible {
   }
   [data-desktop] .alternative-item .alternative-note {
     font-size: 13px;
+    grid-column: 1 / -1;
+  }
+  [data-desktop] .alternative-actions {
+    grid-row: 1;
   }
 }
 @media (min-width: 700px) and (max-width: 899px) and (max-height: 699px) {

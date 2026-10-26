@@ -29,6 +29,8 @@ export type LiveResult =
       intent: 'sentence'
       partial: Partial<SentenceResult>
       done: boolean
+      /** The main JSON string has closed, even if learner details still stream. */
+      mainReady?: boolean
       requestSource: LangCode
       /** The trimmed input text this result was produced for — lets stale
        * consumers (heuristics, safety nets) detect that `live` outlived the
@@ -40,6 +42,7 @@ export type LiveResult =
       intent: 'word'
       partial: Partial<WordResult>
       done: boolean
+      mainReady?: boolean
       requestSource: LangCode
       text: string
     }
@@ -259,6 +262,16 @@ export function useTranslate(
           rawJson += chunk.raw
           const parsed = partialParse<SentenceResult | WordResult>(rawJson)
           if (!parsed) return
+          // Exclude unterminated strings for readiness, while retaining them
+          // in the visible partial result so translation text still streams.
+          const closed = partialParse<SentenceResult & WordResult>(
+            rawJson,
+            false,
+          )
+          const completeMain =
+            intent === 'sentence' ? closed?.main : closed?.primaryTranslation
+          const mainReady =
+            typeof completeMain === 'string' && Boolean(completeMain.trim())
           if (parsed.sourceLang) {
             onSourceDetected?.({
               text: trimmed,
@@ -266,7 +279,9 @@ export function useTranslate(
               sourceLang: parsed.sourceLang,
             })
           }
-          setLive((prev) => (prev ? { ...prev, partial: parsed } : prev))
+          setLive((prev) =>
+            prev ? { ...prev, partial: parsed, mainReady } : prev,
+          )
         } else {
           commit(chunk.done)
         }

@@ -676,6 +676,106 @@ test('Paste replaces a turn and Copy sends the complete main result', async () =
   }
 })
 
+test('Copy works for a ready main translation while its details are still streaming', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  try {
+    const initial = { ...sentence, done: false, mainReady: false }
+    await render(<Fixture initial={initial} />)
+    updateUrgent({ isPending: true, streaming: true })
+    const copy = page
+      .getByTestId('output-toolbar')
+      .getByRole('button', { name: 'Copy', exact: true })
+    await expect.element(copy).toBeDisabled()
+    updateUrgent({ live: { ...initial, mainReady: true } })
+    await expect.element(copy).toBeEnabled()
+    await copy.click()
+    await expect
+      .poll(() => writeText.mock.calls[0]?.[0])
+      .toBe('오늘 도와줘서 고마워요.')
+    await page.getByTestId('input-textarea').fill('A different message')
+    await expect.element(copy).toBeDisabled()
+  } finally {
+    if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
+    else Reflect.deleteProperty(navigator, 'clipboard')
+  }
+})
+
+test('landscape sentence notes use the card width without reserving bottom insets above the result', async () => {
+  const original = [window.innerWidth, window.innerHeight] as const
+  try {
+    await page.viewport(960, 548)
+    await render(
+      <Fixture
+        initial={{
+          ...sentence,
+          text: 'Hello how are you',
+          requestKey: requestKey('Hello how are you'),
+          partial: {
+            ...sentence.partial,
+            main: '안녕하세요, 어떻게 지내세요?',
+            rationale:
+              "The greeting is rendered with the polite 안녕하세요, while 어떻게 지내세요 naturally conveys asking about someone's current well-being rather than translating each word mechanically.",
+            formalityNote:
+              'The main translation uses polite 해요체, suitable for everyday conversation.',
+            alternatives: [
+              {
+                text: '안녕, 잘 지내?',
+                note: 'This uses the close-friend greeting 안녕 and the informal question 잘 지내?, so it sounds warmer and more familiar than the polite main translation.',
+              },
+              {
+                text: '안녕하세요, 잘 지내세요?',
+                note: 'A friendly polite greeting that works well in everyday conversation.',
+              },
+            ],
+          },
+        }}
+      />,
+    )
+    const shell = document.querySelector<HTMLElement>('.app-shell')!
+    shell.style.setProperty('--safe-area-bottom', '34px')
+    window.dispatchEvent(new Event('resize'))
+    const editor = document.querySelector('.composer')!.getBoundingClientRect()
+    const target = page
+      .getByTestId('target-toolbar')
+      .element()
+      .getBoundingClientRect()
+    expect(target.top - editor.bottom).toBeLessThanOrEqual(16)
+    const card = page.getByTestId('alternative-item').elements()[0]!
+    const note = card
+      .querySelector('.alternative-note')!
+      .getBoundingClientRect()
+    expect(note.width).toBeGreaterThan(card.getBoundingClientRect().width * 0.8)
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.effect?.getComputedTiming().iterations !== Infinity,
+        )
+        .map((animation) => animation.finished.catch(() => {})),
+    )
+    await page.screenshot({
+      path: '../../test-results/sentence-landscape-density.png',
+    })
+    const secondTranslation = page
+      .getByText('안녕하세요, 잘 지내세요?', { exact: true })
+      .element()
+    assertWithinViewport(secondTranslation)
+    const copy = page
+      .getByTestId('output-toolbar')
+      .getByRole('button', { name: 'Copy', exact: true })
+      .element()
+    expect(copy.getBoundingClientRect().bottom).toBeLessThanOrEqual(548 - 34)
+  } finally {
+    await page.viewport(...original)
+  }
+})
+
 test('Korean controls and a full input keep the conversation actions reachable', async () => {
   await render(<Fixture />)
   await page.getByRole('button', { name: '한', exact: true }).click()

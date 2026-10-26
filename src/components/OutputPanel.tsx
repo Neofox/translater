@@ -11,7 +11,7 @@ import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
-import { mainText, resultIsCurrent } from '../lib/liveResult'
+import { copyableMainText, mainText, resultIsCurrent } from '../lib/liveResult'
 import { isLongForm } from '../lib/longForm'
 
 export default function OutputPanel() {
@@ -36,6 +36,19 @@ export default function OutputPanel() {
   const { t, lang } = useUiLang()
   const { mod, shift } = useKbd()
   const copyText = mainText(live)
+  const copyReady = copyableMainText(
+    live,
+    {
+      text: input,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+      uiLang: lang,
+    },
+    isPending,
+  )
   const stale =
     isPending ||
     !resultIsCurrent(live, {
@@ -155,7 +168,7 @@ export default function OutputPanel() {
                     text={copyText ?? ''}
                     size="md"
                     primary
-                    disabled={!live.done || stale || !copyText}
+                    disabled={!copyReady}
                   />
                   {speech && copyText?.trim() && (
                     <ListenButton {...speech} text={copyText} label />
