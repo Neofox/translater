@@ -119,7 +119,7 @@ it.each(['paste-input', 'clear-input'])(
   },
 )
 
-it('offers working source samples in the empty result state', () => {
+it('keeps the empty result free of sample actions', () => {
   render(
     <UiLangProvider>
       <TranslatorProvider>
@@ -128,9 +128,11 @@ it('offers working source samples in the empty result state', () => {
       </TranslatorProvider>
     </UiLangProvider>,
   )
-  fireEvent.click(screen.getByRole('button', { name: 'Try a word: 설레다' }))
+  expect(
+    screen.queryAllByRole('button', { name: /try a|sample/i }),
+  ).toHaveLength(0)
   expect(
     screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Input text' })
       .value,
-  ).toBe('설레다')
+  ).toBe('')
 })

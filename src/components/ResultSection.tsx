@@ -8,13 +8,17 @@ export default function ResultSection({
   children,
   className = '',
   tag,
+  alwaysOpen = false,
 }: {
   title: string
   children: ReactNode
   className?: string
   tag?: string
+  alwaysOpen?: boolean
 }) {
-  const { desktop } = useWorkspaceLayoutContext()
+  const { desktop, mode, short } = useWorkspaceLayoutContext()
+  const expanded =
+    alwaysOpen || desktop || (!short && (mode === 'split' || mode === 'book'))
   const [open, setOpen] = useState(false)
   const id = useId()
   return (
@@ -23,7 +27,7 @@ export default function ResultSection({
       aria-labelledby={`${id}-title`}
     >
       <h3 id={`${id}-title`} className="result-section-title">
-        {desktop ? (
+        {expanded ? (
           <>
             <span>{title}</span>
             {tag && <span className="section-tag"> · {tag}</span>}
@@ -47,7 +51,7 @@ export default function ResultSection({
       </h3>
       <div
         id={`${id}-body`}
-        hidden={!desktop && !open}
+        hidden={!expanded && !open}
         className="result-section-body"
       >
         {children}

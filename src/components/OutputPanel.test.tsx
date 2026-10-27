@@ -87,9 +87,12 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-it('offers pronunciation only when the translation is complete', () => {
+it('shows Listen disabled until the translation is complete', () => {
   const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
-  expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Listen in ko' })
+      .disabled,
+  ).toBe(true)
   fixture.live.done = true
   rerender(<OutputPanel />)
   expect(
@@ -125,12 +128,14 @@ it('removes pronunciation when the result fails', () => {
   expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
 })
 
-it('disables Copy until the current translation is complete', () => {
+it('enables Copy when the current main text is complete while details still stream', () => {
   const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
   ).toBe(true)
-  fixture.live.done = true
+  fixture.live = { ...fixture.live, mainReady: true }
+  fixture.isPending = true
+  fixture.streaming = true
   rerender(<OutputPanel />)
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
@@ -141,7 +146,8 @@ it('disables Copy until the current translation is complete', () => {
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
   ).toBe(true)
   fixture.input = fixture.live.text
-  fixture.isPending = true
+  fixture.live.done = true
+  fixture.streaming = false
   rerender(<OutputPanel />)
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
@@ -179,20 +185,26 @@ it('keeps desktop explanation and learning content open with static headings', (
   expect(screen.getByText('A useful ending.').closest('[hidden]')).toBeNull()
 })
 
-it('tucks compact wording notes behind a keyboard-accessible disclosure', () => {
+it('pairs compact wording with the main translation before actions and alternatives', () => {
   fixture.live.done = true
   fixture.live.partial = {
     ...fixture.live.partial,
     rationale: 'An idiomatic expression.',
     formalityNote: 'A polite ending.',
+    alternatives: [{ text: '반가워요', note: 'A warmer greeting.' }],
   }
   render(<OutputPanel />, { wrapper: UiLangProvider })
-  const toggle = screen.getByRole('button', { name: /^Why this wording/ })
-  expect(toggle.getAttribute('aria-expanded')).toBe('false')
-  expect(screen.getByText('A polite ending.').closest('[hidden]')).toBeTruthy()
-  fireEvent.click(toggle)
-  expect(toggle.getAttribute('aria-expanded')).toBe('true')
-  expect(screen.getByText('A polite ending.').closest('[hidden]')).toBeNull()
+  expect(screen.queryByRole('button', { name: /^Why this wording/ })).toBeNull()
+  const why = screen.getByRole('region', { name: 'Why this wording' })
+  expect(why.textContent).toContain('An idiomatic expression.')
+  expect(why.textContent).toContain('A polite ending.')
+  expect(why.closest('[hidden]')).toBeNull()
+  const copy = screen
+    .getByTestId('output-toolbar')
+    .querySelector('.copy-button')!
+  expect(
+    why.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
 })
 
 it.each(['sentence', 'word'] as const)(
@@ -236,18 +248,19 @@ it.each(['sentence', 'word'] as const)(
           }
     fixture.streaming = true
     const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
-    expect(
-      screen.queryAllByRole('button', { name: 'Listen in ko' }),
-    ).toHaveLength(0)
+    const waiting = screen.getAllByRole<HTMLButtonElement>('button', {
+      name: 'Listen in ko',
+    })
+    expect(waiting.every((button) => button.disabled)).toBe(true)
     fixture.streaming = false
     fixture.live.done = true
     rerender(<OutputPanel />)
-    fireEvent.click(
-      screen.getByRole('button', {
+    expect(
+      screen.getByRole('heading', {
         name:
           intent === 'sentence' ? 'Alternatives' : 'Alternative translations',
       }),
-    )
+    ).toBeTruthy()
     const buttons = screen.getAllByRole<HTMLButtonElement>('button', {
       name: 'Listen in ko',
     })
@@ -343,12 +356,12 @@ it.each(['sentence', 'word'] as const)(
             },
           }
     const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
-    fireEvent.click(
-      screen.getByRole('button', {
+    expect(
+      screen.getByRole('heading', {
         name:
           intent === 'sentence' ? 'Alternatives' : 'Alternative translations',
       }),
-    )
+    ).toBeTruthy()
     const copies = () =>
       screen.getAllByRole<HTMLButtonElement>('button', { name: 'Copy' })
     expect(copies()).toHaveLength(3)

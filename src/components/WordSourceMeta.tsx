@@ -192,7 +192,7 @@ function PrimaryBlock({
           {primary.examples.map((ex, i) => (
             <li
               key={i}
-              className="text-ink-soft before:mr-2 before:text-ink-dim before:content-['—']"
+              className="text-ink-soft before:mr-2 before:text-ink-dim before:content-['•']"
             >
               {ex}
             </li>
@@ -229,7 +229,7 @@ function OtherBlock({
                 {s.examples.map((ex, j) => (
                   <li
                     key={j}
-                    className="text-ink-soft text-[13px] before:mr-2 before:text-ink-dim before:content-['—']"
+                    className="text-ink-soft text-[13px] before:mr-2 before:text-ink-dim before:content-['•']"
                   >
                     {ex}
                   </li>

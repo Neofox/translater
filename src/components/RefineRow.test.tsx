@@ -8,6 +8,8 @@ import {
 } from '../context/TranslatorContext'
 import { UiLangProvider } from '../hooks/useUiLang'
 import RefineRow from './RefineRow'
+import { translationRequestKey } from '../lib/translationRequestKey'
+import type { LiveResult, TranslateArgs } from '../hooks/useTranslate'
 
 vi.mock('../hooks/useTranslate', async () => {
   const reactModule = await import('react')
@@ -23,7 +25,7 @@ vi.mock('../hooks/useTranslate', async () => {
     currentError = v
     errorListeners.forEach((fn) => fn(v))
   }
-  function useTranslate() {
+  function useTranslate(args: TranslateArgs) {
     const [live, setLive] = reactModule.useState(currentLive)
     reactModule.useEffect(() => {
       listeners.add(setLive)
@@ -38,8 +40,19 @@ vi.mock('../hooks/useTranslate', async () => {
         errorListeners.delete(setError)
       }
     }, [])
+    // Default fixtures model an immediate completed provider response. An
+    // explicit requestKey freezes provenance for stale-settings regressions.
+    const requestKey = translationRequestKey({ ...args, uiLang: 'en' })
+    const keyedLive = reactModule.useMemo(() => {
+      const result = live as LiveResult | null
+      return result?.requestKey
+        ? result
+        : result
+          ? { ...result, requestKey }
+          : null
+    }, [live, requestKey])
     return {
-      live,
+      live: keyedLive,
       isPending: false,
       streaming: false,
       error,
@@ -74,8 +87,11 @@ async function setMockError(v: unknown) {
   act(() => mod.__setMockError(v))
 }
 
+let currentContext: ReturnType<typeof useTranslatorContext>
+
 function Setup({ text }: { text: string }) {
   const ctx = useTranslatorContext()
+  currentContext = ctx
   const { setInput } = ctx
   React.useEffect(() => {
     setInput(text)
@@ -182,6 +198,76 @@ describe('RefineRow', () => {
     ).toBe(false)
   })
 
+  it('keeps static refinement controls disabled while a sentence is incomplete', async () => {
+    renderRow('see you tomorrow')
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요' },
+      done: false,
+      requestSource: 'auto',
+      text: 'see you tomorrow',
+    })
+    const chip =
+      await screen.findByTestId<HTMLButtonElement>('refine-chip-softer')
+    const custom = screen.getByTestId<HTMLButtonElement>(
+      'refine-custom-trigger',
+    )
+    expect(chip.disabled).toBe(true)
+    expect(custom.disabled).toBe(true)
+    fireEvent.click(chip)
+    expect(chip.getAttribute('aria-pressed')).toBe('false')
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요' },
+      done: true,
+      requestSource: 'auto',
+      text: 'see you tomorrow',
+    })
+    expect(screen.getByTestId('refine-chip-softer')).toBe(chip)
+    expect(chip.disabled).toBe(false)
+  })
+
+  it.each(['tone', 'target', 'context'] as const)(
+    'disables known refinements while the completed result has stale %s settings',
+    async (setting) => {
+      renderRow('see you tomorrow')
+      const result = {
+        intent: 'sentence' as const,
+        partial: { main: '내일 봐요' },
+        done: true,
+        requestSource: 'auto' as const,
+        text: 'see you tomorrow',
+        requestKey: translationRequestKey({
+          ...currentContext,
+          text: currentContext.input,
+          uiLang: 'en',
+        }),
+      }
+      await setMockLive(result)
+      const chip =
+        await screen.findByTestId<HTMLButtonElement>('refine-chip-softer')
+      expect(chip.disabled).toBe(false)
+      act(() => {
+        if (setting === 'tone') currentContext.setMode('professional')
+        else if (setting === 'target') currentContext.setTarget('ja')
+        else currentContext.setContext('Replying to a colleague.')
+      })
+      expect(screen.getByTestId('refine-chip-softer')).toBe(chip)
+      expect(chip.disabled).toBe(true)
+      fireEvent.click(chip)
+      expect(currentContext.refinements).toEqual([])
+      await setMockLive({
+        ...result,
+        requestKey: translationRequestKey({
+          ...currentContext,
+          text: currentContext.input,
+          uiLang: 'en',
+        }),
+      })
+      expect(chip.disabled).toBe(false)
+    },
+  )
+
   it('renders nothing without a completed sentence result', () => {
     renderRow('see you tomorrow')
     expect(screen.queryByTestId('refine-chip-softer')).toBeNull()
@@ -190,6 +276,11 @@ describe('RefineRow', () => {
   it('shows a compact inline notice and stays visible when a refine fails', async () => {
     renderRow('see you tomorrow')
     await setMockLive({
+      requestKey: translationRequestKey({
+        ...currentContext,
+        text: currentContext.input,
+        uiLang: 'en',
+      }),
       intent: 'sentence',
       partial: { main: '내일 봐요' },
       done: true,

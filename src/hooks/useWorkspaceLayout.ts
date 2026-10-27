@@ -20,32 +20,72 @@ export function useWorkspaceLayout() {
       '(device-posture: folded) and (vertical-viewport-segments: 2)',
     )
     const viewport = window.visualViewport
+    const touch = window.matchMedia('(any-pointer: coarse)')
+    let natural = { width: window.innerWidth, height: window.innerHeight }
     const measure = () => {
-      const visibleHeight = viewport?.height || window.innerHeight
+      const zoomed = Math.abs((viewport?.scale || 1) - 1) > 0.01
+      const visibleHeight = zoomed
+        ? window.innerHeight
+        : viewport?.height || window.innerHeight
+      const outerWidth = panels.clientWidth || window.innerWidth
+      if (Math.abs(outerWidth - natural.width) > 1)
+        natural = {
+          width: outerWidth,
+          height: Math.max(window.innerHeight, visibleHeight),
+        }
+      const focused = document.activeElement
+      const editing =
+        focused instanceof HTMLElement &&
+        panels.contains(focused) &&
+        focused.matches('textarea, input, [contenteditable="true"]')
+      const keyboard =
+        !zoomed &&
+        (previous.current.keyboard ||
+          (editing &&
+            (touch.matches || visibleHeight < window.innerHeight - 100))) &&
+        natural.height - visibleHeight > Math.max(100, natural.height * 0.2)
+      // Keyboard animations arrive as many small resizes. Keep the original
+      // height throughout editing instead of ratcheting it down at each frame.
+      const screenResize = !touch.matches && visibleHeight >= window.innerHeight
+      if (!keyboard && !zoomed && (!editing || screenResize))
+        natural.height = visibleHeight
       shell?.style.setProperty('--app-height', `${visibleHeight}px`)
-      const width = panels.clientWidth || window.innerWidth
+      // Safari may pan its visual viewport independently of the layout viewport.
+      // Clamp a stale offset back to zero after the keyboard has been dismissed.
+      const top = zoomed
+        ? 0
+        : Math.max(
+            0,
+            Math.min(
+              viewport?.offsetTop || 0,
+              Math.max(window.innerHeight, natural.height) - visibleHeight,
+            ),
+          )
+      shell?.style.setProperty('--app-top', `${top}px`)
+      const safeArea = getComputedStyle(shell ?? panels)
+      const sideInsets =
+        (parseFloat(safeArea.getPropertyValue('--safe-area-left')) || 0) +
+        (parseFloat(safeArea.getPropertyValue('--safe-area-right')) || 0)
+      const width = Math.max(0, outerWidth - sideInsets)
       const height = panels.clientHeight || visibleHeight
       panels.style.setProperty('--workspace-height', `${height}px`)
       const mode: WorkspaceLayout['mode'] = laptop.matches
         ? 'laptop'
         : book.matches
           ? 'book'
-          : width >= 520 && width > visibleHeight && visibleHeight < 360
-            ? 'split'
-            : 'stack'
-      const resultFirst =
-        mode === 'laptop' ||
-        (mode !== 'book' && (width < 640 || visibleHeight < 480))
+          : width >= 1100
+            ? 'workspace'
+            : width >= 560 && width > natural.height
+              ? 'split'
+              : 'stack'
+      const resultFirst = mode === 'laptop' || mode === 'stack'
       const next = {
         mode,
         resultFirst,
-        desktop:
-          mode === 'stack' &&
-          !resultFirst &&
-          width >= 1100 &&
-          visibleHeight >= 640,
+        desktop: mode === 'workspace',
         short: visibleHeight < 460,
         tight: visibleHeight < 360,
+        keyboard,
       }
       if (
         Object.keys(next).every(
@@ -55,7 +95,6 @@ export function useWorkspaceLayout() {
         )
       )
         return
-      const focused = document.activeElement
       if (focused instanceof HTMLElement && panels.contains(focused))
         restoreFocus.current = focused
       previous.current = next
@@ -72,6 +111,9 @@ export function useWorkspaceLayout() {
     observer?.observe(panels)
     window.addEventListener('resize', measure)
     viewport?.addEventListener('resize', measure)
+    viewport?.addEventListener('scroll', measure)
+    panels.addEventListener('focusin', measure)
+    panels.addEventListener('focusout', measure)
     book.addEventListener('change', measure)
     laptop.addEventListener('change', measure)
     measure()
@@ -80,9 +122,13 @@ export function useWorkspaceLayout() {
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', measure)
       viewport?.removeEventListener('resize', measure)
+      viewport?.removeEventListener('scroll', measure)
+      panels.removeEventListener('focusin', measure)
+      panels.removeEventListener('focusout', measure)
       book.removeEventListener('change', measure)
       laptop.removeEventListener('change', measure)
       shell?.style.removeProperty('--app-height')
+      shell?.style.removeProperty('--app-top')
     }
   }, [panelsRef])
 
@@ -92,6 +138,13 @@ export function useWorkspaceLayout() {
       element.focus({ preventScroll: true })
     restoreFocus.current = null
   }, [layout])
+
+  useLayoutEffect(() => {
+    if (layout.keyboard) {
+      const result = panelsRef.current?.querySelector('.result-scroll')
+      if (result) result.scrollTop = 0
+    }
+  }, [layout.keyboard, panelsRef])
 
   return { panelsRef, layout }
 }

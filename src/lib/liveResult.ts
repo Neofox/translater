@@ -15,3 +15,15 @@ export function resultIsCurrent(
     live?.requestKey && live.requestKey === translationRequestKey(request),
   )
 }
+
+/** Main Copy can finish ahead of learner details, but never use an old run. */
+export function copyableMainText(
+  live: LiveResult | null,
+  request: Parameters<typeof translationRequestKey>[0],
+  isPending: boolean,
+): string | null {
+  if (!live || !(live.done || live.mainReady)) return null
+  if ((live.done && isPending) || !resultIsCurrent(live, request)) return null
+  const text = mainText(live)
+  return text?.trim() ? text : null
+}

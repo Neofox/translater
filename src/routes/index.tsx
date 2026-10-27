@@ -5,7 +5,7 @@ import {
   useTranslatorContext,
 } from '../context/TranslatorContext'
 import { useTranslatorShortcuts } from '../hooks/useTranslatorShortcuts'
-import { mainText, resultIsCurrent } from '../lib/liveResult'
+import { copyableMainText } from '../lib/liveResult'
 import { useUiLang } from '../hooks/useUiLang'
 
 export const Route = createFileRoute('/')({ component: Translator })
@@ -40,13 +40,9 @@ function TranslatorShortcuts() {
     live,
     onForce: () => void run(undefined, 'force'),
     onCopy: () => {
-      const text = mainText(live)
-      if (
-        text &&
-        live?.done &&
-        !isPending &&
-        !error &&
-        resultIsCurrent(live, {
+      const text = copyableMainText(
+        live,
+        {
           text: input,
           source,
           target,
@@ -54,9 +50,10 @@ function TranslatorShortcuts() {
           context,
           refinements,
           uiLang: lang,
-        })
+        },
+        isPending,
       )
-        void navigator.clipboard.writeText(text)
+      if (text && !error) void navigator.clipboard.writeText(text)
     },
     onFocusInput: () => {
       textareaRef.current?.focus()

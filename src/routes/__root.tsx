@@ -15,7 +15,7 @@ export const Route = createRootRoute({
       { name: 'robots', content: 'noindex, nofollow, noarchive, nosnippet' },
       { name: 'googlebot', content: 'noindex, nofollow' },
       { name: 'color-scheme', content: 'dark' },
-      { name: 'theme-color', content: '#0f1118' },
+      { name: 'theme-color', content: '#171821' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-title', content: 'Translater' },
       { title: 'Translater' },

@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'react'
 
 export type WorkspaceLayout = {
-  mode: 'stack' | 'split' | 'book' | 'laptop'
+  mode: 'workspace' | 'stack' | 'split' | 'book' | 'laptop'
   resultFirst: boolean
   desktop: boolean
   short: boolean
   tight: boolean
+  keyboard: boolean
 }
 
 export const COMPACT_LAYOUT: WorkspaceLayout = {
@@ -14,6 +15,7 @@ export const COMPACT_LAYOUT: WorkspaceLayout = {
   desktop: false,
   short: false,
   tight: false,
+  keyboard: false,
 }
 
 export const WorkspaceLayoutContext = createContext(COMPACT_LAYOUT)

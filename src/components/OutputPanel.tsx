@@ -5,14 +5,14 @@ import ListenButton from './ListenButton'
 import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
 import Pill from './ui/Pill'
-import Tag from './ui/Tag'
-import { useKbd } from '../hooks/useKbd'
+import MainExplanation from './MainExplanation'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
-import { mainText, resultIsCurrent } from '../lib/liveResult'
+import { copyableMainText, mainText, resultIsCurrent } from '../lib/liveResult'
 import { isLongForm } from '../lib/longForm'
+import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 
 export default function OutputPanel() {
   const {
@@ -34,8 +34,22 @@ export default function OutputPanel() {
     refinements,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
-  const { mod, shift } = useKbd()
+  const { desktop, mode: layoutMode } = useWorkspaceLayoutContext()
+  const separateReference = ['workspace', 'split', 'book'].includes(layoutMode)
   const copyText = mainText(live)
+  const copyReady = copyableMainText(
+    live,
+    {
+      text: input,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+      uiLang: lang,
+    },
+    isPending,
+  )
   const stale =
     isPending ||
     !resultIsCurrent(live, {
@@ -47,20 +61,18 @@ export default function OutputPanel() {
       refinements,
       uiLang: lang,
     })
-  const speech = live?.done
-    ? {
-        language: live.partial.targetLang ?? target,
-        disabled: stale,
-        resetKey: JSON.stringify([
-          input,
-          source,
-          target,
-          mode,
-          context,
-          refinements,
-        ]),
-      }
-    : undefined
+  const speech = {
+    language: live?.partial.targetLang ?? target,
+    disabled: stale || !live?.done,
+    resetKey: JSON.stringify([
+      input,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+    ]),
+  }
 
   return (
     <section
@@ -85,7 +97,11 @@ export default function OutputPanel() {
             }
           }}
         >
-          <ArrowRightLeft size={18} aria-hidden />
+          {streaming ? (
+            <Loader2 size={18} className="animate-spin" aria-hidden />
+          ) : (
+            <ArrowRightLeft size={18} aria-hidden />
+          )}
         </button>
         <LanguageChipBar
           kind="target"
@@ -94,8 +110,7 @@ export default function OutputPanel() {
           aria-label={t('targetLanguage')}
         />
         {streaming && (
-          <span className="stream-state">
-            <Loader2 size={14} className="animate-spin" aria-hidden />
+          <span className="sr-only" role="status">
             {isPolish ? t('polishing') : t('streaming')}
           </span>
         )}
@@ -149,53 +164,48 @@ export default function OutputPanel() {
                   <span className="result-cursor animate-pulse" aria-hidden />
                 )}
               </p>
+              <MainExplanation
+                live={live}
+                streaming={streaming}
+                registerLabel={
+                  live.intent === 'sentence' && live.partial.targetLang === 'ko'
+                    ? mode === 'friends'
+                      ? '반말'
+                      : mode === 'casual'
+                        ? '해요체'
+                        : '존댓말'
+                    : undefined
+                }
+              />
               <div className="result-actions" data-testid="output-toolbar">
                 <div className="primary-result-actions">
                   <CopyButton
                     text={copyText ?? ''}
                     size="md"
                     primary
-                    disabled={!live.done || stale || !copyText}
+                    compact={!desktop}
+                    disabled={!copyReady}
                   />
-                  {speech && copyText?.trim() && (
-                    <ListenButton {...speech} text={copyText} label />
-                  )}
-                  <kbd className="result-shortcut">
-                    {mod}
-                    {shift}C
-                  </kbd>
+                  <ListenButton
+                    {...speech}
+                    text={copyText ?? ''}
+                    label={desktop}
+                  />
                 </div>
-                {live.intent === 'word' && live.partial.posList?.[0]?.pos && (
-                  <Tag tone="warm">{live.partial.posList[0].pos}</Tag>
-                )}
                 <RefineRow />
               </div>
-              {streaming && (
-                <div className="stream-skeleton" aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              )}
               {live.intent === 'sentence' ? (
                 <SentenceView
+                  content={separateReference ? 'alternatives' : 'all'}
                   result={live.partial}
                   streaming={streaming}
                   speech={speech}
                   copyDisabled={!live.done || stale}
-                  registerLabel={
-                    live.partial.targetLang === 'ko'
-                      ? mode === 'friends'
-                        ? '반말'
-                        : mode === 'casual'
-                          ? '해요체'
-                          : '존댓말'
-                      : undefined
-                  }
                   hideAlternatives={isLongForm(live.text)}
                 />
               ) : (
                 <WordView
+                  content={separateReference ? 'alternatives' : 'all'}
                   result={live.partial}
                   mode={mode}
                   streaming={streaming}
@@ -207,29 +217,7 @@ export default function OutputPanel() {
           )}
           {!error && !live && !isPending && (
             <div className="result-empty">
-              <p className="state-title">{t('emptyTitle')}</p>
-              <p className="state-body">{t('emptyBody')}</p>
-              <div className="state-actions">
-                <Pill
-                  size="md"
-                  onClick={() =>
-                    setInput(
-                      'I had a really lovely time with you. Let’s do this again soon.',
-                    )
-                  }
-                >
-                  {t('sampleSentence')}
-                </Pill>
-                <Pill
-                  size="md"
-                  onClick={() => {
-                    setTarget('en')
-                    setInput('설레다')
-                  }}
-                >
-                  {t('sampleWord')}
-                </Pill>
-              </div>
+              <p>{t('emptyMain')}</p>
             </div>
           )}
         </div>

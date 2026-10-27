@@ -12,6 +12,7 @@ import { useUiLang } from '../hooks/useUiLang'
 import { useTranslatorContext } from '../context/TranslatorContext'
 
 type Props = {
+  content?: 'all' | 'alternatives' | 'reference'
   result: Partial<WordResult>
   mode: Mode
   copyDisabled?: boolean
@@ -20,6 +21,7 @@ type Props = {
 }
 
 export default function WordView({
+  content = 'all',
   result,
   streaming,
   speech,
@@ -27,22 +29,31 @@ export default function WordView({
 }: Props) {
   const { t } = useUiLang()
   const { lookupWord } = useTranslatorContext()
-  const all = result.alternativeTranslations ?? []
+  const all =
+    content === 'reference' ? [] : (result.alternativeTranslations ?? [])
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
   const hasAlternatives = settled.length > 0 || Boolean(streaming && all.length)
+  const about = content !== 'alternatives' && (
+    <ResultSection
+      title={`${t('aboutWord')}${result.headword ? ` · ${result.headword}` : ''}`}
+      className="detail-about"
+    >
+      <WordSourceMeta
+        result={result}
+        streaming={streaming}
+        onLookup={lookupWord}
+      />
+    </ResultSection>
+  )
   return (
     <div
       className={`result-details ${hasAlternatives ? 'has-alternatives' : ''}`}
     >
-      {result.primaryUsageNote && (
-        <ResultSection title={t('usage')} className="detail-why">
-          <p>{result.primaryUsageNote}</p>
-        </ResultSection>
-      )}
       {hasAlternatives && (
         <ResultSection
           title={t('alternativeTranslations')}
           className="detail-alternatives"
+          alwaysOpen
         >
           <ul className="alternative-list">
             {settled.map((alt, index) => (
@@ -60,22 +71,16 @@ export default function WordView({
               </AlternativeItem>
             ))}
             {streaming && all.length > settled.length && (
-              <AlternativeItemSkeleton />
+              <AlternativeItemSkeleton speech={speech} />
             )}
           </ul>
         </ResultSection>
       )}
-      <ResultSection
-        title={`${t('aboutWord')}${result.headword ? ` · ${result.headword}` : ''}`}
-        className="detail-about"
-      >
-        <WordSourceMeta
-          result={result}
-          streaming={streaming}
-          onLookup={lookupWord}
-        />
-      </ResultSection>
-      <LearningTips tips={result.learningTips} />
+      {content === 'reference' && about}
+      {content !== 'reference' && about}
+      {content !== 'alternatives' && (
+        <LearningTips tips={result.learningTips} />
+      )}
     </div>
   )
 }

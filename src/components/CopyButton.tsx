@@ -40,8 +40,9 @@ export default function CopyButton({
       size={size}
       onClick={handleCopy}
       aria-label={label_}
+      title={label_}
       disabled={disabled}
-      className="copy-button disabled:cursor-not-allowed disabled:opacity-45"
+      className={`copy-button ${compact ? 'icon-action' : ''} disabled:cursor-not-allowed disabled:opacity-45`}
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
       {!compact && <span>{label_}</span>}

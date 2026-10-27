@@ -25,6 +25,7 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - Three tone modes: `friends` (slang/반말), `casual` (해요체), `professional` (하십시오체).
 - Prompts are multi-message conversations: `developer` (language rule) → `system` (instructions) → few-shot `user`/`assistant` → actual `user` input.
 - LLM responses are streamed as incremental JSON fragments (server sends each delta, client accumulates) and parsed via `partial-json`.
+- Main Copy and its keyboard shortcut become available when the main JSON string closes, while learner details continue streaming. `LiveResult.mainReady` is derived without accepting partial strings; preserve current-request and error guards. Listen and alternative Copy still wait for a completed result.
 - Runtime: AI SDK v7 requires ESM and Node.js 22+. The project declares `"type": "module"`, and Vercel Functions use `nodejs22.x`.
 - Gateway routing: authenticate with Vercel-managed OIDC by default; in Vercel Functions the token is request-scoped (`x-vercel-oidc-token`) and the AI SDK resolves it through `@vercel/oidc`, so never preflight request authentication from `process.env`. `AI_GATEWAY_API_KEY` remains an optional fallback for local or external runtimes. `TRANSLATE_MODEL` must be one exact `provider/model`; the app never sends a fallback model list and sets `maxRetries: 0` so a paid retry requires explicit user action.
 - Caching and provider options: Gateway caching is `auto`. For GPT-5.6, OpenAI prompt caching uses `promptCacheOptions: { mode: 'explicit', ttl: '30m' }`; the stable final-user reminder ends with an explicit breakpoint and all live source/context/refinement content follows in a separate text part. OpenAI-only options (`reasoningEffort: 'none'`, `store: false`, `promptCacheKey`, and explicit cache settings) are sent only for `openai/*` models.
@@ -39,7 +40,7 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - `SPEECH_MODEL` chooses one exact Gateway speech model (default `google/gemini-3.8-flash-lite-tts`). `SPEECH_VOICE` is optional; Google defaults to `Kore`. Change deployment env, redeploy, and reload to switch. No fallback or automatic retry. Swaps must support HTTPS `generateSpeech` with mono PCM16 WAV output (8–48 kHz). Gateway currently does not support its experimental WebSocket speech surface.
 - `useSpeech` unlocks Web Audio synchronously on tap, streams through `PcmPlayer`, stops on edits/settings changes/unmount/pagehide, and caches only completed audio in a bounded page-memory LRU. Preserve the layout-effect reset: passive cleanup can cancel an immediate tap on a newly completed result.
 - Speech limits: 4,000 input characters, 8 MiB audio, 90-second server timeout. Never log source text, raw provider errors, or audio; speech does not register telemetry. `aiSdkWarnings.server.ts` installs a permanent process-wide SDK warning suppression policy because provider warnings have no per-call warning hook; do not temporarily toggle it around requests.
-- `OutputPanel` exposes main and alternative Listen controls only on completed non-error results; both use the same language, stale/pending guard, and settings reset key. `useSpeech` shares one active playback owner across controls, so starting another voice cancels the previous loading/playing request. Keep owner cleanup guarded by identity. Result `ViewTransition` updates are scheduled at completion/error; run initialization and token deltas stay urgent to preserve live-result provenance. Respect reduced motion.
+- Main and alternative Copy/Listen controls render their real, static content during loading; do not replace known buttons or refinement chips with skeletons. Copy enables when the current main string is complete; Listen and Refine remain disabled until the whole current non-error result completes. Both Listen surfaces use the same language, stale/pending guard, and settings reset key. `useSpeech` shares one active playback owner across controls, so starting another voice cancels the previous loading/playing request. Keep owner cleanup guarded by identity. Result `ViewTransition` updates are scheduled at completion/error; run initialization and token deltas stay urgent to preserve live-result provenance. Respect reduced motion.
 
 ## Styling
 
@@ -120,26 +121,72 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 ### Workspace layout
 
 `TranslatorWorkspace` owns the shell and shares `useWorkspaceLayout` through
-`WorkspaceLayoutContext`. Desktop uses a framed, auto-growing source composer
-above the result. Breakpoints use the visible app height, with the measured
-panel height retained for sizing. Compact portrait places the result first and composer below;
-short landscape splits them. The hook tracks visualViewport height for the
-keyboard and preserves focus/drafts when keyed panels reorder. Fold media use
+`WorkspaceLayoutContext`. A's desktop `workspace` mode starts at 1100px of usable
+width: source on the left, result on the right, with one result reading column.
+Option 1 sizes the source editor to content (capped for long text), with
+Paste/Clear and reply context directly beneath it. A separately scrollable
+`ReferencePanel` fills the remaining source pane with wording, dictionary and
+learning notes. Layout selection uses the unoccluded viewport, with the measured
+panel height retained for sizing. Compact portrait places the result first and composer below.
+Landscape at 560–1099px of usable width stays split before, during and after typing.
+Other compact stacked layouts keep the result first. The hook retains the
+pre-keyboard height through incremental resize events while editing, and tracks
+visualViewport height and offsetTop on both resize and scroll. The fixed shell
+follows the visible area without introducing root scroll. Keyboard entry resets
+the result scroll to its main translation and preserves focus/drafts. Fold media use
 physical viewport segments where available; no device-name detection.
 
-Desktop details stay open: alternatives left, Why this wording and Learning tips
-right. Without alternatives the two learner sections share the available width.
-Compact details are accessible disclosures. Dictionary metadata and synonym
-lookup live with the result. The target scroll surface has no focus ring;
+Desktop reference details stay open in a single column, contained to a 44rem
+measure. Workspace, split and physical book layouts place notes under source;
+output retains main translation, actions/refinements and always-open alternatives.
+Split/book notes collapse at short visible heights and stay in the same pane
+when the keyboard opens. Portrait/laptop retain notes after alternatives in the
+result scroll, as disclosures. `SentenceView` and `WordView` select `all`,
+`alternatives` or `reference` content, avoiding duplicate metadata. Dictionary
+metadata and synonym lookup live in reference content. POS appears there once,
+never in the Copy/Listen action group. Desktop Copy contains its shortcut hint. The target scroll surface has no focus ring;
 buttons, menus and selects retain visible keyboard focus.
 
 Main result text is `[data-testid="main-translation"]`, its scroll surface is
 `[data-testid="translation-result"]`, and its Copy/Listen/refinements are inside
-`[data-testid="output-toolbar"]`. Copy is disabled for partial, pending or stale
-results, including the settings debounce. `LiveResult.requestKey` captures the
+`[data-testid="output-toolbar"]`. Main Copy is enabled once its JSON string is complete,
+even while details stream, and remains disabled for stale results/settings debounce.
+`LiveResult.requestKey` captures the
 request settings in page memory; `resultIsCurrent` guards main/alternative actions
 and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
 being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
+
+Completed compact stacked turns condense the source into one editable row with
+Paste, Clear and an expand control. Preserve the same textarea node/cursor and
+keyboard focus when the main result becomes ready. Keep that compact state while
+the next edit is pending; Clear resets it, explicit expansion exposes languages
+and reply context, and input-limit warnings bypass condensing. Close paths must
+reset the context-focus state before unmounting a focused context field. Applied
+reply context remains indicated on the compact expand control. Phone result
+Copy/Listen controls use 44px icon targets with accessible names/tooltips;
+desktop main actions retain labels. Keep the composer inset from safe-area edges.
+
+Use A's background/surface tokens and type scale. Do not restore the obsolete C
+desktop top-composer card, word/action grid or two-column learner layout. Workspace
+textarea auto-grows to its capped content height; compact layouts retain their
+existing auto-sizing/condensing behavior. A whole source line stays visible in
+the compact portrait editor. Paste uses tonal violet, keeping Copy strongest.
+Keep long-result actions reachable.
+Ordinary language menus may extend beyond a short composer into the viewport;
+workspace/book/laptop/split panes constrain popups to their own pane. Popup
+padding must still include the applicable safe-area insets.
+
+Safe-area padding belongs on the header/composer/result controls, never on the
+whole `.app-shell`: backgrounds must still cover the viewport. The `--safe-area-*`
+variables alias browser `env()` values and allow nonzero-inset browser tests.
+Responsive breakpoints use the width left after side insets. Split columns share
+that usable width before adding their outer insets; both split panes protect the
+bottom edge. A tight keyboard hides the header; transfer its remaining top safe
+inset to the shell, accounting for visualViewport offsetTop. The compact typing
+composer keeps Paste/Clear reachable without reserving an extra bottom inset
+already excluded by the keyboard. Keep sticky Copy safe with long results and
+the software keyboard, not just with one-line fixtures. Keyboard tests must
+simulate incremental visual-viewport shrink/pan separately from layout viewport size.
 
 ### Page structure snapshot (high-level)
 
@@ -174,7 +221,7 @@ Use npm for this project. Commit `package-lock.json` with dependency changes; us
 - Dev server: `npm run dev`
 - Unit tests: `npm test`
 - Browser dependencies: `npx playwright install chromium webkit`
-- Browser matrix: `npm run test:browser` (Chromium/WebKit at seven folded/unfolded phone and MacBook sizes, synthetic speech; no paid calls)
+- Browser matrix: `npm run test:browser` (Chromium/WebKit at seven folded/unfolded phone and MacBook sizes, synthetic speech; no paid calls). Browser fixtures wait for CSS and use the system-font fallback to avoid external font CDN startup/screenshot races. Production font loading is unchanged.
 - Replay report: `npm run test:browser:report` (serves `test-results/browser/index.html`)
 - Interactive browser tests: `npm run test:browser:ui`
 - Translation smoke test: `npx tsx scripts/smoke-translate.mjs` (real, potentially billed Gateway request)

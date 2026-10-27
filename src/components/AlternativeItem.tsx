@@ -28,8 +28,8 @@ export default function AlternativeItem({
     >
       {text && (
         <div className="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
-          {speech && <ListenButton {...speech} text={text} size="sm" />}
-          <CopyButton text={text} disabled={copyDisabled} />
+          <CopyButton text={text} disabled={copyDisabled} compact />
+          {speech ? <ListenButton {...speech} text={text} size="sm" /> : null}
         </div>
       )}
       {children ? (

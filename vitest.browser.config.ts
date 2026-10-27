@@ -15,7 +15,26 @@ const viewports = [
 ] as const
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    // Layout checks exercise the app's system-font fallback without depending
+    // on a remote font CDN during stylesheet application or screenshots.
+    {
+      name: 'browser-system-fonts',
+      enforce: 'pre',
+      transform(code, id) {
+        if (
+          id.split('?')[0] ===
+          fileURLToPath(new URL('./src/styles.css', import.meta.url))
+        )
+          return code.replace(
+            /^@import url\('https:\/\/cdn\.jsdelivr\.net[^\n]+\);\n/m,
+            '',
+          )
+      },
+    },
+    react(),
+    tailwindcss(),
+  ],
   optimizeDeps: {
     include: [
       'react',
