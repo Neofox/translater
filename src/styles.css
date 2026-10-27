@@ -2141,6 +2141,72 @@ textarea:focus-visible {
   display: none;
 }
 
+.learning-entry {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.learning-entry > span {
+  flex: 1 1 120px;
+}
+.learning-entry-actions,
+.adjust-menu {
+  display: contents;
+}
+.learning-entry-actions > .ui-pill,
+.adjust-menu > .ui-pill {
+  min-height: 44px;
+}
+.adjust-menu > .ui-pill > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: min(40vw, 260px);
+}
+.adjust-content {
+  flex: 1 1 100%;
+  min-width: 0;
+  width: 100%;
+}
+.adjust-content[hidden] {
+  display: none;
+}
+.adjust-content .refine-row {
+  margin-block: 4px 8px;
+}
+.adjust-content .refine-label {
+  display: none;
+}
+.adjust-error {
+  flex: 1 1 100%;
+  color: var(--color-warm);
+  font-size: 13px;
+}
+.settings-trigger.ui-pill {
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 10px;
+}
+.settings-popover {
+  z-index: 60;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--color-ink);
+  max-width: calc(
+    100vw - 24px - var(--safe-area-left, 0px) - var(--safe-area-right, 0px)
+  );
+}
+.settings-popover h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.settings-popover [aria-label='UI language'] button {
+  min-height: 44px;
+  min-width: 52px;
+}
+
 .alternative-skeleton .alternative-text,
 .alternative-skeleton .alternative-note {
   min-height: 1lh;

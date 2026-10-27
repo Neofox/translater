@@ -3,7 +3,7 @@ import { ArrowRightLeft, RotateCcw, TriangleAlert, Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
 import ListenButton from './ListenButton'
 import LanguageChipBar from './LanguageChipBar'
-import RefineRow from './RefineRow'
+import AdjustMenu from './AdjustMenu'
 import Pill from './ui/Pill'
 import MainExplanation from './MainExplanation'
 import SentenceView from './SentenceView'
@@ -198,23 +198,26 @@ export default function OutputPanel() {
                     label={desktop}
                   />
                 </div>
-                <RefineRow />
+                {!learning && <AdjustMenu />}
               </div>
               {learning && (
                 <div className="learning-entry">
                   <span>
                     {learning.isSentence ? t('tapPhrase') : t('wordDetails')}
                   </span>
-                  <Pill
-                    tone="warm"
-                    size="md"
-                    data-testid="breakdown-button"
-                    disabled={!learning.canOpen}
-                    aria-expanded={learning.isOpen}
-                    onClick={() => learning.openAt()}
-                  >
-                    {t(learning.isSentence ? 'breakdown' : 'wordDetails')}
-                  </Pill>
+                  <div className="learning-entry-actions">
+                    <Pill
+                      tone="warm"
+                      size="md"
+                      data-testid="breakdown-button"
+                      disabled={!learning.canOpen}
+                      aria-expanded={learning.isOpen}
+                      onClick={() => learning.openAt()}
+                    >
+                      {t(learning.isSentence ? 'breakdown' : 'wordDetails')}
+                    </Pill>
+                    <AdjustMenu />
+                  </div>
                 </div>
               )}
               {live.intent === 'sentence' ? (

@@ -5,24 +5,9 @@ import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { resultIsCurrent } from '../lib/liveResult'
 import { MAX_REFINEMENTS, MAX_REFINEMENT_CHARS } from '../lib/limits'
-import type { StringKey } from '../lib/i18n'
+import { REFINEMENT_CHIPS as CHIPS } from '../lib/refinements'
 
 // Instructions are fixed English strings (model-facing); labels localize.
-const CHIPS: Array<{ id: string; instruction: string; labelKey: StringKey }> = [
-  { id: 'softer', instruction: 'make it softer', labelKey: 'refineSofter' },
-  {
-    id: 'direct',
-    instruction: 'make it more direct',
-    labelKey: 'refineMoreDirect',
-  },
-  { id: 'shorter', instruction: 'make it shorter', labelKey: 'refineShorter' },
-  {
-    id: 'playful',
-    instruction: 'make it more playful',
-    labelKey: 'refineMorePlayful',
-  },
-]
-
 const CHIP_INSTRUCTIONS = new Set(CHIPS.map((c) => c.instruction))
 
 const CUSTOM_LABEL_MAX = 20
