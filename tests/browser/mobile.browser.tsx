@@ -895,15 +895,21 @@ test.each([
       expect(
         document.querySelector<HTMLElement>('.reference-scroll')!.clientHeight,
       ).toBeGreaterThanOrEqual(44)
+      updateUrgent({ error: { kind: 'server', message: 'Connection lost.' } })
+      await expect
+        .poll(() => document.querySelector('.reference-panel'))
+        .toBeNull()
+      for (const id of ['paste-input', 'clear-input', 'context-toggle']) {
+        expect(
+          page.getByTestId(id).element().getBoundingClientRect().bottom,
+        ).toBeLessThanOrEqual(height - 34)
+      }
       const input = page
         .getByTestId('input-textarea')
         .element() as HTMLTextAreaElement
       expect(input).toBe(sourceNode)
       expect([input.selectionStart, input.selectionEnd]).toEqual([5, 14])
       const selected = input.value
-      await settledScreenshot({
-        path: `../../test-results/option1-context-${width}x${height}.png`,
-      })
       await page.getByTestId('context-toggle').click()
       expect(input.value).toBe(selected)
       await page.getByTestId('clear-input').click()

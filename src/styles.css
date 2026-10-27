@@ -1675,13 +1675,31 @@ textarea:focus-visible {
 
 /* Expanded reply context must not consume the whole reference pane. The
    composer scrolls only when its combined fields outgrow this budget. */
-.input-panel:has(> .reference-panel) .composer {
-  max-height: 70%;
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer {
+  max-height: 100%;
   overflow-y: auto;
   scrollbar-width: thin;
 }
-.input-panel:has(> .reference-panel) .composer-actions,
-.input-panel:has(> .reference-panel) .composer-meta {
+.input-panel:has(> .reference-panel) .composer {
+  max-height: 70%;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer-actions,
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer-meta {
   position: sticky;
   bottom: 0;
   z-index: 3;

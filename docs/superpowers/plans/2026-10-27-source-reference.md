@@ -71,6 +71,14 @@ CopyButton accepts optional shortcut text; the main desktop instance supplies it
 
 - Additional visual regression: compact portrait exposed part of the next source
   line. Its scrollport now fits one whole 44px line; RED/GREEN verified. Source
-  + context stress includes 34px safe bottom and preserves the source selection.
+  - context stress includes 34px safe bottom and preserves the source selection.
 - Screenshot captures wait for finite entrance transitions so reference metadata
   and alternatives show their settled contrast. Final matrix follows this fix pass.
+
+- Extended the context regression through the error state: disappearing references
+  must not remove the composer's size bound or sticky actions. Reproduced clipping
+  in both engines; bounded fallback now also covers no-reference/error states.
+- Browser startup waits for the stylesheet. Test-only Vite transformation removes
+  the remote font import to exercise the app's system fallback without CDN races.
+  Confirmed production CSS retains its original font import. All seven Chromium
+  profiles passed in the restarted matrix; WebKit verification is still running.
