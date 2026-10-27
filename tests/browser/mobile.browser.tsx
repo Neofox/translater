@@ -1901,3 +1901,130 @@ test.each(['en', 'ko'] as const)(
     await expect.element(listen).toHaveAttribute('aria-pressed', 'false')
   },
 )
+
+async function settleResultMotion() {
+  await Promise.all(
+    [...document.getAnimations()]
+      .filter((animation) =>
+        Number.isFinite(animation.effect?.getComputedTiming().endTime ?? 0),
+      )
+      .map((animation) => animation.finished.catch(() => {})),
+  )
+}
+
+test('stream completion keeps Copy, language controls and existing alternatives anchored', async () => {
+  const partial: LiveResult = {
+    ...withAlternatives,
+    done: false,
+    mainReady: true,
+  }
+  await render(<Fixture initial={partial} />)
+  updateUrgent({ isPending: true, streaming: true })
+  await expect
+    .element(
+      page
+        .getByTestId('output-toolbar')
+        .getByRole('button', { name: 'Copy', exact: true }),
+    )
+    .toBeEnabled()
+  const copy = page
+    .getByTestId('output-toolbar')
+    .getByRole('button', { name: 'Copy', exact: true })
+    .element()
+  const lang = page
+    .getByTestId('target-toolbar')
+    .getByTestId('lang-chip')
+    .first()
+    .element()
+  const alt = page.getByTestId('alternative-item').first().element()
+  await settleResultMotion()
+  await settledScreenshot({
+    path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-details.png`,
+  })
+  const before = [copy, lang, alt].map((e) => e.getBoundingClientRect())
+  expect(
+    page.getByTestId('output-toolbar').getByTestId('listen-button').query(),
+  ).toBeNull()
+  expect(page.getByTestId('refine-chip-softer').query()).toBeNull()
+  updateUrgent({ live: withAlternatives, isPending: false, streaming: false })
+  await expect
+    .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
+    .toBeVisible()
+  await settleResultMotion()
+  const after = [copy, lang, alt].map((e) => e.getBoundingClientRect())
+  await settledScreenshot({
+    path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-complete.png`,
+  })
+  for (let i = 0; i < before.length; i++) {
+    expect(Math.abs(before[i]!.x - after[i]!.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(before[i]!.y - after[i]!.y)).toBeLessThanOrEqual(1)
+  }
+})
+
+test('wording placeholder uses its real text line height while main Copy stays available', async () => {
+  const initial: LiveResult = {
+    ...sentence,
+    done: false,
+    mainReady: false,
+    partial: {
+      ...sentence.partial,
+      main: '',
+      rationale: '',
+      formalityNote: '',
+    },
+  }
+  await render(<Fixture initial={initial} />)
+  updateUrgent({ isPending: true, streaming: true })
+  const copy = page
+    .getByTestId('output-toolbar')
+    .getByRole('button', { name: 'Copy', exact: true })
+  await expect.element(copy).toBeDisabled()
+  await settledScreenshot({
+    path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-waiting.png`,
+  })
+  updateUrgent({
+    live: {
+      ...initial,
+      mainReady: true,
+      partial: { ...initial.partial, main: sentence.partial.main },
+    },
+  })
+  await expect.element(copy).toBeEnabled()
+  await settledScreenshot({
+    path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-main-ready.png`,
+  })
+  const before = copy.element().getBoundingClientRect()
+  updateUrgent({
+    live: {
+      ...initial,
+      mainReady: true,
+      partial: {
+        ...initial.partial,
+        main: sentence.partial.main,
+        rationale: 'Natural wording.',
+      },
+    },
+  })
+  await expect
+    .element(page.getByText('Natural wording.', { exact: true }))
+    .toBeVisible()
+  expect(
+    Math.abs(before.top - copy.element().getBoundingClientRect().top),
+  ).toBeLessThanOrEqual(1)
+})
+
+test('source field retains its neutral border while typing and controls keep keyboard focus', async () => {
+  await render(<Fixture />)
+  await expandSourceIfNeeded()
+  const input = page
+    .getByTestId('input-textarea')
+    .element() as HTMLTextAreaElement
+  const field = document.querySelector('.composer-field')!
+  const before = getComputedStyle(field).borderColor
+  input.focus({ preventScroll: true })
+  expect(getComputedStyle(field).borderColor).toBe(before)
+  expect(getComputedStyle(field).boxShadow).toBe('none')
+  expect(getComputedStyle(input).outlineStyle).toBe('none')
+  await page.getByTestId('clear-input').click()
+  expect(document.activeElement).toBe(input)
+})

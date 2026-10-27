@@ -48,6 +48,7 @@ export default function SentenceView({
                 text={alt.text}
                 note={alt.note}
                 speech={speech}
+                streaming={streaming}
                 copyDisabled={copyDisabled}
               />
             ))}

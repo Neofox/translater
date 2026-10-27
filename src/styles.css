@@ -1082,24 +1082,6 @@ textarea:focus-visible {
 .detail-about > .result-section-title {
   color: var(--color-warm);
 }
-.stream-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-block: 16px;
-}
-.stream-skeleton span {
-  display: block;
-  height: 14px;
-  border-radius: 6px;
-  background: #272a39;
-}
-.stream-skeleton span:nth-child(2) {
-  width: 82%;
-}
-.stream-skeleton span:nth-child(3) {
-  width: 64%;
-}
 
 .translator-panels[data-tight] .primary-result-actions .copy-button {
   min-height: 44px;
@@ -1716,12 +1698,12 @@ textarea:focus-visible {
 .main-explanation-skeleton {
   display: block;
   width: 62%;
-  height: 14px;
+  height: 1lh;
   border-radius: 6px;
   background: var(--color-panel-2);
-  margin-block: 6px 16px;
 }
-.primary-result-actions .ui-pill {
+.primary-result-actions .ui-pill,
+.primary-result-actions .listen-placeholder {
   width: 112px;
   min-width: 112px;
   height: 44px;
@@ -1826,14 +1808,7 @@ textarea:focus-visible {
   border-radius: 12px;
   background: var(--color-panel);
 }
-.translator-panels:is(
-    [data-layout='workspace'],
-    [data-layout='split'],
-    [data-layout='book']
-  )
-  .composer-field:focus-within {
-  border-color: var(--color-focus);
-}
+
 .translator-panels:is(
     [data-layout='workspace'],
     [data-layout='split'],
@@ -1931,4 +1906,56 @@ textarea:focus-visible {
   > .result-section-title {
   min-height: 28px;
   padding-block: 4px;
+}
+
+/* Loading controls reserve the same geometry as their completed counterparts. */
+.listen-placeholder {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.listen-placeholder > span {
+  width: 40%;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-panel-2);
+}
+.refine-placeholder {
+  height: 44px;
+  overflow: hidden;
+}
+.refine-label-placeholder {
+  width: 40px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: var(--color-panel-2);
+}
+.refine-chip-placeholder {
+  width: 72px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-panel-2);
+}
+.alternative-skeleton .alternative-text,
+.alternative-skeleton .alternative-note {
+  min-height: 1lh;
+}
+.alternative-skeleton p > span {
+  display: inline-block;
+  width: 65%;
+  height: 0.65em;
+  border-radius: 4px;
+  background: var(--color-panel-2);
+}
+.alternative-skeleton .alternative-note > span {
+  width: 85%;
 }

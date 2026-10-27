@@ -19,24 +19,24 @@ export default function MainExplanation({
       : live.partial.primaryUsageNote
   const formality =
     live.intent === 'sentence' ? live.partial.formalityNote : undefined
-  if (!rationale && !formality) {
-    return streaming ? (
-      <span className="main-explanation-skeleton" aria-hidden />
-    ) : null
-  }
+  if (!rationale && !formality && !streaming) return null
   return (
     <section className="main-explanation detail-why" aria-label={title}>
       <h3 className="sr-only">{title}</h3>
-      <p>
-        {registerLabel && (
-          <span className="section-tag" lang="ko">
-            {registerLabel}
-          </span>
-        )}
-        {rationale && <span>{rationale}</span>}
-        {rationale && formality && ' '}
-        {formality && <span>{formality}</span>}
-      </p>
+      {!rationale && !formality ? (
+        <span className="main-explanation-skeleton animate-pulse" aria-hidden />
+      ) : (
+        <p>
+          {registerLabel && (
+            <span className="section-tag" lang="ko">
+              {registerLabel}
+            </span>
+          )}
+          {rationale && <span>{rationale}</span>}
+          {rationale && formality && ' '}
+          {formality && <span>{formality}</span>}
+        </p>
+      )}
     </section>
   )
 }

@@ -6,6 +6,7 @@ import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
 import Pill from './ui/Pill'
 import MainExplanation from './MainExplanation'
+import { ListenPlaceholder, RefinePlaceholder } from './ResultPlaceholders'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -99,7 +100,11 @@ export default function OutputPanel() {
             }
           }}
         >
-          <ArrowRightLeft size={18} aria-hidden />
+          {streaming ? (
+            <Loader2 size={18} className="animate-spin" aria-hidden />
+          ) : (
+            <ArrowRightLeft size={18} aria-hidden />
+          )}
         </button>
         <LanguageChipBar
           kind="target"
@@ -108,8 +113,7 @@ export default function OutputPanel() {
           aria-label={t('targetLanguage')}
         />
         {streaming && (
-          <span className="stream-state">
-            <Loader2 size={14} className="animate-spin" aria-hidden />
+          <span className="sr-only" role="status">
             {isPolish ? t('polishing') : t('streaming')}
           </span>
         )}
@@ -185,19 +189,17 @@ export default function OutputPanel() {
                     compact={!desktop}
                     disabled={!copyReady}
                   />
-                  {speech && copyText?.trim() && (
+                  {speech && copyText?.trim() ? (
                     <ListenButton {...speech} text={copyText} label={desktop} />
-                  )}
+                  ) : streaming ? (
+                    <ListenPlaceholder labelled={desktop} />
+                  ) : null}
                 </div>
                 <RefineRow />
+                {streaming && live.intent === 'sentence' && (
+                  <RefinePlaceholder />
+                )}
               </div>
-              {streaming && (
-                <div className="stream-skeleton" aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              )}
               {live.intent === 'sentence' ? (
                 <SentenceView
                   content={separateReference ? 'alternatives' : 'all'}
