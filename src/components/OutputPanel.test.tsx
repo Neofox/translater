@@ -87,9 +87,12 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-it('offers pronunciation only when the translation is complete', () => {
+it('shows Listen disabled until the translation is complete', () => {
   const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
-  expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Listen in ko' })
+      .disabled,
+  ).toBe(true)
   fixture.live.done = true
   rerender(<OutputPanel />)
   expect(
@@ -245,9 +248,10 @@ it.each(['sentence', 'word'] as const)(
           }
     fixture.streaming = true
     const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
-    expect(
-      screen.queryAllByRole('button', { name: 'Listen in ko' }),
-    ).toHaveLength(0)
+    const waiting = screen.getAllByRole<HTMLButtonElement>('button', {
+      name: 'Listen in ko',
+    })
+    expect(waiting.every((button) => button.disabled)).toBe(true)
     fixture.streaming = false
     fixture.live.done = true
     rerender(<OutputPanel />)

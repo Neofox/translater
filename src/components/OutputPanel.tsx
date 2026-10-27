@@ -6,7 +6,6 @@ import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
 import Pill from './ui/Pill'
 import MainExplanation from './MainExplanation'
-import { ListenPlaceholder, RefinePlaceholder } from './ResultPlaceholders'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -62,20 +61,18 @@ export default function OutputPanel() {
       refinements,
       uiLang: lang,
     })
-  const speech = live?.done
-    ? {
-        language: live.partial.targetLang ?? target,
-        disabled: stale,
-        resetKey: JSON.stringify([
-          input,
-          source,
-          target,
-          mode,
-          context,
-          refinements,
-        ]),
-      }
-    : undefined
+  const speech = {
+    language: live?.partial.targetLang ?? target,
+    disabled: stale || !live?.done,
+    resetKey: JSON.stringify([
+      input,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+    ]),
+  }
 
   return (
     <section
@@ -189,16 +186,13 @@ export default function OutputPanel() {
                     compact={!desktop}
                     disabled={!copyReady}
                   />
-                  {speech && copyText?.trim() ? (
-                    <ListenButton {...speech} text={copyText} label={desktop} />
-                  ) : streaming ? (
-                    <ListenPlaceholder labelled={desktop} />
-                  ) : null}
+                  <ListenButton
+                    {...speech}
+                    text={copyText ?? ''}
+                    label={desktop}
+                  />
                 </div>
                 <RefineRow />
-                {streaming && live.intent === 'sentence' && (
-                  <RefinePlaceholder />
-                )}
               </div>
               {live.intent === 'sentence' ? (
                 <SentenceView

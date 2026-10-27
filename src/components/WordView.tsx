@@ -63,7 +63,6 @@ export default function WordView({
                 text={alt.text}
                 note={alt.note}
                 speech={speech}
-                streaming={streaming}
                 copyDisabled={copyDisabled}
               >
                 {(alt.register ?? []).map((register) => (
@@ -72,7 +71,7 @@ export default function WordView({
               </AlternativeItem>
             ))}
             {streaming && all.length > settled.length && (
-              <AlternativeItemSkeleton />
+              <AlternativeItemSkeleton speech={speech} />
             )}
           </ul>
         </ResultSection>

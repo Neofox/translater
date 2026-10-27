@@ -488,7 +488,7 @@ test('editing input cancels playback and switching sentence to word resets the r
   await page.mark('new pending result cancels speech', () => {
     update({ isPending: true, streaming: true, live: { ...word, done: false } })
   })
-  await expect.element(listen).not.toBeInTheDocument()
+  await expect.element(listen).toBeDisabled()
   await expect
     .poll(() => SyntheticAudioContext.instances.at(-1)?.closed)
     .toBe(true)
@@ -550,7 +550,7 @@ test('streaming deltas stay urgent and only completion starts a result transitio
   expect(transition).not.toHaveBeenCalled()
   await expect
     .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
-    .not.toBeInTheDocument()
+    .toBeDisabled()
   await page.mark('completed translation commits in a transition', () => {
     update({ live: sentence, isPending: false, streaming: false })
   })
@@ -1942,15 +1942,24 @@ test('stream completion keeps Copy, language controls and existing alternatives 
     path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-details.png`,
   })
   const before = [copy, lang, alt].map((e) => e.getBoundingClientRect())
-  expect(
-    page.getByTestId('output-toolbar').getByTestId('listen-button').query(),
-  ).toBeNull()
-  expect(page.getByTestId('refine-chip-softer').query()).toBeNull()
+  await expect
+    .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
+    .toBeDisabled()
+  await expect.element(page.getByTestId('refine-chip-softer')).toBeDisabled()
+  const staticListen = page
+    .getByTestId('output-toolbar')
+    .getByTestId('listen-button')
+    .element()
+  const staticRefine = page.getByTestId('refine-chip-softer').element()
   updateUrgent({ live: withAlternatives, isPending: false, streaming: false })
   await expect
     .element(page.getByTestId('output-toolbar').getByTestId('listen-button'))
     .toBeVisible()
   await settleResultMotion()
+  expect(
+    page.getByTestId('output-toolbar').getByTestId('listen-button').element(),
+  ).toBe(staticListen)
+  expect(page.getByTestId('refine-chip-softer').element()).toBe(staticRefine)
   const after = [copy, lang, alt].map((e) => e.getBoundingClientRect())
   await settledScreenshot({
     path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-complete.png`,

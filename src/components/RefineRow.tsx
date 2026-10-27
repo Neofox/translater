@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import Pill from './ui/Pill'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
+import { resultIsCurrent } from '../lib/liveResult'
 import { MAX_REFINEMENTS, MAX_REFINEMENT_CHARS } from '../lib/limits'
 import type { StringKey } from '../lib/i18n'
 
@@ -30,24 +31,38 @@ export default function RefineRow() {
   const {
     live,
     streaming,
+    isPending,
     error,
     refineError,
     input,
+    source,
+    target,
+    mode,
+    context,
     refinements,
     addRefinement,
     removeRefinement,
   } = useTranslatorContext()
-  const { t } = useUiLang()
+  const { t, lang } = useUiLang()
   const [freeform, setFreeform] = useState('')
   const [customOpen, setCustomOpen] = useState(false)
   const freeformRef = useRef<HTMLInputElement>(null)
 
-  // Only meaningful under a completed sentence result.
-  if (error || streaming) return null
-  if (!live || live.intent !== 'sentence' || !live.done) return null
-  // `live` outlives input edits during the debounce window — don't show
-  // refine controls for a result that no longer matches the current input.
-  if (live.text !== input.trim()) return null
+  if (error || !live || live.intent !== 'sentence') return null
+  // Static controls keep their geometry; only a current, complete result can act.
+  const ready =
+    live.done &&
+    !streaming &&
+    !isPending &&
+    resultIsCurrent(live, {
+      text: input,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+      uiLang: lang,
+    })
 
   // Chips are toggles: tapping an active chip removes its adjustment. The
   // free-text field allows a single custom adjustment at a time; once set it
@@ -56,6 +71,7 @@ export default function RefineRow() {
   const atCap = refinements.length >= MAX_REFINEMENTS
 
   const toggle = (instruction: string) => {
+    if (!ready) return
     const idx = refinements.indexOf(instruction)
     if (idx >= 0) removeRefinement(idx)
     else addRefinement(instruction)
@@ -63,7 +79,7 @@ export default function RefineRow() {
 
   const submitFreeform = () => {
     const trimmed = freeform.trim()
-    if (!trimmed || atCap || custom) return
+    if (!ready || !trimmed || atCap || custom) return
     addRefinement(trimmed)
     setFreeform('')
   }
@@ -85,7 +101,7 @@ export default function RefineRow() {
               size="sm"
               tone={active ? 'active' : 'accent'}
               onClick={() => toggle(c.instruction)}
-              disabled={!active && atCap}
+              disabled={!ready || (!active && atCap)}
               aria-pressed={active}
               data-testid={`refine-chip-${c.id}`}
               className="disabled:cursor-not-allowed disabled:opacity-40"
@@ -103,6 +119,7 @@ export default function RefineRow() {
               setCustomOpen(true)
             }}
             aria-pressed
+            disabled={!ready}
             aria-label={`${t('refineRemove')}: ${custom}`}
             title={custom}
             data-testid="refine-custom"
@@ -117,7 +134,7 @@ export default function RefineRow() {
               size="sm"
               className="refine-custom-trigger"
               aria-expanded={customOpen}
-              disabled={atCap}
+              disabled={!ready || atCap}
               onClick={() => {
                 setCustomOpen(!customOpen)
                 if (!customOpen)
@@ -133,7 +150,7 @@ export default function RefineRow() {
               hidden={!customOpen}
               value={freeform}
               maxLength={MAX_REFINEMENT_CHARS}
-              disabled={atCap}
+              disabled={!ready || atCap}
               onChange={(e) => setFreeform(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) {

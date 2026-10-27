@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import CopyButton from './CopyButton'
 import ListenButton from './ListenButton'
-import { ListenPlaceholder } from './ResultPlaceholders'
 import type { SpeechOptions } from '../hooks/useSpeech'
 
 type Props = {
@@ -11,7 +10,6 @@ type Props = {
   index: number
   children?: ReactNode
   speech?: Omit<SpeechOptions, 'text'>
-  streaming?: boolean
 }
 
 export default function AlternativeItem({
@@ -21,7 +19,6 @@ export default function AlternativeItem({
   children,
   speech,
   copyDisabled,
-  streaming,
 }: Props) {
   return (
     <li
@@ -32,11 +29,7 @@ export default function AlternativeItem({
       {text && (
         <div className="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
           <CopyButton text={text} disabled={copyDisabled} compact />
-          {speech ? (
-            <ListenButton {...speech} text={text} size="sm" />
-          ) : streaming ? (
-            <ListenPlaceholder />
-          ) : null}
+          {speech ? <ListenButton {...speech} text={text} size="sm" /> : null}
         </div>
       )}
       {children ? (

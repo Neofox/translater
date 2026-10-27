@@ -1702,8 +1702,7 @@ textarea:focus-visible {
   border-radius: 6px;
   background: var(--color-panel-2);
 }
-.primary-result-actions .ui-pill,
-.primary-result-actions .listen-placeholder {
+.primary-result-actions .ui-pill {
   width: 112px;
   min-width: 112px;
   height: 44px;
@@ -1908,43 +1907,6 @@ textarea:focus-visible {
   padding-block: 4px;
 }
 
-/* Loading controls reserve the same geometry as their completed counterparts. */
-.listen-placeholder {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-}
-.listen-placeholder > span {
-  width: 40%;
-  height: 12px;
-  border-radius: 4px;
-  background: var(--color-panel-2);
-}
-.refine-placeholder {
-  height: 44px;
-  overflow: hidden;
-}
-.refine-label-placeholder {
-  width: 40px;
-  height: 12px;
-  flex-shrink: 0;
-  border-radius: 4px;
-  background: var(--color-panel-2);
-}
-.refine-chip-placeholder {
-  width: 72px;
-  height: 44px;
-  flex-shrink: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-panel-2);
-}
 .alternative-skeleton .alternative-text,
 .alternative-skeleton .alternative-note {
   min-height: 1lh;
