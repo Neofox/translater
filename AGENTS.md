@@ -123,8 +123,10 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 `TranslatorWorkspace` owns the shell and shares `useWorkspaceLayout` through
 `WorkspaceLayoutContext`. A's desktop `workspace` mode starts at 1100px of usable
 width: source on the left, result on the right, with one result reading column.
-The source editor fills its pane and scrolls internally; Paste/Clear and reply
-context stay at its footer. Layout selection uses the unoccluded viewport, with the measured
+Option 1 sizes the source editor to content (capped for long text), with
+Paste/Clear and reply context directly beneath it. A separately scrollable
+`ReferencePanel` fills the remaining source pane with wording, dictionary and
+learning notes. Layout selection uses the unoccluded viewport, with the measured
 panel height retained for sizing. Compact portrait places the result first and composer below.
 Landscape at 560–1099px of usable width stays split before, during and after typing.
 Other compact stacked layouts keep the result first. The hook retains the
@@ -134,11 +136,15 @@ follows the visible area without introducing root scroll. Keyboard entry resets
 the result scroll to its main translation and preserves focus/drafts. Fold media use
 physical viewport segments where available; no device-name detection.
 
-Desktop details stay open in a single column, contained to a 44rem measure.
-Alternatives are always open and come before longer usage/wording notes in DOM order.
-Split-pane details remain open in one readable column; other compact stacked details
-are accessible disclosures. Dictionary metadata and synonym
-lookup live with the result. The target scroll surface has no focus ring;
+Desktop reference details stay open in a single column, contained to a 44rem
+measure. Workspace, split and physical book layouts place notes under source;
+output retains main translation, actions/refinements and always-open alternatives.
+Split/book notes collapse at short visible heights and stay in the same pane
+when the keyboard opens. Portrait/laptop retain notes after alternatives in the
+result scroll, as disclosures. `SentenceView` and `WordView` select `all`,
+`alternatives` or `reference` content, avoiding duplicate metadata. Dictionary
+metadata and synonym lookup live in reference content. POS appears there once,
+never in the Copy/Listen action group. Desktop Copy contains its shortcut hint. The target scroll surface has no focus ring;
 buttons, menus and selects retain visible keyboard focus.
 
 Main result text is `[data-testid="main-translation"]`, its scroll surface is
@@ -162,8 +168,9 @@ desktop main actions retain labels. Keep the composer inset from safe-area edges
 
 Use A's background/surface tokens and type scale. Do not restore the obsolete C
 desktop top-composer card, word/action grid or two-column learner layout. Workspace
-textarea sizing deliberately bypasses content auto-growth and fills the remaining
-grid row; compact layouts retain their existing auto-sizing/condensing behavior.
+textarea auto-grows to its capped content height; compact layouts retain their
+existing auto-sizing/condensing behavior. A whole source line stays visible in
+the compact portrait editor. Paste uses tonal violet, keeping Copy strongest.
 Keep long-result actions reachable.
 Ordinary language menus may extend beyond a short composer into the viewport;
 workspace/book/laptop/split panes constrain popups to their own pane. Popup

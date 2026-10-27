@@ -10,6 +10,7 @@ type Props = {
   size?: 'sm' | 'md'
   disabled?: boolean
   primary?: boolean
+  shortcut?: string
 }
 
 export default function CopyButton({
@@ -19,6 +20,7 @@ export default function CopyButton({
   size = 'sm',
   disabled = false,
   primary = false,
+  shortcut,
 }: Props) {
   const { t } = useUiLang()
   const [copied, setCopied] = useState(false)
@@ -40,12 +42,17 @@ export default function CopyButton({
       size={size}
       onClick={handleCopy}
       aria-label={label_}
-      title={label_}
+      title={shortcut ? `${label_} (${shortcut})` : label_}
       disabled={disabled}
       className={`copy-button ${compact ? 'icon-action' : ''} disabled:cursor-not-allowed disabled:opacity-45`}
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
       {!compact && <span>{label_}</span>}
+      {!compact && shortcut && (
+        <kbd className="copy-shortcut" aria-hidden>
+          {shortcut}
+        </kbd>
+      )}
     </Pill>
   )
 }

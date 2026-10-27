@@ -5,7 +5,6 @@ import ListenButton from './ListenButton'
 import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
 import Pill from './ui/Pill'
-import Tag from './ui/Tag'
 import { useKbd } from '../hooks/useKbd'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
@@ -36,7 +35,8 @@ export default function OutputPanel() {
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
   const { mod, shift } = useKbd()
-  const { desktop } = useWorkspaceLayoutContext()
+  const { desktop, mode: layoutMode } = useWorkspaceLayoutContext()
+  const separateReference = ['workspace', 'split', 'book'].includes(layoutMode)
   const copyText = mainText(live)
   const copyReady = copyableMainText(
     live,
@@ -172,17 +172,11 @@ export default function OutputPanel() {
                     primary
                     compact={!desktop}
                     disabled={!copyReady}
+                    shortcut={desktop ? `${mod}${shift}C` : undefined}
                   />
                   {speech && copyText?.trim() && (
                     <ListenButton {...speech} text={copyText} label={desktop} />
                   )}
-                  {live.intent === 'word' && live.partial.posList?.[0]?.pos && (
-                    <Tag tone="warm">{live.partial.posList[0].pos}</Tag>
-                  )}
-                  <kbd className="result-shortcut">
-                    {mod}
-                    {shift}C
-                  </kbd>
                 </div>
                 <RefineRow />
               </div>
@@ -195,6 +189,7 @@ export default function OutputPanel() {
               )}
               {live.intent === 'sentence' ? (
                 <SentenceView
+                  content={separateReference ? 'alternatives' : 'all'}
                   result={live.partial}
                   streaming={streaming}
                   speech={speech}
@@ -212,6 +207,7 @@ export default function OutputPanel() {
                 />
               ) : (
                 <WordView
+                  content={separateReference ? 'alternatives' : 'all'}
                   result={live.partial}
                   mode={mode}
                   streaming={streaming}

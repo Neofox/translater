@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Clipboard, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import LanguageChipBar from './LanguageChipBar'
@@ -11,7 +12,7 @@ import { STRINGS } from '../lib/i18n'
 import { useKbd } from '../hooks/useKbd'
 import { copyableMainText } from '../lib/liveResult'
 
-export default function InputPanel() {
+export default function InputPanel({ children }: { children?: ReactNode }) {
   const {
     input,
     setInput,
@@ -63,10 +64,6 @@ export default function InputPanel() {
     const textarea = textareaRef.current
     if (!textarea) return
     const resize = () => {
-      if (layout.mode === 'workspace') {
-        textarea.style.height = '100%'
-        return
-      }
       textarea.style.height = '0px'
       const style = getComputedStyle(textarea)
       const minimum = parseFloat(style.minHeight) || 52
@@ -259,6 +256,7 @@ export default function InputPanel() {
           <kbd className="composer-shortcut">{mod}↵</kbd>
         </div>
       </div>
+      {children}
     </section>
   )
 }

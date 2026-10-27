@@ -1457,7 +1457,7 @@ textarea:focus-visible {
   background: var(--color-accent-soft);
 }
 
-/* A: a full-height writing pane and one contained result reading column. */
+/* Option 1: source and reference notes beside translation and alternatives. */
 .translator-panels[data-layout='workspace'] {
   grid-template-columns:
     minmax(
@@ -1480,14 +1480,13 @@ textarea:focus-visible {
   background: var(--color-bg);
 }
 .translator-panels[data-layout='workspace'] .composer {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   width: 100%;
-  height: 100%;
   max-width: 44rem;
   margin: 0;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto auto;
   grid-template-areas: 'head head' 'context context' 'input input' 'actions meta';
   gap: 8px;
   padding: 0;
@@ -1497,9 +1496,8 @@ textarea:focus-visible {
   box-shadow: none;
 }
 .translator-panels[data-layout='workspace'] .translation-input {
-  height: 100%;
-  min-height: 0;
-  max-height: none;
+  min-height: 78px;
+  max-height: max(52px, min(280px, calc(var(--workspace-height) * 0.36)));
   padding: 8px 0;
   border-radius: 0;
   background: transparent;
@@ -1585,7 +1583,6 @@ textarea:focus-visible {
   flex-wrap: nowrap;
   overflow-x: auto;
 }
-.translator-panels[data-layout='workspace'] .result-shortcut,
 .translator-panels[data-layout='workspace'] .composer-shortcut {
   display: inline-flex;
 }
@@ -1594,4 +1591,99 @@ textarea:focus-visible {
 }
 .translator-panels[data-keyboard][data-layout='workspace'] .composer {
   row-gap: 4px;
+}
+
+/* References stay in the source pane throughout landscape keyboard changes. */
+.translator-panels:is([data-layout='split'], [data-layout='book'])
+  .input-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.translator-panels:is([data-layout='split'], [data-layout='book']) .composer {
+  flex: 0 0 auto;
+  width: 100%;
+}
+.reference-panel {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 44rem;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  overflow: hidden;
+}
+.reference-scroll {
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 12px;
+  scroll-padding-block: 8px;
+}
+.reference-heading {
+  margin: 0 0 8px;
+  color: var(--color-ink-dim);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.reference-scroll .result-details {
+  margin-top: 0;
+}
+.reference-scroll .result-section:first-child {
+  border-top: 0;
+}
+.reference-scroll .word-source-meta {
+  border-top: 0;
+  padding-block: 4px 0;
+}
+.translator-panels[data-layout='workspace'] .reference-panel {
+  margin-top: 24px;
+  padding-top: 16px;
+}
+.translator-panels[data-short] .reference-panel {
+  margin-top: 8px;
+  padding-top: 4px;
+}
+.translator-panels[data-short] .reference-heading {
+  margin-bottom: 0;
+}
+.translator-panels .paste-button {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-line);
+}
+.input-panel[data-source-compact] .translation-input {
+  line-height: 44px;
+  padding-block: 0;
+}
+.copy-shortcut {
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+/* Expanded reply context must not consume the whole reference pane. The
+   composer scrolls only when its combined fields outgrow this budget. */
+.input-panel:has(> .reference-panel) .composer {
+  max-height: 70%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.input-panel:has(> .reference-panel) .composer-actions,
+.input-panel:has(> .reference-panel) .composer-meta {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--color-bg);
 }

@@ -165,6 +165,17 @@ function Fixture({
   )
 }
 
+async function settledScreenshot(options: { path: string }) {
+  await Promise.all(
+    [...document.getAnimations()]
+      .filter((animation) =>
+        Number.isFinite(animation.effect?.getComputedTiming().endTime ?? 0),
+      )
+      .map((animation) => animation.finished.catch(() => {})),
+  )
+  await page.screenshot(options)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   SyntheticAudioContext.instances = []
@@ -218,7 +229,7 @@ test('Paste Clear and the main result actions remain visible and touch sized', a
   expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
     window.innerWidth,
   )
-  await page.screenshot({
+  await settledScreenshot({
     path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-short.png`,
   })
 })
@@ -334,7 +345,7 @@ test.each([false, true])(
           Infinity,
       )
       expect(first.querySelector('.copy-button')!.textContent.trim()).toBe('')
-      await page.screenshot({
+      await settledScreenshot({
         path: `../../test-results/folded-result-first-${keyboard ? 'keyboard' : 'closed'}.png`,
       })
       await page.getByTestId('source-expand').click()
@@ -405,19 +416,16 @@ test('context and learner details remain usable without a popup', async () => {
   await page.getByTestId('context-clear').click()
   await expect.element(page.getByTestId('context-textarea')).toHaveValue('')
   await page.getByTestId('context-toggle').click()
-  const desktop = Boolean(
-    document.querySelector(
-      '.translator-panels[data-desktop], .translator-panels[data-layout="split"]',
-    ),
-  )
-  if (!desktop)
-    await page
-      .getByRole('button', { name: 'Learning tips', exact: true })
-      .click()
+  const toggle = page.getByRole('button', {
+    name: 'Learning tips',
+    exact: true,
+  })
+  const collapsible = Boolean(toggle.query())
+  if (collapsible) await toggle.click()
   await expect
     .element(page.getByText(learningTips.grammar, { exact: true }))
     .toBeVisible()
-  if (!desktop) {
+  if (collapsible) {
     await page
       .getByRole('button', { name: 'Learning tips', exact: true })
       .click()
@@ -649,7 +657,7 @@ const withAlternatives: LiveResult = {
   },
 }
 
-test('desktop notes stay open and short alternatives fit without scrolling', async () => {
+test('desktop source and reference share the left pane while alternatives stay right', async () => {
   if (window.innerWidth < 1100 || window.innerHeight < 640) return
   await render(<Fixture initial={withAlternatives} />)
   expect(
@@ -663,19 +671,25 @@ test('desktop notes stay open and short alternatives fit without scrolling', asy
   expect(Math.abs(source.top - result.top)).toBeLessThanOrEqual(1)
   expect(
     page.getByTestId('input-textarea').element().getBoundingClientRect().height,
-  ).toBeGreaterThan(source.height * 0.5)
+  ).toBeLessThan(source.height * 0.36)
   const footer = document
     .querySelector('.composer-actions')!
     .getBoundingClientRect()
-  expect(source.bottom - footer.bottom).toBeLessThanOrEqual(32)
+  expect(
+    footer.top -
+      page.getByTestId('input-textarea').element().getBoundingClientRect()
+        .bottom,
+  ).toBeLessThanOrEqual(16)
   const alts = document
     .querySelector('.detail-alternatives')!
     .getBoundingClientRect()
   const whyBounds = document
     .querySelector('.detail-why')!
     .getBoundingClientRect()
-  expect(Math.abs(alts.left - whyBounds.left)).toBeLessThanOrEqual(1)
-  expect(whyBounds.top).toBeGreaterThanOrEqual(alts.bottom)
+  expect(whyBounds.right).toBeLessThanOrEqual(result.left)
+  expect(whyBounds.top).toBeGreaterThanOrEqual(footer.bottom)
+  expect(alts.left).toBeGreaterThanOrEqual(result.left)
+  expect(document.querySelectorAll('.detail-why')).toHaveLength(1)
   await expect
     .element(
       page.getByRole('heading', { name: /^Why this wording/, exact: true }),
@@ -698,10 +712,208 @@ test('desktop notes stay open and short alternatives fit without scrolling', asy
       animation.finished.catch(() => {}),
     ),
   )
-  await page.screenshot({
+  await settledScreenshot({
     path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-alternatives.png`,
   })
 })
+
+test('word metadata stays separate from translation actions at every size', async () => {
+  await render(<Fixture initial={word} />)
+  const actions = document.querySelector('.primary-result-actions')!
+  expect(actions.textContent).not.toContain('noun')
+  expect(actions.querySelector(':scope > kbd')).toBeNull()
+  expect(document.querySelectorAll('.word-source-meta')).toHaveLength(1)
+  if (document.querySelector('.translator-panels[data-desktop]')) {
+    expect(
+      document.querySelector('.reference-panel .word-source-meta'),
+    ).not.toBeNull()
+    const copy = page
+      .getByTestId('output-toolbar')
+      .getByRole('button', { name: 'Copy', exact: true })
+      .element()
+    expect(copy.getAttribute('title')).toContain('C')
+    expect(copy.querySelector('kbd')).not.toBeNull()
+  } else {
+    expect(actions.querySelector('kbd')).toBeNull()
+    expect(
+      document.querySelector(
+        document.querySelector('.reference-panel')
+          ? '.reference-panel .word-source-meta'
+          : '.output-panel .word-source-meta',
+      ),
+    ).not.toBeNull()
+  }
+  await settledScreenshot({
+    path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-word.png`,
+  })
+})
+
+test('reference notes track streaming clear and error without moving source focus', async () => {
+  if (window.innerWidth < 1100) return
+  await render(<Fixture initial={withAlternatives} />)
+  const input = page
+    .getByTestId('input-textarea')
+    .element() as HTMLTextAreaElement
+  input.focus()
+  input.setSelectionRange(5, 14)
+  updateUrgent({
+    streaming: true,
+    live: {
+      ...withAlternatives,
+      done: false,
+      partial: {
+        ...withAlternatives.partial,
+        rationale: 'Notes are arriving.',
+      },
+    },
+  })
+  await expect
+    .poll(() => document.querySelector('.reference-panel')?.textContent)
+    .toContain('Notes are arriving.')
+  expect(document.activeElement).toBe(input)
+  expect([input.selectionStart, input.selectionEnd]).toEqual([5, 14])
+  updateUrgent({
+    streaming: false,
+    error: { kind: 'server', message: 'Connection lost.' },
+  })
+  await expect.poll(() => document.querySelector('.reference-panel')).toBeNull()
+  updateUrgent({ error: null })
+  await page.getByTestId('clear-input').click()
+  await expect.poll(() => document.querySelector('.reference-panel')).toBeNull()
+  expect(document.activeElement).toBe(input)
+})
+
+test('portrait keeps alternatives ahead of notes and the source compact', async () => {
+  if (window.innerWidth >= 1100 || window.innerWidth > window.innerHeight)
+    return
+  await render(<Fixture initial={withAlternatives} />)
+  const source = document.querySelector('.input-panel')!
+  expect(source.hasAttribute('data-source-compact')).toBe(true)
+  expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(90)
+  const editor = page
+    .getByTestId('input-textarea')
+    .element() as HTMLTextAreaElement
+  const lineHeight = parseFloat(getComputedStyle(editor).lineHeight)
+  expect(Math.abs(editor.clientHeight / lineHeight - 1)).toBeLessThan(0.01)
+  const alternative = document.querySelector('.detail-alternatives')!
+  const notes = document.querySelector('.detail-why')!
+  expect(
+    alternative.compareDocumentPosition(notes) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  expect(document.querySelector('.reference-panel')).toBeNull()
+  await expect
+    .element(
+      page
+        .getByTestId('alternative-item')
+        .first()
+        .getByRole('button', { name: 'Copy', exact: true }),
+    )
+    .toBeVisible()
+  await settledScreenshot({
+    path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-alternatives.png`,
+  })
+})
+
+test('Duo landscape uses source-side notes without changing pane order', async () => {
+  if (window.innerWidth >= 1100 || window.innerWidth <= window.innerHeight)
+    return
+  await render(<Fixture initial={withAlternatives} />)
+  const source = document.querySelector('.input-panel')!.getBoundingClientRect()
+  const output = document
+    .querySelector('.output-panel')!
+    .getBoundingClientRect()
+  expect(output.right).toBeLessThanOrEqual(source.left + 1)
+  const reference = document.querySelector('.reference-panel')
+  expect(reference).not.toBeNull()
+  expect(reference!.closest('.input-panel')).not.toBeNull()
+  expect(document.querySelector('.output-panel .detail-why')).toBeNull()
+  if (window.innerHeight < 460) {
+    const toggle = page.getByRole('button', { name: /^Why this wording/ })
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'false')
+    await toggle.click()
+    await expect
+      .element(
+        page.getByText('Natural wording for a friendly conversation.', {
+          exact: true,
+        }),
+      )
+      .toBeVisible()
+  } else {
+    await expect
+      .element(
+        page.getByText('Natural wording for a friendly conversation.', {
+          exact: true,
+        }),
+      )
+      .toBeVisible()
+  }
+  await expect.element(page.getByTestId('paste-input')).toBeVisible()
+  await expect.element(page.getByTestId('clear-input')).toBeVisible()
+  await settledScreenshot({
+    path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-alternatives.png`,
+  })
+})
+
+test.each([
+  [580, 382],
+  [736, 594],
+  [1280, 760],
+] as const)(
+  'long source and expanded context keep actions reachable at %s by %s',
+  async (width, height) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    try {
+      await page.viewport(width, height)
+      const text = Array(30).fill('Please translate this sentence.').join('\n')
+      await render(
+        <Fixture
+          initial={{ ...withAlternatives, text, requestKey: requestKey(text) }}
+        />,
+      )
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      shell.style.setProperty('--safe-area-bottom', '34px')
+      const sourceNode = page
+        .getByTestId('input-textarea')
+        .element() as HTMLTextAreaElement
+      sourceNode.focus()
+      sourceNode.setSelectionRange(5, 14)
+      await page.getByTestId('context-toggle').click()
+      await page
+        .getByTestId('context-textarea')
+        .fill(Array(8).fill('An earlier reply with useful context.').join('\n'))
+      const pane = document
+        .querySelector('.input-panel')!
+        .getBoundingClientRect()
+      for (const id of ['paste-input', 'clear-input', 'context-toggle']) {
+        const button = page.getByTestId(id).element()
+        assertWithinViewport(button)
+        expect(button.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+          Math.min(pane.bottom, height - 34),
+        )
+      }
+      expect(
+        document.querySelector<HTMLElement>('.reference-scroll')!.clientHeight,
+      ).toBeGreaterThanOrEqual(44)
+      const input = page
+        .getByTestId('input-textarea')
+        .element() as HTMLTextAreaElement
+      expect(input).toBe(sourceNode)
+      expect([input.selectionStart, input.selectionEnd]).toEqual([5, 14])
+      const selected = input.value
+      await settledScreenshot({
+        path: `../../test-results/option1-context-${width}x${height}.png`,
+      })
+      await page.getByTestId('context-toggle').click()
+      expect(input.value).toBe(selected)
+      await page.getByTestId('clear-input').click()
+      expect(document.activeElement).toBe(input)
+      await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
+    } finally {
+      await page.viewport(...original)
+    }
+  },
+)
 
 test('A workspace keeps long source and result controls above the safe bottom edge', async () => {
   const original = [window.innerWidth, window.innerHeight] as const
@@ -739,6 +951,11 @@ test('A workspace keeps long source and result controls above the safe bottom ed
       .element() as HTMLTextAreaElement
     expect(input.scrollHeight).toBeGreaterThan(input.clientHeight)
     input.scrollTop = input.scrollHeight
+    const reference = document.querySelector<HTMLElement>('.reference-scroll')!
+    expect(reference).not.toBeNull()
+    expect(reference.clientHeight).toBeGreaterThan(160)
+    expect(reference.scrollHeight).toBeGreaterThan(reference.clientHeight)
+    reference.scrollTop = reference.scrollHeight
     for (const selector of ['paste-input', 'clear-input']) {
       const control = page.getByTestId(selector).element()
       assertWithinViewport(control)
@@ -766,7 +983,7 @@ test('A workspace keeps long source and result controls above the safe bottom ed
       resultScroll.getBoundingClientRect().top,
     )
     assertWithinViewport(copyControl)
-    await page.screenshot({
+    await settledScreenshot({
       path: '../../test-results/a-workspace-long-safe.png',
     })
     await page.getByTestId('clear-input').click()
@@ -831,7 +1048,7 @@ test('long text keeps a single learner reading column and the result has no focu
     expect(Math.abs(why.left - tips.left)).toBeLessThanOrEqual(2)
     expect(tips.top).toBeGreaterThan(why.bottom)
   }
-  await page.screenshot({
+  await settledScreenshot({
     path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-long.png`,
   })
 })
@@ -848,8 +1065,7 @@ test('source sizing keeps Clear reachable for long and short turns', async () =>
     document
       .querySelector('.translator-panels')!
       .getAttribute('data-layout') === 'workspace'
-  if (workspace) expect(textarea.offsetHeight).toBe(shortHeight)
-  else if (window.innerHeight >= 460)
+  if (window.innerHeight >= 460)
     expect(textarea.offsetHeight).toBeGreaterThan(shortHeight)
   else expect(textarea.offsetHeight).toBeGreaterThanOrEqual(shortHeight)
   await input.fill('Hi')
@@ -1025,7 +1241,7 @@ test('landscape sentence notes use the card width without reserving bottom inset
         )
         .map((animation) => animation.finished.catch(() => {})),
     )
-    await page.screenshot({
+    await settledScreenshot({
       path: '../../test-results/sentence-landscape-density.png',
     })
     const secondTranslation = page
@@ -1205,7 +1421,7 @@ test.each([
       expect(document.scrollingElement!.scrollHeight).toBeLessThanOrEqual(
         height,
       )
-      await page.screenshot({
+      await settledScreenshot({
         path: `../../test-results/safari-keyboard-${width}x${height}.png`,
       })
       viewport.offsetTop += 20
@@ -1326,16 +1542,13 @@ test.each(['book', 'laptop'] as const)(
   },
 )
 
-test('dictionary metadata stays with the result and synonyms start a new lookup', async () => {
+test('dictionary metadata stays readable and synonyms start a new lookup', async () => {
   await render(<Fixture initial={word} />)
-  if (
-    !document.querySelector(
-      '[data-desktop], .translator-panels[data-layout="split"]',
-    )
-  )
-    await page
-      .getByRole('button', { name: 'About · library', exact: true })
-      .click()
+  const about = page.getByRole('button', {
+    name: 'About · library',
+    exact: true,
+  })
+  if (about.query()) await about.click()
   await expect
     .element(
       page.getByText(
@@ -1427,7 +1640,7 @@ test.each([
             .bottom,
         ),
       )
-      await page.screenshot({
+      await settledScreenshot({
         path: `../../test-results/safari-safe-area-${width}x${height}.png`,
       })
       await page.getByTestId('clear-input').click()
@@ -1439,7 +1652,7 @@ test.each([
       expect(
         page.getByRole('button', { name: /try a|sample/i }).query(),
       ).toBeNull()
-      await page.screenshot({
+      await settledScreenshot({
         path: `../../test-results/safari-safe-area-${width}x${height}-empty.png`,
       })
     } finally {
@@ -1551,7 +1764,7 @@ test.each([
           )
           .map((animation) => animation.finished.catch(() => {})),
       )
-      await page.screenshot({
+      await settledScreenshot({
         path: `../../test-results/dictionary-density-${width}x${height}.png`,
       })
       usage.scrollIntoView({ block: 'center' })

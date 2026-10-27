@@ -1,5 +1,6 @@
 import InputPanel from './InputPanel'
 import OutputPanel from './OutputPanel'
+import ReferencePanel from './ReferencePanel'
 import ModeToggle from './ModeToggle'
 import UiLangToggle from './UiLangToggle'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -9,7 +10,13 @@ import { useWorkspaceLayout } from '../hooks/useWorkspaceLayout'
 export default function TranslatorWorkspace() {
   const { panelsRef, layout } = useWorkspaceLayout()
   const { mode, setMode } = useTranslatorContext()
-  const panels = [<InputPanel key="input" />, <OutputPanel key="output" />]
+  const separateReference = ['workspace', 'split', 'book'].includes(layout.mode)
+  const panels = [
+    <InputPanel key="input">
+      {separateReference && <ReferencePanel />}
+    </InputPanel>,
+    <OutputPanel key="output" />,
+  ]
   if (layout.resultFirst) panels.reverse()
   return (
     <WorkspaceLayoutContext.Provider value={layout}>

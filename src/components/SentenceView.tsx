@@ -7,6 +7,7 @@ import ResultSection from './ResultSection'
 import { useUiLang } from '../hooks/useUiLang'
 
 type Props = {
+  content?: 'all' | 'alternatives' | 'reference'
   result: Partial<SentenceResult>
   registerLabel?: string
   copyDisabled?: boolean
@@ -16,6 +17,7 @@ type Props = {
 }
 
 export default function SentenceView({
+  content = 'all',
   result,
   streaming,
   hideAlternatives,
@@ -24,7 +26,10 @@ export default function SentenceView({
   registerLabel,
 }: Props) {
   const { t } = useUiLang()
-  const all = hideAlternatives ? [] : (result.alternatives ?? [])
+  const all =
+    hideAlternatives || content === 'reference'
+      ? []
+      : (result.alternatives ?? [])
   const settled = streaming ? all.slice(0, Math.max(0, all.length - 1)) : all
   const hasAlternatives = settled.length > 0 || Boolean(streaming && all.length)
   return (
@@ -54,17 +59,20 @@ export default function SentenceView({
           </ul>
         </ResultSection>
       )}
-      {(result.rationale || result.formalityNote) && (
-        <ResultSection
-          title={t('whyWording')}
-          tag={registerLabel}
-          className="detail-why"
-        >
-          {result.rationale && <p>{result.rationale}</p>}
-          {result.formalityNote && <p>{result.formalityNote}</p>}
-        </ResultSection>
+      {content !== 'alternatives' &&
+        (result.rationale || result.formalityNote) && (
+          <ResultSection
+            title={t('whyWording')}
+            tag={registerLabel}
+            className="detail-why"
+          >
+            {result.rationale && <p>{result.rationale}</p>}
+            {result.formalityNote && <p>{result.formalityNote}</p>}
+          </ResultSection>
+        )}
+      {content !== 'alternatives' && (
+        <LearningTips tips={result.learningTips} />
       )}
-      <LearningTips tips={result.learningTips} />
     </div>
   )
 }

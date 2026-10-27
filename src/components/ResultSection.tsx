@@ -16,8 +16,9 @@ export default function ResultSection({
   tag?: string
   alwaysOpen?: boolean
 }) {
-  const { desktop, mode } = useWorkspaceLayoutContext()
-  const expanded = alwaysOpen || desktop || mode === 'split'
+  const { desktop, mode, short } = useWorkspaceLayoutContext()
+  const expanded =
+    alwaysOpen || desktop || (!short && (mode === 'split' || mode === 'book'))
   const [open, setOpen] = useState(false)
   const id = useId()
   return (
