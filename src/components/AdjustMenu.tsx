@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { useTranslatorContext } from '../context/TranslatorContext'
+import { useLearningContext } from '../context/LearningContext'
+import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { REFINEMENT_CHIPS } from '../lib/refinements'
 import RefineRow from './RefineRow'
@@ -10,6 +12,8 @@ export default function AdjustMenu() {
   const { live, input, refinements, refineError, error, textareaRef } =
     useTranslatorContext()
   const hasError = Boolean(error)
+  const learning = useLearningContext()
+  const layout = useWorkspaceLayoutContext()
   const { t, lang } = useUiLang()
   const [open, setOpen] = useState(false)
   const [inline, setInline] = useState(false)
@@ -18,6 +22,12 @@ export default function AdjustMenu() {
   const focusChips = useRef(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const id = useId()
+  const compactOpen = open && !inline && layout.resultFirst
+  const wasCompactOpen = useRef(false)
+  useLayoutEffect(() => {
+    if (compactOpen && !wasCompactOpen.current) learning?.setMinimized(true)
+    wasCompactOpen.current = compactOpen
+  }, [compactOpen, learning?.setMinimized])
   useLayoutEffect(() => {
     const root = menu.current
     const header = root?.closest<HTMLElement>('.app-header')
