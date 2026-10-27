@@ -406,6 +406,30 @@ test('adjustment width measurement reconnects after an error and same-sentence r
   await page.getByTestId('adjust-button').click()
   await expect.element(page.getByTestId('refine-chip-softer')).toBeVisible()
 })
+test('opening Custom with phrase details already open keeps Copy clickable', async () => {
+  if (window.innerWidth >= 560) return
+  await render(<Fixture prepared />)
+  await page.getByTestId('inspectable-phrase').first().click()
+  await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
+  await page.getByTestId('adjust-button').click()
+  await page.getByTestId('refine-custom-trigger').click()
+  await page.getByTestId('refine-freeform').fill('gentler please')
+  const copy = mainCopy().element()
+  await expect
+    .poll(() => {
+      const r = copy.getBoundingClientRect()
+      return (
+        document
+          .elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+          ?.closest('button') === copy
+      )
+    })
+    .toBe(true)
+  await settledShot('combined-learning-adjust')
+  await page.getByRole('button', { name: 'Show learning', exact: true }).click()
+  await expect.element(page.getByTestId('refine-freeform')).not.toBeVisible()
+  await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
+})
 test('header custom adjustments keep keyboard focus and restore the source keyboard layout', async () => {
   if (window.innerWidth >= 500 || window.innerHeight < 450) return
   const viewport = Object.assign(new EventTarget(), {
@@ -478,9 +502,14 @@ test('header custom adjustments keep keyboard focus and restore the source keybo
     viewport.height = Math.floor(initialHeight * 0.55)
     viewport.dispatchEvent(new Event('resize'))
     await new Promise(requestAnimationFrame)
+    await expect
+      .poll(
+        () => getComputedStyle(document.querySelector('.app-header')!).display,
+      )
+      .toBe('none')
     expect(
-      getComputedStyle(document.querySelector('.app-header')!).display,
-    ).toBe('none')
+      mainCopy().element().getBoundingClientRect().bottom,
+    ).toBeLessThanOrEqual(viewport.height)
     visibleRect(mainCopy().element())
     visibleRect(page.getByTestId('clear-input').element())
   } finally {

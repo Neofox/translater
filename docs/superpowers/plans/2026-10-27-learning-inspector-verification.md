@@ -240,3 +240,38 @@ keyboard shrink/pan, Copy during streaming, native selection, prepared phrase
 maps, on-demand enrichment, dictionary lookup, speech cancellation/replay,
 Custom Apply/Close, adaptive draft retention, error/retry and outside-click Copy.
 Physical phone hardware remains untested.
+
+## Production verification and combined compact panels
+
+PR #7 merged as `a7ae00a4805fcdacda0f3daffec4461d36f20de2`. Vercel production
+`dpl_Edjnkw6TUJs7chezewZHrmMcsdWG` became READY and assigned the existing
+production domains, including `translate.jers.dev`. The pushed and merged trees
+were identical. The temporary GitHub account switch was restored afterwards.
+
+Live production returned a real sentence translation and prepared phrase map.
+A first phrase tap showed its basic meaning with zero same-origin POSTs; explicit
+More detail made one successful HTTP 200 request and displayed base form and
+grammar. Main Copy confirmed Copied. No credentials or environment values changed.
+
+The live 382×580 check then found an untested combination: an expanded learning
+panel plus Custom covered Copy, despite Copy's rectangle remaining within the
+viewport. The new regression uses elementFromPoint to verify the button is
+actually clickable. Opening compact Adjust now minimizes learning while retaining
+the selected phrase; Show learning dismisses Adjust and restores the selection.
+Both the original overlap and the reverse restoration race had failing tests
+before their fixes. The initial correction passed 196 learning checks across all
+14 configurations; the final transition-only change passed all **42 affected browser checks** across
+14 configurations, including one-click restoration. Fresh 322 unit tests, typecheck,
+lint, formatting, diff check and production build also passed. A WebKit keyboard
+assertion now waits for the asynchronous layout state and additionally checks
+that Copy stays within the visual viewport.
+
+After the user unlocked the Mac on October 28, Open Design opened both the live
+failure and corrected screenshots. Its final verdict was **satisfied for release**:
+translation, Copy/Listen, Custom Apply/Close and source Paste/Clear remain visible,
+and the minimized learning row preserves the selected phrase. It identified no
+release blocker. Its optional suggestion about text scrolling behind pinned
+Copy/Listen was left as existing scroll behaviour; no extra divider was added.
+The combined-state regression was freshly rerun in Chromium/WebKit portrait:
+**2/2 passed**, including one-click learning restoration. The correction is
+cleared for release through the normal PR and production deployment workflow.

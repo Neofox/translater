@@ -84,7 +84,10 @@ at ordinary portrait heights and scroll in one row at short heights. Opening
 Custom at short heights retains only its input, Apply and Close; a tight keyboard
 uses that single strip in place of the header controls. The source composer keeps
 its space and reference notes collapse temporarily in short layouts. Custom drafts
-survive Close and width changes; Copy/Listen remain separate. Applying/removing
+survive Close and width changes; Copy/Listen remain separate. In stacked layouts,
+opening Adjust minimizes an already-open learning panel, retaining its selection.
+Show learning dismisses Adjust and restores that panel, so the expanded surfaces
+never compete for the space needed by Copy. Applying/removing
 chips, limits and failed-refinement rollback retain existing behaviour. UI language
 moves into an accessible Settings popover; translation Tone stays visible.
 
