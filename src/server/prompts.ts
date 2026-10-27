@@ -217,6 +217,14 @@ const SENTENCE_FEWSHOT_EN = {
     sourceLang: 'en',
     targetLang: 'ko',
     main: '오늘 어떻게 지내요?',
+    learningPhrases: [
+      { text: '오늘', gloss: 'today', sourceTexts: ['today'] },
+      {
+        text: '어떻게 지내요',
+        gloss: 'how are you doing',
+        sourceTexts: ['How are you doing'],
+      },
+    ],
     rationale:
       '해요체 with 어떻게 (how) gives a warm, natural greeting. Korean doesn\'t distinguish "how are you" from "how are you doing": 어떻게 지내요 covers both without the stiff feel of formal 잘 지내십니까.',
     alternatives: [
@@ -247,6 +255,14 @@ const SENTENCE_FEWSHOT_KO = {
     sourceLang: 'ko',
     targetLang: 'en',
     main: 'How are you doing today?',
+    learningPhrases: [
+      {
+        text: 'How are you doing',
+        gloss: '어떻게 지내?',
+        sourceTexts: ['어떻게 지내?'],
+      },
+      { text: 'today', gloss: '오늘', sourceTexts: ['오늘'] },
+    ],
     rationale:
       '"How are you doing"는 자연스러운 일상 인사입니다. 반말의 친근한 느낌을 살리기 위해 격식 있는 "How do you do"보다 현재진행형을 쓴 캐주얼한 표현이 더 잘 어울립니다.',
     alternatives: [
@@ -280,6 +296,19 @@ const SENTENCE_POLISH_FEWSHOT_EN = {
     sourceLang: 'en',
     targetLang: 'en',
     main: 'Could you send the document when you get a chance? Thanks.',
+    learningPhrases: [
+      {
+        text: 'Could you send the document',
+        gloss: 'a polite request to send it',
+        sourceTexts: ['can u send the doc'],
+      },
+      {
+        text: 'when you get a chance',
+        gloss: 'whenever you have time',
+        sourceTexts: ['whenever u get a sec'],
+      },
+      { text: 'Thanks', gloss: 'thank you', sourceTexts: ['thx'] },
+    ],
     rationale:
       'Cleaned up the chat-shorthand ("u" → "you"), softened the imperative into a request with "Could you", and added normal capitalization: keeps the friendly tone but reads like a polished message rather than a quick text.',
     alternatives: [
@@ -307,6 +336,23 @@ const SENTENCE_POLISH_FEWSHOT_KO = {
     sourceLang: 'ko',
     targetLang: 'ko',
     main: '시간 나실 때 그거 메일로 보내주시겠어요?',
+    learningPhrases: [
+      {
+        text: '시간 나실 때',
+        gloss: '시간이 있을 때, 높임 표현',
+        sourceTexts: ['시간 날 때'],
+      },
+      {
+        text: '그거 메일로',
+        gloss: '그것을 이메일로',
+        sourceTexts: ['그거', '메일로'],
+      },
+      {
+        text: '보내주시겠어요',
+        gloss: '정중하게 보내 달라고 요청함',
+        sourceTexts: ['보내줘'],
+      },
+    ],
     rationale:
       '반말 명령형("보내줘")을 "-시겠어요"를 써서 정중한 요청으로 바꿨습니다. 문장 순서도 "시간 나실 때"를 앞으로 옮겨 부담을 덜어주는 느낌을 살렸습니다.',
     alternatives: [
@@ -368,6 +414,7 @@ export function sentencePrompt(args: {
       ? 'Return ONE primary rewrite in `main`, plus 2-6 concise alternatives showing other phrasings within the same register band.'
       : 'Return ONE primary translation in `main`, plus 2-6 concise alternatives (unless the source is unambiguous, then 0). Each alternative should differ in a meaningful way (register, phrasing, idiom choice).',
     'LONG INPUT OVERRIDE: when the source spans multiple lines, contains three or more sentences, or reads as a paragraph, set `alternatives` to an empty array: alternative phrasings only help for short single-sentence input. `main` must still cover the ENTIRE source.',
+    `PREPARED LEARNING: immediately after main, provide learningPhrases: meaningful grammatical phrases quoted EXACTLY from main in target order, with a very short gloss in ${metaLang} and exact corresponding sourceTexts (empty when implied). Cover meaningful text in natural units, never standalone punctuation, never a whole long sentence as one chunk. Do not count character offsets or invent text. This is a small phrase map, not a second long explanation.`,
     isPolish
       ? `The \`rationale\` (in ${metaLang}) is an edit note: explain what you changed and why (register shift, awkwardness fixed, clarity improved, idiom swapped). Not a translation note.`
       : `The \`rationale\` (in ${metaLang}) should highlight interesting linguistic or cultural nuances: wordplay, double meanings, idioms, slang origins, ambiguity resolved. Avoid generic tone descriptions like "casual" or "informal" without further insight.`,

@@ -7,6 +7,9 @@ const validSentenceResult = {
   sourceLang: 'en' as const,
   targetLang: 'ko' as const,
   main: '안녕하세요',
+  learningPhrases: [
+    { text: '안녕하세요', gloss: 'hello', sourceTexts: ['hello'] },
+  ],
   rationale: 'A natural greeting.',
   alternatives: [],
   formalityNote: '',
@@ -128,12 +131,17 @@ describe('handleTranslate via AI Gateway', () => {
         providerOptions: {
           gateway: {
             caching: 'auto',
-            tags: ['translation', 'sentence', 'initial', 'v12-ai-gateway'],
+            tags: [
+              'translation',
+              'sentence',
+              'initial',
+              'v13-prepared-learning',
+            ],
           },
           openai: {
             reasoningEffort: 'none',
             store: false,
-            promptCacheKey: expect.stringContaining('nt:v12-ai-gateway'),
+            promptCacheKey: expect.stringContaining('nt:v13-prepared-learning'),
             promptCacheOptions: {
               mode: 'explicit',
               ttl: '30m',

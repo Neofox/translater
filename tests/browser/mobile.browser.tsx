@@ -301,7 +301,8 @@ test.each([false, true])(
       await expect
         .poll(() => source.hasAttribute('data-source-compact'))
         .toBe(true)
-      expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(104)
+      // Labelled Paste/Clear use a second compact row instead of icon-only actions.
+      expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(160)
       expect(page.getByTestId('input-textarea').element()).toBe(input)
       expect(document.activeElement).toBe(input)
       expect([input.selectionStart, input.selectionEnd]).toEqual([3, 6])
@@ -309,7 +310,7 @@ test.each([false, true])(
         .querySelector('.composer')!
         .getBoundingClientRect()
       expect(composer.left).toBeGreaterThanOrEqual(12)
-      expect(composer.height).toBeLessThanOrEqual(56)
+      expect(composer.height).toBeLessThanOrEqual(110)
       expect(composer.bottom).toBeLessThanOrEqual(
         source.getBoundingClientRect().bottom,
       )
@@ -324,6 +325,7 @@ test.each([false, true])(
         expect(control.getBoundingClientRect().width).toBeGreaterThanOrEqual(44)
       }
       const first = page.getByTestId('alternative-item').elements()[0]!
+      if (keyboard) first.scrollIntoView({ block: 'nearest' })
       await expect
         .element(page.getByText('안녕, 여러분', { exact: true }))
         .toBeVisible()
@@ -338,13 +340,12 @@ test.each([false, true])(
       )
       expect(first.closest('[hidden]')).toBeNull()
       expect(
-        document.querySelector('.detail-alternatives')!.getBoundingClientRect()
-          .top,
-      ).toBeLessThan(
-        document.querySelector('.detail-learning')?.getBoundingClientRect()
-          .top ?? Infinity,
-      )
+        document.querySelector('.output-panel .detail-learning'),
+      ).toBeNull()
       expect(first.querySelector('.copy-button')!.textContent.trim()).toBe('')
+      assertWithinViewport(
+        primary.getByRole('button', { name: 'Copy', exact: true }).element(),
+      )
       await settledScreenshot({
         path: `../../test-results/folded-result-first-${keyboard ? 'keyboard' : 'closed'}.png`,
       })
@@ -404,7 +405,7 @@ test('language menus stay within the viewport and support keyboard selection', a
 })
 
 test('context and learner details remain usable without a popup', async () => {
-  await render(<Fixture />)
+  await render(<Fixture initial={word} />)
   await expandSourceIfNeeded()
   await page.getByTestId('context-toggle').click()
   await page
@@ -416,6 +417,9 @@ test('context and learner details remain usable without a popup', async () => {
   await page.getByTestId('context-clear').click()
   await expect.element(page.getByTestId('context-textarea')).toHaveValue('')
   await page.getByTestId('context-toggle').click()
+  await page.getByTestId('word-details-trigger').click()
+  // Pointer inspection waits for native selection before opening its panel.
+  await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
   const toggle = page.getByRole('button', {
     name: 'Learning tips',
     exact: true,
@@ -722,10 +726,13 @@ test('desktop source and reference share the left pane while alternatives stay r
 
 test('word metadata stays separate from translation actions at every size', async () => {
   await render(<Fixture initial={word} />)
+  await page.getByTestId('word-details-trigger').click()
   const actions = document.querySelector('.primary-result-actions')!
   expect(actions.textContent).not.toContain('noun')
   expect(actions.querySelector(':scope > kbd')).toBeNull()
-  expect(document.querySelectorAll('.word-source-meta')).toHaveLength(1)
+  await expect
+    .poll(() => document.querySelectorAll('.word-source-meta').length)
+    .toBe(1)
   if (document.querySelector('.translator-panels[data-desktop]')) {
     expect(
       document.querySelector('.reference-panel .word-source-meta'),
@@ -742,7 +749,7 @@ test('word metadata stays separate from translation actions at every size', asyn
       document.querySelector(
         document.querySelector('.reference-panel')
           ? '.reference-panel .word-source-meta'
-          : '.output-panel .word-source-meta',
+          : '.learning-panel .word-source-meta',
       ),
     ).not.toBeNull()
   }
@@ -788,24 +795,23 @@ test('reference notes track streaming clear and error without moving source focu
   expect(document.activeElement).toBe(input)
 })
 
-test('portrait keeps alternatives ahead of notes and the source compact', async () => {
+test('portrait keeps alternatives readable and learning in its own compact panel', async () => {
   if (window.innerWidth >= 1100 || window.innerWidth > window.innerHeight)
     return
   await render(<Fixture initial={withAlternatives} />)
   const source = document.querySelector('.input-panel')!
   expect(source.hasAttribute('data-source-compact')).toBe(true)
-  expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(90)
+  expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(140)
   const editor = page
     .getByTestId('input-textarea')
     .element() as HTMLTextAreaElement
   const lineHeight = parseFloat(getComputedStyle(editor).lineHeight)
   expect(Math.abs(editor.clientHeight / lineHeight - 1)).toBeLessThan(0.01)
-  const alternative = document.querySelector('.detail-alternatives')!
-  const notes = document.querySelector('.detail-learning')!
   expect(
-    alternative.compareDocumentPosition(notes) &
-      Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy()
+    document.querySelector('.detail-alternatives')!.closest('.output-panel'),
+  ).not.toBeNull()
+  expect(document.querySelector('.output-panel .detail-learning')).toBeNull()
+  expect(document.querySelector('.learning-panel')).toBeNull()
   expect(document.querySelector('.reference-panel')).toBeNull()
   await expect
     .element(
@@ -1262,7 +1268,9 @@ test('landscape sentence notes use the card width without reserving bottom inset
 
 test('Korean controls and a full input keep the conversation actions reachable', async () => {
   await render(<Fixture />)
+  await page.getByTestId('settings-button').click()
   await page.getByRole('button', { name: '한', exact: true }).click()
+  await userEvent.keyboard('{Escape}')
   await expect
     .element(page.getByTestId('paste-input'))
     .toHaveTextContent('붙여넣기')
@@ -1543,6 +1551,7 @@ test.each(['book', 'laptop'] as const)(
 
 test('dictionary metadata stays readable and synonyms start a new lookup', async () => {
   await render(<Fixture initial={word} />)
+  await page.getByTestId('word-details-trigger').click()
   const about = page.getByRole('button', {
     name: 'About · library',
     exact: true,

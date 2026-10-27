@@ -3,7 +3,6 @@ import { ArrowRightLeft, RotateCcw, TriangleAlert, Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
 import ListenButton from './ListenButton'
 import LanguageChipBar from './LanguageChipBar'
-import RefineRow from './RefineRow'
 import Pill from './ui/Pill'
 import MainExplanation from './MainExplanation'
 import SentenceView from './SentenceView'
@@ -13,8 +12,11 @@ import { useUiLang } from '../hooks/useUiLang'
 import { copyableMainText, mainText, resultIsCurrent } from '../lib/liveResult'
 import { isLongForm } from '../lib/longForm'
 import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
+import { useLearningContext } from '../context/LearningContext'
+import InspectableTranslation from './InspectableTranslation'
 
 export default function OutputPanel() {
+  const learning = useLearningContext()
   const {
     input,
     source,
@@ -149,12 +151,35 @@ export default function OutputPanel() {
           )}
           {!error && live && (
             <div className="result-content">
-              <p
+              <InspectableTranslation
                 className={`result-main ${live.intent === 'word' ? 'result-word' : ''}`}
-                lang={live.partial.targetLang ?? target}
-                data-testid="main-translation"
+                language={live.partial.targetLang ?? target}
+                text={copyText ?? ''}
+                disabled={!learning?.canOpen}
+                actionLabel={
+                  learning && !learning.isSentence
+                    ? `${t('wordDetails')}: ${copyText ?? ''}`
+                    : undefined
+                }
+                expanded={
+                  live.intent === 'word' && separateReference
+                    ? true
+                    : learning?.isOpen
+                }
+                selectedChunk={learning?.selectedChunk}
+                chunks={learning?.preparedChunks}
+                onInspect={
+                  learning?.isSentence
+                    ? learning.openAt
+                    : () => {
+                        if (learning?.isOpen && !separateReference)
+                          learning.close()
+                        else learning?.openAt()
+                      }
+                }
+                resetKey={learning?.identity}
               >
-                {copyText ||
+                {!copyText &&
                   (streaming ? (
                     <span className="result-cursor animate-pulse" aria-hidden />
                   ) : (
@@ -163,7 +188,7 @@ export default function OutputPanel() {
                 {streaming && copyText && (
                   <span className="result-cursor animate-pulse" aria-hidden />
                 )}
-              </p>
+              </InspectableTranslation>
               <MainExplanation
                 live={live}
                 streaming={streaming}
@@ -192,11 +217,33 @@ export default function OutputPanel() {
                     label={desktop}
                   />
                 </div>
-                <RefineRow />
               </div>
+              {learning?.isSentence &&
+                !(separateReference && learning.hasPreparedMap) && (
+                  <div className="learning-entry">
+                    <Pill
+                      tone="warm"
+                      size="md"
+                      data-testid="breakdown-button"
+                      disabled={!learning.canOpen}
+                      aria-expanded={learning.isOpen}
+                      onClick={() => learning.openAt()}
+                    >
+                      {t('breakdown')}
+                    </Pill>
+                  </div>
+                )}
+              {learning && (
+                <div
+                  data-testid="tight-learning-slot"
+                  className="tight-learning-slot"
+                />
+              )}
               {live.intent === 'sentence' ? (
                 <SentenceView
-                  content={separateReference ? 'alternatives' : 'all'}
+                  content={
+                    learning || separateReference ? 'alternatives' : 'all'
+                  }
                   result={live.partial}
                   streaming={streaming}
                   speech={speech}
@@ -205,7 +252,9 @@ export default function OutputPanel() {
                 />
               ) : (
                 <WordView
-                  content={separateReference ? 'alternatives' : 'all'}
+                  content={
+                    learning || separateReference ? 'alternatives' : 'all'
+                  }
                   result={live.partial}
                   mode={mode}
                   streaming={streaming}

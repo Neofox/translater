@@ -1889,6 +1889,92 @@ textarea:focus-visible {
 .result-main {
   margin-top: 8px;
 }
+
+/* Learning leaves the editable textarea and its native selection intact. */
+.source-input-area {
+  grid-area: input;
+  position: relative;
+  min-width: 0;
+  border-radius: 12px;
+  background: var(--color-panel);
+}
+.source-input-area .translation-input {
+  position: relative;
+  background: transparent;
+}
+.source-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  color: transparent;
+  pointer-events: none;
+  border-color: transparent;
+}
+.source-highlight mark {
+  color: transparent;
+}
+.learning-highlight {
+  color: var(--color-warm);
+  background: var(--color-warm-soft);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.result-main[data-inspectable] .inspectable-phrase,
+.result-main[data-inspectable] .word-details-trigger {
+  cursor: pointer;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--color-warm) 70%,
+    transparent
+  );
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-skip-ink: auto;
+}
+.result-main[data-inspectable] .inspectable-phrase:hover,
+.result-main[data-inspectable] .word-details-trigger:hover {
+  text-decoration-color: var(--color-warm);
+}
+.word-details-trigger {
+  appearance: none;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: inherit;
+  text-underline-offset: inherit;
+  cursor: pointer;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.word-details-trigger:hover,
+.word-details-trigger[aria-expanded='true'] {
+  color: var(--color-warm);
+}
+.word-details-trigger:disabled {
+  cursor: text;
+}
+.learning-entry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-block: 4px 20px;
+}
+.learning-entry .ui-pill {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+.result-content .detail-alternatives {
+  border-top: 0;
+}
 .primary-result-actions {
   padding-block: 6px;
   margin-block: -6px 6px;
@@ -1905,6 +1991,486 @@ textarea:focus-visible {
   > .result-section-title {
   min-height: 28px;
   padding-block: 4px;
+}
+
+/* A: one learning surface, in the existing reference pane or above composer. */
+.learning-inspector {
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.learning-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-soft);
+  margin-block: 12px;
+}
+.learning-chunks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.learning-chunks button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 2px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.learning-chunks button:hover {
+  background: var(--color-warm-soft);
+}
+.learning-chunks button > :first-child {
+  font-weight: 600;
+}
+.learning-chunks button > :not(:first-child) {
+  color: var(--color-ink-soft);
+}
+.learning-order {
+  color: var(--color-ink-soft);
+  margin-block: 16px;
+}
+.learning-phrase {
+  color: var(--color-warm);
+  font-size: 22px;
+  font-weight: 600;
+  margin-block: 16px 12px;
+}
+.learning-facts {
+  margin: 0;
+}
+.learning-facts > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.3fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.learning-facts dt,
+.learning-subheading {
+  color: var(--color-warm);
+  font-size: 12px;
+  font-weight: 600;
+}
+.learning-facts dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+.learning-detail-skeleton > div {
+  margin-bottom: 20px;
+}
+.learning-detail-skeleton dt {
+  padding-top: 2px;
+}
+.learning-detail-skeleton dd {
+  display: grid;
+  gap: 8px;
+}
+.learning-skeleton-line {
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--color-ink-dim) 22%, transparent);
+}
+.learning-detail-skeleton dt .learning-skeleton-line {
+  width: 70%;
+}
+.learning-detail-skeleton dd .learning-skeleton-line:last-child {
+  width: 72%;
+}
+.learning-back {
+  margin-top: 4px;
+}
+.learning-inspector .ui-pill {
+  min-height: 44px;
+}
+.learning-sentences {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.learning-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(260px, calc(var(--app-height, 100dvh) * 0.3));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-panel);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.learning-panel[hidden],
+.learning-panel-body[hidden] {
+  display: none;
+}
+.learning-panel-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding-inline: 12px 4px;
+}
+.learning-panel-header h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-warm);
+  font-size: 12px;
+  font-weight: 600;
+}
+.learning-panel-header .ui-pill {
+  min-height: 44px;
+  padding-inline: 10px;
+}
+.learning-panel-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 14px 14px;
+}
+.translator-panels:is([data-layout='stack'], [data-layout='laptop'])
+  .input-panel {
+  display: flex;
+  flex-direction: column;
+}
+.translator-panels:is([data-layout='stack'], [data-layout='laptop']) .composer {
+  flex: 0 0 auto;
+  width: 100%;
+}
+.translator-panels[data-tight] .learning-panel {
+  display: none;
+}
+.input-panel[data-source-compact] .composer,
+.translator-panels[data-keyboard][data-layout='stack']
+  .input-panel[data-source-compact]
+  .composer {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'input' 'actions';
+}
+.input-panel[data-source-compact] .composer-actions {
+  gap: 6px;
+  padding: 0 4px 4px;
+}
+.input-panel[data-source-compact] .paste-button,
+.input-panel[data-source-compact] .clear-button {
+  width: auto;
+  flex-direction: row;
+  min-height: 44px;
+  padding-inline: 10px;
+  gap: 6px;
+  font-size: 14px;
+}
+.input-panel[data-source-compact] .paste-button span,
+.input-panel[data-source-compact] .clear-button span {
+  display: inline;
+}
+.input-panel[data-source-compact] .source-expand-button {
+  margin-left: auto;
+}
+.input-panel[data-source-compact] .source-input-area {
+  background: transparent;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .source-input-area {
+  background: transparent;
+}
+.app-header {
+  position: relative;
+  z-index: 5;
+  align-items: flex-start;
+}
+.app-shell:has(.adjust-menu) .app-header {
+  padding-block: max(6px, var(--safe-area-top))
+    calc(6px + var(--adjust-panel-height, 0px));
+}
+.app-brand {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.app-settings:has(.adjust-menu) {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(44px, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  flex: 1;
+  max-width: 960px;
+  margin-left: auto;
+}
+.app-settings:has(.adjust-menu) > :is(.mode-segment, .mode-select) {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+.app-settings:has(.adjust-menu) > .adjust-menu {
+  grid-column: 2;
+  grid-row: 1;
+}
+.app-settings:has(.adjust-menu) > .settings-trigger {
+  grid-column: 3;
+  grid-row: 1;
+}
+@container header (max-width: 760px) {
+  .app-settings:has(.adjust-menu) > .mode-segment {
+    display: none;
+  }
+  .app-settings:has(.adjust-menu) > .mode-select {
+    display: block;
+    width: 100%;
+    max-width: 112px;
+  }
+}
+.adjust-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  position: static;
+}
+.adjust-trigger.ui-pill {
+  min-height: 44px;
+  max-width: 100%;
+}
+.adjust-trigger-compact.ui-pill {
+  width: 44px;
+  min-width: 44px;
+  padding-inline: 0;
+}
+.adjust-menu > .ui-pill > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: min(40vw, 260px);
+}
+.adjust-content {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  width: max-content;
+  min-width: 0;
+}
+.adjust-content[data-open] {
+  position: static;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  visibility: visible;
+  pointer-events: auto;
+  width: 100%;
+}
+.adjust-menu .refine-row {
+  margin: 0;
+}
+.adjust-menu:not([data-inline]) .adjust-content[data-open] {
+  position: absolute;
+  top: calc(max(6px, var(--safe-area-top)) + 50px);
+  right: max(var(--header-gutter), var(--safe-area-right));
+  width: min(
+    420px,
+    calc(100vw - 32px - var(--safe-area-left) - var(--safe-area-right))
+  );
+  overflow: visible;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-panel);
+  z-index: 60;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-header {
+  display: flex;
+}
+.app-header .adjust-menu .refine-row {
+  display: block;
+}
+.adjust-content .refine-controls .ui-pill {
+  font-size: 14px;
+  padding-inline: 10px;
+}
+.adjust-content .refine-controls .ui-pill:not([aria-pressed='true']) {
+  color: var(--color-ink);
+}
+.adjust-content .refine-label {
+  display: none;
+}
+.adjust-inline-label {
+  flex-shrink: 0;
+  display: block;
+  min-height: 44px;
+  line-height: 44px;
+  padding-left: 14px;
+  border-left: 1px solid var(--color-border-strong);
+  color: var(--color-ink-dim);
+  font-size: 13px;
+}
+.adjust-menu:not([data-inline]) .adjust-inline-label {
+  position: absolute;
+  visibility: hidden;
+}
+.adjust-menu:not([data-inline]) .refine-controls {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.app-shell[data-short] .adjust-menu:not([data-inline]) .refine-controls {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.app-shell[data-short]
+  .adjust-menu:not([data-inline])
+  .refine-controls:has(.refine-custom-editor:not([hidden]))
+  > button {
+  display: none;
+}
+.app-shell[data-short]:has(.adjust-content[data-open]) .input-panel .composer {
+  max-height: 100%;
+  flex-shrink: 0;
+}
+.app-shell[data-short]:has(.adjust-content[data-open]) .reference-panel {
+  display: none;
+}
+/* With the software keyboard, dedicate the header to the focused custom field.
+   The same input stays mounted; the result and composer retain their own space. */
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-header {
+  padding-bottom: 6px;
+  min-height: 56px;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-brand,
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-settings
+  > :is(.mode-segment, .mode-select, .settings-trigger),
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .adjust-trigger,
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .refine-controls
+  > button {
+  display: none;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-settings {
+  display: block;
+  max-width: none;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .adjust-content[data-open] {
+  position: static;
+  padding: 0;
+  width: 100%;
+  border: 0;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .refine-freeform {
+  width: 100%;
+}
+.refine-custom-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.refine-custom-editor[hidden] {
+  display: none;
+}
+.refine-custom-editor .refine-freeform {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+}
+.refine-custom-editor .ui-pill {
+  flex-shrink: 0;
+}
+.adjust-trigger[data-active]::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.adjust-error {
+  flex: 1 1 100%;
+  color: var(--color-warm);
+  font-size: 13px;
+}
+.settings-trigger.ui-pill {
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 10px;
+}
+.settings-popover {
+  z-index: 60;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--color-ink);
+  max-width: calc(
+    100vw - 24px - var(--safe-area-left, 0px) - var(--safe-area-right, 0px)
+  );
+}
+.settings-popover h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.settings-popover [aria-label='UI language'] button {
+  min-height: 44px;
+  min-width: 52px;
+}
+
+/* Keep main Copy reachable when scrolling from the translation to alternatives. */
+.primary-result-actions {
+  top: 0;
+}
+
+.translator-panels[data-tight] .learning-panel[data-tight-inline] {
+  display: flex;
+  max-height: none;
+  margin-top: 12px;
+}
+.tight-learning-slot {
+  scroll-margin-top: 60px;
 }
 
 .alternative-skeleton .alternative-text,

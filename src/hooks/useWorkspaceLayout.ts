@@ -36,7 +36,7 @@ export function useWorkspaceLayout() {
       const focused = document.activeElement
       const editing =
         focused instanceof HTMLElement &&
-        panels.contains(focused) &&
+        Boolean(shell?.contains(focused)) &&
         focused.matches('textarea, input, [contenteditable="true"]')
       const keyboard =
         !zoomed &&

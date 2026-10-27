@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LearningPhrases } from './learningTypes'
 
 // All fields are required: these schemas are passed to AI SDK `Output.object`
 // for strict final validation. "Not applicable" is an empty string / empty
@@ -59,6 +60,9 @@ export const SentenceResult = z.object({
     'The language `main` and every alternative are actually written in.',
   ),
   main: z.string().describe('The primary translation of the source text.'),
+  learningPhrases: LearningPhrases.describe(
+    'A lightweight breakdown prepared with the main translation. In target order, quote exact meaningful phrases from main with a short gloss in the metadata language and exact corresponding sourceTexts (empty if implicit). Cover the meaningful text, group grammatical units naturally, never emit punctuation-only chunks. No offsets, no rewriting. Generate immediately after main, before longer explanations.',
+  ),
   rationale: z
     .string()
     .describe(

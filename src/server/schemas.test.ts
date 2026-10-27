@@ -10,6 +10,9 @@ const validResult = {
   sourceLang: 'zh',
   targetLang: 'en',
   main: 'School life',
+  learningPhrases: [
+    { text: 'School life', gloss: 'life at school', sourceTexts: ['學校生活'] },
+  ],
   rationale: 'A direct translation.',
   alternatives: [],
   formalityNote: '',

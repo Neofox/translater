@@ -10,8 +10,12 @@ import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
 import { STRINGS } from '../lib/i18n'
 import { copyableMainText } from '../lib/liveResult'
+import { useLearningContext } from '../context/LearningContext'
+import SourceHighlight from './SourceHighlight'
+import LearningPanel from './LearningPanel'
 
 export default function InputPanel({ children }: { children?: ReactNode }) {
+  const learning = useLearningContext()
   const {
     input,
     setInput,
@@ -116,6 +120,7 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
       aria-label={t('sourceText')}
       data-source-compact={compact || undefined}
     >
+      <LearningPanel />
       <div className="composer">
         <div className="composer-header">
           <LanguageChipBar
@@ -139,44 +144,53 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
               <ContextTextarea />
             </div>
           )}
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onFocus={() => {
-              if (layout.keyboard) {
-                setContextOpen(false)
-                setContextEditing(false)
-              }
-            }}
-            onPaste={() => queueImmediate('paste')}
-            onBlur={(event) => {
-              const next = event.relatedTarget
-              if (!(
-                next instanceof Element && next.closest('[data-input-action]')
-              ))
-                flush('blur')
-            }}
-            onKeyDown={(event) => {
-              if (
-                event.key === 'Enter' &&
-                !event.shiftKey &&
-                !event.metaKey &&
-                !event.ctrlKey &&
-                !event.nativeEvent.isComposing &&
-                flush('enter')
-              )
-                event.preventDefault()
-            }}
-            placeholder={t('placeholder')}
-            aria-label={t('inputText')}
-            data-testid="input-textarea"
-            className="translation-input scrollbar-thin"
-            spellCheck
-            autoComplete="off"
-            autoCorrect="on"
-          />
+          <div className="source-input-area">
+            {learning?.selectedChunk && (
+              <SourceHighlight
+                text={input}
+                spans={learning.selectedChunk.sourceSpans}
+                textareaRef={textareaRef}
+              />
+            )}
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onFocus={() => {
+                if (layout.keyboard) {
+                  setContextOpen(false)
+                  setContextEditing(false)
+                }
+              }}
+              onPaste={() => queueImmediate('paste')}
+              onBlur={(event) => {
+                const next = event.relatedTarget
+                if (!(
+                  next instanceof Element && next.closest('[data-input-action]')
+                ))
+                  flush('blur')
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key === 'Enter' &&
+                  !event.shiftKey &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.nativeEvent.isComposing &&
+                  flush('enter')
+                )
+                  event.preventDefault()
+              }}
+              placeholder={t('placeholder')}
+              aria-label={t('inputText')}
+              data-testid="input-textarea"
+              className="translation-input scrollbar-thin"
+              spellCheck
+              autoComplete="off"
+              autoCorrect="on"
+            />
+          </div>
           <div className="composer-actions">
             <Pill
               size="md"
@@ -195,6 +209,7 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
               size="md"
               className="clear-button"
               onClick={() => {
+                learning?.close()
                 clearInput()
                 focusSource()
               }}
