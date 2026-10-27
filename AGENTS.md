@@ -221,7 +221,7 @@ Use npm for this project. Commit `package-lock.json` with dependency changes; us
 - Dev server: `npm run dev`
 - Unit tests: `npm test`
 - Browser dependencies: `npx playwright install chromium webkit`
-- Browser matrix: `npm run test:browser` (Chromium/WebKit at seven folded/unfolded phone and MacBook sizes, synthetic speech; no paid calls)
+- Browser matrix: `npm run test:browser` (Chromium/WebKit at seven folded/unfolded phone and MacBook sizes, synthetic speech; no paid calls). Browser fixtures wait for CSS and use the system-font fallback to avoid external font CDN startup/screenshot races. Production font loading is unchanged.
 - Replay report: `npm run test:browser:report` (serves `test-results/browser/index.html`)
 - Interactive browser tests: `npm run test:browser:ui`
 - Translation smoke test: `npx tsx scripts/smoke-translate.mjs` (real, potentially billed Gateway request)

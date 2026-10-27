@@ -47,8 +47,8 @@ CopyButton accepts optional shortcut text; the main desktop instance supplies it
       and sticky actions. Apply Open Design's concrete Duo policy when returned.
 - [x] Run focused Chromium/WebKit checks, inspect desktop and mobile captures;
       keep existing provenance, speech and Safari regressions green.
-- [ ] Update documentation; run unit, browser matrix, typecheck, lint, format and build.
-- [ ] Request one fresh review, fix important findings with regressions; commit,
+- [x] Update documentation; run unit, browser matrix, typecheck, lint, format and build.
+- [x] Request one fresh review, fix important findings with regressions; commit,
       push and verify updated preview/checks.
 
 ## Execution record
@@ -82,3 +82,11 @@ CopyButton accepts optional shortcut text; the main desktop instance supplies it
   the remote font import to exercise the app's system fallback without CDN races.
   Confirmed production CSS retains its original font import. All seven Chromium
   profiles passed in the restarted matrix; WebKit verification is still running.
+
+- Final verification: all644 browser checks passed across14 Chromium/WebKit
+  profiles after the fix pass and CDN isolation. All268 unit tests, typecheck,
+  lint, formatting and production build passed. Settled short/long/word captures
+  refreshed at all7 sizes. No deferred review findings or design rulings.
+- Implementation pushed as `dec39a4` to PR6. Vercel/security checks succeeded;
+  authenticated preview and stylesheet returned HTTP200 with the reference pane,
+  Copy hint and original production font import. PR remains open and unmerged.
