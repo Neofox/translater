@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import AdjustMenu from './AdjustMenu'
 import { UiLangProvider } from '../hooks/useUiLang'
+
 const fixture = vi.hoisted(() => ({
   live: { intent: 'sentence' },
   input: 'Hello',

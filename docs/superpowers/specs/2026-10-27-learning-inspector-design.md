@@ -71,7 +71,10 @@ nonmodal learning panel between the result region and composer. It has its own
 scroll, Whole sentence, minimize and close controls; it never covers the source
 actions or main Copy. At short visible heights and keyboard entry, minimize it
 to a small labelled restore control; at tight heights collapse that control into
-the existing Breakdown entry if necessary. Editing does not automatically reopen
+the existing Breakdown entry if necessary. On deliberate open at tight heights,
+place the same inspector inside the result scroll, with main Copy pinned and the
+composer outside that scroll. Short stacked windows allow explicit restore after
+initial minimization. Editing does not automatically reopen
 learning. When focus is inside a panel that closes, return focus to a surviving
 trigger; never restore it to an unmounted node. No focus trap or background inert.
 

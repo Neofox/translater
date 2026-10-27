@@ -1,4 +1,5 @@
 import type { StringKey } from './i18n'
+
 export const REFINEMENT_CHIPS: Array<{
   id: string
   instruction: string

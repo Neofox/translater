@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { isInspectTap, textOffsetAtPoint } from '../lib/phrasePointer'
 import type { PointerPoint } from '../lib/phrasePointer'
@@ -12,6 +12,7 @@ type Props = {
   onInspect?: (offset: number) => void
   className?: string
   children?: ReactNode
+  resetKey?: string
 }
 
 export default function InspectableTranslation({
@@ -22,6 +23,7 @@ export default function InspectableTranslation({
   onInspect,
   className = 'result-main',
   children,
+  resetKey,
 }: Props) {
   const root = useRef<HTMLParagraphElement>(null)
   const down = useRef<PointerPoint | null>(null)
@@ -30,10 +32,19 @@ export default function InspectableTranslation({
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
   }
-  useEffect(() => {
+  useLayoutEffect(() => {
     cancel()
-    return cancel
-  }, [text, disabled])
+    down.current = null
+    const reset = () => {
+      cancel()
+      down.current = null
+    }
+    window.addEventListener('pagehide', reset)
+    return () => {
+      reset()
+      window.removeEventListener('pagehide', reset)
+    }
+  }, [text, disabled, resetKey])
   const selected = !disabled ? selectedChunk : null
   return (
     <p
@@ -42,10 +53,10 @@ export default function InspectableTranslation({
       lang={language}
       data-testid="main-translation"
       data-inspectable={!disabled || undefined}
-      onPointerDown={(event) => {
+      onPointerDownCapture={(event) => {
         cancel()
         down.current =
-          !disabled && event.button === 0
+          !disabled && event.button === 0 && !window.getSelection()?.toString()
             ? { x: event.clientX, y: event.clientY, time: performance.now() }
             : null
       }}

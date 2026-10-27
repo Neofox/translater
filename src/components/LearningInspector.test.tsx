@@ -5,6 +5,8 @@ import LearningInspector from './LearningInspector'
 import { UiLangProvider } from '../hooks/useUiLang'
 
 const fixture = vi.hoisted(() => ({
+  // This deliberately partial hook fixture exercises the inspector in isolation.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   learning: null as unknown,
   translator: {
     live: {

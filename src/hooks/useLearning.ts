@@ -49,7 +49,9 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
     controller: AbortController
     offset?: number
   } | null>(null)
-  const failed = useRef<string | null>(null)
+  // Failure metadata is separate from the completed-result cache: restoring a
+  // failed sentence must expose Retry, never silently start another paid run.
+  const failed = useRef(new Map<string, 'learningFailed' | 'learningTooLong'>())
   const current =
     enabled && state.identity === identity ? state : empty(identity)
   const ranges = snapshot
@@ -71,7 +73,7 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
   }, [cancel])
   useLayoutEffect(() => {
     cancel()
-    failed.current = null
+    failed.current.clear()
     setState(empty(identity))
     return cancel
   }, [identity, enabled, cancel])
@@ -108,6 +110,7 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
           sentence,
           chunk: choose(result),
         })
+      if (active.current?.key !== key) cancel()
       const cached = cache.current.get(key)
       if (cached) {
         cache.current.delete(key)
@@ -119,8 +122,15 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
         active.current.offset = offset
         return
       }
-      if (!retry && failed.current === key) {
-        setState((s) => ({ ...s, isOpen: true, minimized: false }))
+      const failure = failed.current.get(key)
+      if (!retry && failure) {
+        setState({
+          ...empty(live.identity),
+          sentence,
+          isOpen: true,
+          status: 'error',
+          error: failure,
+        })
         return
       }
       cancel()
@@ -131,7 +141,9 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
         sentence,
       })
       if (!LearningInput.safeParse(data).success) {
-        failed.current = key
+        failed.current.set(key, 'learningTooLong')
+        if (failed.current.size > 20)
+          failed.current.delete(failed.current.keys().next().value!)
         setState((s) => ({ ...s, status: 'error', error: 'learningTooLong' }))
         return
       }
@@ -152,7 +164,7 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
           cache.current.set(key, result)
           if (cache.current.size > 20)
             cache.current.delete(cache.current.keys().next().value!)
-          failed.current = null
+          failed.current.delete(key)
           const idx =
             pending.offset === undefined
               ? null
@@ -169,7 +181,9 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
           })
         } catch {
           if (isCurrent()) {
-            failed.current = key
+            failed.current.set(key, 'learningFailed')
+            if (failed.current.size > 20)
+              failed.current.delete(failed.current.keys().next().value!)
             setState((s) => ({
               ...s,
               status: 'error',

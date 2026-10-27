@@ -159,6 +159,7 @@ export default function OutputPanel() {
                 disabled={!learning?.canOpen || !learning.isSentence}
                 selectedChunk={learning?.selectedChunk}
                 onInspect={learning?.openAt}
+                resetKey={learning?.identity}
               >
                 {!copyText &&
                   (streaming ? (
@@ -219,6 +220,12 @@ export default function OutputPanel() {
                     <AdjustMenu />
                   </div>
                 </div>
+              )}
+              {learning && (
+                <div
+                  data-testid="tight-learning-slot"
+                  className="tight-learning-slot"
+                />
               )}
               {live.intent === 'sentence' ? (
                 <SentenceView

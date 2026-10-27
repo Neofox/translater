@@ -9,6 +9,7 @@ import {
 import { afterEach, expect, it } from 'vitest'
 import SettingsMenu from './SettingsMenu'
 import { UiLangProvider } from '../hooks/useUiLang'
+
 afterEach(() => {
   cleanup()
   window.localStorage.clear()

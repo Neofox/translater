@@ -126,3 +126,46 @@ it('cancels on close and pagehide and never accepts a late completion', async ()
   expect(result.current.isOpen).toBe(false)
   expect(result.current.status).toBe('idle')
 })
+
+const multi = {
+  ...props,
+  snapshot: { ...snapshot, translation: '안녕. 안녕.', sentenceEnd: 7 },
+}
+it('returning to a cached sentence cancels another sentence request before it can replace the chosen view', async () => {
+  let finish!: (r: LearningResult) => void
+  vi.mocked(learn)
+    .mockResolvedValueOnce(output)
+    .mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          finish = r
+        }),
+    )
+  const { result } = renderHook(() => useLearning(multi))
+  act(() => result.current.openAt())
+  await waitFor(() => expect(result.current.status).toBe('ready'))
+  act(() => result.current.selectSentence(1))
+  act(() => result.current.selectSentence(0))
+  await act(async () => {
+    finish({ ...output, chunks: [{ ...output.chunks[0]!, start: 4, end: 6 }] })
+  })
+  expect(result.current.selectedSentence).toBe(0)
+  expect(result.current.result?.chunks[0]?.start).toBe(0)
+})
+it('returning to a failed sentence restores its error and Retry rather than another cached sentence', async () => {
+  vi.mocked(learn)
+    .mockResolvedValueOnce(output)
+    .mockRejectedValueOnce(new Error('offline'))
+  const { result } = renderHook(() => useLearning(multi))
+  act(() => result.current.openAt())
+  await waitFor(() => expect(result.current.status).toBe('ready'))
+  act(() => result.current.selectSentence(1))
+  await waitFor(() => expect(result.current.status).toBe('error'))
+  act(() => result.current.selectSentence(0))
+  expect(result.current.status).toBe('ready')
+  act(() => result.current.selectSentence(1))
+  expect(result.current.selectedSentence).toBe(1)
+  expect(result.current.status).toBe('error')
+  expect(result.current.result).toBeNull()
+  expect(learn).toHaveBeenCalledTimes(2)
+})

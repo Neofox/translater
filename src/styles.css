@@ -2114,6 +2114,7 @@ textarea:focus-visible {
 .input-panel[data-source-compact] .paste-button,
 .input-panel[data-source-compact] .clear-button {
   width: auto;
+  flex-direction: row;
   min-height: 44px;
   padding-inline: 10px;
   gap: 6px;
@@ -2205,6 +2206,20 @@ textarea:focus-visible {
 .settings-popover [aria-label='UI language'] button {
   min-height: 44px;
   min-width: 52px;
+}
+
+/* Keep main Copy reachable when scrolling from the translation to alternatives. */
+.primary-result-actions {
+  top: 0;
+}
+
+.translator-panels[data-tight] .learning-panel[data-tight-inline] {
+  display: flex;
+  max-height: none;
+  margin-top: 12px;
+}
+.tight-learning-slot {
+  scroll-margin-top: 60px;
 }
 
 .alternative-skeleton .alternative-text,

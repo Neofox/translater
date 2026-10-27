@@ -16,7 +16,8 @@ export function textOffsetAtPoint(
   x: number,
   y: number,
 ): number | null {
-  const doc = root.ownerDocument as Document & {
+  const doc = root.ownerDocument as unknown as {
+    createRange: Document['createRange']
     caretPositionFromPoint?: (
       x: number,
       y: number,

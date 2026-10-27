@@ -6,7 +6,7 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import { useTranslatorContext } from './TranslatorContext'
+import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { useLearning } from '../hooks/useLearning'
 import { mainText, resultIsCurrent } from '../lib/liveResult'
