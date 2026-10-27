@@ -198,6 +198,31 @@ describe('RefineRow', () => {
     ).toBe(false)
   })
 
+  it('offers Apply and Close, preserving an unapplied draft when closed', async () => {
+    renderRow('see you tomorrow')
+    await setMockLive({
+      intent: 'sentence',
+      partial: { main: '내일 봐요' },
+      done: true,
+      requestSource: 'auto',
+      text: 'see you tomorrow',
+    })
+    const trigger = await screen.findByTestId('refine-custom-trigger')
+    fireEvent.click(trigger)
+    const input = screen.getByTestId('refine-freeform')
+    fireEvent.change(input, { target: { value: 'gentler please' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Close adjustment' }))
+    expect(currentContext.refinements).toEqual([])
+    expect(document.activeElement).toBe(trigger)
+    fireEvent.click(trigger)
+    expect(screen.getByTestId<HTMLInputElement>('refine-freeform').value).toBe(
+      'gentler please',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(currentContext.refinements).toEqual(['gentler please'])
+    expect(await screen.findByTestId('refine-custom')).toBeTruthy()
+  })
+
   it('keeps static refinement controls disabled while a sentence is incomplete', async () => {
     renderRow('see you tomorrow')
     await setMockLive({

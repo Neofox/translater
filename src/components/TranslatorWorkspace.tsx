@@ -3,6 +3,7 @@ import OutputPanel from './OutputPanel'
 import ReferencePanel from './ReferencePanel'
 import ModeToggle from './ModeToggle'
 import SettingsMenu from './SettingsMenu'
+import AdjustMenu from './AdjustMenu'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { WorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useWorkspaceLayout } from '../hooks/useWorkspaceLayout'
@@ -39,6 +40,7 @@ export default function TranslatorWorkspace() {
             </div>
             <div className="app-settings">
               <ModeToggle value={mode} onChange={setMode} />
+              <AdjustMenu />
               <SettingsMenu />
             </div>
           </header>

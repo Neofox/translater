@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
@@ -12,7 +12,9 @@ const CHIP_INSTRUCTIONS = new Set(CHIPS.map((c) => c.instruction))
 
 const CUSTOM_LABEL_MAX = 20
 
-export default function RefineRow() {
+export default function RefineRow({
+  onCloseCustom,
+}: { onCloseCustom?: () => void } = {}) {
   const {
     live,
     streaming,
@@ -32,6 +34,15 @@ export default function RefineRow() {
   const [freeform, setFreeform] = useState('')
   const [customOpen, setCustomOpen] = useState(false)
   const freeformRef = useRef<HTMLInputElement>(null)
+  const customTrigger = useRef<HTMLButtonElement>(null)
+  const restoreAfterClose = useRef(false)
+  useLayoutEffect(() => {
+    if (!customOpen && restoreAfterClose.current) {
+      restoreAfterClose.current = false
+      if (onCloseCustom) onCloseCustom()
+      else customTrigger.current?.focus()
+    }
+  }, [customOpen, onCloseCustom])
 
   if (error || !live || live.intent !== 'sentence') return null
   // Static controls keep their geometry; only a current, complete result can act.
@@ -116,7 +127,9 @@ export default function RefineRow() {
         ) : (
           <>
             <Pill
+              ref={customTrigger}
               size="sm"
+              tone={customOpen ? 'active' : 'neutral'}
               className="refine-custom-trigger"
               aria-expanded={customOpen}
               disabled={!ready || atCap}
@@ -130,24 +143,47 @@ export default function RefineRow() {
               <Plus size={16} aria-hidden />
               {t('refineCustom')}
             </Pill>
-            <input
-              ref={freeformRef}
-              hidden={!customOpen}
-              value={freeform}
-              maxLength={MAX_REFINEMENT_CHARS}
-              disabled={!ready || atCap}
-              onChange={(e) => setFreeform(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                  e.preventDefault()
-                  submitFreeform()
-                }
-              }}
-              placeholder={t('refinePlaceholder')}
-              aria-label={t('refinePlaceholder')}
-              data-testid="refine-freeform"
-              className="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-            />
+            <div className="refine-custom-editor" hidden={!customOpen}>
+              <input
+                ref={freeformRef}
+                hidden={!customOpen}
+                value={freeform}
+                maxLength={MAX_REFINEMENT_CHARS}
+                disabled={!ready || atCap}
+                onChange={(e) => setFreeform(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    submitFreeform()
+                  }
+                }}
+                placeholder={t('refinePlaceholder')}
+                aria-label={t('refinePlaceholder')}
+                data-testid="refine-freeform"
+                className="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              />
+              <Pill
+                size="sm"
+                tone="accent"
+                data-testid="refine-apply"
+                disabled={!ready || atCap || !freeform.trim()}
+                onClick={submitFreeform}
+              >
+                {t('refineApply')}
+              </Pill>
+              <Pill
+                size="sm"
+                aria-label={t('refineClose')}
+                title={t('refineClose')}
+                data-testid="refine-close"
+                onClick={() => {
+                  restoreAfterClose.current = true
+                  setCustomOpen(false)
+                }}
+              >
+                <X size={18} aria-hidden />
+              </Pill>
+            </div>
           </>
         )}
       </div>

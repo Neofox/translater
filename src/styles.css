@@ -2195,33 +2195,238 @@ textarea:focus-visible {
   .source-input-area {
   background: transparent;
 }
-.learning-entry-actions,
-.adjust-menu {
-  display: contents;
+.app-header {
+  position: relative;
+  z-index: 5;
+  align-items: flex-start;
 }
-.learning-entry-actions > .ui-pill,
-.adjust-menu > .ui-pill {
+.app-shell:has(.adjust-menu) .app-header {
+  padding-block: max(6px, var(--safe-area-top))
+    calc(6px + var(--adjust-panel-height, 0px));
+}
+.app-brand {
   min-height: 44px;
+  flex-shrink: 0;
+}
+.app-settings:has(.adjust-menu) {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(44px, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  flex: 1;
+  max-width: 960px;
+  margin-left: auto;
+}
+.app-settings:has(.adjust-menu) > :is(.mode-segment, .mode-select) {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+.app-settings:has(.adjust-menu) > .adjust-menu {
+  grid-column: 2;
+  grid-row: 1;
+}
+.app-settings:has(.adjust-menu) > .settings-trigger {
+  grid-column: 3;
+  grid-row: 1;
+}
+@container header (max-width: 760px) {
+  .app-settings:has(.adjust-menu) > .mode-segment {
+    display: none;
+  }
+  .app-settings:has(.adjust-menu) > .mode-select {
+    display: block;
+    width: 100%;
+    max-width: 112px;
+  }
+}
+.adjust-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  position: static;
+}
+.adjust-trigger.ui-pill {
+  min-height: 44px;
+  max-width: 100%;
+}
+.adjust-trigger-compact.ui-pill {
+  width: 44px;
+  min-width: 44px;
+  padding-inline: 0;
 }
 .adjust-menu > .ui-pill > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
   max-width: min(40vw, 260px);
 }
 .adjust-content {
-  flex: 1 1 100%;
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  width: max-content;
   min-width: 0;
+}
+.adjust-content[data-open] {
+  position: static;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  visibility: visible;
+  pointer-events: auto;
   width: 100%;
 }
-.adjust-content[hidden] {
-  display: none;
+.adjust-menu .refine-row {
+  margin: 0;
 }
-.adjust-content .refine-row {
-  margin-block: 4px 8px;
+.adjust-menu:not([data-inline]) .adjust-content[data-open] {
+  position: absolute;
+  top: calc(max(6px, var(--safe-area-top)) + 50px);
+  right: max(var(--header-gutter), var(--safe-area-right));
+  width: min(
+    420px,
+    calc(100vw - 32px - var(--safe-area-left) - var(--safe-area-right))
+  );
+  overflow: visible;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-panel);
+  z-index: 60;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-header {
+  display: flex;
+}
+.app-header .adjust-menu .refine-row {
+  display: block;
+}
+.adjust-content .refine-controls .ui-pill {
+  font-size: 14px;
+  padding-inline: 10px;
+}
+.adjust-content .refine-controls .ui-pill:not([aria-pressed='true']) {
+  color: var(--color-ink);
 }
 .adjust-content .refine-label {
   display: none;
+}
+.adjust-inline-label {
+  flex-shrink: 0;
+  display: block;
+  min-height: 44px;
+  line-height: 44px;
+  padding-left: 14px;
+  border-left: 1px solid var(--color-border-strong);
+  color: var(--color-ink-dim);
+  font-size: 13px;
+}
+.adjust-menu:not([data-inline]) .adjust-inline-label {
+  position: absolute;
+  visibility: hidden;
+}
+.adjust-menu:not([data-inline]) .refine-controls {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.app-shell[data-short] .adjust-menu:not([data-inline]) .refine-controls {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.app-shell[data-short]
+  .adjust-menu:not([data-inline])
+  .refine-controls:has(.refine-custom-editor:not([hidden]))
+  > button {
+  display: none;
+}
+.app-shell[data-short]:has(.adjust-content[data-open]) .input-panel .composer {
+  max-height: 100%;
+  flex-shrink: 0;
+}
+.app-shell[data-short]:has(.adjust-content[data-open]) .reference-panel {
+  display: none;
+}
+/* With the software keyboard, dedicate the header to the focused custom field.
+   The same input stays mounted; the result and composer retain their own space. */
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-header {
+  padding-bottom: 6px;
+  min-height: 56px;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-brand,
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-settings
+  > :is(.mode-segment, .mode-select, .settings-trigger),
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .adjust-trigger,
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .refine-controls
+  > button {
+  display: none;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .app-settings {
+  display: block;
+  max-width: none;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .adjust-content[data-open] {
+  position: static;
+  padding: 0;
+  width: 100%;
+  border: 0;
+}
+.app-shell[data-keyboard][data-tight]:has(
+    .adjust-content[data-open] .refine-custom-editor:not([hidden])
+  )
+  .refine-freeform {
+  width: 100%;
+}
+.refine-custom-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.refine-custom-editor[hidden] {
+  display: none;
+}
+.refine-custom-editor .refine-freeform {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+}
+.refine-custom-editor .ui-pill {
+  flex-shrink: 0;
+}
+.adjust-trigger[data-active]::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 .adjust-error {
   flex: 1 1 100%;

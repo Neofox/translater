@@ -49,7 +49,7 @@ prepared meaning visible and add skeleton rows for the extra facts with a
 “Loading more detail…” status. Respect reduced motion and hide placeholders from
 assistive technology.
 Do not add instructional helper copy in the inspector or action row.
-Group Breakdown/Adjust with spacing, without enclosing divider lines; alternatives
+Keep Adjust with Tone in the header; use spacing around compact Breakdown, without enclosing divider lines; alternatives
 also use spacing above their heading, retaining separators only between results.
 
 The overview lists meaningful target-language chunks with their source equivalents
@@ -77,7 +77,14 @@ Word details label/button row. Desktop shows its dictionary automatically, witho
 stealing source focus; the trigger focuses it. Compact layouts reveal it on demand
 and closing restores the word trigger. Omit punctuation-only breakdown entries.
 Alternatives keep their explanations, Copy/Listen and open list. Refine becomes
-one Adjust disclosure whose summary names active adjustments; applying/removing
+a header group beside Tone, separated by a muted Adjust label and divider. Show
+chips directly when their measured width fits; otherwise use a disclosure with
+active summary and dot. Its compact panel reserves real header space. Chips wrap
+at ordinary portrait heights and scroll in one row at short heights. Opening
+Custom at short heights retains only its input, Apply and Close; a tight keyboard
+uses that single strip in place of the header controls. The source composer keeps
+its space and reference notes collapse temporarily in short layouts. Custom drafts
+survive Close and width changes; Copy/Listen remain separate. Applying/removing
 chips, limits and failed-refinement rollback retain existing behaviour. UI language
 moves into an accessible Settings popover; translation Tone stays visible.
 

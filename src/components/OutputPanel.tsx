@@ -3,7 +3,6 @@ import { ArrowRightLeft, RotateCcw, TriangleAlert, Loader2 } from 'lucide-react'
 import CopyButton from './CopyButton'
 import ListenButton from './ListenButton'
 import LanguageChipBar from './LanguageChipBar'
-import AdjustMenu from './AdjustMenu'
 import Pill from './ui/Pill'
 import MainExplanation from './MainExplanation'
 import SentenceView from './SentenceView'
@@ -218,27 +217,22 @@ export default function OutputPanel() {
                     label={desktop}
                   />
                 </div>
-                {!learning && <AdjustMenu />}
               </div>
-              {learning?.isSentence && (
-                <div className="learning-entry">
-                  <div className="learning-entry-actions">
-                    {!(separateReference && learning.hasPreparedMap) && (
-                      <Pill
-                        tone="warm"
-                        size="md"
-                        data-testid="breakdown-button"
-                        disabled={!learning.canOpen}
-                        aria-expanded={learning.isOpen}
-                        onClick={() => learning.openAt()}
-                      >
-                        {t('breakdown')}
-                      </Pill>
-                    )}
-                    <AdjustMenu />
+              {learning?.isSentence &&
+                !(separateReference && learning.hasPreparedMap) && (
+                  <div className="learning-entry">
+                    <Pill
+                      tone="warm"
+                      size="md"
+                      data-testid="breakdown-button"
+                      disabled={!learning.canOpen}
+                      aria-expanded={learning.isOpen}
+                      onClick={() => learning.openAt()}
+                    >
+                      {t('breakdown')}
+                    </Pill>
                   </div>
-                </div>
-              )}
+                )}
               {learning && (
                 <div
                   data-testid="tight-learning-slot"

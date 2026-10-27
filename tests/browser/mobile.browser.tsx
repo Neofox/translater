@@ -405,7 +405,7 @@ test('language menus stay within the viewport and support keyboard selection', a
 })
 
 test('context and learner details remain usable without a popup', async () => {
-  await render(<Fixture />)
+  await render(<Fixture initial={word} />)
   await expandSourceIfNeeded()
   await page.getByTestId('context-toggle').click()
   await page
@@ -418,6 +418,8 @@ test('context and learner details remain usable without a popup', async () => {
   await expect.element(page.getByTestId('context-textarea')).toHaveValue('')
   await page.getByTestId('context-toggle').click()
   await page.getByTestId('word-details-trigger').click()
+  // Pointer inspection waits for native selection before opening its panel.
+  await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
   const toggle = page.getByRole('button', {
     name: 'Learning tips',
     exact: true,

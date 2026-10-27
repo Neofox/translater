@@ -184,3 +184,59 @@ passed. Forty MacBook/portrait Chromium/WebKit interaction checks passed; the
 prepared-loading scenario additionally holds the synthetic provider response to
 verify skeletons and their removal on completion. The screenshot helper was
 updated to wait only for finite transitions, excluding the infinite pulse.
+
+## Header adjustments and Open Design release review
+
+Adjust now belongs beside Tone in the header. A muted label/divider separates
+persistent tone settings from current-result refinements. Measured chip widths
+choose visible controls or one disclosure; the same RefineRow/input remains
+mounted across responsive changes. Compact panels reserve header space rather
+than covering the translation. Custom has labelled Apply and accessible Close,
+both 44px; Close preserves its draft and returns source focus. The open disclosure
+has a selected state and active refinements have a dot/summary.
+
+Short heights use a scrolling chip row or the Custom editor alone. A tight
+keyboard keeps a single Custom strip, leaving translation, Copy/Listen and the
+source Paste/Clear controls visible. Short source-side layouts temporarily
+collapse reference notes and allow the composer its full space, avoiding text
+and action overlap. Outside dismissal runs after the clicked action; a failing
+clipboard regression demonstrated that pointerdown dismissal could swallow Copy.
+
+The native Open Design app reviewed actual-component screenshots in four rounds:
+
+1. Small fixes: separate Adjust from Tone; reserve phone panel space; avoid
+   keyboard/composer overlap.
+2. Keep: accepted those fixes; recommended visible Custom Apply/Close and open
+   trigger state.
+3. Accepted desktop, portrait and keyboard; required fixing 580×382 source/actions
+   overlap. Suggested selected Custom state as optional polish.
+4. **Accept**: “I'm satisfied with the complete design for release, and I have no
+   further changes to recommend.” The final landscape screenshot shows both
+   source lines above Paste/Clear with no notes peeking underneath.
+
+Open Design reviewed static screenshots, not code or a physical device. Its
+acceptance covers the final desktop, portrait, short landscape and emulated
+319px keyboard designs. Browser tests cover interactions and layout separately.
+
+A fresh read-only code review found one Important lifecycle case: error/remount
+could leave width measurement observing detached controls. A stable-refinements
+fixture reproduced it; depending on the error's presence reconnects measurement
+on same-sentence Retry. The new browser regression failed before and passed
+in Chromium/WebKit after the fix. The legacy context/dictionary test now uses
+its intended word fixture rather than seeking a word trigger in a sentence.
+
+Release verification: **322/322 unit tests**, typecheck, lint, formatting,
+diff check and production build passed. The complete 910-case Chromium/WebKit
+matrix finished with **906 passing** and four instances of the same legacy
+context/dictionary harness race: it queried for a disclosure before the native
+selection grace period opened the panel. Waiting for the inspector before
+querying its controls fixes the harness. The affected test then passed **14/14**
+browser/viewport configurations. No product code changed after that full run.
+All 182 dedicated learning/adjustment cases passed in the complete matrix.
+
+The matrix spans 382×580, 580×382, 594×736, 736×594, 1512×982, 1728×1117 and
+1488×700 in both engines. It covers source/target language menus, safe areas,
+keyboard shrink/pan, Copy during streaming, native selection, prepared phrase
+maps, on-demand enrichment, dictionary lookup, speech cancellation/replay,
+Custom Apply/Close, adaptive draft retention, error/retry and outside-click Copy.
+Physical phone hardware remains untested.

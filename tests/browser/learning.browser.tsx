@@ -17,6 +17,7 @@ vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('../../src/server/learning', () => ({ learn: vi.fn() }))
 const sourceText = 'Thanks for helping me today.'
 const translation = '오늘 도와줘서 고마워요.'
+const noRefinements: string[] = []
 const fact = {
   baseForm: '도와주다',
   literalMeaning: 'because you helped',
@@ -59,6 +60,7 @@ let update: (patch: {
   live?: LiveResult | null
   streaming?: boolean
   isPending?: boolean
+  error?: { kind: 'server'; message: string } | null
 }) => void
 function Fixture({
   long = false,
@@ -146,12 +148,17 @@ function Fixture({
   })
   const [streaming, setStreaming] = useState(false)
   const [isPending, setPending] = useState(false)
+  const [error, setError] = useState<{
+    kind: 'server'
+    message: string
+  } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   update = (p) => {
     if (p.input !== undefined) setInput(p.input)
     if (p.live !== undefined) setLive(p.live)
     if (p.streaming !== undefined) setStreaming(p.streaming)
     if (p.isPending !== undefined) setPending(p.isPending)
+    if (p.error !== undefined) setError(p.error)
   }
   vi.mocked(useTranslatorContext).mockReturnValue({
     input,
@@ -163,8 +170,8 @@ function Fixture({
     target: 'ko',
     mode: 'casual',
     context: '',
-    refinements: [],
-    error: null,
+    refinements: noRefinements,
+    error,
     refineError: null,
     detected: 'en',
     intent: live?.intent ?? 'sentence',
@@ -302,6 +309,184 @@ test('prepared phrases are available immediately and only explicit More detail s
     )
     .toBeVisible()
   expect(learn).toHaveBeenCalledTimes(1)
+})
+test('adjustments stay with tone in the header and expose chips when there is room', async () => {
+  await render(<Fixture prepared />)
+  const toolbar = document.querySelector('.app-header')!
+  const adjust = page.getByTestId('adjust-button')
+  const softer = page.getByTestId('refine-chip-softer')
+  const inline = document
+    .querySelector('.adjust-menu')
+    ?.hasAttribute('data-inline')
+  await settledShot('header-adjustments-default')
+  if (window.innerWidth >= 1100) expect(inline).toBe(true)
+  if (inline) {
+    await expect.element(softer).toBeVisible()
+    await expect.element(adjust).not.toBeVisible()
+    const tone = page
+      .getByTestId('settings-button')
+      .element()
+      .getBoundingClientRect()
+    const chip = softer.element().getBoundingClientRect()
+    expect(Math.abs(chip.top - tone.top)).toBeLessThanOrEqual(2)
+  } else {
+    await expect.element(adjust).toBeVisible()
+    expect(toolbar.contains(adjust.element())).toBe(true)
+    const tone = page
+      .getByTestId('settings-button')
+      .element()
+      .getBoundingClientRect()
+    expect(
+      Math.abs(adjust.element().getBoundingClientRect().top - tone.top),
+    ).toBeLessThanOrEqual(2)
+    await adjust.click()
+    await expect.element(softer).toBeVisible()
+  }
+  await settledShot('inline-adjustments')
+  await page.getByTestId('refine-custom-trigger').click()
+  const field = page.getByTestId('refine-freeform')
+  await field.fill('gentler please')
+  const node = field.element()
+  expect(page.getByTestId('output-toolbar').element().contains(node)).toBe(
+    false,
+  )
+  if (inline) {
+    const content = document.querySelector<HTMLElement>('.app-settings')!
+    content.style.maxWidth = '450px'
+    await expect.element(adjust).toBeVisible()
+    await expect.element(field).toBeVisible()
+    expect(field.element()).toBe(node)
+    content.style.maxWidth = ''
+    await expect.element(adjust).not.toBeVisible()
+  }
+  await expect.element(field).toHaveValue('gentler please')
+  if (!inline) {
+    const panel = document.querySelector('.adjust-content[data-open]')!
+    expect(panel.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      document.querySelector('.translator-panels')!.getBoundingClientRect().top,
+    )
+    expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth)
+    const source = page
+      .getByTestId('input-textarea')
+      .element()
+      .getBoundingClientRect()
+    const actions = document
+      .querySelector('.composer-actions')!
+      .getBoundingClientRect()
+    expect(source.top + 24).toBeLessThanOrEqual(actions.top)
+    if (window.innerHeight < 460 && window.innerWidth >= 560)
+      expect(source.bottom).toBeLessThanOrEqual(actions.top)
+  }
+  visibleRect(mainCopy().element())
+  visibleRect(page.getByTestId('clear-input').element())
+  await settledShot('inline-adjustments-custom')
+  if (!inline) {
+    const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    await mainCopy().click()
+    expect(copy).toHaveBeenCalledWith(translation)
+    await expect.element(adjust).toHaveAttribute('aria-expanded', 'false')
+    copy.mockRestore()
+  }
+})
+test('adjustment width measurement reconnects after an error and same-sentence retry', async () => {
+  await render(<Fixture prepared />)
+  update({ error: { kind: 'server', message: 'Unavailable' } })
+  await expect
+    .element(page.getByTestId('refine-chip-softer'))
+    .not.toBeInTheDocument()
+  update({ error: null })
+  await expect
+    .element(page.getByTestId('refine-chip-softer'))
+    .toBeInTheDocument()
+  document.querySelector<HTMLElement>('.app-settings')!.style.maxWidth = '450px'
+  await expect.element(page.getByTestId('adjust-button')).toBeVisible()
+  expect(
+    document.querySelector('.adjust-menu')?.hasAttribute('data-inline'),
+  ).toBe(false)
+  await page.getByTestId('adjust-button').click()
+  await expect.element(page.getByTestId('refine-chip-softer')).toBeVisible()
+})
+test('header custom adjustments keep keyboard focus and restore the source keyboard layout', async () => {
+  if (window.innerWidth >= 500 || window.innerHeight < 450) return
+  const viewport = Object.assign(new EventTarget(), {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    offsetTop: 0,
+    scale: 1,
+  })
+  const initialHeight = window.innerHeight
+  vi.stubGlobal('visualViewport', viewport)
+  try {
+    await render(<Fixture prepared />)
+    await page.getByTestId('adjust-button').click()
+    await page.getByTestId('refine-custom-trigger').click()
+    const field = page.getByTestId('refine-freeform')
+    await field.fill('gentler please')
+    for (const ratio of [0.85, 0.7, 0.55]) {
+      viewport.height = Math.floor(initialHeight * ratio)
+      viewport.dispatchEvent(new Event('resize'))
+      await new Promise(requestAnimationFrame)
+    }
+    await expect.element(field).toBeVisible()
+    expect(document.activeElement).toBe(field.element())
+    await expect.element(field).toHaveValue('gentler please')
+    expect(
+      page
+        .getByTestId('adjust-button')
+        .element()
+        .closest('.app-header')
+        ?.getBoundingClientRect().bottom,
+    ).toBeLessThan(viewport.height)
+    const fieldBox = field.element().getBoundingClientRect()
+    const composerBox = document
+      .querySelector('.input-panel')!
+      .getBoundingClientRect()
+    expect(fieldBox.bottom).toBeLessThanOrEqual(composerBox.top)
+    const copyBox = mainCopy().element().getBoundingClientRect()
+    expect(copyBox.top).toBeGreaterThanOrEqual(fieldBox.bottom)
+    expect(copyBox.bottom).toBeLessThanOrEqual(composerBox.top)
+    const mainBox = page
+      .getByTestId('main-translation')
+      .element()
+      .getBoundingClientRect()
+    expect(mainBox.top).toBeGreaterThanOrEqual(fieldBox.bottom)
+    expect(mainBox.top + 24).toBeLessThanOrEqual(copyBox.top)
+    for (const id of ['refine-apply', 'refine-close']) {
+      const box = page.getByTestId(id).element().getBoundingClientRect()
+      expect(box.height).toBeGreaterThanOrEqual(44)
+      expect(box.right).toBeLessThanOrEqual(window.innerWidth)
+      expect(box.bottom).toBeLessThanOrEqual(fieldBox.bottom + 2)
+    }
+    await settledShot('header-adjust-keyboard')
+    await page.getByTestId('refine-close').click()
+    await expect.element(field).not.toBeVisible()
+    await expect
+      .poll(() => document.activeElement)
+      .toBe(page.getByTestId('input-textarea').element())
+    viewport.height = initialHeight
+    viewport.dispatchEvent(new Event('resize'))
+    await new Promise(requestAnimationFrame)
+    await page.getByTestId('adjust-button').click()
+    await page.getByTestId('refine-custom-trigger').click()
+    await expect.element(field).toHaveValue('gentler please')
+    await expect.poll(() => document.activeElement).toBe(field.element())
+    await userEvent.keyboard('{Escape}')
+    const editor = page
+      .getByTestId('input-textarea')
+      .element() as HTMLTextAreaElement
+    editor.focus()
+    viewport.height = Math.floor(initialHeight * 0.55)
+    viewport.dispatchEvent(new Event('resize'))
+    await new Promise(requestAnimationFrame)
+    expect(
+      getComputedStyle(document.querySelector('.app-header')!).display,
+    ).toBe('none')
+    visibleRect(mainCopy().element())
+    visibleRect(page.getByTestId('clear-input').element())
+  } finally {
+    vi.unstubAllGlobals()
+    window.dispatchEvent(new Event('resize'))
+  }
 })
 const mainCopy = () =>
   page
