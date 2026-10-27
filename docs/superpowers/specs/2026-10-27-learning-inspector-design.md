@@ -37,6 +37,10 @@ The default translation retains its short wording explanation and Copy/Listen.
 A quiet, labelled Breakdown action opens the sentence overview. Tapping a phrase
 in a complete, current main translation opens that phrase in the same inspector.
 Do not add another permanent column or duplicate grammar/dictionary cards.
+Use dotted underlines and a pointer cursor on completed interactive translation
+text. Do not add instructional helper copy in the inspector or action row.
+Group Breakdown/Adjust with spacing, without enclosing divider lines; alternatives
+also use spacing above their heading, retaining separators only between results.
 
 The overview lists meaningful target-language chunks with their source equivalents
 and a short word-order/omission explanation. Phrase detail shows contextual meaning,

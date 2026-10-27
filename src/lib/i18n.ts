@@ -5,7 +5,6 @@ export const STRINGS = {
   en: {
     breakdown: 'Breakdown',
     learn: 'Learn',
-    tapPhrase: 'Tap a phrase to see how it works',
     wholeSentence: 'Whole sentence',
     wordDetails: 'Word details',
     learningLoading: 'Breaking down this sentence…',
@@ -13,8 +12,6 @@ export const STRINGS = {
     learningTooLong:
       'This translation is too long to break down. You can still copy it.',
     learningPartial: 'Some text has no phrase breakdown.',
-    learningEmpty:
-      'Open Breakdown or tap a phrase in the translation to explore it.',
     closeLearning: 'Close learning',
     minimizeLearning: 'Minimize learning',
     showLearning: 'Show learning',
@@ -130,7 +127,6 @@ export const STRINGS = {
   ko: {
     breakdown: '문장 분석',
     learn: '학습',
-    tapPhrase: '번역의 표현을 눌러 자세히 알아보세요',
     wholeSentence: '문장 전체',
     wordDetails: '단어 설명',
     learningLoading: '문장을 분석하고 있어요…',
@@ -138,7 +134,6 @@ export const STRINGS = {
     learningTooLong:
       '이 번역은 분석하기에 너무 길어요. 복사는 계속 사용할 수 있어요.',
     learningPartial: '일부 표현에는 분석이 없어요.',
-    learningEmpty: '문장 분석을 열거나 번역의 표현을 눌러 자세히 알아보세요.',
     closeLearning: '학습 닫기',
     minimizeLearning: '학습 접기',
     showLearning: '학습 펼치기',

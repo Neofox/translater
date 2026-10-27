@@ -118,3 +118,16 @@ needed for those four harness failures.
 
 Final typecheck, lint, formatting, diff check and production build passed. The
 learning provider remained absent from client JavaScript (one server chunk).
+
+## Learning affordance polish
+
+Removed both instructional helper messages, restored dotted underlines on
+completed tappable sentence/word text, and replaced the action-row and
+Alternatives-heading dividers with spacing. Existing selection and activation
+behaviour is unchanged. Word buttons inherit the underline explicitly.
+
+Verified the running app visually at MacBook dimensions and checked that both
+sentence and word text have the underline while the helper messages are absent.
+The existing 312 unit tests and 36 Chromium/WebKit MacBook/portrait interaction
+checks passed, covering phrase taps, native selection, keyboard entry, Copy and
+the compact panel. Typecheck, lint, formatting and production build passed.

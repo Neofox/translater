@@ -45,6 +45,7 @@ Translator app built with **TanStack Start** (React SSR) + **Vite** + **Tailwind
 - Stable selectors: `[data-testid="breakdown-button"]`, `learning-inspector`, `learning-panel`, `learning-chunk`, `selected-phrase`, `source-highlight`, `adjust-button`, `settings-button`. Open Adjust before interacting with refine chips; open Settings before changing UI language. Browser fixtures alias the learning transport, preventing paid calls.
 - Word results open their existing dictionary by clicking or keyboard-activating `[data-testid="word-details-trigger"]` on the translation itself. No separate Word details row. Desktop reference content opens on demand and receives keyboard focus; compact close restores the word trigger. This path never calls learning generation.
 - `resolveLearningResult` repairs model counting mistakes only from unique exact quotations, before strict range validation. Correct exact offsets still disambiguate repeated text. Ambiguous/missing source quotes produce no highlight; ambiguous target ranges fail rather than selecting arbitrary text. Preserve grapheme boundaries, sentence bounds, ordering and exact text validation.
+- Completed tappable translation text uses dotted warm underlines and a pointer cursor, including the word-details trigger. Keep native selection intact. Do not restore helper paragraphs explaining tapping/Breakdown. Use spacing around Breakdown/Adjust and above Alternatives; keep separators between alternative rows only.
 
 ## Pronunciation and result transitions
 

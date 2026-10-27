@@ -216,7 +216,6 @@ export default function OutputPanel() {
               </div>
               {learning?.isSentence && (
                 <div className="learning-entry">
-                  <span>{t('tapPhrase')}</span>
                   <div className="learning-entry-actions">
                     <Pill
                       tone="warm"

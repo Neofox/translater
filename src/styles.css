@@ -1921,18 +1921,32 @@ textarea:focus-visible {
   box-shadow: 0 1px 0 var(--color-warm);
 }
 .result-main[data-inspectable] {
-  cursor: text;
+  cursor: pointer;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--color-warm) 70%,
+    transparent
+  );
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-skip-ink: auto;
+}
+.result-main[data-inspectable]:hover {
+  text-decoration-color: var(--color-warm);
 }
 .word-details-trigger {
   appearance: none;
   min-height: 44px;
   border: 0;
-  border-bottom: 1px dotted var(--color-warm);
   padding: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: inherit;
+  text-decoration: inherit;
+  text-underline-offset: inherit;
   cursor: pointer;
   user-select: text;
   -webkit-user-select: text;
@@ -1942,25 +1956,22 @@ textarea:focus-visible {
   color: var(--color-warm);
 }
 .word-details-trigger:disabled {
-  border-color: transparent;
   cursor: text;
 }
 .learning-entry {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-block: 12px;
-  padding-block: 6px;
-  border-block: 1px solid var(--color-border);
-}
-.learning-entry > span {
-  font-size: 12px;
-  color: var(--color-ink-dim);
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-block: 4px 20px;
 }
 .learning-entry .ui-pill {
   flex: 0 0 auto;
   min-height: 44px;
+}
+.result-content .detail-alternatives {
+  border-top: 0;
 }
 .primary-result-actions {
   padding-block: 6px;
@@ -2159,17 +2170,6 @@ textarea:focus-visible {
   )
   .source-input-area {
   background: transparent;
-}
-.translator-panels[data-tight] .learning-entry > span {
-  display: none;
-}
-
-.learning-entry {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-.learning-entry > span {
-  flex: 1 1 120px;
 }
 .learning-entry-actions,
 .adjust-menu {

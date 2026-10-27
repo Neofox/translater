@@ -134,9 +134,6 @@ export default function LearningInspector() {
                 )}
               </section>
             ))}
-          {(!learning || learning.status === 'idle') && (
-            <p className="learning-status">{t('learningEmpty')}</p>
-          )}
         </>
       )}
       {!chunk && (
