@@ -37,8 +37,13 @@ The default translation retains its short wording explanation and Copy/Listen.
 A quiet, labelled Breakdown action opens the sentence overview. Tapping a phrase
 in a complete, current main translation opens that phrase in the same inspector.
 Do not add another permanent column or duplicate grammar/dictionary cards.
-Use dotted underlines and a pointer cursor on completed interactive translation
-text. Do not add instructional helper copy in the inspector or action row.
+Prepare a short phrase map in the translation response, with exact target quotes,
+short meanings and corresponding source quotes. Show its basic overview by default
+in the desktop reference pane. A first tap opens the already prepared meaning;
+only explicit More detail starts a separate enrichment request. Do not gate early
+Copy on this map. Underline meaningful phrase spans individually, leaving punctuation
+and spaces plain. Selected phrases use a background highlight without another underline.
+Do not add instructional helper copy in the inspector or action row.
 Group Breakdown/Adjust with spacing, without enclosing divider lines; alternatives
 also use spacing above their heading, retaining separators only between results.
 
@@ -63,8 +68,9 @@ Existing learning tips, character notes, and word-mode POS/senses/examples/origi
 synonyms move into the shared inspector. Existing synonym lookup still works.
 Word mode uses existing dictionary data and does not request a sentence breakdown.
 Its translated word is the accessible click/keyboard trigger; there is no separate
-Word details label/button row. Opening it reveals the source-side dictionary on
-desktop or the compact learning panel; closing restores the word trigger.
+Word details label/button row. Desktop shows its dictionary automatically, without
+stealing source focus; the trigger focuses it. Compact layouts reveal it on demand
+and closing restores the word trigger. Omit punctuation-only breakdown entries.
 Alternatives keep their explanations, Copy/Listen and open list. Refine becomes
 one Adjust disclosure whose summary names active adjustments; applying/removing
 chips, limits and failed-refinement rollback retain existing behaviour. UI language

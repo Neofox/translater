@@ -15,6 +15,7 @@ type Props = {
   resetKey?: string
   actionLabel?: string
   expanded?: boolean
+  chunks?: TextRange[]
 }
 
 export default function InspectableTranslation({
@@ -28,6 +29,7 @@ export default function InspectableTranslation({
   resetKey,
   actionLabel,
   expanded,
+  chunks = [],
 }: Props) {
   const root = useRef<HTMLParagraphElement>(null)
   const down = useRef<PointerPoint | null>(null)
@@ -50,6 +52,30 @@ export default function InspectableTranslation({
     }
   }, [text, disabled, resetKey])
   const selected = !disabled ? selectedChunk : null
+  const renderText = (from: number, to: number): ReactNode[] => {
+    const parts: ReactNode[] = []
+    let cursor = from
+    if (!disabled)
+      for (const chunk of chunks) {
+        const start = Math.max(from, chunk.start)
+        const end = Math.min(to, chunk.end)
+        if (start >= end || start < cursor) continue
+        parts.push(text.slice(cursor, start))
+        parts.push(
+          <span
+            className="inspectable-phrase"
+            data-testid="inspectable-phrase"
+            data-start={start}
+            key={start}
+          >
+            {text.slice(start, end)}
+          </span>,
+        )
+        cursor = end
+      }
+    parts.push(text.slice(cursor, to))
+    return parts
+  }
   return (
     <p
       ref={root}
@@ -89,6 +115,11 @@ export default function InspectableTranslation({
           event.clientY,
         )
         if (offset === null || offset >= text.length) return
+        if (
+          chunks.length &&
+          !chunks.some((c) => offset >= c.start && offset < c.end)
+        )
+          return
         // Let native double-click/long-press selection win before starting paid work.
         timer.current = setTimeout(() => {
           if (!window.getSelection()?.toString()) onInspect?.(offset)
@@ -112,14 +143,14 @@ export default function InspectableTranslation({
         </button>
       ) : selected ? (
         <>
-          {text.slice(0, selected.start)}
+          {renderText(0, selected.start)}
           <mark className="learning-highlight" data-testid="selected-phrase">
             {text.slice(selected.start, selected.end)}
           </mark>
-          {text.slice(selected.end)}
+          {renderText(selected.end, text.length)}
         </>
       ) : (
-        text
+        renderText(0, text.length)
       )}
       {children}
     </p>

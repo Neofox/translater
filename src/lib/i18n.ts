@@ -4,6 +4,7 @@ export const UI_LANGS: UiLang[] = ['en', 'ko']
 export const STRINGS = {
   en: {
     breakdown: 'Breakdown',
+    moreDetail: 'More detail',
     learn: 'Learn',
     wholeSentence: 'Whole sentence',
     wordDetails: 'Word details',
@@ -126,6 +127,7 @@ export const STRINGS = {
   },
   ko: {
     breakdown: '문장 분석',
+    moreDetail: '더 자세히',
     learn: '학습',
     wholeSentence: '문장 전체',
     wordDetails: '단어 설명',

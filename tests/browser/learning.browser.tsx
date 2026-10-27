@@ -63,9 +63,11 @@ let update: (patch: {
 function Fixture({
   long = false,
   word = false,
+  prepared = false,
 }: {
   long?: boolean
   word?: boolean
+  prepared?: boolean
 }) {
   const initialText = word
     ? 'hello'
@@ -123,6 +125,13 @@ function Fixture({
             sourceLang: 'en',
             targetLang: 'ko',
             main: initialTranslation,
+            learningPhrases: prepared
+              ? analysis.chunks.map((c) => ({
+                  text: c.text,
+                  gloss: c.gloss,
+                  sourceTexts: c.sourceSpans.map((s) => s.text),
+                }))
+              : undefined,
             rationale: 'A polite, natural thank you.',
             alternatives: [
               { text: '정말 고마워요.', note: 'A warmer thank you.' },
@@ -190,7 +199,20 @@ beforeEach(() => {
 test('word details open directly from the translated word without a redundant row or paid request', async () => {
   await render(<Fixture word />)
   expect(document.querySelector('.learning-entry')).toBeNull()
-  expect(document.querySelector('.word-source-meta')).toBeNull()
+  const referenceLayout = ['workspace', 'split', 'book'].includes(
+    document.querySelector('.translator-panels')?.getAttribute('data-layout') ??
+      '',
+  )
+  if (referenceLayout) {
+    await expect
+      .element(
+        page.getByText('A greeting used when meeting someone.', {
+          exact: true,
+        }),
+      )
+      .toBeVisible()
+    expect(learn).not.toHaveBeenCalled()
+  } else expect(document.querySelector('.word-source-meta')).toBeNull()
   const word = page.getByRole('button', { name: 'Word details: 안녕하세요' })
   await word.click()
   await expect
@@ -208,11 +230,13 @@ test('word details open directly from the translated word without a redundant ro
     .getByRole('button', { name: 'Copy', exact: true })
   await expect.element(copy).toBeEnabled()
   if (document.querySelector('.reference-panel'))
-    expect(
-      document
-        .querySelector('.reference-panel')
-        ?.contains(document.activeElement),
-    ).toBe(true)
+    await expect
+      .poll(() =>
+        document
+          .querySelector('.reference-panel')
+          ?.contains(document.activeElement),
+      )
+      .toBe(true)
   else {
     await page
       .getByRole('button', { name: 'Close learning', exact: true })
@@ -227,6 +251,34 @@ test('word details open directly from the translated word without a redundant ro
       )
       .toBeVisible()
   }
+})
+test('prepared phrases are available immediately and only explicit More detail starts a learning request', async () => {
+  await render(<Fixture prepared />)
+  expect(
+    document.querySelectorAll('[data-testid="inspectable-phrase"]'),
+  ).toHaveLength(3)
+  expect(learn).not.toHaveBeenCalled()
+  await page.getByTestId('inspectable-phrase').nth(1).click()
+  await expect
+    .element(page.getByTestId('selected-phrase'))
+    .toHaveTextContent('도와줘서')
+  await expect
+    .element(page.getByText('for helping me', { exact: true }).last())
+    .toBeVisible()
+  expect(learn).not.toHaveBeenCalled()
+  expect(
+    page
+      .getByTestId('selected-phrase')
+      .element()
+      .querySelector('.inspectable-phrase'),
+  ).toBeNull()
+  await page.getByRole('button', { name: 'More detail', exact: true }).click()
+  await expect
+    .element(
+      page.getByText('-어서 gives the reason for the thanks.', { exact: true }),
+    )
+    .toBeVisible()
+  expect(learn).toHaveBeenCalledTimes(1)
 })
 const mainCopy = () =>
   page

@@ -15,6 +15,8 @@ type Options = {
   snapshot: LearningInputData | null
   requestKey: string | null
   enabled: boolean
+  prepared?: LearningResult | null
+  hasPreparedMap?: boolean
 }
 type State = {
   identity: string
@@ -25,6 +27,7 @@ type State = {
   minimized: boolean
   sentence: number
   chunk: number | null
+  isBasic: boolean
 }
 const empty = (identity: string): State => ({
   identity,
@@ -35,13 +38,26 @@ const empty = (identity: string): State => ({
   minimized: false,
   sentence: 0,
   chunk: null,
+  isBasic: false,
 })
 
-export function useLearning({ snapshot, requestKey, enabled }: Options) {
+export function useLearning({
+  snapshot,
+  requestKey,
+  enabled,
+  prepared,
+  hasPreparedMap = Boolean(prepared),
+}: Options) {
   const invoke = useServerFn(learn)
   const identity = JSON.stringify([requestKey, snapshot])
-  const latest = useRef({ identity, enabled, snapshot })
-  latest.current = { identity, enabled, snapshot }
+  const latest = useRef({
+    identity,
+    enabled,
+    snapshot,
+    prepared,
+    hasPreparedMap,
+  })
+  latest.current = { identity, enabled, snapshot, prepared, hasPreparedMap }
   const [state, setState] = useState(() => empty(identity))
   const cache = useRef(new Map<string, LearningResult>())
   const active = useRef<{
@@ -52,11 +68,29 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
   // Failure metadata is separate from the completed-result cache: restoring a
   // failed sentence must expose Retry, never silently start another paid run.
   const failed = useRef(new Map<string, 'learningFailed' | 'learningTooLong'>())
-  const current =
-    enabled && state.identity === identity ? state : empty(identity)
+  let current = enabled && state.identity === identity ? state : empty(identity)
   const ranges = snapshot
     ? sentenceRanges(snapshot.translation, snapshot.target)
     : []
+  const basicFor = (
+    range: { start: number; end: number },
+    result?: LearningResult | null,
+  ) => {
+    const chunks =
+      result?.chunks.filter(
+        (c) => c.start >= range.start && c.end <= range.end,
+      ) ?? []
+    return chunks.length
+      ? { chunks, wordOrder: '', partial: result?.partial ?? false }
+      : null
+  }
+  if (enabled && current.status === 'idle' && ranges[current.sentence]) {
+    const basic =
+      basicFor(ranges[current.sentence]!, prepared) ??
+      (hasPreparedMap ? { chunks: [], wordOrder: '', partial: false } : null)
+    if (basic)
+      current = { ...current, status: 'ready', result: basic, isBasic: true }
+  }
   const cancel = useCallback(() => {
     active.current?.controller.abort()
     active.current = null
@@ -101,7 +135,7 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
         offset === undefined
           ? null
           : result.chunks.findIndex((c) => offset >= c.start && offset < c.end)
-      const show = (result: LearningResult) =>
+      const show = (result: LearningResult, isBasic = false) =>
         setState({
           ...empty(live.identity),
           isOpen: true,
@@ -109,6 +143,7 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
           result,
           sentence,
           chunk: choose(result),
+          isBasic,
         })
       if (active.current?.key !== key) cancel()
       const cached = cache.current.get(key)
@@ -120,6 +155,15 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
       }
       if (active.current?.key === key) {
         active.current.offset = offset
+        return
+      }
+      const basic =
+        basicFor(range, live.prepared) ??
+        (live.hasPreparedMap
+          ? { chunks: [], wordOrder: '', partial: false }
+          : null)
+      if (basic && !retry) {
+        show(basic, true)
         return
       }
       const failure = failed.current.get(key)
@@ -139,6 +183,9 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
         isOpen: true,
         status: 'loading',
         sentence,
+        result: basic,
+        isBasic: Boolean(basic),
+        chunk: basic ? choose(basic) : null,
       })
       if (!LearningInput.safeParse(data).success) {
         failed.current.set(key, 'learningTooLong')
@@ -178,6 +225,7 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
             result,
             sentence,
             chunk: idx,
+            isBasic: false,
           })
         } catch {
           if (isCurrent()) {
@@ -219,9 +267,19 @@ export function useLearning({ snapshot, requestKey, enabled }: Options) {
     openAt,
     close,
     retry: () => request(current.sentence, undefined, true),
+    loadDetails: () =>
+      request(
+        current.sentence,
+        current.result?.chunks[current.chunk ?? -1]?.start,
+        true,
+      ),
     selectSentence: (index: number) => request(index),
-    selectChunk: (index: number | null) =>
-      setState((s) => ({ ...s, chunk: index, minimized: false })),
+    selectChunk: (index: number | null) => {
+      if (active.current)
+        active.current.offset =
+          index === null ? undefined : current.result?.chunks[index]?.start
+      setState((s) => ({ ...s, chunk: index, minimized: false }))
+    },
     setMinimized: (minimized: boolean) =>
       setState((s) => ({ ...s, minimized })),
   }

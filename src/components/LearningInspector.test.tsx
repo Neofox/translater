@@ -82,3 +82,28 @@ it('contains learning failure without exposing provider text and offers explicit
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
   expect(retry).toHaveBeenCalledOnce()
 })
+it('omits punctuation-only rows while preserving the selected phrase index', () => {
+  const selectChunk = vi.fn()
+  fixture.learning = {
+    status: 'ready',
+    selectedChunk: null,
+    ranges: [{ start: 0, end: 14 }],
+    selectedSentence: 0,
+    selectChunk,
+    result: {
+      wordOrder: '',
+      partial: false,
+      chunks: [
+        { text: '안녕하세요', gloss: 'hello' },
+        { text: ',', gloss: '' },
+        { text: '잘 지내세요?', gloss: 'how are you' },
+      ],
+    },
+  }
+  render(<LearningInspector />, { wrapper: UiLangProvider })
+  expect(screen.getAllByTestId('learning-chunk')).toHaveLength(2)
+  fireEvent.click(
+    screen.getByRole('button', { name: '잘 지내세요? how are you' }),
+  )
+  expect(selectChunk).toHaveBeenCalledWith(2)
+})

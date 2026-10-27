@@ -4,16 +4,20 @@ import {
   useContext,
   useLayoutEffect,
   useState,
+  useMemo,
 } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { useLearning } from '../hooks/useLearning'
 import { mainText, resultIsCurrent } from '../lib/liveResult'
+import { prepareLearningResult } from '../lib/learningRanges'
+import type { LearningChunk } from '../server/learningTypes'
 
 type LearningValue = ReturnType<typeof useLearning> & {
   canOpen: boolean
   isSentence: boolean
+  preparedChunks: LearningChunk[]
 }
 const LearningContext = createContext<LearningValue | null>(null)
 export const useLearningContext = () => useContext(LearningContext)
@@ -51,7 +55,18 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     }),
   )
   const isSentence = live?.intent === 'sentence'
+  const phrases =
+    live?.intent === 'sentence' ? live.partial.learningPhrases : undefined
+  const prepared = useMemo(
+    () =>
+      canOpen && isSentence
+        ? prepareLearningResult(input, output, phrases)
+        : null,
+    [canOpen, isSentence, input, output, phrases],
+  )
   const learning = useLearning({
+    prepared,
+    hasPreparedMap: Array.isArray(phrases),
     snapshot: canOpen
       ? {
           text: input,
@@ -98,6 +113,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         ...learning,
         canOpen,
         isSentence,
+        preparedChunks: prepared?.chunks ?? [],
         openAt,
         close,
         isOpen:

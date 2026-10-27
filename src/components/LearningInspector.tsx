@@ -6,6 +6,7 @@ import type { StringKey } from '../lib/i18n'
 import Pill from './ui/Pill'
 import LearningTips from './LearningTips'
 import WordSourceMeta from './WordSourceMeta'
+import { isLearningText } from '../lib/learningRanges'
 
 const FACTS = [
   'gloss',
@@ -29,7 +30,10 @@ export default function LearningInspector() {
   const { live, streaming, lookupWord } = useTranslatorContext()
   const { t } = useUiLang()
   if (!live) return null
-  const chunk = learning?.selectedChunk
+  const chunk =
+    learning?.selectedChunk && isLearningText(learning.selectedChunk.text)
+      ? learning.selectedChunk
+      : null
   return (
     <div className="learning-inspector" data-testid="learning-inspector">
       {live.intent === 'sentence' && (
@@ -85,7 +89,7 @@ export default function LearningInspector() {
               )}
             </div>
           )}
-          {learning?.status === 'ready' &&
+          {(learning?.status === 'ready' || learning?.result) &&
             (chunk ? (
               <section aria-label={chunk.text}>
                 <Pill
@@ -111,20 +115,24 @@ export default function LearningInspector() {
             ) : (
               <section aria-label={t('wholeSentence')}>
                 <ul className="learning-chunks">
-                  {learning.result?.chunks.map((item, index) => (
-                    <li key={`${item.start}:${item.end}`}>
-                      <button
-                        type="button"
-                        aria-label={`${item.text} ${item.gloss || item.naturalMeaning}`}
-                        onClick={() => learning.selectChunk(index)}
-                        data-testid="learning-chunk"
-                      >
-                        <span lang={live.partial.targetLang}>{item.text}</span>
-                        <span aria-hidden="true">→</span>
-                        <span>{item.gloss || item.naturalMeaning}</span>
-                      </button>
-                    </li>
-                  ))}
+                  {learning.result?.chunks.map((item, index) =>
+                    isLearningText(item.text) ? (
+                      <li key={`${item.start}:${item.end}`}>
+                        <button
+                          type="button"
+                          aria-label={`${item.text} ${item.gloss || item.naturalMeaning}`}
+                          onClick={() => learning.selectChunk(index)}
+                          data-testid="learning-chunk"
+                        >
+                          <span lang={live.partial.targetLang}>
+                            {item.text}
+                          </span>
+                          <span aria-hidden="true">→</span>
+                          <span>{item.gloss || item.naturalMeaning}</span>
+                        </button>
+                      </li>
+                    ) : null,
+                  )}
                 </ul>
                 {learning.result?.wordOrder && (
                   <p className="learning-order">{learning.result.wordOrder}</p>
@@ -134,6 +142,11 @@ export default function LearningInspector() {
                 )}
               </section>
             ))}
+          {learning?.isBasic && learning.status === 'ready' && (
+            <Pill tone="warm" size="md" onClick={learning.loadDetails}>
+              {t('moreDetail')}
+            </Pill>
+          )}
         </>
       )}
       {!chunk && (

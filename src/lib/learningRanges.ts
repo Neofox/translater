@@ -1,7 +1,12 @@
-import { LearningInput, LearningOutput } from '../server/learningTypes'
+import {
+  LearningInput,
+  LearningOutput,
+  LearningPhrases,
+} from '../server/learningTypes'
 import type { LearningInputData, LearningResult } from '../server/learningTypes'
 
 export type TextRange = { start: number; end: number }
+export const isLearningText = (text: string) => /[\p{L}\p{N}\p{S}]/u.test(text)
 
 export function sentenceRanges(text: string, language: string): TextRange[] {
   if (!text) return []
@@ -22,6 +27,76 @@ function boundaries(text: string) {
   }).segment(text))
     points.add(part.index)
   return points
+}
+
+/** Resolve the translation's small phrase map without asking the model to count. */
+export function prepareLearningResult(
+  source: string,
+  target: string,
+  value: unknown,
+): LearningResult | null {
+  const parsed = LearningPhrases.safeParse(value)
+  if (!parsed.success) return null
+  const phrases = parsed.data.filter(
+    (p) => isLearningText(p.text) && target.includes(p.text),
+  )
+  if (!phrases.length) return null
+  const edges = boundaries(target)
+  const sourceEdges = boundaries(source)
+  const earliest: number[] = []
+  const latest: number[] = []
+  let cursor = 0
+  for (const phrase of phrases) {
+    const start = target.indexOf(phrase.text, cursor)
+    if (start < 0) return null
+    earliest.push(start)
+    cursor = start + phrase.text.length
+  }
+  cursor = target.length
+  for (let i = phrases.length - 1; i >= 0; i--) {
+    const phrase = phrases[i]!
+    const start = target.lastIndexOf(phrase.text, cursor - phrase.text.length)
+    if (start < 0) return null
+    latest[i] = start
+    cursor = start
+  }
+  const chunks = phrases.flatMap((phrase, i) => {
+    const start = earliest[i]!
+    const end = start + phrase.text.length
+    if (start !== latest[i] || !edges.has(start) || !edges.has(end)) return []
+    return [
+      {
+        start,
+        end,
+        text: phrase.text,
+        gloss: phrase.gloss,
+        baseForm: '',
+        literalMeaning: '',
+        naturalMeaning: '',
+        grammar: '',
+        omissions: '',
+        sourceSpans: phrase.sourceTexts.flatMap((text) => {
+          const from = source.indexOf(text)
+          const to = from + text.length
+          return from >= 0 &&
+            from === source.lastIndexOf(text) &&
+            sourceEdges.has(from) &&
+            sourceEdges.has(to)
+            ? [{ start: from, end: to, text }]
+            : []
+        }),
+      },
+    ]
+  })
+  if (!chunks.length) return null
+  let uncovered = ''
+  cursor = 0
+  for (const chunk of chunks) {
+    uncovered += target.slice(cursor, chunk.start)
+    cursor = chunk.end
+  }
+  uncovered += target.slice(cursor)
+  return { chunks, wordOrder: '', partial: isLearningText(uncovered) }
 }
 
 /** Resolve counting mistakes only when the exact quotation is unambiguous. */

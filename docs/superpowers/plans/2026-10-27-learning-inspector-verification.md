@@ -131,3 +131,43 @@ sentence and word text have the underline while the helper messages are absent.
 The existing 312 unit tests and 36 Chromium/WebKit MacBook/portrait interaction
 checks passed, covering phrase taps, native selection, keyboard entry, Copy and
 the compact panel. Typecheck, lint, formatting and production build passed.
+
+## Prepared phrase map and dictionary restoration
+
+The latest user correction supersedes the original on-demand-only/basic-schema
+constraint: a lightweight `learningPhrases` map is now generated immediately
+after `main` in the same translation response. It contains exact target quotes,
+short glosses and corresponding source quotes, with no model-counted offsets.
+The server cache/prompt version is bumped, and all sentence few-shot examples
+include the new required field. Early main Copy keeps its existing readiness
+rule. The map adds some output tokens to the translation request; it does not
+start a second automatic model request.
+
+The desktop reference pane shows the prepared overview immediately. Tapping a
+marked phrase reveals its basic meaning immediately; only **More detail** starts
+enrichment. Old responses without a phrase-map field retain the legacy fallback.
+Incomplete or ambiguous prepared maps preserve their provenance and never fall
+through to a paid request on tap/navigation. Ordered exact-quote matching resolves
+repeated text only when unambiguous, respecting grapheme boundaries.
+
+Only meaningful phrase spans are underlined; spaces/punctuation remain plain.
+Selected phrases have one background highlight, without an underline. The
+breakdown omits punctuation-only rows while preserving original selection
+indices. Word dictionaries again appear automatically in source-side reference
+layouts without stealing editor focus; compact layouts still open on tap.
+
+A fresh read-only review found two Important cases. Both were reproduced with
+failing tests, fixed, and followed by 320 passing unit tests: uncovered prepared
+sentences must not implicitly request enrichment, and a new selection made while
+enrichment is pending must survive its completion. No Critical issues were found.
+
+Live verification with synthetic text (`Hello, how are you?`) produced a ready
+two-phrase overview without a comma row as part of the translation response.
+Browser checks cover immediate prepared meaning, explicit-only enrichment,
+native selection, stale replies, word dictionaries and the existing quick loop.
+Final evidence: **320/320 unit tests**, **140/140 learning browser checks** across
+all 14 Chromium/WebKit viewport configurations (139s), plus passing typecheck,
+lint, formatting, diff check and production build. A browser network observation
+confirmed **zero server-function requests** from the first prepared-phrase tap.
+Physical device gesture behaviour and broad linguistic quality remain outside
+this local verification.

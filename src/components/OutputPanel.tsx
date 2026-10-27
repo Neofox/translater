@@ -162,13 +162,19 @@ export default function OutputPanel() {
                     ? `${t('wordDetails')}: ${copyText ?? ''}`
                     : undefined
                 }
-                expanded={learning?.isOpen}
+                expanded={
+                  live.intent === 'word' && separateReference
+                    ? true
+                    : learning?.isOpen
+                }
                 selectedChunk={learning?.selectedChunk}
+                chunks={learning?.preparedChunks}
                 onInspect={
                   learning?.isSentence
                     ? learning.openAt
                     : () => {
-                        if (learning?.isOpen) learning.close()
+                        if (learning?.isOpen && !separateReference)
+                          learning.close()
                         else learning?.openAt()
                       }
                 }

@@ -1915,12 +1915,13 @@ textarea:focus-visible {
   color: transparent;
 }
 .learning-highlight {
-  color: inherit;
+  color: var(--color-warm);
   background: var(--color-warm-soft);
   border-radius: 2px;
-  box-shadow: 0 1px 0 var(--color-warm);
+  cursor: pointer;
 }
-.result-main[data-inspectable] {
+.result-main[data-inspectable] .inspectable-phrase,
+.result-main[data-inspectable] .word-details-trigger {
   cursor: pointer;
   text-decoration-line: underline;
   text-decoration-style: dotted;
@@ -1933,7 +1934,8 @@ textarea:focus-visible {
   text-underline-offset: 0.18em;
   text-decoration-skip-ink: auto;
 }
-.result-main[data-inspectable]:hover {
+.result-main[data-inspectable] .inspectable-phrase:hover,
+.result-main[data-inspectable] .word-details-trigger:hover {
   text-decoration-color: var(--color-warm);
 }
 .word-details-trigger {

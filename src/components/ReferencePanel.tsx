@@ -18,7 +18,6 @@ export default function ReferencePanel() {
     }
   }, [wordOpen])
   if (!live || error) return null
-  if (live.intent === 'word' && learning && !learning.isOpen) return null
   return (
     <section className="reference-panel" aria-label={t('notes')}>
       <div

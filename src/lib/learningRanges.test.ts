@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { sentenceRanges, validateLearningResult } from './learningRanges'
+import {
+  prepareLearningResult,
+  sentenceRanges,
+  validateLearningResult,
+} from './learningRanges'
 
 const input = {
   text: 'Thanks for helping me today.',
@@ -44,6 +48,38 @@ const chunks = [
   },
 ]
 describe('validated learning spans', () => {
+  it('prepares exact phrase positions and meanings from the translation response without model-counted offsets', () => {
+    const result = prepareLearningResult(input.text, input.translation, [
+      { text: '오늘', gloss: 'today', sourceTexts: ['today'] },
+      { text: ',', gloss: '', sourceTexts: [] },
+      {
+        text: '도와줘서',
+        gloss: 'for helping me',
+        sourceTexts: ['for helping me'],
+      },
+      { text: '고마워요', gloss: 'thanks', sourceTexts: ['Thanks'] },
+    ])
+    expect(result?.chunks.map((c) => c.text)).toEqual([
+      '오늘',
+      '도와줘서',
+      '고마워요',
+    ])
+    expect(result?.chunks[1]).toMatchObject({
+      start: 3,
+      end: 7,
+      gloss: 'for helping me',
+      sourceSpans: [{ start: 7, end: 21, text: 'for helping me' }],
+    })
+  })
+  it('uses phrase order to resolve repeated quotes and leaves an ambiguous lone quote unmarked', () => {
+    const phrase = { text: 'yes', gloss: 'agreement', sourceTexts: [] }
+    expect(
+      prepareLearningResult('oui oui', 'yes yes', [phrase, phrase])?.chunks.map(
+        (c) => c.start,
+      ),
+    ).toEqual([0, 4])
+    expect(prepareLearningResult('oui oui', 'yes yes', [phrase])).toBeNull()
+  })
   it('keeps exact target text with reordered source correspondence', () => {
     const result = validateLearningResult(input, {
       wordOrder: 'Thanks comes last.',

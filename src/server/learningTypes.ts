@@ -2,6 +2,12 @@ import { z } from 'zod'
 import { MAX_CONTEXT_CHARS, MAX_INPUT_CHARS } from '../lib/limits'
 
 export const MAX_LEARNING_TRANSLATION_CHARS = 16_000
+export const LearningPhrase = z.object({
+  text: z.string().min(1).max(MAX_LEARNING_TRANSLATION_CHARS),
+  gloss: z.string().max(600),
+  sourceTexts: z.array(z.string().min(1).max(4000)).max(8),
+})
+export const LearningPhrases = z.array(LearningPhrase).max(64)
 export const LearningInput = z
   .object({
     text: z.string().min(1).max(MAX_INPUT_CHARS),
