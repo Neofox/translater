@@ -73,23 +73,17 @@ export function useWorkspaceLayout() {
         ? 'laptop'
         : book.matches
           ? 'book'
-          : width >= 560 &&
-              width > natural.height &&
-              (width < 1100 || natural.height < 480)
-            ? 'split'
-            : 'stack'
+          : width >= 1100
+            ? 'workspace'
+            : width >= 560 && width > natural.height
+              ? 'split'
+              : 'stack'
       const resultFirst =
-        mode === 'laptop' ||
-        mode === 'split' ||
-        (mode !== 'book' && (width < 640 || natural.height < 480))
+        mode === 'laptop' || mode === 'split' || mode === 'stack'
       const next = {
         mode,
         resultFirst,
-        desktop:
-          mode === 'stack' &&
-          !resultFirst &&
-          width >= 700 &&
-          natural.height >= 480,
+        desktop: mode === 'workspace',
         short: visibleHeight < 460,
         tight: visibleHeight < 360,
         keyboard,

@@ -63,6 +63,10 @@ export default function InputPanel() {
     const textarea = textareaRef.current
     if (!textarea) return
     const resize = () => {
+      if (layout.mode === 'workspace') {
+        textarea.style.height = '100%'
+        return
+      }
       textarea.style.height = '0px'
       const style = getComputedStyle(textarea)
       const minimum = parseFloat(style.minHeight) || 52
@@ -90,13 +94,21 @@ export default function InputPanel() {
   const count = (showLimit ? STRINGS[lang].charCount : STRINGS[lang].inputCount)
     .replace('{count}', String(input.length))
     .replace('{max}', String(MAX_INPUT_CHARS))
+  const focusSource = () => {
+    const textarea = textareaRef.current
+    const active = document.activeElement
+    // Context focus can temporarily hide the inactive source on tight panes.
+    // Release it before focusing source, within the original user gesture.
+    if (active instanceof HTMLElement && active !== textarea) active.blur()
+    textarea?.focus({ preventScroll: true })
+  }
   const paste = async () => {
     try {
       const text = await navigator.clipboard.readText()
       if (text) {
         queueImmediate('paste')
         setInput(text)
-        textareaRef.current?.focus({ preventScroll: true })
+        focusSource()
       }
     } catch {
       /* Keep the current draft when clipboard access is unavailable. */
@@ -136,6 +148,12 @@ export default function InputPanel() {
           rows={1}
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onFocus={() => {
+            if (layout.keyboard) {
+              setContextOpen(false)
+              setContextEditing(false)
+            }
+          }}
           onPaste={() => queueImmediate('paste')}
           onBlur={(event) => {
             const next = event.relatedTarget
@@ -180,7 +198,10 @@ export default function InputPanel() {
           <Pill
             size="md"
             className="clear-button"
-            onClick={clearInput}
+            onClick={() => {
+              clearInput()
+              focusSource()
+            }}
             title={t('clearInputTitle')}
             aria-label={t('clearInput')}
             data-testid="clear-input"
@@ -210,7 +231,7 @@ export default function InputPanel() {
                   setContextOpen(false)
                   setContextEditing(false)
                 }
-                textareaRef.current?.focus({ preventScroll: true })
+                focusSource()
               }}
             >
               {compact ? (

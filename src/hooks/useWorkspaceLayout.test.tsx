@@ -9,6 +9,63 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it.each([
+  [1512, 982],
+  [1728, 1117],
+] as const)(
+  'keeps the A workspace source first at %i × %i through keyboard changes',
+  (width, height) => {
+    const viewport = Object.assign(new EventTarget(), {
+      height: Number(height),
+      offsetTop: 0,
+      scale: 1,
+    })
+    vi.stubGlobal('visualViewport', viewport)
+    vi.stubGlobal('innerWidth', width)
+    vi.stubGlobal('innerHeight', height)
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+    }))
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+      () => viewport.height - 64,
+    )
+    function Workspace() {
+      const { panelsRef, layout } = useWorkspaceLayout()
+      return (
+        <main className="app-shell">
+          <div
+            ref={panelsRef}
+            data-testid="panels"
+            data-layout={layout.mode}
+            data-result-first={layout.resultFirst}
+            data-desktop={layout.desktop}
+          >
+            <textarea aria-label="Draft" />
+          </div>
+        </main>
+      )
+    }
+    const { getByTestId, getByRole } = render(<Workspace />)
+    const panels = getByTestId('panels')
+    expect(panels.getAttribute('data-layout')).toBe('workspace')
+    expect(panels.getAttribute('data-result-first')).toBe('false')
+    expect(panels.getAttribute('data-desktop')).toBe('true')
+    act(() => {
+      getByRole('textbox').focus()
+    })
+    for (const visible of [height - 50, height - 100, 320])
+      act(() => {
+        viewport.height = visible
+        viewport.dispatchEvent(new Event('resize'))
+      })
+    expect(panels.getAttribute('data-layout')).toBe('workspace')
+    expect(panels.getAttribute('data-result-first')).toBe('false')
+  },
+)
+
 it('tracks the visible keyboard height and releases viewport listeners on unmount', () => {
   const viewport = Object.assign(new EventTarget(), { height: 736 })
   const remove = vi.spyOn(viewport, 'removeEventListener')

@@ -121,19 +121,20 @@ cmux browser --surface <s> click --selector "[aria-label='Target language'] [dat
 ### Workspace layout
 
 `TranslatorWorkspace` owns the shell and shares `useWorkspaceLayout` through
-`WorkspaceLayoutContext`. Desktop uses a framed, auto-growing source composer
-above the result. Layout selection uses the unoccluded viewport, with the measured
+`WorkspaceLayoutContext`. A's desktop `workspace` mode starts at 1100px of usable
+width: source on the left, result on the right, with one result reading column.
+The source editor fills its pane and scrolls internally; Paste/Clear and reply
+context stay at its footer. Layout selection uses the unoccluded viewport, with the measured
 panel height retained for sizing. Compact portrait places the result first and composer below.
-Landscape at 560–1099px of usable width stays split before, during and after typing;
-wider windows split only below 480px of unoccluded height. The hook retains the
+Landscape at 560–1099px of usable width stays split before, during and after typing.
+Other compact stacked layouts keep the result first. The hook retains the
 pre-keyboard height through incremental resize events while editing, and tracks
 visualViewport height and offsetTop on both resize and scroll. The fixed shell
 follows the visible area without introducing root scroll. Keyboard entry resets
 the result scroll to its main translation and preserves focus/drafts. Fold media use
 physical viewport segments where available; no device-name detection.
 
-Desktop details stay open: alternatives left, Why this wording and Learning tips
-right. Without alternatives the two learner sections share the available width.
+Desktop details stay open in a single column, contained to a 44rem measure.
 Alternatives are always open and come before longer usage/wording notes in DOM order.
 Split-pane details remain open in one readable column; other compact stacked details
 are accessible disclosures. Dictionary metadata and synonym
@@ -159,13 +160,13 @@ reply context remains indicated on the compact expand control. Phone result
 Copy/Listen controls use 44px icon targets with accessible names/tooltips;
 desktop main actions retain labels. Keep the composer inset from safe-area edges.
 
-The framed composer and open detail columns start at 700px of usable width and
-480px of unoccluded height in a stacked, source-first workspace. Below 700px of
-height that presentation puts source languages/actions in one toolbar, lets short
-input shrink to one line, and puts word Copy/Listen beside the main translation.
-Keep long-result actions reachable and retain the calmer tall-window layout.
+Use A's background/surface tokens and type scale. Do not restore the obsolete C
+desktop top-composer card, word/action grid or two-column learner layout. Workspace
+textarea sizing deliberately bypasses content auto-growth and fills the remaining
+grid row; compact layouts retain their existing auto-sizing/condensing behavior.
+Keep long-result actions reachable.
 Ordinary language menus may extend beyond a short composer into the viewport;
-book/laptop/split panes constrain popups to their own pane. Popup
+workspace/book/laptop/split panes constrain popups to their own pane. Popup
 padding must still include the applicable safe-area insets.
 
 Safe-area padding belongs on the header/composer/result controls, never on the

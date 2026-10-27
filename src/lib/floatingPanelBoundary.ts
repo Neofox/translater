@@ -9,7 +9,10 @@ export function floatingPanelBoundary({ elements }: MiddlewareState) {
   const layout =
     reference.closest<HTMLElement>('.translator-panels')?.dataset.layout
   const segmented =
-    layout === 'book' || layout === 'laptop' || layout === 'split'
+    layout === 'book' ||
+    layout === 'laptop' ||
+    layout === 'split' ||
+    layout === 'workspace'
   const style = getComputedStyle(panel ?? reference)
   const inset = (side: string) =>
     parseFloat(style.getPropertyValue(`--safe-area-${side}`)) || 0

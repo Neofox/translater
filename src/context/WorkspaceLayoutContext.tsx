@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 export type WorkspaceLayout = {
-  mode: 'stack' | 'split' | 'book' | 'laptop'
+  mode: 'workspace' | 'stack' | 'split' | 'book' | 'laptop'
   resultFirst: boolean
   desktop: boolean
   short: boolean

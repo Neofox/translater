@@ -652,6 +652,30 @@ const withAlternatives: LiveResult = {
 test('desktop notes stay open and short alternatives fit without scrolling', async () => {
   if (window.innerWidth < 1100 || window.innerHeight < 640) return
   await render(<Fixture initial={withAlternatives} />)
+  expect(
+    document.querySelector('.translator-panels')!.getAttribute('data-layout'),
+  ).toBe('workspace')
+  const source = document.querySelector('.input-panel')!.getBoundingClientRect()
+  const result = document
+    .querySelector('.output-panel')!
+    .getBoundingClientRect()
+  expect(source.right).toBeLessThanOrEqual(result.left)
+  expect(Math.abs(source.top - result.top)).toBeLessThanOrEqual(1)
+  expect(
+    page.getByTestId('input-textarea').element().getBoundingClientRect().height,
+  ).toBeGreaterThan(source.height * 0.5)
+  const footer = document
+    .querySelector('.composer-actions')!
+    .getBoundingClientRect()
+  expect(source.bottom - footer.bottom).toBeLessThanOrEqual(32)
+  const alts = document
+    .querySelector('.detail-alternatives')!
+    .getBoundingClientRect()
+  const whyBounds = document
+    .querySelector('.detail-why')!
+    .getBoundingClientRect()
+  expect(Math.abs(alts.left - whyBounds.left)).toBeLessThanOrEqual(1)
+  expect(whyBounds.top).toBeGreaterThanOrEqual(alts.bottom)
   await expect
     .element(
       page.getByRole('heading', { name: /^Why this wording/, exact: true }),
@@ -679,7 +703,81 @@ test('desktop notes stay open and short alternatives fit without scrolling', asy
   })
 })
 
-test('long text uses both learner columns and the result has no focus ring', async () => {
+test('A workspace keeps long source and result controls above the safe bottom edge', async () => {
+  const original = [window.innerWidth, window.innerHeight] as const
+  try {
+    await page.viewport(1280, 760)
+    const text = Array(40).fill('Please translate this sentence.').join('\n')
+    await render(
+      <Fixture
+        initial={{
+          ...sentence,
+          text,
+          requestKey: requestKey(text),
+          partial: {
+            ...sentence.partial,
+            main: longTranslation.repeat(8),
+            rationale: 'A clear explanation of the chosen wording. '.repeat(50),
+          },
+        }}
+      />,
+    )
+    const shell = document.querySelector<HTMLElement>('.app-shell')!
+    shell.style.setProperty('--safe-area-left', '20px')
+    shell.style.setProperty('--safe-area-right', '64px')
+    shell.style.setProperty('--safe-area-bottom', '34px')
+    window.dispatchEvent(new Event('resize'))
+    await expect
+      .poll(() =>
+        document
+          .querySelector('.translator-panels')!
+          .getAttribute('data-layout'),
+      )
+      .toBe('workspace')
+    const input = page
+      .getByTestId('input-textarea')
+      .element() as HTMLTextAreaElement
+    expect(input.scrollHeight).toBeGreaterThan(input.clientHeight)
+    input.scrollTop = input.scrollHeight
+    for (const selector of ['paste-input', 'clear-input']) {
+      const control = page.getByTestId(selector).element()
+      assertWithinViewport(control)
+      const bounds = control.getBoundingClientRect()
+      expect(bounds.bottom).toBeLessThanOrEqual(760 - 34)
+      expect(bounds.left).toBeGreaterThanOrEqual(20)
+      expect(bounds.right).toBeLessThanOrEqual(
+        document.querySelector('.input-panel')!.getBoundingClientRect().right,
+      )
+    }
+    const copyControl = page
+      .getByTestId('output-toolbar')
+      .getByRole('button', { name: 'Copy', exact: true })
+      .element()
+    assertWithinViewport(copyControl)
+    const copy = copyControl.getBoundingClientRect()
+    expect(copy.bottom).toBeLessThanOrEqual(760 - 34)
+    expect(copy.right).toBeLessThanOrEqual(1280 - 64)
+    const resultScroll = page
+      .getByTestId('translation-result')
+      .element() as HTMLElement
+    resultScroll.scrollTop = resultScroll.scrollHeight
+    await expect.poll(() => resultScroll.scrollTop).toBeGreaterThan(0)
+    expect(copyControl.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      resultScroll.getBoundingClientRect().top,
+    )
+    assertWithinViewport(copyControl)
+    await page.screenshot({
+      path: '../../test-results/a-workspace-long-safe.png',
+    })
+    await page.getByTestId('clear-input').click()
+    expect(document.activeElement).toBe(input)
+    await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
+  } finally {
+    await page.viewport(...original)
+  }
+})
+
+test('long text keeps a single learner reading column and the result has no focus ring', async () => {
   const initial: LiveResult = {
     ...sentence,
     text: longSource,
@@ -730,15 +828,15 @@ test('long text uses both learner columns and the result has no focus ring', asy
       .getByRole('heading', { name: 'Learning tips', exact: true })
       .element()
       .getBoundingClientRect()
-    expect(Math.abs(why.top - tips.top)).toBeLessThanOrEqual(2)
-    expect(tips.left).toBeGreaterThan(why.right)
+    expect(Math.abs(why.left - tips.left)).toBeLessThanOrEqual(2)
+    expect(tips.top).toBeGreaterThan(why.bottom)
   }
   await page.screenshot({
     path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-long.png`,
   })
 })
 
-test('source grows for a long turn then shrinks again without losing Clear', async () => {
+test('source sizing keeps Clear reachable for long and short turns', async () => {
   await render(<Fixture />)
   await expandSourceIfNeeded()
   const input = page.getByTestId('input-textarea')
@@ -746,12 +844,17 @@ test('source grows for a long turn then shrinks again without losing Clear', asy
   await input.fill('Hi')
   const shortHeight = textarea.offsetHeight
   await input.fill(longSource)
-  if (window.innerHeight >= 460)
+  const workspace =
+    document
+      .querySelector('.translator-panels')!
+      .getAttribute('data-layout') === 'workspace'
+  if (workspace) expect(textarea.offsetHeight).toBe(shortHeight)
+  else if (window.innerHeight >= 460)
     expect(textarea.offsetHeight).toBeGreaterThan(shortHeight)
   else expect(textarea.offsetHeight).toBeGreaterThanOrEqual(shortHeight)
   await input.fill('Hi')
   expect(textarea.offsetHeight).toBeLessThanOrEqual(shortHeight + 1)
-  if (window.innerWidth >= 1100 && window.innerHeight >= 640)
+  if (!workspace && window.innerWidth >= 1100 && window.innerHeight >= 640)
     expect(textarea.offsetHeight).toBeLessThanOrEqual(60)
   await page.getByTestId('clear-input').click()
   await expect.element(input).toHaveValue('')
@@ -760,28 +863,43 @@ test('source grows for a long turn then shrinks again without losing Clear', asy
   await expect.element(page.getByTestId('clear-input')).toBeVisible()
 })
 
-test('resize preserves the focused source node and the conversation draft', async () => {
+test('workspace to Duo resizing preserves the source node cursor and applied context', async () => {
   const original = [window.innerWidth, window.innerHeight] as const
   try {
-    await page.viewport(736, 594)
+    await page.viewport(1512, 982)
     await render(<Fixture />)
+    await page.getByTestId('context-toggle').click()
+    await page
+      .getByTestId('context-textarea')
+      .fill('A friend asking about the weekend.')
     const input = page.getByTestId('input-textarea')
     await input.fill('Keep this unfinished conversation turn.')
     const node = input.element() as HTMLTextAreaElement
     node.setSelectionRange(5, 14)
-    await page.viewport(382, 580)
-    await expect
-      .element(input)
-      .toHaveValue('Keep this unfinished conversation turn.')
-    expect(input.element()).toBe(node)
-    expect(document.activeElement).toBe(node)
-    expect([node.selectionStart, node.selectionEnd]).toEqual([5, 14])
-    await page.viewport(736, 320)
-    await expect
-      .element(input)
-      .toHaveValue('Keep this unfinished conversation turn.')
-    expect(document.activeElement).toBe(node)
-    expect([node.selectionStart, node.selectionEnd]).toEqual([5, 14])
+    for (const [width, height, mode] of [
+      [382, 580, 'stack'],
+      [736, 594, 'split'],
+      [1512, 982, 'workspace'],
+    ] as const) {
+      await page.viewport(width, height)
+      await expect
+        .poll(() =>
+          document
+            .querySelector('.translator-panels')!
+            .getAttribute('data-layout'),
+        )
+        .toBe(mode)
+      await expect
+        .element(input)
+        .toHaveValue('Keep this unfinished conversation turn.')
+      expect(input.element()).toBe(node)
+      expect(document.activeElement).toBe(node)
+      expect([node.selectionStart, node.selectionEnd]).toEqual([5, 14])
+      expect(
+        (page.getByTestId('context-textarea').element() as HTMLTextAreaElement)
+          .value,
+      ).toBe('A friend asking about the weekend.')
+    }
   } finally {
     await page.viewport(...original)
   }
@@ -970,6 +1088,14 @@ test.each([
     expected: 'split',
   },
   {
+    width: 1280,
+    height: 760,
+    visible: 240,
+    offset: 20,
+    right: 64,
+    expected: 'workspace',
+  },
+  {
     width: 440,
     height: 640,
     visible: 300,
@@ -1103,6 +1229,16 @@ test.each([
         expect(bounds.top).toBeGreaterThanOrEqual(Math.max(offset + 20, top))
         expect(bounds.bottom).toBeLessThanOrEqual(offset + 20 + visible)
       }
+      await page.getByTestId('clear-input').click()
+      expect(document.activeElement).toBe(input)
+      await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
+      await expect
+        .element(page.getByTestId('context-toggle'))
+        .toHaveAttribute('aria-expanded', 'false')
+      await page.getByTestId('context-toggle').click()
+      await expect
+        .element(page.getByTestId('context-textarea'))
+        .toHaveValue('A friend is checking in.')
       viewport.height = height
       viewport.offsetTop = 0
       viewport.dispatchEvent(new Event('resize'))
