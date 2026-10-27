@@ -1,0 +1,97 @@
+import { useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
+import { isInspectTap, textOffsetAtPoint } from '../lib/phrasePointer'
+import type { PointerPoint } from '../lib/phrasePointer'
+import type { TextRange } from '../lib/learningRanges'
+
+type Props = {
+  text: string
+  language: string
+  disabled: boolean
+  selectedChunk?: TextRange | null
+  onInspect?: (offset: number) => void
+  className?: string
+  children?: ReactNode
+}
+
+export default function InspectableTranslation({
+  text,
+  language,
+  disabled,
+  selectedChunk,
+  onInspect,
+  className = 'result-main',
+  children,
+}: Props) {
+  const root = useRef<HTMLParagraphElement>(null)
+  const down = useRef<PointerPoint | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+  }
+  useEffect(() => {
+    cancel()
+    return cancel
+  }, [text, disabled])
+  const selected = !disabled ? selectedChunk : null
+  return (
+    <p
+      ref={root}
+      className={className}
+      lang={language}
+      data-testid="main-translation"
+      data-inspectable={!disabled || undefined}
+      onPointerDown={(event) => {
+        cancel()
+        down.current =
+          !disabled && event.button === 0
+            ? { x: event.clientX, y: event.clientY, time: performance.now() }
+            : null
+      }}
+      onPointerCancel={() => {
+        down.current = null
+        cancel()
+      }}
+      onDoubleClick={cancel}
+      onPointerUp={(event) => {
+        const start = down.current
+        down.current = null
+        if (
+          disabled ||
+          !start ||
+          !root.current ||
+          !isInspectTap(
+            start,
+            { x: event.clientX, y: event.clientY, time: performance.now() },
+            window.getSelection()?.toString() ?? '',
+          )
+        )
+          return
+        const offset = textOffsetAtPoint(
+          root.current,
+          event.clientX,
+          event.clientY,
+        )
+        if (offset === null || offset >= text.length) return
+        // Let native double-click/long-press selection win before starting paid work.
+        timer.current = setTimeout(() => {
+          if (!window.getSelection()?.toString()) onInspect?.(offset)
+        }, 400)
+      }}
+    >
+      {selected ? (
+        <>
+          {text.slice(0, selected.start)}
+          <mark className="learning-highlight" data-testid="selected-phrase">
+            {text.slice(selected.start, selected.end)}
+          </mark>
+          {text.slice(selected.end)}
+        </>
+      ) : (
+        text
+      )}
+      {children}
+    </p>
+  )
+}

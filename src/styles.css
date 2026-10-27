@@ -1889,6 +1889,57 @@ textarea:focus-visible {
 .result-main {
   margin-top: 8px;
 }
+
+/* Learning leaves the editable textarea and its native selection intact. */
+.source-input-area {
+  grid-area: input;
+  position: relative;
+  min-width: 0;
+  border-radius: 12px;
+  background: var(--color-panel);
+}
+.source-input-area .translation-input {
+  position: relative;
+  background: transparent;
+}
+.source-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  color: transparent;
+  pointer-events: none;
+  border-color: transparent;
+}
+.source-highlight mark {
+  color: transparent;
+}
+.learning-highlight {
+  color: inherit;
+  background: var(--color-warm-soft);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 var(--color-warm);
+}
+.result-main[data-inspectable] {
+  cursor: text;
+}
+.learning-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block: 12px;
+  padding-block: 6px;
+  border-block: 1px solid var(--color-border);
+}
+.learning-entry > span {
+  font-size: 12px;
+  color: var(--color-ink-dim);
+}
+.learning-entry .ui-pill {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
 .primary-result-actions {
   padding-block: 6px;
   margin-block: -6px 6px;

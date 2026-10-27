@@ -13,8 +13,11 @@ import { useUiLang } from '../hooks/useUiLang'
 import { copyableMainText, mainText, resultIsCurrent } from '../lib/liveResult'
 import { isLongForm } from '../lib/longForm'
 import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
+import { useLearningContext } from '../context/LearningContext'
+import InspectableTranslation from './InspectableTranslation'
 
 export default function OutputPanel() {
+  const learning = useLearningContext()
   const {
     input,
     source,
@@ -149,12 +152,15 @@ export default function OutputPanel() {
           )}
           {!error && live && (
             <div className="result-content">
-              <p
+              <InspectableTranslation
                 className={`result-main ${live.intent === 'word' ? 'result-word' : ''}`}
-                lang={live.partial.targetLang ?? target}
-                data-testid="main-translation"
+                language={live.partial.targetLang ?? target}
+                text={copyText ?? ''}
+                disabled={!learning?.canOpen || !learning.isSentence}
+                selectedChunk={learning?.selectedChunk}
+                onInspect={learning?.openAt}
               >
-                {copyText ||
+                {!copyText &&
                   (streaming ? (
                     <span className="result-cursor animate-pulse" aria-hidden />
                   ) : (
@@ -163,7 +169,7 @@ export default function OutputPanel() {
                 {streaming && copyText && (
                   <span className="result-cursor animate-pulse" aria-hidden />
                 )}
-              </p>
+              </InspectableTranslation>
               <MainExplanation
                 live={live}
                 streaming={streaming}
@@ -194,6 +200,23 @@ export default function OutputPanel() {
                 </div>
                 <RefineRow />
               </div>
+              {learning && (
+                <div className="learning-entry">
+                  <span>
+                    {learning.isSentence ? t('tapPhrase') : t('wordDetails')}
+                  </span>
+                  <Pill
+                    tone="warm"
+                    size="md"
+                    data-testid="breakdown-button"
+                    disabled={!learning.canOpen}
+                    aria-expanded={learning.isOpen}
+                    onClick={() => learning.openAt()}
+                  >
+                    {t(learning.isSentence ? 'breakdown' : 'wordDetails')}
+                  </Pill>
+                </div>
+              )}
               {live.intent === 'sentence' ? (
                 <SentenceView
                   content={separateReference ? 'alternatives' : 'all'}
