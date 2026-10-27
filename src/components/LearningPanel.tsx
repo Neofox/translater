@@ -26,8 +26,8 @@ export default function LearningPanel() {
       if (scroll) scroll.scrollTop = 0
     }
     document
-      .querySelector<HTMLButtonElement>(
-        '[data-testid="breakdown-button"], [data-testid="word-details-trigger"]',
+      .querySelector<HTMLElement>(
+        '[data-testid="breakdown-button"], [data-testid="word-details-trigger"], .reference-scroll',
       )
       ?.focus({ preventScroll: true })
   }

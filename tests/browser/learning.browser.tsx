@@ -254,6 +254,11 @@ test('word details open directly from the translated word without a redundant ro
 })
 test('prepared phrases are available immediately and only explicit More detail starts a learning request', async () => {
   await render(<Fixture prepared />)
+  if (document.querySelector('.reference-panel'))
+    expect(
+      document.querySelector('[data-testid="breakdown-button"]'),
+    ).toBeNull()
+  else await expect.element(page.getByTestId('breakdown-button')).toBeVisible()
   expect(
     document.querySelectorAll('[data-testid="inspectable-phrase"]'),
   ).toHaveLength(3)
@@ -272,7 +277,25 @@ test('prepared phrases are available immediately and only explicit More detail s
       .element()
       .querySelector('.inspectable-phrase'),
   ).toBeNull()
+  let finishDetails!: (value: LearningResult) => void
+  vi.mocked(learn).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishDetails = resolve
+      }),
+  )
   await page.getByRole('button', { name: 'More detail', exact: true }).click()
+  await expect
+    .element(page.getByRole('status'))
+    .toHaveTextContent('Loading more detail…')
+  await expect
+    .element(page.getByTestId('learning-detail-skeleton'))
+    .toBeVisible()
+  await expect
+    .element(page.getByText('for helping me', { exact: true }).last())
+    .toBeVisible()
+  await settledShot('detail-loading')
+  finishDetails(analysis)
   await expect
     .element(
       page.getByText('-어서 gives the reason for the thanks.', { exact: true }),
@@ -293,7 +316,11 @@ function visibleRect(element: Element) {
 }
 async function settledShot(name: string) {
   await Promise.all(
-    [...document.getAnimations()].map((a) => a.finished.catch(() => {})),
+    [...document.getAnimations()]
+      .filter((a) =>
+        Number.isFinite(a.effect?.getComputedTiming().endTime ?? 0),
+      )
+      .map((a) => a.finished.catch(() => {})),
   )
   await page.screenshot({
     path: `../../test-results/learning-${window.innerWidth}x${window.innerHeight}-${name}.png`,

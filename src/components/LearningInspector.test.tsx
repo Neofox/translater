@@ -107,3 +107,39 @@ it('omits punctuation-only rows while preserving the selected phrase index', () 
   )
   expect(selectChunk).toHaveBeenCalledWith(2)
 })
+it('keeps the prepared meaning visible while additional details load into skeleton slots', () => {
+  const chunk = {
+    text: '도와줘서',
+    gloss: 'for helping me',
+    baseForm: '',
+    literalMeaning: '',
+    naturalMeaning: '',
+    grammar: '',
+    omissions: '',
+  }
+  fixture.learning = {
+    status: 'loading',
+    isBasic: true,
+    selectedChunk: chunk,
+    ranges: [{ start: 0, end: 4 }],
+    selectedSentence: 0,
+    result: { chunks: [chunk] },
+  }
+  const { rerender } = render(<LearningInspector />, {
+    wrapper: UiLangProvider,
+  })
+  expect(screen.getByText('for helping me')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toBe('Loading more detail…')
+  expect(
+    screen.getByTestId('learning-detail-skeleton').getAttribute('aria-hidden'),
+  ).toBe('true')
+  fixture.learning = {
+    ...(fixture.learning as object),
+    status: 'ready',
+    isBasic: false,
+    selectedChunk: { ...chunk, grammar: 'A reason ending.' },
+  }
+  rerender(<LearningInspector />)
+  expect(screen.queryByTestId('learning-detail-skeleton')).toBeNull()
+  expect(screen.getByText('A reason ending.')).toBeTruthy()
+})

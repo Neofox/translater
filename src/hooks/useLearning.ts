@@ -261,6 +261,7 @@ export function useLearning({
   )
   return {
     ...current,
+    hasPreparedMap,
     ranges,
     selectedSentence: current.sentence,
     selectedChunk: current.result?.chunks[current.chunk ?? -1] ?? null,

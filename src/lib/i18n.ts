@@ -8,7 +8,7 @@ export const STRINGS = {
     learn: 'Learn',
     wholeSentence: 'Whole sentence',
     wordDetails: 'Word details',
-    learningLoading: 'Breaking down this sentence…',
+    learningLoading: 'Loading more detail…',
     learningFailed: 'Couldn’t load this breakdown. Retry when you’re ready.',
     learningTooLong:
       'This translation is too long to break down. You can still copy it.',
@@ -131,7 +131,7 @@ export const STRINGS = {
     learn: '학습',
     wholeSentence: '문장 전체',
     wordDetails: '단어 설명',
-    learningLoading: '문장을 분석하고 있어요…',
+    learningLoading: '추가 설명을 불러오고 있어요…',
     learningFailed: '문장 분석을 불러오지 못했어요. 준비되면 다시 시도하세요.',
     learningTooLong:
       '이 번역은 분석하기에 너무 길어요. 복사는 계속 사용할 수 있어요.',

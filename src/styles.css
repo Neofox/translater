@@ -2065,6 +2065,28 @@ textarea:focus-visible {
   margin: 0;
   color: var(--color-ink);
 }
+.learning-detail-skeleton > div {
+  margin-bottom: 20px;
+}
+.learning-detail-skeleton dt {
+  padding-top: 2px;
+}
+.learning-detail-skeleton dd {
+  display: grid;
+  gap: 8px;
+}
+.learning-skeleton-line {
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--color-ink-dim) 22%, transparent);
+}
+.learning-detail-skeleton dt .learning-skeleton-line {
+  width: 70%;
+}
+.learning-detail-skeleton dd .learning-skeleton-line:last-child {
+  width: 72%;
+}
 .learning-back {
   margin-top: 4px;
 }

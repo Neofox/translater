@@ -43,6 +43,11 @@ in the desktop reference pane. A first tap opens the already prepared meaning;
 only explicit More detail starts a separate enrichment request. Do not gate early
 Copy on this map. Underline meaningful phrase spans individually, leaving punctuation
 and spaces plain. Selected phrases use a background highlight without another underline.
+Omit the Breakdown button when the prepared overview is already shown in the
+source pane; retain a compact-panel entry point. While enrichment loads, keep the
+prepared meaning visible and add skeleton rows for the extra facts with a
+“Loading more detail…” status. Respect reduced motion and hide placeholders from
+assistive technology.
 Do not add instructional helper copy in the inspector or action row.
 Group Breakdown/Adjust with spacing, without enclosing divider lines; alternatives
 also use spacing above their heading, retaining separators only between results.

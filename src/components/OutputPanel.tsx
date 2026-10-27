@@ -223,16 +223,18 @@ export default function OutputPanel() {
               {learning?.isSentence && (
                 <div className="learning-entry">
                   <div className="learning-entry-actions">
-                    <Pill
-                      tone="warm"
-                      size="md"
-                      data-testid="breakdown-button"
-                      disabled={!learning.canOpen}
-                      aria-expanded={learning.isOpen}
-                      onClick={() => learning.openAt()}
-                    >
-                      {t('breakdown')}
-                    </Pill>
+                    {!(separateReference && learning.hasPreparedMap) && (
+                      <Pill
+                        tone="warm"
+                        size="md"
+                        data-testid="breakdown-button"
+                        disabled={!learning.canOpen}
+                        aria-expanded={learning.isOpen}
+                        onClick={() => learning.openAt()}
+                      >
+                        {t('breakdown')}
+                      </Pill>
+                    )}
                     <AdjustMenu />
                   </div>
                 </div>

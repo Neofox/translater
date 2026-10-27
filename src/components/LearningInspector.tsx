@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useLearningContext } from '../context/LearningContext'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useUiLang } from '../hooks/useUiLang'
@@ -66,12 +66,6 @@ export default function LearningInspector() {
                 <ChevronRight size={16} />
               </Pill>
             </nav>
-          )}
-          {learning?.status === 'loading' && (
-            <p className="learning-status" role="status">
-              <Loader2 className="animate-spin" size={16} aria-hidden />
-              {t('learningLoading')}
-            </p>
           )}
           {learning?.status === 'error' && (
             <div className="learning-status" role="alert">
@@ -146,6 +140,30 @@ export default function LearningInspector() {
             <Pill tone="warm" size="md" onClick={learning.loadDetails}>
               {t('moreDetail')}
             </Pill>
+          )}
+          {learning?.status === 'loading' && (
+            <div className="learning-detail-loading">
+              <p className="learning-status" role="status">
+                {t('learningLoading')}
+              </p>
+              <dl
+                className="learning-facts learning-detail-skeleton animate-pulse"
+                data-testid="learning-detail-skeleton"
+                aria-hidden="true"
+              >
+                {[0, 1, 2].map((row) => (
+                  <div key={row}>
+                    <dt>
+                      <span className="learning-skeleton-line" />
+                    </dt>
+                    <dd>
+                      <span className="learning-skeleton-line" />
+                      <span className="learning-skeleton-line" />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           )}
         </>
       )}

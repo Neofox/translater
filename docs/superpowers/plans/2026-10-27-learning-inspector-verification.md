@@ -171,3 +171,16 @@ lint, formatting, diff check and production build. A browser network observation
 confirmed **zero server-function requests** from the first prepared-phrase tap.
 Physical device gesture behaviour and broad linguistic quality remain outside
 this local verification.
+
+## Redundant action and enrichment loading polish
+
+Removed Breakdown from source-side prepared layouts while preserving compact and
+legacy entry points. Enrichment now says “Loading more detail…” (with a Korean
+equivalent), keeps the prepared meaning visible, and shows three neutral skeleton
+fact rows. Placeholder markup is aria-hidden; the loading status remains announced.
+
+Verification: 321 unit tests, typecheck, lint, formatting and production build
+passed. Forty MacBook/portrait Chromium/WebKit interaction checks passed; the
+prepared-loading scenario additionally holds the synthetic provider response to
+verify skeletons and their removal on completion. The screenshot helper was
+updated to wait only for finite transitions, excluding the infinite pulse.
