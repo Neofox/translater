@@ -417,8 +417,7 @@ test('context and learner details remain usable without a popup', async () => {
   await page.getByTestId('context-clear').click()
   await expect.element(page.getByTestId('context-textarea')).toHaveValue('')
   await page.getByTestId('context-toggle').click()
-  if (!document.querySelector('.reference-panel'))
-    await page.getByTestId('breakdown-button').click()
+  await page.getByTestId('word-details-trigger').click()
   const toggle = page.getByRole('button', {
     name: 'Learning tips',
     exact: true,
@@ -725,12 +724,13 @@ test('desktop source and reference share the left pane while alternatives stay r
 
 test('word metadata stays separate from translation actions at every size', async () => {
   await render(<Fixture initial={word} />)
-  if (!document.querySelector('.reference-panel'))
-    await page.getByTestId('breakdown-button').click()
+  await page.getByTestId('word-details-trigger').click()
   const actions = document.querySelector('.primary-result-actions')!
   expect(actions.textContent).not.toContain('noun')
   expect(actions.querySelector(':scope > kbd')).toBeNull()
-  expect(document.querySelectorAll('.word-source-meta')).toHaveLength(1)
+  await expect
+    .poll(() => document.querySelectorAll('.word-source-meta').length)
+    .toBe(1)
   if (document.querySelector('.translator-panels[data-desktop]')) {
     expect(
       document.querySelector('.reference-panel .word-source-meta'),
@@ -1549,8 +1549,7 @@ test.each(['book', 'laptop'] as const)(
 
 test('dictionary metadata stays readable and synonyms start a new lookup', async () => {
   await render(<Fixture initial={word} />)
-  if (!document.querySelector('.reference-panel'))
-    await page.getByTestId('breakdown-button').click()
+  await page.getByTestId('word-details-trigger').click()
   const about = page.getByRole('button', {
     name: 'About · library',
     exact: true,

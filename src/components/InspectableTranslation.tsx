@@ -13,6 +13,8 @@ type Props = {
   className?: string
   children?: ReactNode
   resetKey?: string
+  actionLabel?: string
+  expanded?: boolean
 }
 
 export default function InspectableTranslation({
@@ -24,6 +26,8 @@ export default function InspectableTranslation({
   className = 'result-main',
   children,
   resetKey,
+  actionLabel,
+  expanded,
 }: Props) {
   const root = useRef<HTMLParagraphElement>(null)
   const down = useRef<PointerPoint | null>(null)
@@ -91,7 +95,22 @@ export default function InspectableTranslation({
         }, 400)
       }}
     >
-      {selected ? (
+      {actionLabel ? (
+        <button
+          type="button"
+          className="word-details-trigger"
+          data-testid="word-details-trigger"
+          aria-label={actionLabel}
+          aria-expanded={expanded}
+          disabled={disabled}
+          onClick={(event) => {
+            // Pointer activation uses the selection-safe gesture handlers above.
+            if (event.detail === 0 && !disabled) onInspect?.(0)
+          }}
+        >
+          {text}
+        </button>
+      ) : selected ? (
         <>
           {text.slice(0, selected.start)}
           <mark className="learning-highlight" data-testid="selected-phrase">

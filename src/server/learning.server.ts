@@ -5,7 +5,7 @@ import { gatewayProviderOptions, resolveTranslateModel } from './gateway'
 import { learningPrompt, LEARNING_PROMPT_VERSION } from './learningPrompts'
 import { LearningInput, LearningOutput } from './learningTypes'
 import type { LearningInputData, LearningResult } from './learningTypes'
-import { validateLearningResult } from '../lib/learningRanges'
+import { resolveLearningResult } from '../lib/learningRanges'
 import {
   classifyTranslationError,
   publicTranslationError,
@@ -61,7 +61,7 @@ export async function handleLearning(
     signal.throwIfAborted()
     let result: LearningResult
     try {
-      result = validateLearningResult(data, output)
+      result = resolveLearningResult(data, output)
     } catch {
       throw publicTranslationError('structured_output', data.uiLang)
     }

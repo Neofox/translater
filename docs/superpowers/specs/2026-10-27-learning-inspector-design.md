@@ -58,6 +58,9 @@ including whitespace, punctuation and line breaks.
 Existing learning tips, character notes, and word-mode POS/senses/examples/origin/
 synonyms move into the shared inspector. Existing synonym lookup still works.
 Word mode uses existing dictionary data and does not request a sentence breakdown.
+Its translated word is the accessible click/keyboard trigger; there is no separate
+Word details label/button row. Opening it reveals the source-side dictionary on
+desktop or the compact learning panel; closing restores the word trigger.
 Alternatives keep their explanations, Copy/Listen and open list. Refine becomes
 one Adjust disclosure whose summary names active adjustments; applying/removing
 chips, limits and failed-refinement rollback retain existing behaviour. UI language
@@ -110,6 +113,9 @@ meaning, grammar and omissions. Strings can be empty where not useful. Validate
 integer ranges, exact slices, grapheme boundaries and non-overlapping ordered
 target chunks in server code. Never accept model offsets that highlight different
 text. Many-to-many source correspondence and empty source spans are valid;
+resolve miscounted offsets from exact quoted text only when its position is
+unambiguous. Keep correct exact offsets for repeated text. Omit unresolved source
+correspondence, and reject unresolved target chunks rather than guessing.
 source spans may reorder. Preserve unmatched target text as normal text and mark
 an incomplete overview as partial rather than inventing coverage. Invalid output
 is a learning-only failure with explicit Retry.

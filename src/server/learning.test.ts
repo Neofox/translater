@@ -94,6 +94,62 @@ it('rejects model spans that refer to different text', async () => {
   await handleLearning(input, new AbortController().signal, deps)
   expect(deps.generate).toHaveBeenCalledTimes(2)
 })
+it('resolves exact unique quotes when the model miscounts source and target offsets', async () => {
+  const deps = runtime()
+  deps.generate.mockResolvedValueOnce({
+    output: {
+      ...output,
+      chunks: [
+        {
+          ...output.chunks[0]!,
+          start: 1,
+          end: 3,
+          sourceSpans: [{ start: 1, end: 4, text: 'Hello' }],
+        },
+      ],
+    },
+  })
+  const result = await handleLearning(input, new AbortController().signal, deps)
+  expect(result.chunks[0]).toMatchObject({
+    start: 0,
+    end: 2,
+    text: '안녕',
+    sourceSpans: [{ start: 0, end: 5, text: 'Hello' }],
+  })
+})
+it('omits an ambiguous source quote instead of highlighting an arbitrary repeated word', async () => {
+  const deps = runtime()
+  deps.generate.mockResolvedValueOnce({
+    output: {
+      ...output,
+      chunks: [
+        {
+          ...output.chunks[0]!,
+          sourceSpans: [{ start: 2, end: 7, text: 'Hello' }],
+        },
+      ],
+    },
+  })
+  const result = await handleLearning(
+    { ...input, text: 'Hello Hello' },
+    new AbortController().signal,
+    deps,
+  )
+  expect(result.chunks[0]?.sourceSpans).toEqual([])
+})
+it('rejects ambiguous target offsets rather than guessing which repeated phrase was meant', async () => {
+  const deps = runtime()
+  deps.generate.mockResolvedValueOnce({
+    output: { ...output, chunks: [{ ...output.chunks[0]!, start: 1, end: 3 }] },
+  })
+  await expect(
+    handleLearning(
+      { ...input, translation: '안녕 안녕', sentenceEnd: 5 },
+      new AbortController().signal,
+      deps,
+    ),
+  ).rejects.toThrow()
+})
 it('does not start or cache generation after cancellation', async () => {
   const deps = runtime()
   const controller = new AbortController()

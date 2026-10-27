@@ -60,14 +60,25 @@ let update: (patch: {
   streaming?: boolean
   isPending?: boolean
 }) => void
-function Fixture({ long = false }: { long?: boolean }) {
-  const initialText = long ? Array(8).fill(sourceText).join('\n\n') : sourceText
-  const initialTranslation = long
-    ? Array(8).fill(translation).join('\n\n')
-    : translation
+function Fixture({
+  long = false,
+  word = false,
+}: {
+  long?: boolean
+  word?: boolean
+}) {
+  const initialText = word
+    ? 'hello'
+    : long
+      ? Array(8).fill(sourceText).join('\n\n')
+      : sourceText
+  const initialTranslation = word
+    ? '안녕하세요'
+    : long
+      ? Array(8).fill(translation).join('\n\n')
+      : translation
   const [input, setInput] = useState(initialText)
   const [live, setLive] = useState<LiveResult | null>({
-    intent: 'sentence',
     requestSource: 'en',
     text: initialText,
     requestKey: translationRequestKey({
@@ -80,18 +91,49 @@ function Fixture({ long = false }: { long?: boolean }) {
       uiLang: 'en',
     }),
     done: true,
-    partial: {
-      sourceLang: 'en',
-      targetLang: 'ko',
-      main: initialTranslation,
-      rationale: 'A polite, natural thank you.',
-      alternatives: [{ text: '정말 고마워요.', note: 'A warmer thank you.' }],
-      learningTips: {
-        grammar: 'An ending used when thanking someone.',
-        vocab: '',
-        characters: [],
-      },
-    },
+    ...(word
+      ? {
+          intent: 'word',
+          partial: {
+            sourceLang: 'en',
+            targetLang: 'ko',
+            headword: 'hello',
+            primaryTranslation: '안녕하세요',
+            posList: [
+              {
+                pos: 'interjection',
+                senses: [
+                  {
+                    definition: 'A greeting used when meeting someone.',
+                    register: [],
+                    examples: [],
+                  },
+                ],
+              },
+            ],
+            synonyms: ['hi'],
+            notes: '',
+            etymology: '',
+            alternativeTranslations: [],
+          },
+        }
+      : {
+          intent: 'sentence',
+          partial: {
+            sourceLang: 'en',
+            targetLang: 'ko',
+            main: initialTranslation,
+            rationale: 'A polite, natural thank you.',
+            alternatives: [
+              { text: '정말 고마워요.', note: 'A warmer thank you.' },
+            ],
+            learningTips: {
+              grammar: 'An ending used when thanking someone.',
+              vocab: '',
+              characters: [],
+            },
+          },
+        }),
   })
   const [streaming, setStreaming] = useState(false)
   const [isPending, setPending] = useState(false)
@@ -116,7 +158,7 @@ function Fixture({ long = false }: { long?: boolean }) {
     error: null,
     refineError: null,
     detected: 'en',
-    intent: 'sentence',
+    intent: live?.intent ?? 'sentence',
     isPolish: false,
     textareaRef,
     setSource: vi.fn(),
@@ -144,6 +186,47 @@ function Fixture({ long = false }: { long?: boolean }) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(learn).mockResolvedValue(analysis)
+})
+test('word details open directly from the translated word without a redundant row or paid request', async () => {
+  await render(<Fixture word />)
+  expect(document.querySelector('.learning-entry')).toBeNull()
+  expect(document.querySelector('.word-source-meta')).toBeNull()
+  const word = page.getByRole('button', { name: 'Word details: 안녕하세요' })
+  await word.click()
+  await expect
+    .element(
+      page.getByText('A greeting used when meeting someone.', { exact: true }),
+    )
+    .toBeVisible()
+  expect(document.querySelectorAll('.word-source-meta')).toHaveLength(1)
+  expect(learn).not.toHaveBeenCalled()
+  expect(document.querySelector('.input-panel textarea')?.textContent).toBe(
+    'hello',
+  )
+  const copy = page
+    .getByTestId('output-toolbar')
+    .getByRole('button', { name: 'Copy', exact: true })
+  await expect.element(copy).toBeEnabled()
+  if (document.querySelector('.reference-panel'))
+    expect(
+      document
+        .querySelector('.reference-panel')
+        ?.contains(document.activeElement),
+    ).toBe(true)
+  else {
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
+    expect(document.activeElement).toBe(word.element())
+    await userEvent.keyboard('{Enter}')
+    await expect
+      .element(
+        page.getByText('A greeting used when meeting someone.', {
+          exact: true,
+        }),
+      )
+      .toBeVisible()
+  }
 })
 const mainCopy = () =>
   page

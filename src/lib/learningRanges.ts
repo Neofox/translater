@@ -24,6 +24,73 @@ function boundaries(text: string) {
   return points
 }
 
+/** Resolve counting mistakes only when the exact quotation is unambiguous. */
+export function resolveLearningResult(
+  input: LearningInputData,
+  output: unknown,
+): LearningResult {
+  const data = LearningInput.parse(input)
+  const result = LearningOutput.parse(output)
+  const targetEdges = boundaries(data.translation)
+  const sourceEdges = boundaries(data.text)
+  const resolve = (
+    span: TextRange & { text: string },
+    text: string,
+    edges: Set<number>,
+    from: number,
+    to: number,
+  ) => {
+    if (
+      span.start >= from &&
+      span.end <= to &&
+      span.start < span.end &&
+      edges.has(span.start) &&
+      edges.has(span.end) &&
+      text.slice(span.start, span.end) === span.text
+    )
+      return span
+    const start = text.indexOf(span.text, from)
+    const end = start + span.text.length
+    const next = text.indexOf(span.text, start + 1)
+    if (
+      start < from ||
+      end > to ||
+      !edges.has(start) ||
+      !edges.has(end) ||
+      (next !== -1 && next + span.text.length <= to)
+    )
+      return null
+    return { ...span, start, end }
+  }
+  return validateLearningResult(data, {
+    ...result,
+    chunks: result.chunks.map((chunk) => {
+      const target = resolve(
+        chunk,
+        data.translation,
+        targetEdges,
+        data.sentenceStart,
+        data.sentenceEnd,
+      )
+      if (!target) throw new Error('Unresolved translation quote')
+      return {
+        ...chunk,
+        ...target,
+        sourceSpans: chunk.sourceSpans.flatMap((span) => {
+          const source = resolve(
+            span,
+            data.text,
+            sourceEdges,
+            0,
+            data.text.length,
+          )
+          return source ? [source] : []
+        }),
+      }
+    }),
+  })
+}
+
 export function validateLearningResult(
   input: LearningInputData,
   output: unknown,

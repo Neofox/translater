@@ -1,6 +1,6 @@
 import type { LearningInputData } from './learningTypes'
 
-export const LEARNING_PROMPT_VERSION = 'learning-v1'
+export const LEARNING_PROMPT_VERSION = 'learning-v2'
 
 export function learningPrompt(data: LearningInputData) {
   return {

@@ -156,9 +156,22 @@ export default function OutputPanel() {
                 className={`result-main ${live.intent === 'word' ? 'result-word' : ''}`}
                 language={live.partial.targetLang ?? target}
                 text={copyText ?? ''}
-                disabled={!learning?.canOpen || !learning.isSentence}
+                disabled={!learning?.canOpen}
+                actionLabel={
+                  learning && !learning.isSentence
+                    ? `${t('wordDetails')}: ${copyText ?? ''}`
+                    : undefined
+                }
+                expanded={learning?.isOpen}
                 selectedChunk={learning?.selectedChunk}
-                onInspect={learning?.openAt}
+                onInspect={
+                  learning?.isSentence
+                    ? learning.openAt
+                    : () => {
+                        if (learning?.isOpen) learning.close()
+                        else learning?.openAt()
+                      }
+                }
                 resetKey={learning?.identity}
               >
                 {!copyText &&
@@ -201,11 +214,9 @@ export default function OutputPanel() {
                 </div>
                 {!learning && <AdjustMenu />}
               </div>
-              {learning && (
+              {learning?.isSentence && (
                 <div className="learning-entry">
-                  <span>
-                    {learning.isSentence ? t('tapPhrase') : t('wordDetails')}
-                  </span>
+                  <span>{t('tapPhrase')}</span>
                   <div className="learning-entry-actions">
                     <Pill
                       tone="warm"
@@ -215,7 +226,7 @@ export default function OutputPanel() {
                       aria-expanded={learning.isOpen}
                       onClick={() => learning.openAt()}
                     >
-                      {t(learning.isSentence ? 'breakdown' : 'wordDetails')}
+                      {t('breakdown')}
                     </Pill>
                     <AdjustMenu />
                   </div>

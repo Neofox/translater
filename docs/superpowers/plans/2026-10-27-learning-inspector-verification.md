@@ -84,3 +84,37 @@ No Critical or deferred Minor findings. No second review was dispatched.
 Only formatter changes were made to `.cta.json` and `prettier.config.js` to pass
 the existing global formatting check; parsed `.cta.json` content is unchanged.
 Ignored execution scratch is excluded from Prettier.
+
+## MacBook follow-up fix
+
+After the user refreshed local authentication, live verification reproduced a
+breakdown failure: model-generated offsets miscounted whitespace and source
+positions. The server now resolves unique exact quotations in code before the
+unchanged strict slice/grapheme/order validation. Correct offsets can still
+disambiguate repeated text. Ambiguous source correspondence is omitted, while
+unresolved target chunks fail safely. No automatic retry or credential change.
+
+The translated word itself now opens dictionary details with click or keyboard
+activation. The duplicate Word details label/button row was removed. Desktop
+reveals the existing dictionary in the source pane and focuses its heading;
+compact panels restore focus to the word on close. This uses existing word data
+and makes no learning provider call.
+
+Verified in the running local app at 1512×982 with the configured live model:
+sentence overview, direct phrase click, phrase details and matching source
+highlight; also direct word click revealing real dictionary data. The browser's
+temporary viewport override was reset afterwards. Live test text was synthetic;
+no provider bodies, credentials or generated analysis were logged.
+
+Regression evidence: 312 unit tests pass. An affected Chromium/WebKit run at
+MacBook and portrait sizes passed 24 checks, including dictionary synonyms,
+native phrase taps, early Copy and direct word activation. All 112 existing
+learning checks passed across the 14 browser/viewport configurations. The new
+word check initially had four landscape failures because it incorrectly expected
+a stacked-panel Close button in split layouts; it now branches on the rendered
+reference panel. Its final rerun passed all 14 configurations, including native
+Enter activation and compact close-focus restoration. No product change was
+needed for those four harness failures.
+
+Final typecheck, lint, formatting, diff check and production build passed. The
+learning provider remained absent from client JavaScript (one server chunk).

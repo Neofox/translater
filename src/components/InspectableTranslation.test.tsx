@@ -41,6 +41,23 @@ it('never inspects an incomplete or stale result', () => {
   fireEvent.click(screen.getByTestId('main-translation'))
   expect(inspect).not.toHaveBeenCalled()
 })
+it('offers word details directly on the word with native keyboard activation', () => {
+  const inspect = vi.fn()
+  render(
+    <InspectableTranslation
+      text="안녕"
+      language="ko"
+      disabled={false}
+      actionLabel="Word details: 안녕"
+      expanded={false}
+      onInspect={inspect}
+    />,
+  )
+  const word = screen.getByRole('button', { name: 'Word details: 안녕' })
+  fireEvent.click(word, { detail: 0 })
+  expect(inspect).toHaveBeenCalledWith(0)
+  expect(word.getAttribute('aria-expanded')).toBe('false')
+})
 
 function gesture(node: Element, type: string) {
   fireEvent(

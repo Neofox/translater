@@ -26,7 +26,9 @@ export default function LearningPanel() {
       if (scroll) scroll.scrollTop = 0
     }
     document
-      .querySelector<HTMLButtonElement>('[data-testid="breakdown-button"]')
+      .querySelector<HTMLButtonElement>(
+        '[data-testid="breakdown-button"], [data-testid="word-details-trigger"]',
+      )
       ?.focus({ preventScroll: true })
   }
   useLayoutEffect(() => {

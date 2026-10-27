@@ -1923,6 +1923,28 @@ textarea:focus-visible {
 .result-main[data-inspectable] {
   cursor: text;
 }
+.word-details-trigger {
+  appearance: none;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 1px dotted var(--color-warm);
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.word-details-trigger:hover,
+.word-details-trigger[aria-expanded='true'] {
+  color: var(--color-warm);
+}
+.word-details-trigger:disabled {
+  border-color: transparent;
+  cursor: text;
+}
 .learning-entry {
   display: flex;
   align-items: center;
