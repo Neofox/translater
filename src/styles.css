@@ -1958,6 +1958,189 @@ textarea:focus-visible {
   padding-block: 4px;
 }
 
+/* A: one learning surface, in the existing reference pane or above composer. */
+.learning-inspector {
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.learning-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-soft);
+  margin-block: 12px;
+}
+.learning-chunks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.learning-chunks button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 2px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.learning-chunks button:hover {
+  background: var(--color-warm-soft);
+}
+.learning-chunks button > :first-child {
+  font-weight: 600;
+}
+.learning-chunks button > :not(:first-child) {
+  color: var(--color-ink-soft);
+}
+.learning-order {
+  color: var(--color-ink-soft);
+  margin-block: 16px;
+}
+.learning-phrase {
+  color: var(--color-warm);
+  font-size: 22px;
+  font-weight: 600;
+  margin-block: 16px 12px;
+}
+.learning-facts {
+  margin: 0;
+}
+.learning-facts > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.3fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.learning-facts dt,
+.learning-subheading {
+  color: var(--color-warm);
+  font-size: 12px;
+  font-weight: 600;
+}
+.learning-facts dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+.learning-back {
+  margin-top: 4px;
+}
+.learning-inspector .ui-pill {
+  min-height: 44px;
+}
+.learning-sentences {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.learning-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(260px, calc(var(--app-height, 100dvh) * 0.3));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-panel);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.learning-panel[hidden],
+.learning-panel-body[hidden] {
+  display: none;
+}
+.learning-panel-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding-inline: 12px 4px;
+}
+.learning-panel-header h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-warm);
+  font-size: 12px;
+  font-weight: 600;
+}
+.learning-panel-header .ui-pill {
+  min-height: 44px;
+  padding-inline: 10px;
+}
+.learning-panel-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 14px 14px;
+}
+.translator-panels:is([data-layout='stack'], [data-layout='laptop'])
+  .input-panel {
+  display: flex;
+  flex-direction: column;
+}
+.translator-panels:is([data-layout='stack'], [data-layout='laptop']) .composer {
+  flex: 0 0 auto;
+  width: 100%;
+}
+.translator-panels[data-tight] .learning-panel {
+  display: none;
+}
+.input-panel[data-source-compact] .composer,
+.translator-panels[data-keyboard][data-layout='stack']
+  .input-panel[data-source-compact]
+  .composer {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'input' 'actions';
+}
+.input-panel[data-source-compact] .composer-actions {
+  gap: 6px;
+  padding: 0 4px 4px;
+}
+.input-panel[data-source-compact] .paste-button,
+.input-panel[data-source-compact] .clear-button {
+  width: auto;
+  min-height: 44px;
+  padding-inline: 10px;
+  gap: 6px;
+  font-size: 14px;
+}
+.input-panel[data-source-compact] .paste-button span,
+.input-panel[data-source-compact] .clear-button span {
+  display: inline;
+}
+.input-panel[data-source-compact] .source-expand-button {
+  margin-left: auto;
+}
+.input-panel[data-source-compact] .source-input-area {
+  background: transparent;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .source-input-area {
+  background: transparent;
+}
+.translator-panels[data-tight] .learning-entry > span {
+  display: none;
+}
+
 .alternative-skeleton .alternative-text,
 .alternative-skeleton .alternative-note {
   min-height: 1lh;

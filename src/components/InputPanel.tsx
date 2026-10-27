@@ -12,6 +12,7 @@ import { STRINGS } from '../lib/i18n'
 import { copyableMainText } from '../lib/liveResult'
 import { useLearningContext } from '../context/LearningContext'
 import SourceHighlight from './SourceHighlight'
+import LearningPanel from './LearningPanel'
 
 export default function InputPanel({ children }: { children?: ReactNode }) {
   const learning = useLearningContext()
@@ -119,6 +120,7 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
       aria-label={t('sourceText')}
       data-source-compact={compact || undefined}
     >
+      <LearningPanel />
       <div className="composer">
         <div className="composer-header">
           <LanguageChipBar

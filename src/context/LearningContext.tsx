@@ -69,10 +69,12 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     enabled: canOpen && isSentence,
   })
   const [wordOpen, setWordOpen] = useState(false)
+  const [wordMinimized, setWordMinimized] = useState(false)
   const wordIdentity = `${live?.requestKey ?? ''}:${canOpen}`
   const [wordKey, setWordKey] = useState(wordIdentity)
   useLayoutEffect(() => {
     setWordOpen(false)
+    setWordMinimized(false)
     setWordKey(wordIdentity)
   }, [wordIdentity])
   const openAt = useCallback(
@@ -100,6 +102,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         close,
         isOpen:
           learning.isOpen || (canOpen && wordOpen && wordKey === wordIdentity),
+        minimized: isSentence ? learning.minimized : wordMinimized,
+        setMinimized: isSentence ? learning.setMinimized : setWordMinimized,
       }}
     >
       {children}

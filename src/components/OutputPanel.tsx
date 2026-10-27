@@ -219,7 +219,9 @@ export default function OutputPanel() {
               )}
               {live.intent === 'sentence' ? (
                 <SentenceView
-                  content={separateReference ? 'alternatives' : 'all'}
+                  content={
+                    learning || separateReference ? 'alternatives' : 'all'
+                  }
                   result={live.partial}
                   streaming={streaming}
                   speech={speech}
@@ -228,7 +230,9 @@ export default function OutputPanel() {
                 />
               ) : (
                 <WordView
-                  content={separateReference ? 'alternatives' : 'all'}
+                  content={
+                    learning || separateReference ? 'alternatives' : 'all'
+                  }
                   result={live.partial}
                   mode={mode}
                   streaming={streaming}
