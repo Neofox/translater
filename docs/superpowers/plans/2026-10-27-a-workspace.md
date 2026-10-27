@@ -39,7 +39,7 @@
 - [x] Run targeted profiles and inspect MacBook/Duo screenshots. Fix any reproduced clipping or focus failures.
 - [x] Update workspace documentation; run unit tests, browser matrix, typecheck, lint, formatting and build.
 - [x] Request one fresh review and resolve important findings with regressions.
-- [ ] Commit/push and verify the updated PR preview.
+- [x] Commit/push and verify the updated PR preview.
 
 ## Execution record
 
@@ -50,4 +50,4 @@
 - Fresh review found bottom-only Copy could leave view after long learner notes. Reproduced RED with long wording notes; top/bottom sticky constraints passed GREEN in both engines. Added workspace→folded→unfolded→workspace context/cursor coverage, also green.
 - No deferred minor findings or unresolved design decisions.
 - Final verification: 268 unit tests and 546 browser checks passed across 14 Chromium/WebKit profiles. Typecheck, lint, formatting and production build passed. Local A gallery includes all seven viewport sizes with short and long text.
-- Commit/push and deployment verification remain the final delivery steps. Physical Duo Safari testing remains a device check; automated keyboard/safe-area coverage passed.
+- Implementation commit `06246c1` pushed to PR6. Vercel and security checks passed; authenticated preview GET returned HTTP 200 with A theme/assets. PR remains open and unmerged. Physical Duo Safari testing remains a device check; automated keyboard/safe-area coverage passed.
