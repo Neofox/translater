@@ -5,7 +5,7 @@ import ListenButton from './ListenButton'
 import LanguageChipBar from './LanguageChipBar'
 import RefineRow from './RefineRow'
 import Pill from './ui/Pill'
-import { useKbd } from '../hooks/useKbd'
+import MainExplanation from './MainExplanation'
 import SentenceView from './SentenceView'
 import WordView from './WordView'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -34,7 +34,6 @@ export default function OutputPanel() {
     refinements,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
-  const { mod, shift } = useKbd()
   const { desktop, mode: layoutMode } = useWorkspaceLayoutContext()
   const separateReference = ['workspace', 'split', 'book'].includes(layoutMode)
   const copyText = mainText(live)
@@ -164,6 +163,19 @@ export default function OutputPanel() {
                   <span className="result-cursor animate-pulse" aria-hidden />
                 )}
               </p>
+              <MainExplanation
+                live={live}
+                streaming={streaming}
+                registerLabel={
+                  live.intent === 'sentence' && live.partial.targetLang === 'ko'
+                    ? mode === 'friends'
+                      ? '반말'
+                      : mode === 'casual'
+                        ? '해요체'
+                        : '존댓말'
+                    : undefined
+                }
+              />
               <div className="result-actions" data-testid="output-toolbar">
                 <div className="primary-result-actions">
                   <CopyButton
@@ -172,7 +184,6 @@ export default function OutputPanel() {
                     primary
                     compact={!desktop}
                     disabled={!copyReady}
-                    shortcut={desktop ? `${mod}${shift}C` : undefined}
                   />
                   {speech && copyText?.trim() && (
                     <ListenButton {...speech} text={copyText} label={desktop} />
@@ -194,15 +205,6 @@ export default function OutputPanel() {
                   streaming={streaming}
                   speech={speech}
                   copyDisabled={!live.done || stale}
-                  registerLabel={
-                    live.partial.targetLang === 'ko'
-                      ? mode === 'friends'
-                        ? '반말'
-                        : mode === 'casual'
-                          ? '해요체'
-                          : '존댓말'
-                      : undefined
-                  }
                   hideAlternatives={isLongForm(live.text)}
                 />
               ) : (

@@ -182,20 +182,26 @@ it('keeps desktop explanation and learning content open with static headings', (
   expect(screen.getByText('A useful ending.').closest('[hidden]')).toBeNull()
 })
 
-it('tucks compact wording notes behind a keyboard-accessible disclosure', () => {
+it('pairs compact wording with the main translation before actions and alternatives', () => {
   fixture.live.done = true
   fixture.live.partial = {
     ...fixture.live.partial,
     rationale: 'An idiomatic expression.',
     formalityNote: 'A polite ending.',
+    alternatives: [{ text: '반가워요', note: 'A warmer greeting.' }],
   }
   render(<OutputPanel />, { wrapper: UiLangProvider })
-  const toggle = screen.getByRole('button', { name: /^Why this wording/ })
-  expect(toggle.getAttribute('aria-expanded')).toBe('false')
-  expect(screen.getByText('A polite ending.').closest('[hidden]')).toBeTruthy()
-  fireEvent.click(toggle)
-  expect(toggle.getAttribute('aria-expanded')).toBe('true')
-  expect(screen.getByText('A polite ending.').closest('[hidden]')).toBeNull()
+  expect(screen.queryByRole('button', { name: /^Why this wording/ })).toBeNull()
+  const why = screen.getByRole('region', { name: 'Why this wording' })
+  expect(why.textContent).toContain('An idiomatic expression.')
+  expect(why.textContent).toContain('A polite ending.')
+  expect(why.closest('[hidden]')).toBeNull()
+  const copy = screen
+    .getByTestId('output-toolbar')
+    .querySelector('.copy-button')!
+  expect(
+    why.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
 })
 
 it.each(['sentence', 'word'] as const)(

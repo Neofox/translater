@@ -341,8 +341,8 @@ test.each([false, true])(
         document.querySelector('.detail-alternatives')!.getBoundingClientRect()
           .top,
       ).toBeLessThan(
-        document.querySelector('.detail-why')?.getBoundingClientRect().top ??
-          Infinity,
+        document.querySelector('.detail-learning')?.getBoundingClientRect()
+          .top ?? Infinity,
       )
       expect(first.querySelector('.copy-button')!.textContent.trim()).toBe('')
       await settledScreenshot({
@@ -686,8 +686,11 @@ test('desktop source and reference share the left pane while alternatives stay r
   const whyBounds = document
     .querySelector('.detail-why')!
     .getBoundingClientRect()
-  expect(whyBounds.right).toBeLessThanOrEqual(result.left)
-  expect(whyBounds.top).toBeGreaterThanOrEqual(footer.bottom)
+  expect(whyBounds.left).toBeGreaterThanOrEqual(result.left)
+  expect(whyBounds.bottom).toBeLessThanOrEqual(
+    document.querySelector('.primary-result-actions')!.getBoundingClientRect()
+      .top,
+  )
   expect(alts.left).toBeGreaterThanOrEqual(result.left)
   expect(document.querySelectorAll('.detail-why')).toHaveLength(1)
   await expect
@@ -732,7 +735,7 @@ test('word metadata stays separate from translation actions at every size', asyn
       .getByRole('button', { name: 'Copy', exact: true })
       .element()
     expect(copy.getAttribute('title')).toContain('C')
-    expect(copy.querySelector('kbd')).not.toBeNull()
+    expect(copy.querySelector('kbd')).toBeNull()
   } else {
     expect(actions.querySelector('kbd')).toBeNull()
     expect(
@@ -768,7 +771,9 @@ test('reference notes track streaming clear and error without moving source focu
     },
   })
   await expect
-    .poll(() => document.querySelector('.reference-panel')?.textContent)
+    .poll(
+      () => document.querySelector('.output-panel .detail-why')?.textContent,
+    )
     .toContain('Notes are arriving.')
   expect(document.activeElement).toBe(input)
   expect([input.selectionStart, input.selectionEnd]).toEqual([5, 14])
@@ -796,7 +801,7 @@ test('portrait keeps alternatives ahead of notes and the source compact', async 
   const lineHeight = parseFloat(getComputedStyle(editor).lineHeight)
   expect(Math.abs(editor.clientHeight / lineHeight - 1)).toBeLessThan(0.01)
   const alternative = document.querySelector('.detail-alternatives')!
-  const notes = document.querySelector('.detail-why')!
+  const notes = document.querySelector('.detail-learning')!
   expect(
     alternative.compareDocumentPosition(notes) &
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -823,31 +828,19 @@ test('Duo landscape uses source-side notes without changing pane order', async (
   const output = document
     .querySelector('.output-panel')!
     .getBoundingClientRect()
-  expect(output.right).toBeLessThanOrEqual(source.left + 1)
+  expect(source.right).toBeLessThanOrEqual(output.left + 1)
   const reference = document.querySelector('.reference-panel')
   expect(reference).not.toBeNull()
   expect(reference!.closest('.input-panel')).not.toBeNull()
-  expect(document.querySelector('.output-panel .detail-why')).toBeNull()
-  if (window.innerHeight < 460) {
-    const toggle = page.getByRole('button', { name: /^Why this wording/ })
-    await expect.element(toggle).toHaveAttribute('aria-expanded', 'false')
-    await toggle.click()
-    await expect
-      .element(
-        page.getByText('Natural wording for a friendly conversation.', {
-          exact: true,
-        }),
-      )
-      .toBeVisible()
-  } else {
-    await expect
-      .element(
-        page.getByText('Natural wording for a friendly conversation.', {
-          exact: true,
-        }),
-      )
-      .toBeVisible()
-  }
+  expect(document.querySelector('.reference-panel .detail-why')).toBeNull()
+  expect(document.querySelector('.output-panel .detail-why')).not.toBeNull()
+  await expect
+    .element(
+      page.getByText('Natural wording for a friendly conversation.', {
+        exact: true,
+      }),
+    )
+    .toBeVisible()
   await expect.element(page.getByTestId('paste-input')).toBeVisible()
   await expect.element(page.getByTestId('clear-input')).toBeVisible()
   await settledScreenshot({
@@ -936,6 +929,10 @@ test('A workspace keeps long source and result controls above the safe bottom ed
             ...sentence.partial,
             main: longTranslation.repeat(8),
             rationale: 'A clear explanation of the chosen wording. '.repeat(50),
+            learningTips: {
+              ...learningTips,
+              grammar: learningTips.grammar.repeat(60),
+            },
           },
         }}
       />,
@@ -1000,7 +997,7 @@ test('A workspace keeps long source and result controls above the safe bottom ed
   }
 })
 
-test('long text keeps a single learner reading column and the result has no focus ring', async () => {
+test('long text keeps source learning separate from output wording without a result focus ring', async () => {
   const initial: LiveResult = {
     ...sentence,
     text: longSource,
@@ -1043,16 +1040,14 @@ test('long text keeps a single learner reading column and the result has no focu
       .element(),
   )
   if (document.querySelector('.translator-panels[data-desktop]')) {
-    const why = page
-      .getByRole('heading', { name: /^Why this wording/, exact: true })
-      .element()
+    const why = document
+      .querySelector('.output-panel .detail-why')!
       .getBoundingClientRect()
     const tips = page
       .getByRole('heading', { name: 'Learning tips', exact: true })
       .element()
       .getBoundingClientRect()
-    expect(Math.abs(why.left - tips.left)).toBeLessThanOrEqual(2)
-    expect(tips.top).toBeGreaterThan(why.bottom)
+    expect(tips.right).toBeLessThanOrEqual(why.left)
   }
   await settledScreenshot({
     path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-long.png`,
@@ -1232,7 +1227,7 @@ test('landscape sentence notes use the card width without reserving bottom inset
     expect(
       document.querySelector('.translator-panels')!.getAttribute('data-layout'),
     ).toBe('split')
-    expect(target.right).toBeLessThanOrEqual(editor.left)
+    expect(editor.right).toBeLessThanOrEqual(target.left)
     const card = page.getByTestId('alternative-item').elements()[0]!
     const note = card
       .querySelector('.alternative-note')!
@@ -1368,8 +1363,6 @@ test.each([
       const panels = document.querySelector<HTMLElement>('.translator-panels')!
       await expect.poll(() => panels.dataset.layout).toBe(expected)
       const order = [...panels.children]
-      if (expected === 'stack')
-        await page.getByRole('button', { name: /^Why this wording/ }).click()
       const scroll = page
         .getByTestId('translation-result')
         .element() as HTMLElement
@@ -1743,7 +1736,7 @@ test.each([
       const output = document
         .querySelector('.output-panel')!
         .getBoundingClientRect()
-      expect(output.right).toBeLessThanOrEqual(source.left)
+      expect(source.right).toBeLessThanOrEqual(output.left)
       expect(
         page.getByTestId('input-textarea').element().getBoundingClientRect()
           .height,
@@ -1756,8 +1749,8 @@ test.each([
         .getByText('to have butterflies', { exact: true })
         .element()
       assertWithinViewport(alternative)
-      expect(alternative.getBoundingClientRect().top).toBeLessThan(
-        usage.getBoundingClientRect().top,
+      expect(usage.getBoundingClientRect().top).toBeLessThan(
+        alternative.getBoundingClientRect().top,
       )
       for (const selector of ['paste-input', 'clear-input'])
         assertWithinViewport(page.getByTestId(selector).element())
@@ -1794,5 +1787,117 @@ test.each([
     } finally {
       await page.viewport(...original)
     }
+  },
+)
+
+test('aligned workspace keeps matching action boxes and usage with its translation', async () => {
+  await render(
+    <Fixture
+      initial={{
+        ...word,
+        partial: {
+          ...word.partial,
+          primaryUsageNote: 'Use this for a public lending library.',
+        },
+      }}
+    />,
+  )
+  const actions = document.querySelector('.primary-result-actions')!
+  const copy = actions.querySelector('.copy-button')!
+  const listen = actions.querySelector('.listen-button')!
+  const a = copy.getBoundingClientRect()
+  const b = listen.getBoundingClientRect()
+  expect(Math.abs(a.height - b.height)).toBeLessThanOrEqual(1)
+  expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(1)
+  expect(actions.querySelector('kbd')).toBeNull()
+  const why = document.querySelector('.output-panel .detail-why')!
+  expect(why.textContent).toContain('Use this for a public lending library.')
+  expect(why.closest('[hidden]')).toBeNull()
+  expect(
+    why.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  expect(document.querySelector('.reference-panel .detail-why')).toBeNull()
+  if (document.querySelector('.reference-panel')) {
+    expect(
+      document.querySelector('.reference-panel .word-source-meta'),
+    ).not.toBeNull()
+    const source = document
+      .querySelector('.input-panel')!
+      .getBoundingClientRect()
+    const result = document
+      .querySelector('.output-panel')!
+      .getBoundingClientRect()
+    expect(source.right).toBeLessThanOrEqual(result.left + 1)
+    expect(
+      getComputedStyle(document.querySelector('.input-panel')!).backgroundColor,
+    ).toBe(
+      getComputedStyle(document.querySelector('.output-panel')!)
+        .backgroundColor,
+    )
+  }
+})
+
+test.each(['en', 'ko'] as const)(
+  'labelled speech actions fit their box while loading and playing in %s',
+  async (lang) => {
+    if (window.innerWidth < 1100) return
+    localStorage.setItem('ui-lang', lang)
+    let release!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    vi.mocked(speak).mockImplementation(async () => {
+      await waiting
+      return new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'audio',
+            audio: new Uint8Array(480),
+            sampleRate: 24000,
+          })
+          controller.enqueue({ type: 'done' })
+          controller.close()
+        },
+      })
+    })
+    await render(
+      <Fixture
+        initial={{
+          ...sentence,
+          partial: {
+            ...sentence.partial,
+            main:
+              lang === 'en'
+                ? '정말 도와줘서 고맙습니다.'
+                : '친절하게 도와줘서 고마워요.',
+          },
+          requestKey: translationRequestKey({
+            text: sourceText,
+            source: 'en',
+            target: 'ko',
+            mode: 'casual',
+            context: '',
+            refinements: [],
+            uiLang: lang,
+          }),
+        }}
+      />,
+    )
+    const listen = page
+      .getByTestId('output-toolbar')
+      .getByTestId('listen-button')
+    const initial = listen.element().getBoundingClientRect()
+    await listen.click()
+    await expect.element(listen).toHaveAttribute('aria-busy', 'true')
+    const control = listen.element()
+    expect(control.scrollWidth).toBeLessThanOrEqual(control.clientWidth)
+    expect(control.getBoundingClientRect().width).toBe(initial.width)
+    release()
+    await expect.element(listen).toHaveAttribute('aria-busy', 'false')
+    await expect.element(listen).toHaveAttribute('aria-pressed', 'true')
+    expect(control.scrollWidth).toBeLessThanOrEqual(control.clientWidth)
+    expect(control.getBoundingClientRect().width).toBe(initial.width)
+    await listen.click()
+    await expect.element(listen).toHaveAttribute('aria-pressed', 'false')
   },
 )

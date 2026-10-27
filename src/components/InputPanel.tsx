@@ -9,7 +9,6 @@ import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
 import { STRINGS } from '../lib/i18n'
-import { useKbd } from '../hooks/useKbd'
 import { copyableMainText } from '../lib/liveResult'
 
 export default function InputPanel({ children }: { children?: ReactNode }) {
@@ -32,7 +31,6 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
   const layout = useWorkspaceLayoutContext()
-  const { mod } = useKbd()
   const [contextOpen, setContextOpen] = useState(false)
   const [contextEditing, setContextEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -128,132 +126,135 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
             aria-label={t('sourceLanguage')}
           />
         </div>
-        {contextOpen && (
-          <div
-            className="composer-context"
-            onFocusCapture={() => setContextEditing(true)}
-            onBlurCapture={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget))
-                setContextEditing(false)
-            }}
-          >
-            <ContextTextarea />
-          </div>
-        )}
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onFocus={() => {
-            if (layout.keyboard) {
-              setContextOpen(false)
-              setContextEditing(false)
-            }
-          }}
-          onPaste={() => queueImmediate('paste')}
-          onBlur={(event) => {
-            const next = event.relatedTarget
-            if (!(
-              next instanceof Element && next.closest('[data-input-action]')
-            ))
-              flush('blur')
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === 'Enter' &&
-              !event.shiftKey &&
-              !event.metaKey &&
-              !event.ctrlKey &&
-              !event.nativeEvent.isComposing &&
-              flush('enter')
-            )
-              event.preventDefault()
-          }}
-          placeholder={t('placeholder')}
-          aria-label={t('inputText')}
-          data-testid="input-textarea"
-          className="translation-input scrollbar-thin"
-          spellCheck
-          autoComplete="off"
-          autoCorrect="on"
-        />
-        <div className="composer-actions">
-          <Pill
-            size="md"
-            tone="primary"
-            className="paste-button"
-            onClick={() => void paste()}
-            aria-label={t('pasteClipboard')}
-            data-testid="paste-input"
-            data-input-action
-            onPointerDown={(event) => event.preventDefault()}
-          >
-            <Clipboard size={16} aria-hidden />
-            <span>{t('paste')}</span>
-          </Pill>
-          <Pill
-            size="md"
-            className="clear-button"
-            onClick={() => {
-              clearInput()
-              focusSource()
-            }}
-            title={t('clearInputTitle')}
-            aria-label={t('clearInput')}
-            data-testid="clear-input"
-            data-input-action
-            onPointerDown={(event) => event.preventDefault()}
-          >
-            <X size={16} aria-hidden />
-            <span>{t('clear')}</span>
-          </Pill>
-          {canCondense && (
-            <Pill
-              size="md"
-              tone={context.trim() ? 'active' : 'neutral'}
-              className="source-expand-button"
-              data-testid="source-expand"
-              data-context={Boolean(context.trim()) || undefined}
-              data-input-action
-              aria-label={compact ? t('expandSource') : t('collapseSource')}
-              title={compact ? t('expandSource') : t('collapseSource')}
-              aria-expanded={!compact}
-              aria-description={context.trim() ? t('contextActive') : undefined}
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={() => {
-                if (compact) setExpanded(true)
-                else {
-                  setExpanded(false)
-                  setContextOpen(false)
+        <div className="composer-field">
+          {contextOpen && (
+            <div
+              className="composer-context"
+              onFocusCapture={() => setContextEditing(true)}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
                   setContextEditing(false)
-                }
-                focusSource()
               }}
             >
-              {compact ? (
-                <ChevronUp size={18} aria-hidden />
-              ) : (
-                <ChevronDown size={18} aria-hidden />
-              )}
-            </Pill>
+              <ContextTextarea />
+            </div>
           )}
-        </div>
-        <div className="composer-meta">
-          <ContextToggle
-            open={contextOpen}
-            onToggle={() => {
-              if (contextOpen) setContextEditing(false)
-              setContextOpen((value) => !value)
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onFocus={() => {
+              if (layout.keyboard) {
+                setContextOpen(false)
+                setContextEditing(false)
+              }
             }}
+            onPaste={() => queueImmediate('paste')}
+            onBlur={(event) => {
+              const next = event.relatedTarget
+              if (!(
+                next instanceof Element && next.closest('[data-input-action]')
+              ))
+                flush('blur')
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.metaKey &&
+                !event.ctrlKey &&
+                !event.nativeEvent.isComposing &&
+                flush('enter')
+              )
+                event.preventDefault()
+            }}
+            placeholder={t('placeholder')}
+            aria-label={t('inputText')}
+            data-testid="input-textarea"
+            className="translation-input scrollbar-thin"
+            spellCheck
+            autoComplete="off"
+            autoCorrect="on"
           />
-          <span
-            className={`input-count ${showLimit ? 'input-count-visible' : ''} ${overLimit ? 'text-red-400' : 'text-ink-dim'}`}
-            aria-live={showLimit ? 'polite' : undefined}
-          >
-            {count}
-          </span>
-          <kbd className="composer-shortcut">{mod}↵</kbd>
+          <div className="composer-actions">
+            <Pill
+              size="md"
+              tone="primary"
+              className="paste-button"
+              onClick={() => void paste()}
+              aria-label={t('pasteClipboard')}
+              data-testid="paste-input"
+              data-input-action
+              onPointerDown={(event) => event.preventDefault()}
+            >
+              <Clipboard size={16} aria-hidden />
+              <span>{t('paste')}</span>
+            </Pill>
+            <Pill
+              size="md"
+              className="clear-button"
+              onClick={() => {
+                clearInput()
+                focusSource()
+              }}
+              title={t('clearInputTitle')}
+              aria-label={t('clearInput')}
+              data-testid="clear-input"
+              data-input-action
+              onPointerDown={(event) => event.preventDefault()}
+            >
+              <X size={16} aria-hidden />
+              <span>{t('clear')}</span>
+            </Pill>
+            {canCondense && (
+              <Pill
+                size="md"
+                tone={context.trim() ? 'active' : 'neutral'}
+                className="source-expand-button"
+                data-testid="source-expand"
+                data-context={Boolean(context.trim()) || undefined}
+                data-input-action
+                aria-label={compact ? t('expandSource') : t('collapseSource')}
+                title={compact ? t('expandSource') : t('collapseSource')}
+                aria-expanded={!compact}
+                aria-description={
+                  context.trim() ? t('contextActive') : undefined
+                }
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (compact) setExpanded(true)
+                  else {
+                    setExpanded(false)
+                    setContextOpen(false)
+                    setContextEditing(false)
+                  }
+                  focusSource()
+                }}
+              >
+                {compact ? (
+                  <ChevronUp size={18} aria-hidden />
+                ) : (
+                  <ChevronDown size={18} aria-hidden />
+                )}
+              </Pill>
+            )}
+          </div>
+          <div className="composer-meta">
+            <ContextToggle
+              open={contextOpen}
+              onToggle={() => {
+                if (contextOpen) setContextEditing(false)
+                setContextOpen((value) => !value)
+              }}
+            />
+            <span
+              className={`input-count ${showLimit ? 'input-count-visible' : ''} ${overLimit ? 'text-red-400' : 'text-ink-dim'}`}
+              aria-live={showLimit ? 'polite' : undefined}
+            >
+              {count}
+            </span>
+          </div>
         </div>
       </div>
       {children}

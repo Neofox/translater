@@ -596,13 +596,13 @@ textarea:focus-visible {
 }
 
 /* Short landscape and keyboard layouts keep the important actions in view. */
-/* Share usable width at 1.35:1, then return each outer inset to its pane. */
+/* Share usable width equally, then return each outer inset to its pane. */
 .translator-panels[data-layout='split'] {
   grid-template-columns:
     minmax(
       0,
       calc(
-        (100% - var(--safe-area-left) - var(--safe-area-right)) * 0.5744680851 +
+        (100% - var(--safe-area-left) - var(--safe-area-right)) * 0.5 +
           var(--safe-area-left)
       )
     )
@@ -920,16 +920,6 @@ textarea:focus-visible {
 .target-toolbar {
   gap: 6px;
 }
-.result-shortcut,
-.composer-shortcut {
-  display: none;
-  font: 12px var(--font-mono);
-  color: var(--color-ink-dim);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
 .result-empty,
 .result-error {
   display: flex;
@@ -1198,10 +1188,10 @@ textarea:focus-visible {
   --safe-area-left: 0px;
 }
 .translator-panels[data-layout='split'] .input-panel {
-  --safe-area-left: 0px;
+  --safe-area-right: 0px;
 }
 .translator-panels[data-layout='split'] .output-panel {
-  --safe-area-right: 0px;
+  --safe-area-left: 0px;
 }
 .translator-panels[data-layout='split'] .input-panel,
 .translator-panels[data-layout='book'] .input-panel {
@@ -1583,9 +1573,7 @@ textarea:focus-visible {
   flex-wrap: nowrap;
   overflow-x: auto;
 }
-.translator-panels[data-layout='workspace'] .composer-shortcut {
-  display: inline-flex;
-}
+
 .translator-panels[data-keyboard][data-layout='workspace'] .input-panel {
   padding-block: 6px;
 }
@@ -1662,16 +1650,6 @@ textarea:focus-visible {
   line-height: 44px;
   padding-block: 0;
 }
-.copy-shortcut {
-  margin-left: 4px;
-  padding-left: 8px;
-  border-left: 1px solid currentColor;
-  border-radius: 0;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 400;
-  opacity: 0.65;
-}
 
 /* Expanded reply context must not consume the whole reference pane. The
    composer scrolls only when its combined fields outgrow this budget. */
@@ -1704,4 +1682,253 @@ textarea:focus-visible {
   bottom: 0;
   z-index: 3;
   background: var(--color-bg);
+}
+
+/* Approved A: one workspace ground, with only the editable field raised. */
+.composer-field {
+  display: contents;
+}
+.input-panel,
+.output-panel,
+.primary-result-actions {
+  background: var(--color-bg);
+}
+.app-header {
+  min-height: 56px;
+  padding-block: max(6px, var(--safe-area-top)) 6px;
+}
+.result-main {
+  margin-bottom: 6px;
+  font-size: clamp(22px, calc(15px + 1vw), 30px);
+}
+.main-explanation {
+  max-width: 42rem;
+  margin-bottom: 16px;
+  color: var(--color-ink-soft);
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.main-explanation .section-tag {
+  margin-right: 6px;
+  font-size: inherit;
+}
+.main-explanation-skeleton {
+  display: block;
+  width: 62%;
+  height: 14px;
+  border-radius: 6px;
+  background: var(--color-panel-2);
+  margin-block: 6px 16px;
+}
+.primary-result-actions .ui-pill {
+  width: 112px;
+  min-width: 112px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+  gap: 8px;
+}
+.primary-result-actions .copy-button {
+  border-color: transparent;
+}
+.primary-result-actions .icon-action {
+  width: 44px;
+  min-width: 44px;
+  padding-inline: 0;
+}
+.alternative-list > * + * {
+  margin-top: 0;
+}
+.alternative-item {
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+.alternative-actions {
+  gap: 8px;
+}
+.alternative-actions .ui-pill {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding-inline: 0;
+}
+.alternative-text {
+  font-size: 18px;
+  font-weight: 500;
+}
+.translator-panels:not([data-desktop]) .main-explanation {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.translator-panels:not([data-desktop]) .alternative-text {
+  font-size: 17px;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .input-panel {
+  --panel-gutter: 16px;
+  padding: 8px var(--panel-gutter) max(16px, var(--safe-area-bottom))
+    calc(var(--panel-gutter) + var(--safe-area-left));
+  border: 0;
+}
+.translator-panels[data-layout='workspace'] .input-panel {
+  --panel-gutter: 24px;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .output-panel {
+  border-left: 1px solid var(--color-border);
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  grid-template-areas: 'head' 'field';
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  max-width: 46rem;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer-field {
+  grid-area: field;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'context context' 'input input' 'actions meta';
+  gap: 0 6px;
+  min-width: 0;
+  padding: 0 8px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-panel);
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer-field:focus-within {
+  border-color: var(--color-focus);
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .translation-input {
+  min-height: 52px;
+  max-height: max(52px, min(280px, calc(var(--workspace-height) * 0.36)));
+  padding: 12px 6px 6px;
+  border-radius: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1.6;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer-actions,
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .composer-meta {
+  background: var(--color-panel);
+}
+.translator-panels:is([data-layout='split'], [data-layout='book'])
+  .composer-actions {
+  flex-wrap: nowrap;
+}
+.translator-panels:is([data-layout='split'], [data-layout='book'])
+  .composer-meta {
+  justify-content: flex-end;
+}
+.translator-panels:is([data-layout='split'], [data-layout='book'])
+  .context-toggle-label,
+.translator-panels:is([data-layout='split'], [data-layout='book'])
+  .input-count {
+  display: none;
+}
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .target-toolbar {
+  padding-top: 8px;
+}
+.translator-panels[data-keyboard]:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .input-panel {
+  padding-top: 6px;
+}
+.translator-panels[data-keyboard]:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .target-toolbar {
+  padding-top: 6px;
+}
+.translator-panels[data-tight]:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .translation-input {
+  min-height: 44px;
+  max-height: 44px;
+  padding-block: 8px;
+}
+
+/* Keep A's compact reading rhythm so alternatives stay close to the result. */
+.result-main {
+  margin-top: 8px;
+}
+.primary-result-actions {
+  padding-block: 6px;
+  margin-block: -6px 6px;
+}
+.refine-row {
+  margin-block: 12px;
+}
+.translator-panels:not([data-desktop]) .target-toolbar,
+.translator-panels:not([data-desktop]) .result-scroll {
+  --panel-gutter: 16px;
+}
+.translator-panels:not([data-desktop])
+  .detail-alternatives
+  > .result-section-title {
+  min-height: 28px;
+  padding-block: 4px;
 }

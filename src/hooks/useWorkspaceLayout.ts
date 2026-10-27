@@ -78,8 +78,7 @@ export function useWorkspaceLayout() {
             : width >= 560 && width > natural.height
               ? 'split'
               : 'stack'
-      const resultFirst =
-        mode === 'laptop' || mode === 'split' || mode === 'stack'
+      const resultFirst = mode === 'laptop' || mode === 'stack'
       const next = {
         mode,
         resultFirst,

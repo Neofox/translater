@@ -9,7 +9,6 @@ import { useUiLang } from '../hooks/useUiLang'
 type Props = {
   content?: 'all' | 'alternatives' | 'reference'
   result: Partial<SentenceResult>
-  registerLabel?: string
   copyDisabled?: boolean
   streaming?: boolean
   speech?: Omit<SpeechOptions, 'text'>
@@ -23,7 +22,6 @@ export default function SentenceView({
   hideAlternatives,
   speech,
   copyDisabled,
-  registerLabel,
 }: Props) {
   const { t } = useUiLang()
   const all =
@@ -59,17 +57,6 @@ export default function SentenceView({
           </ul>
         </ResultSection>
       )}
-      {content !== 'alternatives' &&
-        (result.rationale || result.formalityNote) && (
-          <ResultSection
-            title={t('whyWording')}
-            tag={registerLabel}
-            className="detail-why"
-          >
-            {result.rationale && <p>{result.rationale}</p>}
-            {result.formalityNote && <p>{result.formalityNote}</p>}
-          </ResultSection>
-        )}
       {content !== 'alternatives' && (
         <LearningTips tips={result.learningTips} />
       )}

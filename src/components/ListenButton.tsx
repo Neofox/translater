@@ -49,7 +49,7 @@ export default function ListenButton({
         ) : (
           <Volume2 size={14} aria-hidden="true" />
         )}
-        {showLabel && <span>{label}</span>}
+        {showLabel && <span>{active ? t('stopSpeech') : label}</span>}
       </Pill>
       {error && (
         <span

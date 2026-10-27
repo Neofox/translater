@@ -77,11 +77,6 @@ export default function WordView({
         </ResultSection>
       )}
       {content === 'reference' && about}
-      {content !== 'alternatives' && result.primaryUsageNote && (
-        <ResultSection title={t('usage')} className="detail-why">
-          <p>{result.primaryUsageNote}</p>
-        </ResultSection>
-      )}
       {content !== 'reference' && about}
       {content !== 'alternatives' && (
         <LearningTips tips={result.learningTips} />

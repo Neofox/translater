@@ -21,15 +21,6 @@ export default function ReferencePanel() {
             content="reference"
             result={live.partial}
             streaming={streaming}
-            registerLabel={
-              live.partial.targetLang === 'ko'
-                ? mode === 'friends'
-                  ? '반말'
-                  : mode === 'casual'
-                    ? '해요체'
-                    : '존댓말'
-                : undefined
-            }
           />
         ) : (
           <WordView

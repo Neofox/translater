@@ -10,11 +10,13 @@ afterEach(() => {
 })
 
 it.each([
-  [1512, 982],
-  [1728, 1117],
+  [1512, 982, 'workspace'],
+  [1728, 1117, 'workspace'],
+  [580, 382, 'split'],
+  [736, 594, 'split'],
 ] as const)(
   'keeps the A workspace source first at %i × %i through keyboard changes',
-  (width, height) => {
+  (width, height, expected) => {
     const viewport = Object.assign(new EventTarget(), {
       height: Number(height),
       offsetTop: 0,
@@ -50,9 +52,11 @@ it.each([
     }
     const { getByTestId, getByRole } = render(<Workspace />)
     const panels = getByTestId('panels')
-    expect(panels.getAttribute('data-layout')).toBe('workspace')
+    expect(panels.getAttribute('data-layout')).toBe(expected)
     expect(panels.getAttribute('data-result-first')).toBe('false')
-    expect(panels.getAttribute('data-desktop')).toBe('true')
+    expect(panels.getAttribute('data-desktop')).toBe(
+      expected === 'workspace' ? 'true' : 'false',
+    )
     act(() => {
       getByRole('textbox').focus()
     })
@@ -61,7 +65,7 @@ it.each([
         viewport.height = visible
         viewport.dispatchEvent(new Event('resize'))
       })
-    expect(panels.getAttribute('data-layout')).toBe('workspace')
+    expect(panels.getAttribute('data-layout')).toBe(expected)
     expect(panels.getAttribute('data-result-first')).toBe('false')
   },
 )
