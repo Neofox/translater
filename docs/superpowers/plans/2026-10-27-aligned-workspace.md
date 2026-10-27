@@ -40,4 +40,4 @@
 
 ## Verification
 
-270 unit tests passed. The full browser matrix passed686checks across14profiles. After the final compact-spacing adjustment,98affected layout checks passed acrossall14profiles. Typecheck, lint, scoped formatting and production build passed. One fresh-review finding (active speech label overflow) was fixed with EN/KO loading/playback geometry regressions. See the verification record for limitations.
+270 unit tests passed. The full browser matrix passed 686 checks across 14 profiles. After the final compact-spacing adjustment,98 affected layout checks passed across all 14 profiles. Typecheck, lint, scoped formatting and production build passed. One fresh-review finding (active speech label overflow) was fixed with EN/KO loading/playback geometry regressions. See the verification record for limitations.
