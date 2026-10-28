@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LANGUAGES } from '../lib/languages'
 import type { LangCode } from '../lib/languages'
-import { usePersistentState } from '../lib/usePersistentState'
+import { usePreference } from '../context/PreferencesContext'
 import { useUiLang } from '../hooks/useUiLang'
 import Pill from './ui/Pill'
 import Select from './ui/Select'
@@ -34,9 +34,8 @@ export default function LanguageChipBar({
 }: Props) {
   const { t } = useUiLang()
   const fixed = FIXED[kind]
-  const [recent, setRecent] = usePersistentState<LangCode | null>(
-    kind === 'source' ? 'nt.recentSource' : 'nt.recentTarget',
-    'ja',
+  const [recent, setRecent] = usePreference(
+    kind === 'source' ? 'recentSource' : 'recentTarget',
   )
   const barRef = useRef<HTMLDivElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)

@@ -4,12 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
 } from 'react'
-import { STRINGS, UI_LANGS } from '../lib/i18n'
+import { STRINGS } from '../lib/i18n'
+import {
+  PreferencesProvider,
+  usePreference,
+} from '../context/PreferencesContext'
+import type { PreferencesSnapshot } from '../lib/preferences'
 import type { StringKey, UiLang } from '../lib/i18n'
-
-const STORAGE_KEY = 'ui-lang'
 
 type UiLangCtx = {
   lang: UiLang
@@ -19,30 +21,29 @@ type UiLangCtx = {
 
 const Ctx = createContext<UiLangCtx | null>(null)
 
-function readInitial(): UiLang {
-  if (typeof window === 'undefined') return 'en'
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (stored && (UI_LANGS as string[]).includes(stored)) return stored as UiLang
-  return window.navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en'
+export function UiLangProvider({
+  children,
+  initialPreferences,
+}: {
+  children: React.ReactNode
+  initialPreferences?: PreferencesSnapshot
+}) {
+  return (
+    <PreferencesProvider initial={initialPreferences}>
+      <UiLangContent>{children}</UiLangContent>
+    </PreferencesProvider>
+  )
 }
 
-export function UiLangProvider({ children }: { children: React.ReactNode }) {
-  // Render server-side and initial client-side render in English so SSR output
-  // is deterministic; hydrate to the stored/locale preference in an effect.
-  const [lang, setLangState] = useState<UiLang>('en')
-
+function UiLangContent({ children }: { children: React.ReactNode }) {
+  const [lang, setLanguage] = usePreference('uiLang')
+  const setLang = useCallback(
+    (next: UiLang) => setLanguage(next),
+    [setLanguage],
+  )
   useEffect(() => {
-    setLangState(readInitial())
-  }, [])
-
-  const setLang = useCallback((next: UiLang) => {
-    setLangState(next)
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next)
-    } catch {
-      /* storage unavailable */
-    }
-  }, [])
+    document.documentElement.lang = lang
+  }, [lang])
 
   const value = useMemo<UiLangCtx>(
     () => ({
