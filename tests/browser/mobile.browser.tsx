@@ -1,4 +1,6 @@
-import { startTransition, useRef, useState } from 'react'
+import { act, startTransition, useRef, useState } from 'react'
+import { renderToString } from 'react-dom/server'
+import { hydrateRoot } from 'react-dom/client'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -107,7 +109,7 @@ function Fixture({
   initialDetected = null,
   initialError = null,
 }: {
-  initial?: LiveResult
+  initial?: LiveResult | null
   initialSource?: Context['source']
   initialTarget?: Context['target']
   initialMode?: Context['mode']
@@ -115,7 +117,7 @@ function Fixture({
   initialError?: Context['error']
 }) {
   const [state, setState] = useState<State>({
-    input: initial.text,
+    input: initial?.text ?? '',
     source: initialSource,
     target: initialTarget,
     live: initial,
@@ -175,6 +177,92 @@ async function settledScreenshot(options: { path: string }) {
   )
   await page.screenshot(options)
 }
+
+async function assertServerFirstPaint(sideInset: number) {
+  const html = renderToString(<Fixture initial={null} />)
+  await render(
+    <div data-testid="ssr-host" dangerouslySetInnerHTML={{ __html: html }} />,
+  )
+  const host = page.getByTestId('ssr-host').element()
+  host.style.setProperty('--safe-area-left', `${sideInset}px`)
+  host.style.setProperty('--safe-area-right', `${sideInset}px`)
+  const source = host.querySelector('.input-panel')!
+  const output = host.querySelector('.output-panel')!
+  const usableWidth = window.innerWidth - sideInset * 2
+  const twoColumns =
+    usableWidth >= 1100 ||
+    (usableWidth >= 560 && usableWidth > window.innerHeight)
+  const before = [
+    source,
+    output,
+    host.querySelector('.composer')!,
+    host.querySelector('textarea')!,
+  ].map((e) => e.getBoundingClientRect())
+  if (twoColumns) {
+    expect(Math.abs(before[0]!.top - before[1]!.top)).toBeLessThanOrEqual(1)
+    expect(before[0]!.right).toBeLessThanOrEqual(before[1]!.left + 1)
+  } else {
+    expect(before[1]!.bottom).toBeLessThanOrEqual(before[0]!.top + 1)
+  }
+  if (!sideInset)
+    await settledScreenshot({
+      path: `../../test-results/first-paint-${window.innerWidth}x${window.innerHeight}-ssr.png`,
+    })
+  const recoverable = vi.fn()
+  let root: ReturnType<typeof hydrateRoot> | undefined
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  try {
+    await act(async () => {
+      root = hydrateRoot(host, <Fixture initial={null} />, {
+        onRecoverableError: recoverable,
+      })
+    })
+    await expect
+      .poll(() =>
+        host.querySelector('.translator-panels')?.getAttribute('data-layout'),
+      )
+      .toBe(usableWidth >= 1100 ? 'workspace' : twoColumns ? 'split' : 'stack')
+    const after = [
+      source,
+      output,
+      host.querySelector('.composer')!,
+      host.querySelector('textarea')!,
+    ].map((e) => e.getBoundingClientRect())
+    for (let i = 0; i < before.length; i++)
+      for (const key of ['x', 'y', 'width', 'height'] as const)
+        expect(
+          Math.abs(before[i]![key] - after[i]![key]),
+          `element ${i} ${key}`,
+        ).toBeLessThanOrEqual(1)
+    expect(recoverable).not.toHaveBeenCalled()
+  } finally {
+    const hydratedRoot = root
+    if (hydratedRoot) await act(async () => hydratedRoot.unmount())
+    vi.unstubAllGlobals()
+  }
+}
+
+test.each([0, 12, 64])(
+  'server-rendered first paint matches hydration with %ipx side insets',
+  assertServerFirstPaint,
+)
+
+test.each([
+  [580, 382],
+  [594, 580],
+  [1110, 760],
+])(
+  'server-rendered first paint respects usable-width edges at %i × %i',
+  async (width, height) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    try {
+      await page.viewport(width, height)
+      await assertServerFirstPaint(12)
+    } finally {
+      await page.viewport(...original)
+    }
+  },
+)
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -39,6 +39,7 @@ export default defineConfig({
     include: [
       'react',
       'react-dom/client',
+      'react-dom/server',
       'react/jsx-runtime',
       'lucide-react',
       '@floating-ui/react',
