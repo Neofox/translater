@@ -62,13 +62,14 @@ afterEach(() => {
 })
 
 describe('LanguageChipBar', () => {
-  it('keeps the selected language visible and puts other chips in the menu after a panel narrows', () => {
+  it('keeps chips mounted and updates menu options after a panel narrows', () => {
     const width = stubWidth(600)
     renderBar({ value: 'ko' })
-    expect(chip('en')).toBeTruthy()
+    const english = chip('en')
+    expect(english).toBeTruthy()
     width.fire(180)
     expect(chip('ko')).toBeTruthy()
-    expect(chip('en')).toBeNull()
+    expect(chip('en')).toBe(english)
     width.fire(600)
     expect(chip('en')).toBeTruthy()
     width.fire(180)
@@ -114,12 +115,12 @@ describe('LanguageChipBar', () => {
     expect(chip('ja')!.getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('collapsed mode renders only the selected chip plus the more trigger', () => {
+  it('keeps the selected chip available alongside CSS-managed candidates in a narrow bar', () => {
     stubWidth(220)
     renderBar({ value: 'en' })
     expect(chip('en')).toBeTruthy()
-    expect(chip('auto')).toBeNull()
-    expect(chip('ko')).toBeNull()
+    expect(chip('auto')).toBeTruthy()
+    expect(chip('ko')).toBeTruthy()
     expect(screen.getByTestId('lang-more-trigger')).toBeTruthy()
   })
 

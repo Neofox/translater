@@ -198,6 +198,35 @@ async function assertServerFirstPaint(sideInset: number) {
     host.querySelector('.composer')!,
     host.querySelector('textarea')!,
   ].map((e) => e.getBoundingClientRect())
+  const languageButtons = () =>
+    [...host.querySelectorAll<HTMLElement>('.language-chip-bar')]
+      .filter((bar) => bar.checkVisibility())
+      .sort((a, b) =>
+        String(a.getAttribute('aria-label')).localeCompare(
+          String(b.getAttribute('aria-label')),
+        ),
+      )
+      .map((bar) => {
+        const sourceBar = bar.getAttribute('aria-label') === 'Source language'
+        const expanded = bar.clientWidth >= (sourceBar ? 320 : 280)
+        const visible = [
+          ...bar.querySelectorAll<HTMLElement>('[data-testid="lang-chip"]'),
+        ].filter((chip) => chip.checkVisibility())
+        expect(visible.map((chip) => chip.dataset.value)).toEqual(
+          expanded
+            ? sourceBar
+              ? ['auto', 'en', 'ko', 'ja']
+              : ['en', 'ko', 'ja']
+            : sourceBar
+              ? ['en']
+              : ['ko'],
+        )
+        return [
+          ...visible,
+          bar.querySelector('[data-testid="lang-more-trigger"]')!,
+        ].map((button) => button.getBoundingClientRect())
+      })
+  const buttonsBefore = languageButtons()
   if (twoColumns) {
     expect(Math.abs(before[0]!.top - before[1]!.top)).toBeLessThanOrEqual(1)
     expect(before[0]!.right).toBeLessThanOrEqual(before[1]!.left + 1)
@@ -228,6 +257,19 @@ async function assertServerFirstPaint(sideInset: number) {
       host.querySelector('.composer')!,
       host.querySelector('textarea')!,
     ].map((e) => e.getBoundingClientRect())
+    const buttonsAfter = languageButtons()
+    expect(buttonsAfter.map((bar) => bar.length)).toEqual(
+      buttonsBefore.map((bar) => bar.length),
+    )
+    buttonsBefore.forEach((bar, i) =>
+      bar.forEach((button, j) => {
+        for (const key of ['x', 'y', 'width', 'height'] as const)
+          expect(
+            Math.abs(button[key] - buttonsAfter[i]![j]![key]),
+            `language button ${i}/${j} ${key}`,
+          ).toBeLessThanOrEqual(1)
+      }),
+    )
     for (let i = 0; i < before.length; i++)
       for (const key of ['x', 'y', 'width', 'height'] as const)
         expect(
@@ -2030,8 +2072,7 @@ test('stream completion keeps Copy, language controls and existing alternatives 
     .element()
   const lang = page
     .getByTestId('target-toolbar')
-    .getByTestId('lang-chip')
-    .first()
+    .getByRole('button', { name: '한국어', exact: true })
     .element()
   const alt = page.getByTestId('alternative-item').first().element()
   await settleResultMotion()

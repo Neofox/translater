@@ -377,6 +377,22 @@ textarea:focus-visible {
   font-size: 16px;
   font-weight: 650;
 }
+.language-chip-bar {
+  container: language-chips / inline-size;
+}
+.language-chip-bar .language-chip[aria-pressed='false'] {
+  display: none;
+}
+@container language-chips (min-width: 320px) {
+  .language-chip-bar[data-kind='source'] .language-chip[aria-pressed='false'] {
+    display: inline-flex;
+  }
+}
+@container language-chips (min-width: 280px) {
+  .language-chip-bar[data-kind='target'] .language-chip[aria-pressed='false'] {
+    display: inline-flex;
+  }
+}
 .language-chip-bar button,
 .language-chip-bar [role='combobox'] {
   min-height: 44px;
@@ -2640,6 +2656,9 @@ textarea:focus-visible {
     }
     .translator-panels[data-layout-pending] .composer {
       gap: 4px 6px;
+    }
+    .translator-panels[data-layout-pending] .target-toolbar {
+      padding-top: 6px;
     }
   }
   .app-shell:has(.translator-panels[data-layout-pending]) .app-header {
