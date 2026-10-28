@@ -6,6 +6,7 @@ import type { WorkspaceLayout } from '../context/WorkspaceLayoutContext'
 export function useWorkspaceLayout() {
   const panelsRef = useFoldLayout()
   const [layout, setLayout] = useState(COMPACT_LAYOUT)
+  const [measured, setMeasured] = useState(false)
   const previous = useRef(layout)
   const restoreFocus = useRef<HTMLElement | null>(null)
 
@@ -117,6 +118,7 @@ export function useWorkspaceLayout() {
     book.addEventListener('change', measure)
     laptop.addEventListener('change', measure)
     measure()
+    setMeasured(true)
     return () => {
       observer?.disconnect()
       cancelAnimationFrame(frame)
@@ -146,5 +148,5 @@ export function useWorkspaceLayout() {
     }
   }, [layout.keyboard, panelsRef])
 
-  return { panelsRef, layout }
+  return { panelsRef, layout, measured }
 }

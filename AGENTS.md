@@ -150,6 +150,16 @@ follows the visible area without introducing root scroll. Keyboard entry resets
 the result scroll to its main translation and preserves focus/drafts. Fold media use
 physical viewport segments where available; no device-name detection.
 
+Before the first layout measurement, `data-layout-pending` keeps SSR and initial
+hydration markup identical while CSS chooses the responsive pane arrangement.
+The `workspace-viewport` query container excludes side safe areas; its panels
+expand back to full viewport width so backgrounds still reach the edges.
+Startup container queries match the hook's usable-width breakpoints and are
+disabled for physical folds. Do not restore a compact-only first paint, hide
+the page until mount, or read the browser viewport during the hydration render.
+Browser tests compare raw server markup with hydrated geometry, including
+nonzero safe areas and breakpoint edges, and reject hydration errors.
+
 Desktop reference details stay open in a single column, contained to a 44rem
 measure. Workspace, split and physical book layouts place notes under source;
 output retains main translation, actions/refinements and always-open alternatives.

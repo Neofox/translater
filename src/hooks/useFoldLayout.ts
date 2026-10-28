@@ -27,7 +27,7 @@ export function useFoldLayout() {
       measure()
       observer = new ResizeObserver(measure)
       observer.observe(panels)
-      const header = panels.parentElement?.querySelector('header')
+      const header = panels.closest('.app-shell')?.querySelector('header')
       if (header) observer.observe(header)
       window.addEventListener('resize', measure)
     }
