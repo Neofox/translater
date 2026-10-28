@@ -179,31 +179,38 @@ Desktop reference details stay open in a single column, contained to a 44rem
 measure. Workspace, split and physical book layouts place notes under source;
 output retains main translation, actions/refinements and always-open alternatives.
 Split/book notes collapse at short visible heights and stay in the same pane
-when the keyboard opens. Portrait/laptop retain notes after alternatives in the
-result scroll, as disclosures. `SentenceView` and `WordView` select `all`,
+when the keyboard opens. Portrait/laptop keep the learning inspector inside the result pane above the
+action dock; tight views portal it into the result scroll. `SentenceView` and `WordView` select `all`,
 `alternatives` or `reference` content, avoiding duplicate metadata. Dictionary
 metadata and synonym lookup live in reference content. POS appears there once,
 never in the Copy/Listen action group. Desktop Copy contains its shortcut hint. The target scroll surface has no focus ring;
 buttons, menus and selects retain visible keyboard focus.
 
 Main result text is `[data-testid="main-translation"]`, its scroll surface is
-`[data-testid="translation-result"]`, and its Copy/Listen/refinements are inside
-`[data-testid="output-toolbar"]`. Main Copy is enabled once its JSON string is complete,
+`[data-testid="translation-result"]`, and its persistent Copy/Listen group is
+`[data-testid="output-toolbar"]`, outside generated result content. Adjust remains
+in the app header. Main Copy is enabled once its JSON string is complete,
 even while details stream, and remains disabled for stale results/settings debounce.
 `LiveResult.requestKey` captures the
 request settings in page memory; `resultIsCurrent` guards main/alternative actions
 and the keyboard shortcut. Source Paste/Clear suppress blur flushing for a draft
 being discarded. The source language header hides in short stacked layouts. Both source actions remain visible and labelled on empty and filled input.
 
-Completed compact stacked turns condense the source into one editable row with
-Paste, Clear and an expand control. Preserve the same textarea node/cursor and
+Nonempty compact stacked turns condense the source during the input/paste action
+into one editable row with Paste, Clear and an expand control. Do not wait for
+network or main-text readiness to change the composer height. Preserve the same textarea node/cursor and
 keyboard focus when the main result becomes ready. Keep that compact state while
 the next edit is pending; Clear resets it, explicit expansion exposes languages
 and reply context, and input-limit warnings bypass condensing. Close paths must
 reset the context-focus state before unmounting a focused context field. Applied
 reply context remains indicated on the compact expand control. Phone result
 Copy/Listen controls use 44px icon targets with accessible names/tooltips;
-desktop main actions retain labels. Keep the composer inset from safe-area edges.
+wide result panes (at least 600px) retain labels in a reserved target-header slot.
+Compact panes dock the same controls below result/learning and above the composer;
+never cover scroll content. Speech error feedback appears above the compact dock.
+Keep these real controls mounted, disabled in empty/error/stale states, and keep
+the composer inset from safe-area edges. Reserve the header adjustment slot even
+before a sentence exists, so Tone/Settings do not jump when Adjust appears.
 
 Use A's background/surface tokens and type scale. Do not restore the obsolete C
 desktop top-composer card, word/action grid or two-column learner layout. Workspace
@@ -260,7 +267,7 @@ Use npm for this project. Commit `package-lock.json` with dependency changes; us
 - Dev server: `npm run dev`
 - Unit tests: `npm test`
 - Browser dependencies: `npx playwright install chromium webkit`
-- Browser matrix: `npm run test:browser` (Chromium/WebKit at seven folded/unfolded phone and MacBook sizes, synthetic speech; no paid calls). Browser fixtures wait for CSS and use the system-font fallback to avoid external font CDN startup/screenshot races. Production font loading is unchanged.
+- Browser matrix: `npm run test:browser` (Chromium/WebKit at nine folded/unfolded phone, iPhone and MacBook sizes, synthetic speech; no paid calls). Browser fixtures wait for CSS and use the system-font fallback to avoid external font CDN startup/screenshot races. Production bundles pinned Pretendard font-face CSS with optional display; font subsets keep their original CDN URLs and OFL license. Slow connections must not trigger a late font swap.
 - Replay report: `npm run test:browser:report` (serves `test-results/browser/index.html`)
 - Interactive browser tests: `npm run test:browser:ui`
 - Translation smoke test: `npx tsx scripts/smoke-translate.mjs` (real, potentially billed Gateway request)

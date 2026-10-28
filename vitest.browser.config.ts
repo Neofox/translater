@@ -12,6 +12,8 @@ const viewports = [
   { label: 'macbook-14', width: 1512, height: 982 },
   { label: 'macbook-16', width: 1728, height: 1117 },
   { label: 'desktop-short', width: 1488, height: 700 },
+  { label: 'iphone-portrait', width: 390, height: 844 },
+  { label: 'iphone-landscape', width: 844, height: 390 },
 ] as const
 
 export default defineConfig({
@@ -26,10 +28,7 @@ export default defineConfig({
           id.split('?')[0] ===
           fileURLToPath(new URL('./src/styles.css', import.meta.url))
         )
-          return code.replace(
-            /^@import url\('https:\/\/cdn\.jsdelivr\.net[^\n]+\);\n/m,
-            '',
-          )
+          return code.replace(/^@import '\.\/styles\/pretendard\.css';\n/m, '')
       },
     },
     react(),

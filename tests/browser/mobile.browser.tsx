@@ -197,6 +197,10 @@ async function assertServerFirstPaint(sideInset: number) {
     output,
     host.querySelector('.composer')!,
     host.querySelector('textarea')!,
+    host.querySelector('[data-testid="output-toolbar"] .copy-button')!,
+    host.querySelector(
+      '[data-testid="output-toolbar"] [data-testid="listen-button"]',
+    )!,
   ].map((e) => e.getBoundingClientRect())
   const languageButtons = () =>
     [...host.querySelectorAll<HTMLElement>('.language-chip-bar')]
@@ -256,6 +260,10 @@ async function assertServerFirstPaint(sideInset: number) {
       output,
       host.querySelector('.composer')!,
       host.querySelector('textarea')!,
+      host.querySelector('[data-testid="output-toolbar"] .copy-button')!,
+      host.querySelector(
+        '[data-testid="output-toolbar"] [data-testid="listen-button"]',
+      )!,
     ].map((e) => e.getBoundingClientRect())
     const buttonsAfter = languageButtons()
     expect(buttonsAfter.map((bar) => bar.length)).toEqual(
@@ -338,6 +346,176 @@ async function expandSourceIfNeeded() {
   if (document.querySelector('.input-panel[data-source-compact]'))
     await page.getByTestId('source-expand').click()
 }
+
+test('main actions keep one stable slot while translation and explanation grow', async () => {
+  await render(<Fixture initial={null} />)
+  const toolbar = page.getByTestId('output-toolbar')
+  const copy = toolbar.getByRole('button', { name: 'Copy', exact: true })
+  const listen = toolbar.getByTestId('listen-button')
+  await expect.element(copy).toBeVisible()
+  await expect.element(copy).toBeDisabled()
+  await expect.element(listen).toBeDisabled()
+  const copyNode = copy.element()
+  const listenNode = listen.element()
+  updateUrgent({ input: sourceText, isPending: true, streaming: true })
+  await expect
+    .element(page.getByTestId('input-textarea'))
+    .toHaveValue(sourceText)
+  const before = [
+    copyNode,
+    listenNode,
+    document.querySelector('.composer')!,
+  ].map((e) => e.getBoundingClientRect())
+  const initial: LiveResult = {
+    ...sentence,
+    done: false,
+    mainReady: false,
+    partial: {
+      ...sentence.partial,
+      main: '',
+      rationale: '',
+      formalityNote: '',
+    },
+  }
+  for (const live of [
+    initial,
+    { ...initial, partial: { ...initial.partial, main: '오늘' } },
+    {
+      ...initial,
+      mainReady: true,
+      partial: {
+        ...initial.partial,
+        main: Array(10).fill(sentence.partial.main).join('\n'),
+      },
+    },
+    {
+      ...sentence,
+      partial: {
+        ...sentence.partial,
+        main: Array(10).fill(sentence.partial.main).join('\n'),
+        rationale: 'A longer explanation that wraps on a phone. '.repeat(6),
+      },
+    },
+  ]) {
+    updateUrgent({ live, isPending: !live.done, streaming: !live.done })
+    await expect
+      .poll(
+        () =>
+          document.querySelector('[data-testid="main-translation"]')
+            ?.textContent,
+      )
+      .toContain(live.partial.main ?? '')
+    expect(copy.element()).toBe(copyNode)
+    expect(listen.element()).toBe(listenNode)
+    if (live.mainReady || live.done) await expect.element(copy).toBeEnabled()
+    else await expect.element(copy).toBeDisabled()
+    const after = [
+      copyNode,
+      listenNode,
+      document.querySelector('.composer')!,
+    ].map((e) => e.getBoundingClientRect())
+    after.forEach((rect, i) => {
+      for (const key of ['x', 'y', 'width', 'height'] as const)
+        expect(
+          Math.abs(rect[key] - before[i]![key]),
+          `control ${i} ${key}`,
+        ).toBeLessThanOrEqual(1)
+    })
+    for (const button of [copyNode, listenNode]) {
+      assertWithinViewport(button)
+      const rect = button.getBoundingClientRect()
+      expect(
+        button.contains(
+          document.elementFromPoint(
+            rect.x + rect.width / 2,
+            rect.y + rect.height / 2,
+          ),
+        ),
+      ).toBe(true)
+    }
+  }
+  await settledScreenshot({
+    path: `../../test-results/stable-actions-${window.innerWidth}x${window.innerHeight}-long.png`,
+  })
+  updateUrgent({
+    error: { kind: 'server', message: 'Unavailable' },
+    streaming: false,
+  })
+  await expect.element(copy).toBeDisabled()
+  await expect.element(listen).toBeDisabled()
+})
+
+test('header settings keep their position when sentence adjustments first appear', async () => {
+  await render(<Fixture initial={null} />)
+  const controls = [
+    ...document.querySelectorAll<HTMLElement>(
+      '.mode-segment,.mode-select,.settings-trigger',
+    ),
+  ].filter((e) => e.checkVisibility())
+  const before = controls.map((e) => e.getBoundingClientRect())
+  updateUrgent({ input: sourceText, live: sentence })
+  await expect
+    .element(page.getByTestId('main-translation'))
+    .toHaveTextContent(sentence.partial.main)
+  controls.forEach((control, i) => {
+    const after = control.getBoundingClientRect()
+    expect(control.checkVisibility()).toBe(true)
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(
+        Math.abs(after[key] - before[i]![key]),
+        `header ${i} ${key}`,
+      ).toBeLessThanOrEqual(1)
+  })
+})
+
+test('dock speech failures stay visible inside the result pane', async () => {
+  vi.mocked(speak).mockRejectedValue(new Error('Unavailable'))
+  await render(<Fixture />)
+  await page.getByTestId('output-toolbar').getByTestId('listen-button').click()
+  const status = page.getByTestId('output-toolbar').getByRole('status')
+  await expect.element(status).toBeVisible()
+  const panel = document.querySelector('.output-panel')!.getBoundingClientRect()
+  const bounds = status.element().getBoundingClientRect()
+  expect(bounds.top).toBeGreaterThanOrEqual(panel.top)
+  expect(bounds.bottom).toBeLessThanOrEqual(panel.bottom)
+  expect(bounds.left).toBeGreaterThanOrEqual(panel.left)
+  expect(bounds.right).toBeLessThanOrEqual(panel.right)
+})
+
+test('wide result languages cannot overlap the reserved main actions near the breakpoint', async () => {
+  const original = [window.innerWidth, window.innerHeight] as const
+  try {
+    await page.viewport(1200, 760)
+    await render(<Fixture />)
+    const shell = document.querySelector<HTMLElement>('.app-shell')!
+    shell.style.setProperty('--safe-area-right', '80px')
+    window.dispatchEvent(new Event('resize'))
+    const copy = page
+      .getByTestId('output-toolbar')
+      .getByRole('button', { name: 'Copy', exact: true })
+      .element()
+    const bar = page.getByRole('group', { name: 'Target language' }).element()
+    await expect.poll(() => bar.clientWidth).toBeLessThan(280)
+    const more = page
+      .getByRole('group', { name: 'Target language' })
+      .getByTestId('lang-more-trigger')
+      .element()
+    expect(more.getBoundingClientRect().right + 8).toBeLessThanOrEqual(
+      copy.getBoundingClientRect().left,
+    )
+    const bounds = more.getBoundingClientRect()
+    expect(
+      more.contains(
+        document.elementFromPoint(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2,
+        ),
+      ),
+    ).toBe(true)
+  } finally {
+    await page.viewport(...original)
+  }
+})
 
 test('Paste Clear and the main result actions remain visible and touch sized', async () => {
   await render(<Fixture />)
@@ -427,6 +605,9 @@ test.each([false, true])(
         viewport.dispatchEvent(new Event('resize'))
       }
       updateUrgent({ live: initial })
+      await expect
+        .element(page.getByTestId('main-translation'))
+        .toHaveTextContent('안녕하세요, 여러분')
       const source = document.querySelector<HTMLElement>('.input-panel')!
       await expect
         .poll(() => source.hasAttribute('data-source-compact'))
@@ -450,7 +631,9 @@ test.each([false, true])(
         primary.getByRole('button', { name: 'Copy', exact: true }).element(),
         primary.getByTestId('listen-button').element(),
       ]) {
-        expect(control.textContent.trim()).toBe('')
+        expect(getComputedStyle(control.querySelector('span')!).display).toBe(
+          'none',
+        )
         expect(control.getBoundingClientRect().width).toBeLessThanOrEqual(48)
         expect(control.getBoundingClientRect().width).toBeGreaterThanOrEqual(44)
       }
@@ -821,9 +1004,9 @@ test('desktop source and reference share the left pane while alternatives stay r
     .querySelector('.detail-why')!
     .getBoundingClientRect()
   expect(whyBounds.left).toBeGreaterThanOrEqual(result.left)
-  expect(whyBounds.bottom).toBeLessThanOrEqual(
+  expect(whyBounds.top).toBeGreaterThanOrEqual(
     document.querySelector('.primary-result-actions')!.getBoundingClientRect()
-      .top,
+      .bottom,
   )
   expect(alts.left).toBeGreaterThanOrEqual(result.left)
   expect(document.querySelectorAll('.detail-why')).toHaveLength(1)
@@ -1118,9 +1301,7 @@ test('A workspace keeps long source and result controls above the safe bottom ed
       .element() as HTMLElement
     resultScroll.scrollTop = resultScroll.scrollHeight
     await expect.poll(() => resultScroll.scrollTop).toBeGreaterThan(0)
-    expect(copyControl.getBoundingClientRect().top).toBeGreaterThanOrEqual(
-      resultScroll.getBoundingClientRect().top,
-    )
+    expect(copyControl.getBoundingClientRect().top).toBe(copy.top)
     assertWithinViewport(copyControl)
     await settledScreenshot({
       path: '../../test-results/a-workspace-long-safe.png',
@@ -1544,7 +1725,8 @@ test.each([
         .element()
         .getBoundingClientRect()
       expect(main.top).toBeGreaterThanOrEqual(Math.max(offset, top))
-      expect(main.bottom).toBeLessThanOrEqual(copy.top)
+      if (copy.top < main.top) expect(copy.bottom).toBeLessThanOrEqual(main.top)
+      else expect(main.bottom).toBeLessThanOrEqual(copy.top)
       for (const bounds of [
         copy,
         input.getBoundingClientRect(),
@@ -1952,9 +2134,8 @@ test('aligned workspace keeps matching action boxes and usage with its translati
   const why = document.querySelector('.output-panel .detail-why')!
   expect(why.textContent).toContain('Use this for a public lending library.')
   expect(why.closest('[hidden]')).toBeNull()
-  expect(
-    why.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy()
+  expect(why.closest('.result-scroll')).not.toBeNull()
+  expect(actions.closest('.result-scroll')).toBeNull()
   expect(document.querySelector('.reference-panel .detail-why')).toBeNull()
   if (document.querySelector('.reference-panel')) {
     expect(

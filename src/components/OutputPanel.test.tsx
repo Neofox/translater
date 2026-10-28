@@ -119,13 +119,16 @@ it('disables stale pronunciation immediately when the input is edited or a run i
   ).toBe(true)
 })
 
-it('removes pronunciation when the result fails', () => {
+it('keeps the pronunciation slot disabled when the result fails', () => {
   fixture.live.done = true
   const { rerender } = render(<OutputPanel />, { wrapper: UiLangProvider })
   expect(screen.getByRole('button', { name: 'Listen in ko' })).toBeTruthy()
   fixture.error = { kind: 'server', message: 'Unavailable' }
   rerender(<OutputPanel />)
-  expect(screen.queryByRole('button', { name: 'Listen in ko' })).toBeNull()
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Listen in ko' })
+      .disabled,
+  ).toBe(true)
 })
 
 it('enables Copy when the current main text is complete while details still stream', () => {
@@ -158,7 +161,9 @@ it('does not offer a successful Copy action for a failed result', () => {
   fixture.live.done = true
   fixture.error = { kind: 'server', message: 'Unavailable' }
   render(<OutputPanel />, { wrapper: UiLangProvider })
-  expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
+  ).toBe(true)
 })
 
 it('keeps desktop explanation and learning content open with static headings', () => {
@@ -185,7 +190,7 @@ it('keeps desktop explanation and learning content open with static headings', (
   expect(screen.getByText('A useful ending.').closest('[hidden]')).toBeNull()
 })
 
-it('pairs compact wording with the main translation before actions and alternatives', () => {
+it('keeps compact wording with the main translation before alternatives', () => {
   fixture.live.done = true
   fixture.live.partial = {
     ...fixture.live.partial,
@@ -199,11 +204,9 @@ it('pairs compact wording with the main translation before actions and alternati
   expect(why.textContent).toContain('An idiomatic expression.')
   expect(why.textContent).toContain('A polite ending.')
   expect(why.closest('[hidden]')).toBeNull()
-  const copy = screen
-    .getByTestId('output-toolbar')
-    .querySelector('.copy-button')!
   expect(
-    why.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING,
+    why.compareDocumentPosition(screen.getByText('반가워요')) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
 })
 

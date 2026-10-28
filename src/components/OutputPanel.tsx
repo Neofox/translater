@@ -14,6 +14,7 @@ import { isLongForm } from '../lib/longForm'
 import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useLearningContext } from '../context/LearningContext'
 import InspectableTranslation from './InspectableTranslation'
+import LearningPanel from './LearningPanel'
 
 export default function OutputPanel() {
   const learning = useLearningContext()
@@ -36,7 +37,7 @@ export default function OutputPanel() {
     refinements,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
-  const { desktop, mode: layoutMode } = useWorkspaceLayoutContext()
+  const { mode: layoutMode } = useWorkspaceLayoutContext()
   const separateReference = ['workspace', 'split', 'book'].includes(layoutMode)
   const copyText = mainText(live)
   const copyReady = copyableMainText(
@@ -65,7 +66,7 @@ export default function OutputPanel() {
     })
   const speech = {
     language: live?.partial.targetLang ?? target,
-    disabled: stale || !live?.done,
+    disabled: Boolean(error) || stale || !live?.done,
     resetKey: JSON.stringify([
       input,
       source,
@@ -116,6 +117,17 @@ export default function OutputPanel() {
             {isPolish ? t('polishing') : t('streaming')}
           </span>
         )}
+      </div>
+      <div className="result-actions" data-testid="output-toolbar">
+        <div className="primary-result-actions">
+          <CopyButton
+            text={copyText ?? ''}
+            size="md"
+            primary
+            disabled={!copyReady || Boolean(error)}
+          />
+          <ListenButton {...speech} text={copyText ?? ''} label />
+        </div>
       </div>
       <ViewTransition default="result-transition">
         <div
@@ -211,22 +223,6 @@ export default function OutputPanel() {
                     : undefined
                 }
               />
-              <div className="result-actions" data-testid="output-toolbar">
-                <div className="primary-result-actions">
-                  <CopyButton
-                    text={copyText ?? ''}
-                    size="md"
-                    primary
-                    compact={!desktop}
-                    disabled={!copyReady}
-                  />
-                  <ListenButton
-                    {...speech}
-                    text={copyText ?? ''}
-                    label={desktop}
-                  />
-                </div>
-              </div>
               {learning?.isSentence &&
                 !(separateReference && learning.hasPreparedMap) && (
                   <div className="learning-entry">
@@ -280,6 +276,7 @@ export default function OutputPanel() {
           )}
         </div>
       </ViewTransition>
+      <LearningPanel />
     </section>
   )
 }

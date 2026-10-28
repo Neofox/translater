@@ -84,7 +84,7 @@ export default function AdjustMenu() {
         (label?.getBoundingClientRect().width || 0) +
         14
       const fits = needed > 0 && root.clientWidth >= needed + 2
-      setIconOnly(root.clientWidth < 88)
+      setIconOnly(root.clientWidth < 112)
       if (!fits && controls.contains(document.activeElement)) setOpen(true)
       if (fits && document.activeElement === trigger.current)
         focusChips.current = true
