@@ -41,8 +41,8 @@ export default function LanguageChipBar({
   const barRef = useRef<HTMLDivElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Measure the space left after toolbar actions. Viewport width alone cannot
-  // describe a panel inside columns, split windows, or a folded display.
+  // CSS chooses the visible chips before hydration. Measure only to keep the
+  // portalled menu in sync with those chips after a panel resize.
   useEffect(() => {
     if (!barRef.current || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(([entry]) => {
@@ -59,21 +59,21 @@ export default function LanguageChipBar({
     if (!fixed.includes(value) && value !== recent) setRecent(value)
   }, [value, recent, fixed, setRecent])
 
-  const expandedChips: ReadonlyArray<LangCode> =
-    recent && !fixed.includes(recent) ? [...fixed, recent] : fixed
-  // Collapsed (narrow panel): only the active language stays a chip; every
-  // other choice moves into the ⋯ listbox — including `auto` for the source.
-  const chips: ReadonlyArray<LangCode> = isExpanded ? expandedChips : [value]
+  const promoted = !fixed.includes(value) ? value : recent
+  const chips: ReadonlyArray<LangCode> =
+    promoted && !fixed.includes(promoted) ? [...fixed, promoted] : fixed
+  const menuChips: ReadonlyArray<LangCode> = isExpanded ? chips : [value]
   const moreOptions = LANGUAGES.filter(
-    (l) => (kind === 'source' || l.code !== 'auto') && !chips.includes(l.code),
+    (l) =>
+      (kind === 'source' || l.code !== 'auto') && !menuChips.includes(l.code),
   ).map((l) => ({ value: l.code, label: l.label, searchLabel: l.promptName }))
-  const moreSelected = !chips.includes(value)
 
   return (
     <div
       ref={barRef}
       role="group"
       aria-label={ariaLabel}
+      data-kind={kind}
       className="language-chip-bar flex min-w-0 flex-1 items-center gap-1.5"
     >
       <div className="language-chip-scroll flex min-w-0 items-center gap-1.5 overflow-x-auto">
@@ -115,7 +115,7 @@ export default function LanguageChipBar({
         onChange={onChange}
         options={moreOptions}
         size="md"
-        tone={moreSelected ? 'active' : 'neutral'}
+        tone="neutral"
         placeholder={t('moreLabel')}
         showChevron
         aria-label={t('moreLanguages')}
