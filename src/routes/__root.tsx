@@ -3,8 +3,15 @@ import { Analytics } from '@vercel/analytics/react'
 
 import appCss from '../styles.css?url'
 import { UiLangProvider } from '../hooks/useUiLang'
+import { getPreferences } from '../server/preferences'
+import { preferenceBootstrap } from '../lib/preferences'
 
 export const Route = createRootRoute({
+  loader: () => getPreferences(),
+  headers: () => ({
+    'Cache-Control': 'private, no-store',
+    Vary: 'Cookie, Accept-Language',
+  }),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -30,13 +37,19 @@ export const Route = createRootRoute({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const preferences = Route.useLoaderData()
   return (
-    <html lang="en" className="dark">
+    <html lang={preferences.preferences.uiLang} className="dark">
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{ __html: preferenceBootstrap(preferences) }}
+        />
       </head>
       <body className="bg-bg text-ink font-sans antialiased">
-        <UiLangProvider>{children}</UiLangProvider>
+        <UiLangProvider initialPreferences={preferences}>
+          {children}
+        </UiLangProvider>
         <Analytics />
         <Scripts />
       </body>

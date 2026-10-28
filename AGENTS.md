@@ -160,6 +160,21 @@ the page until mount, or read the browser viewport during the hydration render.
 Browser tests compare raw server markup with hydrated geometry, including
 nonzero safe areas and breakpoint edges, and reject hydration errors.
 
+Saved source/target, tone, UI language and recent language shortcuts share
+`PreferencesContext`. The root loader reads the validated `nt.preferences`
+cookie per request, and uses that same serialized snapshot during hydration.
+Keep document and preference responses `private, no-store`, varying HTML on
+`Cookie, Accept-Language`. Never put source text, reply context or generated
+content in this cookie. Settings actions synchronously update the cookie and
+the legacy localStorage keys, so an immediate reload preserves the choice.
+The self-contained head bootstrap migrates older localStorage preferences with
+one replacement navigation before the app starts; verify cookie writes and
+retain its loop guard. Its compiled function must not reference module-scoped
+helpers. Do not restore default-first preference effects or client-only render
+initializers. Browser tests cover saved snapshots before/after hydration and
+immediate tone persistence; unit tests cover validation, legacy migration,
+blocked cookies and StrictMode effect replay.
+
 Desktop reference details stay open in a single column, contained to a 44rem
 measure. Workspace, split and physical book layouts place notes under source;
 output retains main translation, actions/refinements and always-open alternatives.
