@@ -10,6 +10,7 @@ import { learn } from '../server/learning'
 import { LearningInput } from '../server/learningTypes'
 import type { LearningInputData, LearningResult } from '../server/learningTypes'
 import { sentenceRanges } from '../lib/learningRanges'
+import { learningText, learningLanguage } from '../lib/learningSide'
 
 type Options = {
   snapshot: LearningInputData | null
@@ -70,7 +71,7 @@ export function useLearning({
   const failed = useRef(new Map<string, 'learningFailed' | 'learningTooLong'>())
   let current = enabled && state.identity === identity ? state : empty(identity)
   const ranges = snapshot
-    ? sentenceRanges(snapshot.translation, snapshot.target)
+    ? sentenceRanges(learningText(snapshot), learningLanguage(snapshot))
     : []
   const basicFor = (
     range: { start: number; end: number },
@@ -121,8 +122,8 @@ export function useLearning({
       const live = latest.current
       if (!live.enabled || !live.snapshot) return
       const range = sentenceRanges(
-        live.snapshot.translation,
-        live.snapshot.target,
+        learningText(live.snapshot),
+        learningLanguage(live.snapshot),
       )[sentence]
       if (!range) return
       const data = {
@@ -250,7 +251,7 @@ export function useLearning({
     (offset?: number) => {
       const live = latest.current.snapshot
       if (!live) return
-      const all = sentenceRanges(live.translation, live.target)
+      const all = sentenceRanges(learningText(live), learningLanguage(live))
       const index =
         offset === undefined
           ? 0

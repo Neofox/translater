@@ -46,6 +46,36 @@ function assistantOf(prompt: PromptBundle): unknown {
   return JSON.parse(textOf(m.content))
 }
 
+it.each([
+  ['ko', 'en', 'en'],
+  ['en', 'ko', 'ko'],
+  ['auto', 'en', 'en'],
+])(
+  'prepares learner phrases from the original for %s → %s in %s UI',
+  (source, target, uiLang) => {
+    const prompt = sentencePrompt({
+      text: 'actual input',
+      source,
+      target,
+      uiLang: uiLang as 'en' | 'ko',
+      mode: 'casual',
+    })
+    const demo = assistantOf(prompt) as {
+      main: string
+      learningPhrases: { text: string }[]
+    }
+    const demoSource = textOf(
+      prompt.messages.find((m) => m.role === 'user')!.content,
+    )
+    expect(demo.learningPhrases.every((p) => demoSource.includes(p.text))).toBe(
+      true,
+    )
+    expect(demo.learningPhrases.some((p) => !demo.main.includes(p.text))).toBe(
+      true,
+    )
+  },
+)
+
 describe('few-shot payloads satisfy the strict schemas', () => {
   for (const uiLang of UI_LANGS) {
     for (const mode of MODES) {

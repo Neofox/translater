@@ -38,6 +38,31 @@ const output: LearningResult = {
   ],
 }
 const props = { snapshot, requestKey: 'current', enabled: true }
+it('segments and enriches the Korean source when English is the fluent target language', async () => {
+  vi.mocked(learn).mockResolvedValue(output)
+  const reading = {
+    ...snapshot,
+    text: '오늘 도와줘서 고마워요.',
+    translation: 'Thanks.',
+    source: 'ko',
+    target: 'en',
+    side: 'source' as const,
+    sentenceEnd: 13,
+  }
+  const { result } = renderHook(() =>
+    useLearning({ snapshot: reading, requestKey: 'reading', enabled: true }),
+  )
+  expect(result.current.ranges).toEqual([{ start: 0, end: 13 }])
+  act(() => result.current.openAt(8))
+  await waitFor(() => expect(learn).toHaveBeenCalledTimes(1))
+  expect(vi.mocked(learn).mock.calls[0]?.[0].data).toMatchObject({
+    text: reading.text,
+    translation: 'Thanks.',
+    side: 'source',
+    sentenceStart: 0,
+    sentenceEnd: 13,
+  })
+})
 afterEach(() => {
   cleanup()
   vi.resetAllMocks()

@@ -19,10 +19,14 @@ export const LearningInput = z
     mode: z.enum(['friends', 'casual', 'professional']),
     uiLang: z.enum(['en', 'ko']),
     context: z.string().max(MAX_CONTEXT_CHARS),
+    // Omitted by legacy clients: their analysed text is the target translation.
+    side: z.enum(['source', 'target']).optional(),
   })
   .refine(
     (v) =>
-      v.sentenceStart < v.sentenceEnd && v.sentenceEnd <= v.translation.length,
+      v.sentenceStart < v.sentenceEnd &&
+      v.sentenceEnd <=
+        (v.side === 'source' ? v.text.length : v.translation.length),
     'Invalid sentence range',
   )
 

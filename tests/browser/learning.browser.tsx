@@ -66,41 +66,68 @@ function Fixture({
   long = false,
   word = false,
   prepared = false,
+  reading = false,
+  uiLang = 'en',
 }: {
   long?: boolean
   word?: boolean
   prepared?: boolean
+  reading?: boolean
+  uiLang?: 'en' | 'ko'
 }) {
+  const sourceLanguage = reading ? 'ko' : 'en'
+  const targetLanguage = reading ? 'en' : 'ko'
+  const learnsKorean = uiLang === 'en'
+  const phraseMap = learnsKorean
+    ? analysis.chunks.map((c) => ({
+        text: c.text,
+        gloss: c.gloss,
+        sourceTexts: c.sourceSpans.map((s) => s.text),
+      }))
+    : analysis.chunks
+        .flatMap((c) =>
+          c.sourceSpans.map((span) => ({
+            ...span,
+            gloss: c.text,
+            sourceTexts: [c.text],
+          })),
+        )
+        .sort((a, b) => a.start - b.start)
+        .map(({ text, gloss, sourceTexts }) => ({ text, gloss, sourceTexts }))
   const initialText = word
     ? 'hello'
-    : long
-      ? Array(8).fill(sourceText).join('\n\n')
-      : sourceText
+    : reading
+      ? translation
+      : long
+        ? Array(8).fill(sourceText).join('\n\n')
+        : sourceText
   const initialTranslation = word
     ? '안녕하세요'
-    : long
-      ? Array(8).fill(translation).join('\n\n')
-      : translation
+    : reading
+      ? sourceText
+      : long
+        ? Array(8).fill(translation).join('\n\n')
+        : translation
   const [input, setInput] = useState(initialText)
   const [live, setLive] = useState<LiveResult | null>({
-    requestSource: 'en',
+    requestSource: sourceLanguage,
     text: initialText,
     requestKey: translationRequestKey({
       text: initialText,
-      source: 'en',
-      target: 'ko',
+      source: sourceLanguage,
+      target: targetLanguage,
       mode: 'casual',
       context: '',
       refinements: [],
-      uiLang: 'en',
+      uiLang,
     }),
     done: true,
     ...(word
       ? {
           intent: 'word',
           partial: {
-            sourceLang: 'en',
-            targetLang: 'ko',
+            sourceLang: sourceLanguage,
+            targetLang: targetLanguage,
             headword: 'hello',
             primaryTranslation: '안녕하세요',
             posList: [
@@ -124,19 +151,18 @@ function Fixture({
       : {
           intent: 'sentence',
           partial: {
-            sourceLang: 'en',
-            targetLang: 'ko',
+            sourceLang: sourceLanguage,
+            targetLang: targetLanguage,
             main: initialTranslation,
-            learningPhrases: prepared
-              ? analysis.chunks.map((c) => ({
-                  text: c.text,
-                  gloss: c.gloss,
-                  sourceTexts: c.sourceSpans.map((s) => s.text),
-                }))
-              : undefined,
+            learningPhrases: prepared ? phraseMap : undefined,
             rationale: 'A polite, natural thank you.',
             alternatives: [
-              { text: '정말 고마워요.', note: 'A warmer thank you.' },
+              {
+                text: reading
+                  ? 'I really appreciate your help today.'
+                  : '정말 고마워요.',
+                note: 'A warmer thank you.',
+              },
             ],
             learningTips: {
               grammar: 'An ending used when thanking someone.',
@@ -166,14 +192,14 @@ function Fixture({
     live,
     streaming,
     isPending,
-    source: 'en',
-    target: 'ko',
+    source: sourceLanguage,
+    target: targetLanguage,
     mode: 'casual',
     context: '',
     refinements: noRefinements,
     error,
     refineError: null,
-    detected: 'en',
+    detected: sourceLanguage,
     intent: live?.intent ?? 'sentence',
     isPolish: false,
     textareaRef,
@@ -202,6 +228,84 @@ function Fixture({
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(learn).mockResolvedValue(analysis)
+})
+test('English UI breaks down original Korean when translating into English', async () => {
+  await render(<Fixture reading prepared />)
+  const main = page.getByTestId('main-translation').element()
+  expect(main.textContent).toBe(sourceText)
+  expect(main.hasAttribute('data-inspectable')).toBe(false)
+  expect(main.querySelector('[data-testid="inspectable-phrase"]')).toBeNull()
+  if (page.getByTestId('breakdown-button').query())
+    await page.getByTestId('breakdown-button').click()
+  const row = page.getByTestId('learning-chunk').nth(1)
+  await expect.element(row).toBeVisible()
+  expect(row.element().textContent).toContain('도와줘서')
+  const editor = page
+    .getByTestId('input-textarea')
+    .element() as HTMLTextAreaElement
+  await row.click()
+  await expect
+    .poll(() =>
+      document
+        .querySelector('[data-testid="source-highlight"]')
+        ?.textContent.replace(/\u200b/g, ''),
+    )
+    .toBe(translation)
+  expect(
+    document.querySelector('[data-testid="source-highlight"] mark')
+      ?.textContent,
+  ).toBe('도와줘서')
+  expect(document.querySelector('.learning-phrase')?.getAttribute('lang')).toBe(
+    'ko',
+  )
+  expect(editor.value).toBe(translation)
+  expect(learn).not.toHaveBeenCalled()
+  await settledShot('source-language-breakdown')
+  await page.getByRole('button', { name: 'More detail', exact: true }).click()
+  await expect
+    .element(page.getByText(fact.grammar, { exact: true }))
+    .toBeVisible()
+  expect(vi.mocked(learn).mock.calls[0]?.[0].data).toMatchObject({
+    side: 'source',
+    text: translation,
+    translation: sourceText,
+    source: 'ko',
+    target: 'en',
+    sentenceStart: 0,
+    sentenceEnd: translation.length,
+    uiLang: 'en',
+  })
+  visibleRect(mainCopy().element())
+  visibleRect(page.getByTestId('clear-input').element())
+})
+
+test('Korean UI breaks down original English when translating into Korean', async () => {
+  localStorage.setItem('ui-lang', 'ko')
+  await render(<Fixture prepared uiLang="ko" />)
+  if (page.getByTestId('breakdown-button').query())
+    await page.getByTestId('breakdown-button').click()
+  await expect.element(page.getByTestId('learning-chunk').first()).toBeVisible()
+  expect(
+    page.getByTestId('learning-chunk').first().element().textContent,
+  ).toContain('Thanks')
+  expect(
+    page
+      .getByTestId('main-translation')
+      .element()
+      .hasAttribute('data-inspectable'),
+  ).toBe(false)
+  await page.getByTestId('learning-chunk').first().click()
+  await expect
+    .poll(
+      () =>
+        document.querySelector('[data-testid="source-highlight"] mark')
+          ?.textContent,
+    )
+    .toBe('Thanks')
+  expect(document.querySelector('.learning-phrase')?.getAttribute('lang')).toBe(
+    'en',
+  )
+  expect(learn).not.toHaveBeenCalled()
 })
 test('word details open directly from the translated word without a redundant row or paid request', async () => {
   await render(<Fixture word />)

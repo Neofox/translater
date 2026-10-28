@@ -12,12 +12,15 @@ import { useUiLang } from '../hooks/useUiLang'
 import { useLearning } from '../hooks/useLearning'
 import { mainText, resultIsCurrent } from '../lib/liveResult'
 import { prepareLearningResult } from '../lib/learningRanges'
+import { learningSide } from '../lib/learningSide'
 import type { LearningChunk } from '../server/learningTypes'
 
 type LearningValue = ReturnType<typeof useLearning> & {
   canOpen: boolean
   isSentence: boolean
   preparedChunks: LearningChunk[]
+  side: 'source' | 'target'
+  language: string
 }
 const LearningContext = createContext<LearningValue | null>(null)
 export const useLearningContext = () => useContext(LearningContext)
@@ -55,14 +58,19 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     }),
   )
   const isSentence = live?.intent === 'sentence'
+  const sourceLanguage = live?.partial.sourceLang ?? source
+  const targetLanguage = live?.partial.targetLang ?? target
+  const side = learningSide(sourceLanguage, targetLanguage, lang)
+  const learningText = side === 'source' ? input : output
+  const counterpart = side === 'source' ? output : input
   const phrases =
     live?.intent === 'sentence' ? live.partial.learningPhrases : undefined
   const prepared = useMemo(
     () =>
       canOpen && isSentence
-        ? prepareLearningResult(input, output, phrases)
+        ? prepareLearningResult(counterpart, learningText, phrases)
         : null,
-    [canOpen, isSentence, input, output, phrases],
+    [canOpen, isSentence, counterpart, learningText, phrases],
   )
   const learning = useLearning({
     prepared,
@@ -72,9 +80,10 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           text: input,
           translation: output,
           sentenceStart: 0,
-          sentenceEnd: output.length,
-          source: live?.partial.sourceLang ?? source,
-          target: live?.partial.targetLang ?? target,
+          sentenceEnd: learningText.length,
+          source: sourceLanguage,
+          target: targetLanguage,
+          side,
           mode,
           uiLang: lang,
           context,
@@ -113,6 +122,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         ...learning,
         canOpen,
         isSentence,
+        side,
+        language: side === 'source' ? sourceLanguage : targetLanguage,
         preparedChunks: prepared?.chunks ?? [],
         openAt,
         close,

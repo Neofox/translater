@@ -1,3 +1,4 @@
+import { learningText, counterpartText } from './learningSide'
 import {
   LearningInput,
   LearningOutput,
@@ -106,8 +107,10 @@ export function resolveLearningResult(
 ): LearningResult {
   const data = LearningInput.parse(input)
   const result = LearningOutput.parse(output)
-  const targetEdges = boundaries(data.translation)
-  const sourceEdges = boundaries(data.text)
+  const analysed = learningText(data)
+  const counterpart = counterpartText(data)
+  const targetEdges = boundaries(analysed)
+  const sourceEdges = boundaries(counterpart)
   const resolve = (
     span: TextRange & { text: string },
     text: string,
@@ -142,7 +145,7 @@ export function resolveLearningResult(
     chunks: result.chunks.map((chunk) => {
       const target = resolve(
         chunk,
-        data.translation,
+        analysed,
         targetEdges,
         data.sentenceStart,
         data.sentenceEnd,
@@ -154,10 +157,10 @@ export function resolveLearningResult(
         sourceSpans: chunk.sourceSpans.flatMap((span) => {
           const source = resolve(
             span,
-            data.text,
+            counterpart,
             sourceEdges,
             0,
-            data.text.length,
+            counterpart.length,
           )
           return source ? [source] : []
         }),
@@ -172,8 +175,10 @@ export function validateLearningResult(
 ): LearningResult {
   const data = LearningInput.parse(input)
   const result = LearningOutput.parse(output)
-  const targetEdges = boundaries(data.translation)
-  const sourceEdges = boundaries(data.text)
+  const analysed = learningText(data)
+  const counterpart = counterpartText(data)
+  const targetEdges = boundaries(analysed)
+  const sourceEdges = boundaries(counterpart)
   if (
     !targetEdges.has(data.sentenceStart) ||
     !targetEdges.has(data.sentenceEnd)
@@ -194,15 +199,15 @@ export function validateLearningResult(
     if (
       chunk.start < cursor ||
       chunk.end > data.sentenceEnd ||
-      !valid(chunk, data.translation, targetEdges)
+      !valid(chunk, analysed, targetEdges)
     )
       throw new Error('Invalid translation span')
     for (const source of chunk.sourceSpans)
-      if (!valid(source, data.text, sourceEdges))
+      if (!valid(source, counterpart, sourceEdges))
         throw new Error('Invalid source span')
-    uncovered += data.translation.slice(cursor, chunk.start)
+    uncovered += analysed.slice(cursor, chunk.start)
     cursor = chunk.end
   }
-  uncovered += data.translation.slice(cursor, data.sentenceEnd)
+  uncovered += analysed.slice(cursor, data.sentenceEnd)
   return { ...result, partial: /[\p{L}\p{N}\p{M}\p{S}]/u.test(uncovered) }
 }

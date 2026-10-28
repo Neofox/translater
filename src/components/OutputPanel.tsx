@@ -155,7 +155,10 @@ export default function OutputPanel() {
                 className={`result-main ${live.intent === 'word' ? 'result-word' : ''}`}
                 language={live.partial.targetLang ?? target}
                 text={copyText ?? ''}
-                disabled={!learning?.canOpen}
+                disabled={
+                  !learning?.canOpen ||
+                  (learning.isSentence && learning.side === 'source')
+                }
                 actionLabel={
                   learning && !learning.isSentence
                     ? `${t('wordDetails')}: ${copyText ?? ''}`
@@ -166,8 +169,14 @@ export default function OutputPanel() {
                     ? true
                     : learning?.isOpen
                 }
-                selectedChunk={learning?.selectedChunk}
-                chunks={learning?.preparedChunks}
+                selectedChunk={
+                  learning?.side === 'source' && learning.isSentence
+                    ? null
+                    : learning?.selectedChunk
+                }
+                chunks={
+                  learning?.side === 'source' ? [] : learning?.preparedChunks
+                }
                 onInspect={
                   learning?.isSentence
                     ? learning.openAt
