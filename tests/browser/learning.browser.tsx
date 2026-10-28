@@ -551,7 +551,10 @@ test('header custom adjustments keep keyboard focus and restore the source keybo
     const field = page.getByTestId('refine-freeform')
     await field.fill('gentler please')
     for (const ratio of [0.85, 0.7, 0.55]) {
-      viewport.height = Math.floor(initialHeight * ratio)
+      viewport.height =
+        ratio === 0.55
+          ? Math.min(319, Math.floor(initialHeight * ratio))
+          : Math.floor(initialHeight * ratio)
       viewport.dispatchEvent(new Event('resize'))
       await new Promise(requestAnimationFrame)
     }
@@ -603,7 +606,7 @@ test('header custom adjustments keep keyboard focus and restore the source keybo
       .getByTestId('input-textarea')
       .element() as HTMLTextAreaElement
     editor.focus()
-    viewport.height = Math.floor(initialHeight * 0.55)
+    viewport.height = Math.min(319, Math.floor(initialHeight * 0.55))
     viewport.dispatchEvent(new Event('resize'))
     await new Promise(requestAnimationFrame)
     await expect

@@ -2,3 +2,6 @@ package-lock.json
 pnpm-lock.yaml
 yarn.lock
 .superpowers/
+
+# Pinned generated font-face declarations
+src/styles/pretendard.css

@@ -9,10 +9,8 @@ import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useUiLang } from '../hooks/useUiLang'
 import { INPUT_WARN_THRESHOLD, MAX_INPUT_CHARS } from '../lib/limits'
 import { STRINGS } from '../lib/i18n'
-import { copyableMainText } from '../lib/liveResult'
 import { useLearningContext } from '../context/LearningContext'
 import SourceHighlight from './SourceHighlight'
-import LearningPanel from './LearningPanel'
 
 export default function InputPanel({ children }: { children?: ReactNode }) {
   const learning = useLearningContext()
@@ -20,11 +18,6 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
     input,
     setInput,
     source,
-    target,
-    mode,
-    refinements,
-    live,
-    isPending,
     setSource,
     detected,
     clearInput,
@@ -38,26 +31,17 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
   const [contextOpen, setContextOpen] = useState(false)
   const [contextEditing, setContextEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [hadResult, setHadResult] = useState(false)
   const overLimit = input.length > MAX_INPUT_CHARS
   const showLimit = input.length >= INPUT_WARN_THRESHOLD
   const eligible =
     layout.mode === 'stack' && layout.resultFirst && !layout.desktop
-  const ready = Boolean(
-    copyableMainText(
-      live,
-      { text: input, source, target, mode, context, refinements, uiLang: lang },
-      isPending,
-    ),
-  )
-  const canCondense = eligible && Boolean(input.trim()) && (ready || hadResult)
+  const canCondense = eligible && Boolean(input.trim())
   const compact = canCondense && !expanded && !contextEditing && !showLimit
   useEffect(() => {
     if (!input.trim()) {
-      setHadResult(false)
       setExpanded(false)
-    } else if (ready) setHadResult(true)
-  }, [input, ready])
+    }
+  }, [input])
   useEffect(() => {
     if (context.trim()) setContextOpen(true)
   }, [context])
@@ -120,7 +104,6 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
       aria-label={t('sourceText')}
       data-source-compact={compact || undefined}
     >
-      <LearningPanel />
       <div className="composer">
         <div className="composer-header">
           <LanguageChipBar
