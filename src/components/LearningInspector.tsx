@@ -94,7 +94,7 @@ export default function LearningInspector() {
                   <ArrowLeft size={16} aria-hidden />
                   {t('wholeSentence')}
                 </Pill>
-                <h3 className="learning-phrase" lang={live.partial.targetLang}>
+                <h3 className="learning-phrase" lang={learning.language}>
                   {chunk.text}
                 </h3>
                 <dl className="learning-facts">
@@ -118,9 +118,7 @@ export default function LearningInspector() {
                           onClick={() => learning.selectChunk(index)}
                           data-testid="learning-chunk"
                         >
-                          <span lang={live.partial.targetLang}>
-                            {item.text}
-                          </span>
+                          <span lang={learning.language}>{item.text}</span>
                           <span aria-hidden="true">→</span>
                           <span>{item.gloss || item.naturalMeaning}</span>
                         </button>

@@ -135,13 +135,13 @@ describe('handleTranslate via AI Gateway', () => {
               'translation',
               'sentence',
               'initial',
-              'v13-prepared-learning',
+              'v14-learner-language',
             ],
           },
           openai: {
             reasoningEffort: 'none',
             store: false,
-            promptCacheKey: expect.stringContaining('nt:v13-prepared-learning'),
+            promptCacheKey: expect.stringContaining('nt:v14-learner-language'),
             promptCacheOptions: {
               mode: 'explicit',
               ttl: '30m',

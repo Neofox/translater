@@ -61,7 +61,7 @@ export const SentenceResult = z.object({
   ),
   main: z.string().describe('The primary translation of the source text.'),
   learningPhrases: LearningPhrases.describe(
-    'A lightweight breakdown prepared with the main translation. In target order, quote exact meaningful phrases from main with a short gloss in the metadata language and exact corresponding sourceTexts (empty if implicit). Cover the meaningful text, group grammatical units naturally, never emit punctuation-only chunks. No offsets, no rewriting. Generate immediately after main, before longer explanations.',
+    'A lightweight breakdown of the language the user is learning. If targetLang is the UI language and sourceLang differs, quote exact original source phrases in source order; sourceTexts then quotes corresponding phrases from main. Otherwise quote main in target order and sourceTexts quotes the original source. Short glosses are in the metadata language. Empty counterpart arrays for implicit content. Cover meaningful text in grammatical units, never punctuation-only chunks. No offsets or rewriting. Generate immediately after main, before longer explanations.',
   ),
   rationale: z
     .string()

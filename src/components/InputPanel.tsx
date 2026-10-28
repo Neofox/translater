@@ -148,7 +148,11 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
             {learning?.selectedChunk && (
               <SourceHighlight
                 text={input}
-                spans={learning.selectedChunk.sourceSpans}
+                spans={
+                  learning.side === 'source'
+                    ? [learning.selectedChunk]
+                    : learning.selectedChunk.sourceSpans
+                }
                 textareaRef={textareaRef}
               />
             )}

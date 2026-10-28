@@ -240,7 +240,7 @@ const SENTENCE_FEWSHOT_EN = {
     formalityNote: '',
     learningTips: {
       grammar:
-        '"How are you doing" uses the present progressive ("are doing") where many languages would use a simple present. In English this framing makes the greeting feel active and current rather than generic.',
+        '어떻게 means how, and 지내요 is the polite present form of 지내다 (to get along). Korean uses this form for an everyday greeting.',
       vocab: '',
       characters: [],
     },
@@ -281,6 +281,69 @@ const SENTENCE_FEWSHOT_KO = {
         '"How are you doing"은 현재진행형(be + -ing)을 사용해 "지금 이 순간 어떻게 지내고 있는지"를 묻는 뉘앙스를 줍니다. 한국어의 "어떻게 지내?"보다 "지금"에 가까운 감각이 있습니다.',
       vocab:
         '"doing"은 구체적으로 무엇을 하는지가 아니라 "지내다"에 가까운 관용적 쓰임입니다. 영어에서 인사말로 굳어진 표현입니다.',
+      characters: [],
+    },
+  }),
+}
+
+// Reading into the fluent UI language: the breakdown stays on the original.
+const SENTENCE_READING_FEWSHOT_EN = {
+  user: '오늘 어떻게 지내요?',
+  assistant: JSON.stringify({
+    sourceLang: 'ko',
+    targetLang: 'en',
+    main: 'How are you doing today?',
+    learningPhrases: [
+      { text: '오늘', gloss: 'today', sourceTexts: ['today'] },
+      {
+        text: '어떻게 지내요',
+        gloss: 'how are you doing',
+        sourceTexts: ['How are you doing'],
+      },
+    ],
+    rationale:
+      'The Korean greeting asks how someone is getting along; this is its natural everyday English equivalent.',
+    alternatives: [
+      {
+        text: 'How is it going today?',
+        note: 'A more informal English greeting with the same meaning.',
+      },
+    ],
+    formalityNote: '',
+    learningTips: {
+      grammar:
+        '지내요 is the polite present form of 지내다. 어떻게 asks how someone is getting along.',
+      vocab: '오늘 means today.',
+      characters: [],
+    },
+  }),
+}
+const SENTENCE_READING_FEWSHOT_KO = {
+  user: 'How are you doing today?',
+  assistant: JSON.stringify({
+    sourceLang: 'en',
+    targetLang: 'ko',
+    main: '오늘 어떻게 지내요?',
+    learningPhrases: [
+      {
+        text: 'How are you doing',
+        gloss: '어떻게 지내는지 묻는 인사',
+        sourceTexts: ['어떻게 지내요'],
+      },
+      { text: 'today', gloss: '오늘', sourceTexts: ['오늘'] },
+    ],
+    rationale: '영어의 일상 인사를 자연스러운 한국어 해요체로 옮겼습니다.',
+    alternatives: [
+      {
+        text: '오늘 잘 지내요?',
+        note: '상대방의 안부를 조금 더 간단히 묻는 표현입니다.',
+      },
+    ],
+    formalityNote: '',
+    learningTips: {
+      grammar:
+        'How are you doing은 현재진행형으로 지금 어떻게 지내는지 묻는 일상 인사입니다.',
+      vocab: 'doing은 이 인사에서 구체적인 행동보다 지내는 상태를 뜻합니다.',
       characters: [],
     },
   }),
@@ -414,7 +477,7 @@ export function sentencePrompt(args: {
       ? 'Return ONE primary rewrite in `main`, plus 2-6 concise alternatives showing other phrasings within the same register band.'
       : 'Return ONE primary translation in `main`, plus 2-6 concise alternatives (unless the source is unambiguous, then 0). Each alternative should differ in a meaningful way (register, phrasing, idiom choice).',
     'LONG INPUT OVERRIDE: when the source spans multiple lines, contains three or more sentences, or reads as a paragraph, set `alternatives` to an empty array: alternative phrasings only help for short single-sentence input. `main` must still cover the ENTIRE source.',
-    `PREPARED LEARNING: immediately after main, provide learningPhrases: meaningful grammatical phrases quoted EXACTLY from main in target order, with a very short gloss in ${metaLang} and exact corresponding sourceTexts (empty when implied). Cover meaningful text in natural units, never standalone punctuation, never a whole long sentence as one chunk. Do not count character offsets or invent text. This is a small phrase map, not a second long explanation.`,
+    `PREPARED LEARNING: the user is fluent in ${langName(uiLang)}. If targetLang is "${uiLang}" and sourceLang differs, learningPhrases must quote meaningful grammatical phrases EXACTLY from the ORIGINAL SOURCE in source order; sourceTexts then quotes their exact counterparts from main. Otherwise learningPhrases quotes main in target order and sourceTexts quotes the original source. Never break down the fluent target language when the original is foreign. Generate immediately after main, with very short glosses in ${metaLang}; counterpart arrays may be empty when implied. Cover meaningful text in natural units, never standalone punctuation or a whole long sentence as one chunk. Do not count offsets or invent text. This is a small phrase map, not a second long explanation.`,
     isPolish
       ? `The \`rationale\` (in ${metaLang}) is an edit note: explain what you changed and why (register shift, awkwardness fixed, clarity improved, idiom swapped). Not a translation note.`
       : `The \`rationale\` (in ${metaLang}) should highlight interesting linguistic or cultural nuances: wordplay, double meanings, idioms, slang origins, ambiguity resolved. Avoid generic tone descriptions like "casual" or "informal" without further insight.`,
@@ -445,9 +508,13 @@ export function sentencePrompt(args: {
     ? uiLang === 'ko'
       ? SENTENCE_POLISH_FEWSHOT_KO
       : SENTENCE_POLISH_FEWSHOT_EN
-    : uiLang === 'ko'
-      ? SENTENCE_FEWSHOT_KO
-      : SENTENCE_FEWSHOT_EN
+    : target === uiLang && source !== uiLang
+      ? uiLang === 'ko'
+        ? SENTENCE_READING_FEWSHOT_KO
+        : SENTENCE_READING_FEWSHOT_EN
+      : uiLang === 'ko'
+        ? SENTENCE_FEWSHOT_KO
+        : SENTENCE_FEWSHOT_EN
 
   return translationPrompt(
     metadataLanguageRule(uiLang),

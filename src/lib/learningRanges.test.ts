@@ -48,6 +48,26 @@ const chunks = [
   },
 ]
 describe('validated learning spans', () => {
+  it('validates Korean source chunks against the original when translating into the UI language', () => {
+    const reading = {
+      ...input,
+      text: input.translation,
+      translation: 'Thanks.',
+      source: 'ko',
+      target: 'en',
+      side: 'source' as const,
+    }
+    const result = validateLearningResult(reading, {
+      wordOrder: '',
+      chunks: chunks.map((chunk) => ({ ...chunk, sourceSpans: [] })),
+    })
+    expect(result.chunks.map((c) => c.text)).toEqual([
+      '오늘',
+      '도와줘서',
+      '고마워요',
+    ])
+    expect(result.partial).toBe(false)
+  })
   it('prepares exact phrase positions and meanings from the translation response without model-counted offsets', () => {
     const result = prepareLearningResult(input.text, input.translation, [
       { text: '오늘', gloss: 'today', sourceTexts: ['today'] },
