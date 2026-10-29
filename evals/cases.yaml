@@ -1,0 +1,230 @@
+# Fixed, hand-written cases (never real user input), weighted to the real use:
+# EN<->KO only. An English speaker reads everyday Korean (news, healthcare,
+# admin, coworkers), writes natural Korean to coworkers/friends/partner and
+# learns Korean grammar; a Korean speaker (Korean UI) learns English.
+# `situation` is shown only to the judges; the app sees mode/context as usual.
+
+# --- Reading everyday Korean -> English (English UI, learn the Korean source) ---
+- description: read news article
+  vars:
+    text: 한국은행은 오늘 기준금리를 연 3.25%로 동결했다. 물가 상승세가 둔화되고 있지만 가계부채 증가세가 여전히 높다는 판단에서다. 시장에서는 연내 추가 인하 가능성에 주목하고 있다.
+    source: ko
+    target: en
+    situation: Reading a Korean news article; needs an accurate, clear English rendering.
+- description: read healthcare insurance claim
+  vars:
+    text: 실손보험 청구를 위해서는 진료비 영수증과 진료비 세부내역서를 제출해야 합니다. 본인부담금은 건강보험 적용 여부에 따라 달라질 수 있습니다.
+    source: ko
+    target: en
+    situation: Foreigner navigating the Korean healthcare system; domain terms must be correct and explained.
+- description: read hospital notice
+  vars:
+    text: 내원 시 신분증을 꼭 지참해 주시기 바랍니다. 초진 환자분께서는 접수 후 문진표를 작성해 주세요.
+    source: ko
+    target: en
+    situation: Notice at a Korean clinic.
+- description: read admin moving-in registration
+  vars:
+    text: 전입신고는 이사한 날부터 14일 이내에 주민센터나 정부24에서 하시면 됩니다.
+    source: ko
+    target: en
+    situation: Korean government/admin information.
+- description: read coworker kakao schedule change
+  vars:
+    text: 팀장님이 내일 회의 30분 당겨서 9시 반에 하자고 하셨어요~ 자료는 오늘 중으로 공유 부탁드려요!
+    source: ko
+    target: en
+    situation: KakaoTalk message from a coworker.
+- description: read coworker kakao abbreviations
+  vars:
+    text: ㅇㅋ 확인했습니다! 근데 이거 오늘까지 가능할지 모르겠네요 ㅠㅠ
+    source: ko
+    target: en
+    situation: Quick chat reply from a coworker with chat abbreviations and emoticons.
+- description: read friend slang
+  vars:
+    text: 야 오늘 저녁에 치맥 ㄱ? 나 오늘 완전 멘붕이었음 ㅋㅋ
+    source: ko
+    target: en
+    mode: friends
+    situation: Message from a close friend full of slang.
+- description: read girlfriend message
+  vars:
+    text: 자기야 오늘 퇴근 언제 해? 보고 싶어 ㅠㅠ 맛있는 거 먹자
+    source: ko
+    target: en
+    mode: friends
+    situation: Message from the user's girlfriend; keep the affectionate tone.
+- description: read auto-detected coworker message
+  vars:
+    text: 혹시 오늘 오후에 잠깐 시간 괜찮으세요? 확인 부탁드릴 게 있어서요.
+    source: auto
+    target: en
+    expectSource: ko
+    situation: Coworker message pasted with auto-detected language.
+
+# --- Writing English -> natural Korean (English UI, learn the Korean target) ---
+- description: write coworker peer thanks
+  vars:
+    text: Thanks for covering for me yesterday, I owe you one!
+    source: en
+    target: ko
+    situation: To a coworker of similar age and rank.
+- description: write senior coworker late reply
+  vars:
+    text: Sorry for the late reply. I'll review the document and get back to you by tomorrow morning.
+    source: en
+    target: ko
+    mode: professional
+    situation: To a senior colleague or manager.
+- description: write coworker reply with context
+  vars:
+    text: Sure, anytime after 10 works for me.
+    source: en
+    target: ko
+    context: 혹시 내일 오전에 잠깐 통화 가능하실까요?
+    situation: Replying to a coworker's polite question.
+- description: write friend rain check
+  vars:
+    text: Dude I'm so sorry, I totally forgot about tonight. Rain check?
+    source: en
+    target: ko
+    mode: friends
+    situation: To a close friend; must sound like a real Korean friend texting.
+- description: write friends group invite multi-line
+  vars:
+    text: "Hey guys!\nBBQ at my place on Saturday, 6pm.\nBring drinks if you can 🍻"
+    source: en
+    target: ko
+    mode: friends
+    situation: Group chat with close friends.
+- description: write girlfriend miss you
+  vars:
+    text: I miss you so much, can't wait to see you this weekend ❤️
+    source: en
+    target: ko
+    mode: friends
+    situation: To the user's girlfriend; affectionate couple 반말, natural not cheesy.
+- description: write girlfriend caring
+  vars:
+    text: Did you eat yet? Don't skip lunch again, okay? I'll pick you up after work.
+    source: en
+    target: ko
+    mode: friends
+    situation: To the user's girlfriend; caring couple 반말.
+- description: write girlfriend apology
+  vars:
+    text: I'm sorry I was grumpy earlier. It wasn't about you, I just had a rough day.
+    source: en
+    target: ko
+    mode: friends
+    situation: Apologizing to the user's girlfriend; sincere and warm.
+- description: write girlfriend refine playful
+  vars:
+    text: Can you call me when you're free?
+    source: en
+    target: ko
+    mode: friends
+    refinements: make it more playful
+    previousMain: 시간 될 때 전화해 줄 수 있어?
+    situation: To the user's girlfriend, asking for a more playful version.
+- description: write idiom casual
+  vars:
+    text: It's not a big deal, don't sweat it.
+    source: en
+    target: ko
+    situation: Reassuring an acquaintance or coworker.
+
+# --- Learning Korean grammar and words (English UI) ---
+- description: learn korean grammar sentence
+  vars:
+    text: 비가 올 것 같아서 우산을 챙겨 왔는데 결국 안 왔네요.
+    source: ko
+    target: en
+    situation: Learner wants the grammar (-ㄹ 것 같아서, -는데, -네요) explained accurately.
+- description: learn check own korean
+  vars:
+    text: 저는 어제 친구랑 영화를 봤어요 그리고 아주 재밌었어요
+    source: ko
+    target: ko
+    situation: The learner wrote this Korean and wants it corrected into natural Korean.
+- description: word 답답하다
+  vars:
+    {
+      text: 답답하다,
+      source: ko,
+      target: en,
+      intent: word,
+      situation: Learning a common Korean emotion word.,
+    }
+- description: word 수고하셨습니다
+  vars:
+    {
+      text: 수고하셨습니다,
+      source: ko,
+      target: en,
+      intent: word,
+      situation: Learning a workplace set phrase.,
+    }
+- description: word 눈치
+  vars:
+    {
+      text: 눈치,
+      source: ko,
+      target: en,
+      intent: word,
+      situation: Learning a culturally loaded Korean word.,
+    }
+- description: word awkward en-ko
+  vars:
+    {
+      text: awkward,
+      source: en,
+      target: ko,
+      intent: word,
+      situation: Looking up how to say an English word in Korean.,
+    }
+
+# --- Korean speaker learning English (Korean UI, explanations in Korean) ---
+- description: ui-ko write english to friend
+  vars:
+    text: 오늘 회사에서 너무 힘들었어. 빨리 집에 가고 싶다.
+    source: ko
+    target: en
+    mode: friends
+    uiLang: ko
+    situation: Korean speaker writing to an English-speaking partner and learning the English.
+- description: ui-ko read english message
+  vars:
+    text: I'm running a bit late, grab a table and I'll be there soon.
+    source: en
+    target: ko
+    uiLang: ko
+    situation: Korean speaker reading an English message and learning its expressions.
+- description: ui-ko read english notice
+  vars:
+    text: The new policy will take effect next month, so make sure to update your account details.
+    source: en
+    target: ko
+    uiLang: ko
+    situation: Korean speaker reading English admin text.
+- description: ui-ko word figure out
+  vars:
+    {
+      text: figure out,
+      source: en,
+      target: ko,
+      intent: word,
+      uiLang: ko,
+      situation: Korean speaker learning an English phrasal verb.,
+    }
+- description: ui-ko word hangry
+  vars:
+    {
+      text: hangry,
+      source: en,
+      target: ko,
+      intent: word,
+      uiLang: ko,
+      situation: Korean speaker learning English slang.,
+    }

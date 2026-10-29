@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: CI quality check for the production translation model
+
+# Keep in sync with the production TRANSLATE_MODEL (Vercel env) and the
+# matching variant in promptfooconfig.yaml.
+prompts:
+  - '{{text}}'
+
+providers:
+  - id: file://translationProvider.ts
+    label: gpt-6-luna reasoning=none
+    config:
+      model: openai/gpt-6-luna
+      reasoning: none
+
+evaluateOptions:
+  maxConcurrency: 16
+
+defaultTest:
+  vars:
+    intent: sentence
+    mode: casual
+    uiLang: en
+    context: ''
+    refinements: ''
+    previousMain: ''
+    situation: ''
+  options:
+    provider: vercel:anthropic/claude-sonnet-5.5
+  assert:
+    - type: javascript
+      value: file://checks.ts
+      metric: checks
+    - type: llm-rubric
+      value: file://rubrics.ts:translationRubric
+      metric: translation
+      threshold: 0.7
+    - type: llm-rubric
+      value: file://rubrics.ts:explanationsRubric
+      metric: explanations
+      threshold: 0.7
+
+tests:
+  - file://cases.yaml
+  - file://injection.yaml

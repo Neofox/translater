@@ -1,0 +1,65 @@
+name: Translation quality eval
+
+# Billed: about $1 per run (production model only). Runs when the model-facing
+# request or the eval changes, or on demand from the Actions tab.
+on:
+  pull_request:
+    paths:
+      - src/server/prompts.ts
+      - src/server/schemas.ts
+      - src/server/learningTypes.ts
+      - src/server/translationRequest.ts
+      - src/server/gateway.ts
+      - evals/**
+      - .github/workflows/translation-eval.yml
+  workflow_dispatch:
+
+concurrency:
+  group: translation-eval-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  eval:
+    # Fork PRs do not receive the Gateway secret.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Translation and judge responses are cached by request, so unchanged
+      # cases cost nothing on reruns.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .promptfoo-cache
+          key: promptfoo-${{ hashFiles('src/server/prompts.ts', 'src/server/schemas.ts', 'src/server/learningTypes.ts', 'evals/**') }}
+          restore-keys: promptfoo-
+
+      - uses: promptfoo/promptfoo-action@04839e664f52212b877170219dab0d7ad2bf6440 # promptfoo-action-v1.3.4
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          PROMPTFOO_DISABLE_TELEMETRY: '1'
+          PROMPTFOO_DISABLE_UPDATE: '1'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          config: evals/ci.promptfooconfig.yaml
+          promptfoo-version: 0.125.1
+          use-config-prompts: true
+          force-run: true
+          no-share: true
+          cache-path: .promptfoo-cache
+          max-concurrency: '16'
+          no-progress-bar: true

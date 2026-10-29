@@ -1,0 +1,105 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: Translation and explanation quality across models and reasoning levels
+
+# The providers build the production request from the test vars; this prompt
+# only gives promptfoo a column label.
+prompts:
+  - '{{text}}'
+
+# Each provider is one variant. Only model and reasoning differ; prompts,
+# schema and Gateway options come from src/server/translationRequest.ts.
+providers:
+  - id: file://translationProvider.ts
+    label: deepseek-flash reasoning=none
+    config:
+      model: deepseek/deepseek-v4.1-flash-1017
+      reasoning: none
+  - id: file://translationProvider.ts
+    label: deepseek-flash reasoning=default
+    config:
+      model: deepseek/deepseek-v4.1-flash-1017
+      reasoning: provider-default
+  # Production model and setting.
+  - id: file://translationProvider.ts
+    label: gpt-6-luna reasoning=none
+    config:
+      model: openai/gpt-6-luna
+      reasoning: none
+  - id: file://translationProvider.ts
+    label: gpt-6-luna lean-prompt
+    config:
+      model: openai/gpt-6-luna
+      reasoning: none
+      promptVariant: lean
+  - id: file://translationProvider.ts
+    label: gpt-6-luna lean-prompt no-characters
+    config:
+      model: openai/gpt-6-luna
+      reasoning: none
+      promptVariant: lean-nochars
+  - id: file://translationProvider.ts
+    label: gpt-6-luna reasoning=low
+    config:
+      model: openai/gpt-6-luna
+      reasoning: low
+  - id: file://translationProvider.ts
+    label: glm-5.3-flash reasoning=none
+    config:
+      model: zai/glm-5.3-flash
+      reasoning: none
+  - id: file://translationProvider.ts
+    label: glm-5.3-flash reasoning=default
+    config:
+      model: zai/glm-5.3-flash
+      reasoning: provider-default
+  - id: file://translationProvider.ts
+    label: claude-haiku-5.5 reasoning=none
+    config:
+      model: anthropic/claude-haiku-5.5
+      reasoning: none
+  # Quality ceiling only: reasoning makes it too slow for production.
+  - id: file://translationProvider.ts
+    label: gpt-6.1-sol reasoning=low
+    config:
+      model: openai/gpt-6.1-sol
+      reasoning: low
+  - id: file://translationProvider.ts
+    label: gpt-6.1-terra reasoning=none
+    config:
+      model: openai/gpt-6.1-terra
+      reasoning: none
+
+evaluateOptions:
+  # AI Gateway handles this easily; promptfoo backs off on rate limits.
+  maxConcurrency: 16
+
+defaultTest:
+  vars:
+    intent: sentence
+    mode: casual
+    uiLang: en
+    context: ''
+    refinements: ''
+    previousMain: ''
+    situation: ''
+  options:
+    # Judges grade one anonymous output at a time. No select-best: promptfoo
+    # shows variants in config order and the judge favoured the first one, so
+    # `npm run eval:summary` ranks variants from these scores instead.
+    provider: vercel:anthropic/claude-sonnet-5.5
+  assert:
+    - type: javascript
+      value: file://checks.ts
+      metric: checks
+    - type: llm-rubric
+      value: file://rubrics.ts:translationRubric
+      metric: translation
+      threshold: 0.7
+    - type: llm-rubric
+      value: file://rubrics.ts:explanationsRubric
+      metric: explanations
+      threshold: 0.7
+
+tests:
+  - file://cases.yaml
+  - file://injection.yaml
