@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook } from '@testing-library/react'
 import { StrictMode } from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { useLearning } from './useLearning'
-import { learn } from '../server/learning'
 import type { LearningResult } from '../server/learningTypes'
 
-vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('../server/learning', () => ({ learn: vi.fn() }))
+const network = vi.fn()
+beforeEach(() => vi.stubGlobal('fetch', network))
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  vi.clearAllMocks()
+})
 const snapshot = {
   text: 'Hello',
   translation: '안녕',
@@ -29,255 +33,127 @@ const output: LearningResult = {
       text: '안녕',
       sourceSpans: [],
       gloss: 'hello',
-      baseForm: '',
-      literalMeaning: '',
-      naturalMeaning: '',
-      grammar: '',
+      baseForm: '안녕',
+      literalMeaning: 'peace',
+      naturalMeaning: 'hello',
+      grammar: 'An informal greeting.',
       omissions: '',
+      grammarHighlights: [],
     },
   ],
 }
-const props = { snapshot, requestKey: 'current', enabled: true }
-it('segments and enriches the Korean source when English is the fluent target language', async () => {
-  vi.mocked(learn).mockResolvedValue(output)
-  const reading = {
-    ...snapshot,
-    text: '오늘 도와줘서 고마워요.',
-    translation: 'Thanks.',
-    source: 'ko',
-    target: 'en',
-    side: 'source' as const,
-    sentenceEnd: 13,
-  }
-  const { result } = renderHook(() =>
-    useLearning({ snapshot: reading, requestKey: 'reading', enabled: true }),
-  )
-  expect(result.current.ranges).toEqual([{ start: 0, end: 13 }])
-  act(() => result.current.openAt(8))
-  await waitFor(() => expect(learn).toHaveBeenCalledTimes(1))
-  expect(vi.mocked(learn).mock.calls[0]?.[0].data).toMatchObject({
-    text: reading.text,
-    translation: 'Thanks.',
-    side: 'source',
-    sentenceStart: 0,
-    sentenceEnd: 13,
-  })
-})
-afterEach(() => {
-  cleanup()
-  vi.resetAllMocks()
-})
-it('exposes prepared meanings before opening and fetches deeper facts only on explicit expansion', async () => {
-  vi.mocked(learn).mockResolvedValue({
-    ...output,
-    chunks: [{ ...output.chunks[0]!, grammar: 'An informal greeting.' }],
-  })
-  const { result } = renderHook(() =>
-    useLearning({ ...props, prepared: output }),
-  )
-  expect(result.current.result?.chunks[0]?.gloss).toBe('hello')
-  expect(learn).not.toHaveBeenCalled()
-  act(() => result.current.openAt(1))
-  expect(result.current.selectedChunk?.gloss).toBe('hello')
-  expect(result.current.isBasic).toBe(true)
-  expect(learn).not.toHaveBeenCalled()
-  act(() => result.current.loadDetails())
-  await waitFor(() =>
-    expect(result.current.selectedChunk?.grammar).toBe('An informal greeting.'),
-  )
-  expect(learn).toHaveBeenCalledTimes(1)
-  expect(result.current.isBasic).toBe(false)
-})
-
-it('fetches only on deliberate open, deduplicates taps, and caches completed results', async () => {
-  let finish!: (r: LearningResult) => void
-  vi.mocked(learn).mockImplementation(
-    () =>
-      new Promise((r) => {
-        finish = r
-      }),
-  )
+const props = {
+  snapshot,
+  prepared: output,
+  requestKey: 'current',
+  enabled: true,
+}
+it('reveals complete initial-response details immediately with no enrichment action or network', () => {
   const { result } = renderHook(() => useLearning(props), {
     wrapper: StrictMode,
   })
-  expect(learn).not.toHaveBeenCalled()
-  act(() => {
-    result.current.openAt(1)
-    result.current.openAt(0)
-  })
-  expect(learn).toHaveBeenCalledTimes(1)
-  await act(async () => {
-    finish(output)
-  })
-  expect(result.current.selectedChunk?.text).toBe('안녕')
-  act(() => {
-    result.current.close()
-    result.current.openAt()
-  })
-  expect(learn).toHaveBeenCalledTimes(1)
-  expect(result.current.result?.chunks[0]?.gloss).toBe('hello')
-})
-it('aborts on edits and ignores a late old response without reopening learning', async () => {
-  let finish!: (r: LearningResult) => void
-  vi.mocked(learn).mockImplementation(
-    () =>
-      new Promise((r) => {
-        finish = r
-      }),
+  expect(result.current.result?.chunks[0]?.grammar).toBe(
+    'An informal greeting.',
   )
-  const { result, rerender } = renderHook((p) => useLearning(p), {
-    initialProps: props,
-  })
-  act(() => result.current.openAt())
-  const signal = vi.mocked(learn).mock.calls[0]![0].signal!
-  rerender({ ...props, requestKey: 'edited', enabled: false })
-  expect(signal.aborted).toBe(true)
-  await act(async () => {
-    finish(output)
-  })
-  expect(result.current.isOpen).toBe(false)
-  expect(result.current.result).toBeNull()
-})
-it('keeps failures local and retries only through the explicit retry action', async () => {
-  vi.mocked(learn)
-    .mockRejectedValueOnce(new Error('untrusted raw input'))
-    .mockResolvedValue(output)
-  const { result, rerender } = renderHook((p) => useLearning(p), {
-    initialProps: props,
-  })
-  act(() => result.current.openAt())
-  await waitFor(() => expect(result.current.status).toBe('error'))
-  expect(result.current.error).not.toContain('untrusted')
-  rerender({ ...props })
-  act(() => result.current.openAt())
-  expect(learn).toHaveBeenCalledTimes(1)
-  act(() => result.current.retry())
-  await waitFor(() => expect(result.current.status).toBe('ready'))
-  expect(learn).toHaveBeenCalledTimes(2)
-})
-it('cancels on close and pagehide and never accepts a late completion', async () => {
-  let finish!: (r: LearningResult) => void
-  vi.mocked(learn).mockImplementation(
-    () =>
-      new Promise((r) => {
-        finish = r
-      }),
-  )
-  const { result } = renderHook(() => useLearning(props))
-  act(() => result.current.openAt())
-  act(() => window.dispatchEvent(new Event('pagehide')))
-  await act(async () => {
-    finish(output)
-  })
-  expect(result.current.isOpen).toBe(false)
-  expect(result.current.status).toBe('idle')
-})
-
-const multi = {
-  ...props,
-  snapshot: { ...snapshot, translation: '안녕. 안녕.', sentenceEnd: 7 },
-}
-it('never starts enrichment for an uncovered sentence in a prepared response', () => {
-  vi.mocked(learn).mockResolvedValue(output)
-  const { result } = renderHook(() =>
-    useLearning({ ...multi, prepared: output }),
-  )
-  act(() => result.current.selectSentence(1))
-  expect(learn).not.toHaveBeenCalled()
-  expect(result.current.isBasic).toBe(true)
-  act(() => result.current.loadDetails())
-  expect(learn).toHaveBeenCalledTimes(1)
-})
-it('preserves prepared-response provenance when no safe phrase positions can be resolved', () => {
-  const { result } = renderHook(() =>
-    useLearning({ ...props, prepared: null, hasPreparedMap: true }),
-  )
-  act(() => result.current.openAt())
-  expect(learn).not.toHaveBeenCalled()
-  expect(result.current.isBasic).toBe(true)
-})
-it.each([null, 1])(
-  'preserves the newer selection %s when deeper analysis completes',
-  async (selection) => {
-    let finish!: (r: LearningResult) => void
-    vi.mocked(learn).mockImplementation(
-      () =>
-        new Promise((r) => {
-          finish = r
-        }),
-    )
-    const prepared = {
-      ...output,
-      chunks: [
-        output.chunks[0]!,
-        {
-          ...output.chunks[0]!,
-          start: 3,
-          end: 5,
-          text: '친구',
-          gloss: 'friend',
-        },
-      ],
-    }
-    const { result } = renderHook(() =>
-      useLearning({
-        ...props,
-        snapshot: { ...snapshot, translation: '안녕 친구', sentenceEnd: 5 },
-        prepared,
-      }),
-    )
-    act(() => {
-      result.current.openAt(0)
-    })
-    act(() => {
-      result.current.loadDetails()
-    })
-    act(() => {
-      result.current.selectChunk(selection)
-    })
-    await act(async () => {
-      finish(prepared)
-    })
-    expect(result.current.selectedChunk?.text).toBe(
-      selection === null ? undefined : '친구',
-    )
-  },
-)
-it('returning to a cached sentence cancels another sentence request before it can replace the chosen view', async () => {
-  let finish!: (r: LearningResult) => void
-  vi.mocked(learn)
-    .mockResolvedValueOnce(output)
-    .mockImplementationOnce(
-      () =>
-        new Promise((r) => {
-          finish = r
-        }),
-    )
-  const { result } = renderHook(() => useLearning(multi))
-  act(() => result.current.openAt())
-  await waitFor(() => expect(result.current.status).toBe('ready'))
-  act(() => result.current.selectSentence(1))
-  act(() => result.current.selectSentence(0))
-  await act(async () => {
-    finish({ ...output, chunks: [{ ...output.chunks[0]!, start: 4, end: 6 }] })
-  })
-  expect(result.current.selectedSentence).toBe(0)
-  expect(result.current.result?.chunks[0]?.start).toBe(0)
-})
-it('returning to a failed sentence restores its error and Retry rather than another cached sentence', async () => {
-  vi.mocked(learn)
-    .mockResolvedValueOnce(output)
-    .mockRejectedValueOnce(new Error('offline'))
-  const { result } = renderHook(() => useLearning(multi))
-  act(() => result.current.openAt())
-  await waitFor(() => expect(result.current.status).toBe('ready'))
-  act(() => result.current.selectSentence(1))
-  await waitFor(() => expect(result.current.status).toBe('error'))
-  act(() => result.current.selectSentence(0))
+  act(() => result.current.openAt(1))
+  expect(result.current.selectedChunk?.baseForm).toBe('안녕')
   expect(result.current.status).toBe('ready')
-  act(() => result.current.selectSentence(1))
-  expect(result.current.selectedSentence).toBe(1)
-  expect(result.current.status).toBe('error')
+  expect(result.current).not.toHaveProperty('loadDetails')
+  expect(result.current).not.toHaveProperty('retry')
+  expect(network).not.toHaveBeenCalled()
+})
+it('reopening and changing phrase selection stays entirely local', () => {
+  const { result } = renderHook(() => useLearning(props))
+  act(() => result.current.openAt(0))
+  act(() => result.current.selectChunk(null))
+  expect(result.current.selectedChunk).toBeNull()
+  act(() => result.current.selectChunk(0))
+  expect(result.current.selectedChunk?.literalMeaning).toBe('peace')
+  act(() => result.current.close())
+  expect(result.current.isOpen).toBe(false)
+  act(() => result.current.openAt(0))
+  expect(result.current.selectedChunk?.grammar).toBe('An informal greeting.')
+  expect(network).not.toHaveBeenCalled()
+})
+it('does not fetch missing legacy phrase data', () => {
+  const { result } = renderHook(() => useLearning({ ...props, prepared: null }))
+  act(() => result.current.openAt())
+  expect(result.current.isOpen).toBe(false)
   expect(result.current.result).toBeNull()
-  expect(learn).toHaveBeenCalledTimes(2)
+  expect(network).not.toHaveBeenCalled()
+})
+it('clears open selection on request changes even when wording is identical', () => {
+  const { result, rerender } = renderHook((p) => useLearning(p), {
+    initialProps: props,
+  })
+  act(() => result.current.openAt(0))
+  rerender({ ...props, requestKey: 'new settings' })
+  expect(result.current.isOpen).toBe(false)
+  expect(result.current.selectedChunk).toBeNull()
+})
+it('invalidates immediately on edits, pending settings, errors or Clear', () => {
+  const { result, rerender } = renderHook((p) => useLearning(p), {
+    initialProps: props,
+  })
+  act(() => result.current.openAt(0))
+  rerender({ ...props, enabled: false })
+  expect(result.current.isOpen).toBe(false)
+  expect(result.current.selectedChunk).toBeNull()
+  expect(result.current.result).toBeNull()
+})
+it('closes on pagehide without persisting source or analysis', () => {
+  const { result } = renderHook(() => useLearning(props))
+  act(() => result.current.openAt(0))
+  act(() => window.dispatchEvent(new Event('pagehide')))
+  expect(result.current.isOpen).toBe(false)
+  expect(result.current.selectedChunk).toBeNull()
+  expect(network).not.toHaveBeenCalled()
+})
+it('segments the non-fluent original source and opens its prepared details', () => {
+  const reading = {
+    ...snapshot,
+    text: '안녕',
+    translation: 'Hello',
+    source: 'ko',
+    target: 'en',
+    side: 'source' as const,
+  }
+  const { result } = renderHook(() =>
+    useLearning({ ...props, snapshot: reading }),
+  )
+  expect(result.current.result?.chunks[0]?.text).toBe('안녕')
+  act(() => result.current.openAt(1))
+  expect(result.current.selectedChunk?.text).toBe('안녕')
+  expect(network).not.toHaveBeenCalled()
+})
+it('shows the whole multi-sentence message and selects phrases by global offset without pagination', () => {
+  const translation = '안녕. 다시 왔어.'
+  const prepared: LearningResult = {
+    ...output,
+    chunks: [
+      output.chunks[0]!,
+      {
+        ...output.chunks[0]!,
+        start: 4,
+        end: 9,
+        text: '다시 왔어',
+        baseForm: '오다',
+      },
+    ],
+  }
+  const { result } = renderHook(() =>
+    useLearning({
+      ...props,
+      prepared,
+      snapshot: { ...snapshot, translation, sentenceEnd: translation.length },
+    }),
+  )
+  expect(result.current.result?.chunks).toHaveLength(2)
+  expect(result.current).not.toHaveProperty('selectSentence')
+  act(() => result.current.openAt(7))
+  expect(result.current.selectedChunk?.text).toBe('다시 왔어')
+  act(() => result.current.selectChunk(0))
+  expect(result.current.selectedChunk?.text).toBe('안녕')
+  expect(result.current.result?.chunks).toHaveLength(2)
+  expect(network).not.toHaveBeenCalled()
 })

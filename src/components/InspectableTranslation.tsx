@@ -6,6 +6,8 @@ import type { TextRange } from '../lib/learningRanges'
 
 type Props = {
   text: string
+  onReveal?: () => void
+  wholeTextInteractive?: boolean
   language: string
   disabled: boolean
   selectedChunk?: TextRange | null
@@ -20,6 +22,8 @@ type Props = {
 
 export default function InspectableTranslation({
   text,
+  onReveal,
+  wholeTextInteractive = false,
   language,
   disabled,
   selectedChunk,
@@ -52,6 +56,8 @@ export default function InspectableTranslation({
     }
   }, [text, disabled, resetKey])
   const selected = !disabled ? selectedChunk : null
+  const interactive =
+    !disabled && Boolean(wholeTextInteractive || actionLabel || chunks.length)
   const renderText = (from: number, to: number): ReactNode[] => {
     const parts: ReactNode[] = []
     let cursor = from
@@ -82,11 +88,37 @@ export default function InspectableTranslation({
       className={className}
       lang={language}
       data-testid="main-translation"
-      data-inspectable={!disabled || undefined}
+      data-inspectable={interactive || undefined}
+      tabIndex={wholeTextInteractive && interactive && !actionLabel ? 0 : -1}
+      role={
+        wholeTextInteractive && interactive && !actionLabel
+          ? 'button'
+          : undefined
+      }
+      aria-expanded={
+        wholeTextInteractive && interactive && !actionLabel
+          ? expanded
+          : undefined
+      }
+      onKeyDown={(event) => {
+        if (
+          wholeTextInteractive &&
+          interactive &&
+          !actionLabel &&
+          (event.key === 'Enter' || event.key === ' ')
+        ) {
+          event.preventDefault()
+          onInspect?.(0)
+        }
+      }}
+      onFocusCapture={onReveal}
       onPointerDownCapture={(event) => {
+        onReveal?.()
         cancel()
         down.current =
-          !disabled && event.button === 0 && !window.getSelection()?.toString()
+          interactive &&
+          event.button === 0 &&
+          !window.getSelection()?.toString()
             ? { x: event.clientX, y: event.clientY, time: performance.now() }
             : null
       }}
@@ -99,7 +131,7 @@ export default function InspectableTranslation({
         const start = down.current
         down.current = null
         if (
-          disabled ||
+          !interactive ||
           !start ||
           !root.current ||
           !isInspectTap(
@@ -116,11 +148,12 @@ export default function InspectableTranslation({
         )
         if (offset === null || offset >= text.length) return
         if (
+          !wholeTextInteractive &&
           chunks.length &&
           !chunks.some((c) => offset >= c.start && offset < c.end)
         )
           return
-        // Let native double-click/long-press selection win before starting paid work.
+        // Let native double-click/long-press selection win before inspecting.
         timer.current = setTimeout(() => {
           if (!window.getSelection()?.toString()) onInspect?.(offset)
         }, 400)

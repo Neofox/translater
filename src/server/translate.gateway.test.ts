@@ -8,12 +8,23 @@ const validSentenceResult = {
   targetLang: 'ko' as const,
   main: '안녕하세요',
   learningPhrases: [
-    { text: '안녕하세요', gloss: 'hello', sourceTexts: ['hello'] },
+    {
+      text: '안녕하세요',
+      gloss: 'hello',
+      sourceTexts: ['hello'],
+      baseForm: '안녕하다',
+      literalMeaning: 'be at peace',
+      naturalMeaning: 'hello',
+      grammar: 'A polite greeting.',
+      omissions: '',
+      grammarHighlights: [],
+      usageNote: '',
+      characters: [],
+    },
   ],
   rationale: 'A natural greeting.',
   alternatives: [],
   formalityNote: '',
-  learningTips: { grammar: '', vocab: '', characters: [] },
 }
 
 const data = {
@@ -135,13 +146,15 @@ describe('handleTranslate via AI Gateway', () => {
               'translation',
               'sentence',
               'initial',
-              'v14-learner-language',
+              'v16-consolidated-details',
             ],
           },
           openai: {
             reasoningEffort: 'none',
             store: false,
-            promptCacheKey: expect.stringContaining('nt:v14-learner-language'),
+            promptCacheKey: expect.stringContaining(
+              'nt:v16-consolidated-details',
+            ),
             promptCacheOptions: {
               mode: 'explicit',
               ttl: '30m',

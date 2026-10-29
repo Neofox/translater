@@ -21,52 +21,35 @@ vi.mock('./LearningInspector', () => ({
   default: () => <p>Sentence overview</p>,
 }))
 afterEach(cleanup)
-it('allows a deliberate restore in a short stacked window without keyboard occlusion', () => {
-  const tree = (
-    <UiLangProvider>
-      <WorkspaceLayoutContext.Provider
-        value={{ ...COMPACT_LAYOUT, short: true }}
-      >
-        <LearningPanel />
-      </WorkspaceLayoutContext.Provider>
-    </UiLangProvider>
-  )
-  const { rerender } = render(tree)
-  const show = screen.getByRole<HTMLButtonElement>('button', {
-    name: 'Show learning',
-  })
-  expect(show.disabled).toBe(false)
-  fireEvent.click(show)
-  expect(fixture.setMinimized).toHaveBeenCalledWith(false)
-  fixture.minimized = false
-  rerender(
-    <UiLangProvider>
-      <WorkspaceLayoutContext.Provider
-        value={{ ...COMPACT_LAYOUT, short: true }}
-      >
-        <LearningPanel />
-      </WorkspaceLayoutContext.Provider>
-    </UiLangProvider>,
-  )
-  expect(screen.getByText('Sentence overview').closest('[hidden]')).toBeNull()
-})
-
-it('offers the learning content inside the result scroll at tight heights', () => {
-  fixture.minimized = false
+it('keeps the full reading view open at short heights until explicitly closed', () => {
   render(
     <UiLangProvider>
       <WorkspaceLayoutContext.Provider
-        value={{ ...COMPACT_LAYOUT, short: true, tight: true }}
+        value={{ ...COMPACT_LAYOUT, short: true }}
       >
-        <div data-testid="tight-learning-slot" />
         <LearningPanel />
       </WorkspaceLayoutContext.Provider>
     </UiLangProvider>,
   )
   expect(screen.getByText('Sentence overview').closest('[hidden]')).toBeNull()
   expect(
-    screen
-      .getByText('Sentence overview')
-      .closest('[data-testid="tight-learning-slot"]'),
-  ).not.toBeNull()
+    screen.getByTestId('learning-panel').hasAttribute('data-expanded'),
+  ).toBe(true)
+  expect(screen.queryByRole('button', { name: 'Show learning' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Close learning' }))
+})
+it('keeps its independent reading surface at tight keyboard heights', () => {
+  render(
+    <UiLangProvider>
+      <WorkspaceLayoutContext.Provider
+        value={{ ...COMPACT_LAYOUT, short: true, tight: true, keyboard: true }}
+      >
+        <LearningPanel />
+      </WorkspaceLayoutContext.Provider>
+    </UiLangProvider>,
+  )
+  expect(screen.getByText('Sentence overview').closest('[hidden]')).toBeNull()
+  expect(document.activeElement).toBe(
+    screen.getByRole('button', { name: 'Close learning' }),
+  )
 })

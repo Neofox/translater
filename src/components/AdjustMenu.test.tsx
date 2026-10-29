@@ -32,3 +32,13 @@ it('shows active adjustments while collapsed and retains a custom draft through 
     'gentler please',
   )
 })
+
+it('closes with Escape even when a touch activation leaves focus outside the menu', () => {
+  render(<AdjustMenu />, { wrapper: UiLangProvider })
+  const trigger = screen.getByRole('button', { name: /Adjust.*Softer/ })
+  fireEvent.click(trigger)
+  expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  expect(document.activeElement).toBe(trigger)
+})

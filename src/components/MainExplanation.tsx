@@ -24,9 +24,12 @@ export default function MainExplanation({
     <section className="main-explanation detail-why" aria-label={title}>
       <h3 className="sr-only">{title}</h3>
       {!rationale && !formality ? (
-        <span className="main-explanation-skeleton animate-pulse" aria-hidden />
+        <div className="main-explanation-skeleton" aria-hidden>
+          <span className="skeleton-line" />
+          <span className="skeleton-line" />
+        </div>
       ) : (
-        <p>
+        <p className="detail-enter">
           {registerLabel && (
             <span className="section-tag" lang="ko">
               {registerLabel}

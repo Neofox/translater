@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useState,
   useMemo,
+  useRef,
 } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslatorContext } from '../context/TranslatorContext'
@@ -12,15 +13,20 @@ import { useUiLang } from '../hooks/useUiLang'
 import { useLearning } from '../hooks/useLearning'
 import { mainText, resultIsCurrent } from '../lib/liveResult'
 import { prepareLearningResult } from '../lib/learningRanges'
+import type { TextRange } from '../lib/learningRanges'
 import { learningSide } from '../lib/learningSide'
 import type { LearningChunk } from '../server/learningTypes'
 
-type LearningValue = ReturnType<typeof useLearning> & {
+type LearningValue = Omit<ReturnType<typeof useLearning>, 'openAt'> & {
+  openAt: (offset?: number, origin?: 'source' | 'target') => void
   canOpen: boolean
   isSentence: boolean
   preparedChunks: LearningChunk[]
+  preparedHighlights: TextRange[]
   side: 'source' | 'target'
   language: string
+  wordActivation: number
+  restoreSourceFocus?: () => boolean
 }
 const LearningContext = createContext<LearningValue | null>(null)
 export const useLearningContext = () => useContext(LearningContext)
@@ -39,6 +45,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     isPending,
     streaming,
     error,
+    textareaRef,
   } = translator
   const output = mainText(live) ?? ''
   const canOpen = Boolean(
@@ -93,6 +100,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     enabled: canOpen && isSentence,
   })
   const [wordOpen, setWordOpen] = useState(false)
+  const [wordActivation, setWordActivation] = useState(0)
   const [wordMinimized, setWordMinimized] = useState(false)
   const wordIdentity = `${live?.requestKey ?? ''}:${canOpen}`
   const [wordKey, setWordKey] = useState(wordIdentity)
@@ -101,16 +109,56 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     setWordMinimized(false)
     setWordKey(wordIdentity)
   }, [wordIdentity])
+  const sourceFocus = useRef<{
+    node: HTMLTextAreaElement
+    start: number
+    end: number
+    direction: 'forward' | 'backward' | 'none'
+    top: number
+    left: number
+    identity: string
+  } | null>(null)
+  const restoreSourceFocus = () => {
+    const saved = sourceFocus.current
+    sourceFocus.current = null
+    if (!saved?.node.isConnected || saved.identity !== learning.identity)
+      return false
+    saved.node.focus({ preventScroll: true })
+    saved.node.setSelectionRange(saved.start, saved.end, saved.direction)
+    saved.node.scrollTop = saved.top
+    saved.node.scrollLeft = saved.left
+    return true
+  }
   const openAt = useCallback(
-    (offset?: number) => {
+    (offset?: number, origin: 'source' | 'target' = 'target') => {
       if (!canOpen) return
+      const node = origin === 'source' ? textareaRef.current : null
+      sourceFocus.current = node
+        ? {
+            node,
+            start: node.selectionStart,
+            end: node.selectionEnd,
+            direction: node.selectionDirection,
+            top: node.scrollTop,
+            left: node.scrollLeft,
+            identity: learning.identity,
+          }
+        : null
       if (isSentence) learning.openAt(offset)
       else {
         setWordKey(wordIdentity)
         setWordOpen(true)
+        setWordActivation((count) => count + 1)
       }
     },
-    [canOpen, isSentence, learning.openAt, wordIdentity],
+    [
+      canOpen,
+      isSentence,
+      learning.openAt,
+      wordIdentity,
+      textareaRef,
+      learning.identity,
+    ],
   )
   const close = () => {
     learning.close()
@@ -120,12 +168,17 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     <LearningContext.Provider
       value={{
         ...learning,
-        canOpen,
+        canOpen: canOpen && (!isSentence || Boolean(prepared?.chunks.length)),
         isSentence,
         side,
         language: side === 'source' ? sourceLanguage : targetLanguage,
+        wordActivation,
         preparedChunks: prepared?.chunks ?? [],
+        preparedHighlights:
+          prepared?.chunks.flatMap((chunk) => chunk.grammarHighlights ?? []) ??
+          [],
         openAt,
+        restoreSourceFocus,
         close,
         isOpen:
           learning.isOpen || (canOpen && wordOpen && wordKey === wordIdentity),

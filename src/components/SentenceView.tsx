@@ -2,7 +2,6 @@ import type { SentenceResult } from '../server/schemas'
 import AlternativeItem from './AlternativeItem'
 import type { SpeechOptions } from '../hooks/useSpeech'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
-import LearningTips from './LearningTips'
 import ResultSection from './ResultSection'
 import { useUiLang } from '../hooks/useUiLang'
 
@@ -56,9 +55,6 @@ export default function SentenceView({
             )}
           </ul>
         </ResultSection>
-      )}
-      {content !== 'alternatives' && (
-        <LearningTips tips={result.learningTips} />
       )}
     </div>
   )

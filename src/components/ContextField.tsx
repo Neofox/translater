@@ -27,6 +27,7 @@ export function ContextToggle({
     >
       <Reply size={18} />
       <span className="context-toggle-label">{t('contextToggle')}</span>
+      <span className="context-toggle-short-label">{t('contextShort')}</span>
     </Pill>
   )
 }

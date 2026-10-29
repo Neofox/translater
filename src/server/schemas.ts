@@ -1,54 +1,9 @@
 import { z } from 'zod'
-import { LearningPhrases } from './learningTypes'
+import { CharacterBreakdown, LearningPhrases } from './learningTypes'
 
 // All fields are required: these schemas are passed to AI SDK `Output.object`
 // for strict final validation. "Not applicable" is an empty string / empty
 // array, never a missing key: so no `.optional()` / `.default()` here.
-
-const LearningTips = z
-  .object({
-    grammar: z
-      .string()
-      .describe(
-        'One or two short sentences (in the metadata language: see prompt) on a useful grammar/structure point from the translation: tense/mood, particle, verb ending, honorific, inversion, clitic placement, gender agreement, word-order quirk, etc. Empty string when nothing genuinely illuminating.',
-      ),
-    vocab: z
-      .string()
-      .describe(
-        'One or two short sentences (in the metadata language: see prompt) on a notable word choice, idiom, slang, false friend, cognate, regional variant, or cultural connotation that a literal gloss would miss. Empty string when not useful.',
-      ),
-    characters: z
-      .array(
-        z.object({
-          word: z
-            .string()
-            .describe(
-              'The CJK word as it appears in its native script: Hangul for Korean (e.g. 도서관), mixed kanji/kana for Japanese (e.g. 図書館), Hanzi for Chinese (e.g. 图书馆).',
-            ),
-          chars: z
-            .array(
-              z.object({
-                char: z.string().describe('A single CJK character, e.g. 書.'),
-                meaning: z
-                  .string()
-                  .describe(
-                    'Short gloss in the metadata language: see prompt.',
-                  ),
-              }),
-            )
-            .max(10)
-            .describe('The character breakdown in order.'),
-        }),
-      )
-      .max(3)
-      .describe(
-        '0-3 CJK-character words worth breaking down for a learner. Populate ONLY when source or target is Korean (Sino-Korean hanja), Japanese (kanji), or Chinese (hanzi). Skip purely native words (고유어, 和語) and loanwords. Empty array for non-CJK pairs.',
-      ),
-  })
-  .describe(
-    'Compact learning aid rendered as "Learning tips". Populate when the language pair involves a language the user does not speak natively: give a useful grammar/structure point and any notable vocab/idiom/cultural note. Leave fields empty individually when there is nothing substantive to say.',
-  )
-export type LearningTips = z.infer<typeof LearningTips>
 
 const UsedLang = z.enum(['en', 'ko', 'ja', 'fr', 'es', 'zh', 'other'])
 
@@ -61,7 +16,7 @@ export const SentenceResult = z.object({
   ),
   main: z.string().describe('The primary translation of the source text.'),
   learningPhrases: LearningPhrases.describe(
-    'A lightweight breakdown of the language the user is learning. If targetLang is the UI language and sourceLang differs, quote exact original source phrases in source order; sourceTexts then quotes corresponding phrases from main. Otherwise quote main in target order and sourceTexts quotes the original source. Short glosses are in the metadata language. Empty counterpart arrays for implicit content. Cover meaningful text in grammatical units, never punctuation-only chunks. No offsets or rewriting. Generate immediately after main, before longer explanations.',
+    'Complete concise phrase details from this same translation request. If targetLang is the UI language and sourceLang differs, quote original source phrases in source order; sourceTexts quotes their counterparts from main. Otherwise quote main in target order and sourceTexts quotes the original source. Supply a short gloss, dictionary/base form where useful, literal and natural meaning, grammatical construction and implicit content; use empty strings for inapplicable facts. Explanations use the metadata language; baseForm keeps the analysed language. grammarHighlights contains only exact short grammar/conjugation quotations worth underlining, usually [] or one quotation, never every word. Cover meaningful text in natural units, never punctuation-only chunks. No offsets or rewriting. Generate main first so it can be copied while these details stream.',
   ),
   rationale: z
     .string()
@@ -88,7 +43,6 @@ export const SentenceResult = z.object({
     .describe(
       'Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, in the metadata language (see prompt). Empty string when not relevant.',
     ),
-  learningTips: LearningTips,
 })
 export type SentenceResult = z.infer<typeof SentenceResult>
 
@@ -186,9 +140,19 @@ export const WordResult = z.object({
   notes: z
     .string()
     .describe(
-      'Usage notes, false friends, common collocations, in the metadata language (see prompt). Empty string when none worth noting.',
+      'Vocabulary nuance, idioms, cultural context, usage notes, false friends and common collocations, in the metadata language (see prompt). Empty string when none worth noting.',
     ),
 
-  learningTips: LearningTips,
+  grammar: z
+    .string()
+    .describe(
+      'Useful grammar, inflection or construction for the non-fluent language in this entry, in the metadata language. Empty if unhelpful. Do not duplicate notes.',
+    ),
+  characters: z
+    .array(CharacterBreakdown)
+    .max(3)
+    .describe(
+      'Useful character origins from the non-fluent language in this entry. Skip native words and loanwords; [] when inapplicable.',
+    ),
 })
 export type WordResult = z.infer<typeof WordResult>

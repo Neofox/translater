@@ -143,6 +143,7 @@ it('enables Copy when the current main text is complete while details still stre
   expect(
     screen.getByRole<HTMLButtonElement>('button', { name: 'Copy' }).disabled,
   ).toBe(false)
+  expect(screen.getByTestId('main-translation').textContent).toBe('안녕하세요')
   fixture.input = 'An edited source'
   rerender(<OutputPanel />)
   expect(
@@ -172,7 +173,6 @@ it('keeps desktop explanation and learning content open with static headings', (
     ...fixture.live.partial,
     rationale: 'The wording avoids a literal idiom.',
     formalityNote: 'A polite ending.',
-    learningTips: { grammar: 'A useful ending.', vocab: '', characters: [] },
   }
   render(
     <WorkspaceLayoutContext.Provider
@@ -185,9 +185,8 @@ it('keeps desktop explanation and learning content open with static headings', (
   expect(
     screen.getByRole('heading', { name: /^Why this wording/ }),
   ).toBeTruthy()
-  expect(screen.getByRole('heading', { name: 'Learning tips' })).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: 'Learning tips' })).toBeNull()
   expect(screen.queryByRole('button', { name: /^Why this wording/ })).toBeNull()
-  expect(screen.getByText('A useful ending.').closest('[hidden]')).toBeNull()
 })
 
 it('keeps compact wording with the main translation before alternatives', () => {

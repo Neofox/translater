@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Clipboard, X } from 'lucide-react'
+import { Clipboard, X } from 'lucide-react'
 import Pill from './ui/Pill'
 import LanguageChipBar from './LanguageChipBar'
 import { ContextTextarea, ContextToggle } from './ContextField'
@@ -29,19 +29,15 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
   const { t, lang } = useUiLang()
   const layout = useWorkspaceLayoutContext()
   const [contextOpen, setContextOpen] = useState(false)
-  const [contextEditing, setContextEditing] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const sourceGrammar =
+    learning?.side === 'source' ? learning.preparedHighlights : []
+  const sourceSpans = learning?.selectedChunk
+    ? learning.side === 'source'
+      ? [learning.selectedChunk]
+      : learning.selectedChunk.sourceSpans
+    : []
   const overLimit = input.length > MAX_INPUT_CHARS
   const showLimit = input.length >= INPUT_WARN_THRESHOLD
-  const eligible =
-    layout.mode === 'stack' && layout.resultFirst && !layout.desktop
-  const canCondense = eligible && Boolean(input.trim())
-  const compact = canCondense && !expanded && !contextEditing && !showLimit
-  useEffect(() => {
-    if (!input.trim()) {
-      setExpanded(false)
-    }
-  }, [input])
   useEffect(() => {
     if (context.trim()) setContextOpen(true)
   }, [context])
@@ -60,6 +56,7 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
       textarea.style.height = `${Math.max(minimum, Math.min(maximum, textarea.scrollHeight + border))}px`
     }
     resize()
+    let frame = 0
     let width = textarea.parentElement?.clientWidth
     const observer =
       typeof ResizeObserver === 'undefined'
@@ -67,12 +64,16 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
         : new ResizeObserver(([entry]) => {
             if (entry && entry.contentRect.width !== width) {
               width = entry.contentRect.width
-              resize()
+              cancelAnimationFrame(frame)
+              frame = requestAnimationFrame(resize)
             }
           })
     if (textarea.parentElement) observer?.observe(textarea.parentElement)
-    return () => observer?.disconnect()
-  }, [input, contextOpen, layout, compact, textareaRef])
+    return () => {
+      observer?.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [input, contextOpen, layout, textareaRef])
 
   const count = (showLimit ? STRINGS[lang].charCount : STRINGS[lang].inputCount)
     .replace('{count}', String(input.length))
@@ -102,7 +103,7 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
     <section
       className="input-panel"
       aria-label={t('sourceText')}
-      data-source-compact={compact || undefined}
+      inert={Boolean(learning?.isOpen && !layout.desktop)}
     >
       <div className="composer">
         <div className="composer-header">
@@ -116,27 +117,26 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
         </div>
         <div className="composer-field">
           {contextOpen && (
-            <div
-              className="composer-context"
-              onFocusCapture={() => setContextEditing(true)}
-              onBlurCapture={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget))
-                  setContextEditing(false)
-              }}
-            >
+            <div className="composer-context">
               <ContextTextarea />
             </div>
           )}
           <div className="source-input-area">
-            {learning?.selectedChunk && (
+            {(sourceSpans.length > 0 || sourceGrammar.length > 0) && (
               <SourceHighlight
                 text={input}
-                spans={
-                  learning.side === 'source'
-                    ? [learning.selectedChunk]
-                    : learning.selectedChunk.sourceSpans
-                }
+                spans={sourceSpans}
+                grammarHighlights={sourceGrammar}
                 textareaRef={textareaRef}
+                inspectionKey={learning?.identity}
+                onInspect={
+                  learning?.canOpen && learning.side === 'source'
+                    ? (offset) => {
+                        learning.openAt(offset, 'source')
+                        if (!layout.desktop) textareaRef.current?.blur()
+                      }
+                    : undefined
+                }
               />
             )}
             <textarea
@@ -147,7 +147,6 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
               onFocus={() => {
                 if (layout.keyboard) {
                   setContextOpen(false)
-                  setContextEditing(false)
                 }
               }}
               onPaste={() => queueImmediate('paste')}
@@ -157,17 +156,6 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
                   next instanceof Element && next.closest('[data-input-action]')
                 ))
                   flush('blur')
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter' &&
-                  !event.shiftKey &&
-                  !event.metaKey &&
-                  !event.ctrlKey &&
-                  !event.nativeEvent.isComposing &&
-                  flush('enter')
-                )
-                  event.preventDefault()
               }}
               placeholder={t('placeholder')}
               aria-label={t('inputText')}
@@ -209,44 +197,11 @@ export default function InputPanel({ children }: { children?: ReactNode }) {
               <X size={16} aria-hidden />
               <span>{t('clear')}</span>
             </Pill>
-            {canCondense && (
-              <Pill
-                size="md"
-                tone={context.trim() ? 'active' : 'neutral'}
-                className="source-expand-button"
-                data-testid="source-expand"
-                data-context={Boolean(context.trim()) || undefined}
-                data-input-action
-                aria-label={compact ? t('expandSource') : t('collapseSource')}
-                title={compact ? t('expandSource') : t('collapseSource')}
-                aria-expanded={!compact}
-                aria-description={
-                  context.trim() ? t('contextActive') : undefined
-                }
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  if (compact) setExpanded(true)
-                  else {
-                    setExpanded(false)
-                    setContextOpen(false)
-                    setContextEditing(false)
-                  }
-                  focusSource()
-                }}
-              >
-                {compact ? (
-                  <ChevronUp size={18} aria-hidden />
-                ) : (
-                  <ChevronDown size={18} aria-hidden />
-                )}
-              </Pill>
-            )}
           </div>
           <div className="composer-meta">
             <ContextToggle
               open={contextOpen}
               onToggle={() => {
-                if (contextOpen) setContextEditing(false)
                 setContextOpen((value) => !value)
               }}
             />

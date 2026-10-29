@@ -15,6 +15,7 @@ import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
 import { useLearningContext } from '../context/LearningContext'
 import InspectableTranslation from './InspectableTranslation'
 import LearningPanel from './LearningPanel'
+import { useStreamingText } from '../hooks/useStreamingText'
 
 export default function OutputPanel() {
   const learning = useLearningContext()
@@ -37,9 +38,24 @@ export default function OutputPanel() {
     refinements,
   } = useTranslatorContext()
   const { t, lang } = useUiLang()
-  const { mode: layoutMode } = useWorkspaceLayoutContext()
+  const { mode: layoutMode, desktop } = useWorkspaceLayoutContext()
+  const mobileLearning = Boolean(!desktop && learning?.isOpen)
   const separateReference = ['workspace', 'split', 'book'].includes(layoutMode)
   const copyText = mainText(live)
+  const reveal = useStreamingText(
+    copyText ?? '',
+    Boolean(streaming && !live?.mainReady && !live?.done && !error),
+    JSON.stringify([
+      live?.requestKey,
+      live?.text,
+      source,
+      target,
+      mode,
+      context,
+      refinements,
+      lang,
+    ]),
+  )
   const copyReady = copyableMainText(
     live,
     {
@@ -82,8 +98,18 @@ export default function OutputPanel() {
       className="output-panel"
       aria-label={t('translation')}
       aria-busy={streaming}
+      onKeyDown={(event) => {
+        if (mobileLearning && event.key === 'Escape') {
+          event.stopPropagation()
+          learning?.close()
+        }
+      }}
     >
-      <div className="target-toolbar" data-testid="target-toolbar">
+      <div
+        className="target-toolbar"
+        data-testid="target-toolbar"
+        inert={mobileLearning}
+      >
         <button
           type="button"
           className="swap-button"
@@ -133,8 +159,10 @@ export default function OutputPanel() {
         <div
           className="result-scroll scrollbar-thin"
           data-testid="translation-result"
+          onFocusCapture={reveal.revealAll}
           tabIndex={0}
           aria-label={t('translation')}
+          inert={mobileLearning}
         >
           {error && (
             <div className="result-error" role="alert">
@@ -166,10 +194,12 @@ export default function OutputPanel() {
               <InspectableTranslation
                 className={`result-main ${live.intent === 'word' ? 'result-word' : ''}`}
                 language={live.partial.targetLang ?? target}
-                text={copyText ?? ''}
+                text={reveal.text}
+                onReveal={reveal.revealAll}
+                wholeTextInteractive={!desktop && Boolean(learning?.isSentence)}
                 disabled={
                   !learning?.canOpen ||
-                  (learning.isSentence && learning.side === 'source')
+                  (desktop && learning.isSentence && learning.side === 'source')
                 }
                 actionLabel={
                   learning && !learning.isSentence
@@ -187,11 +217,28 @@ export default function OutputPanel() {
                     : learning?.selectedChunk
                 }
                 chunks={
-                  learning?.side === 'source' ? [] : learning?.preparedChunks
+                  learning?.side === 'source'
+                    ? []
+                    : learning?.preparedHighlights
                 }
                 onInspect={
                   learning?.isSentence
-                    ? learning.openAt
+                    ? (offset) => {
+                        if (
+                          !desktop &&
+                          document.activeElement instanceof HTMLElement
+                        )
+                          document.activeElement.blur()
+                        if (learning.side === 'source') {
+                          const chunk = learning.preparedChunks.find((c) =>
+                            c.sourceSpans.some(
+                              (span) =>
+                                offset >= span.start && offset < span.end,
+                            ),
+                          )
+                          learning.openAt(chunk?.start)
+                        } else learning.openAt(offset)
+                      }
                     : () => {
                         if (learning?.isOpen && !separateReference)
                           learning.close()
@@ -200,13 +247,13 @@ export default function OutputPanel() {
                 }
                 resetKey={learning?.identity}
               >
-                {!copyText &&
-                  (streaming ? (
+                {!reveal.text &&
+                  (streaming && !live.mainReady ? (
                     <span className="result-cursor animate-pulse" aria-hidden />
                   ) : (
                     <span className="text-ink-dim">&hellip;</span>
                   ))}
-                {streaming && copyText && (
+                {streaming && !live.mainReady && copyText && (
                   <span className="result-cursor animate-pulse" aria-hidden />
                 )}
               </InspectableTranslation>
@@ -223,21 +270,6 @@ export default function OutputPanel() {
                     : undefined
                 }
               />
-              {learning?.isSentence &&
-                !(separateReference && learning.hasPreparedMap) && (
-                  <div className="learning-entry">
-                    <Pill
-                      tone="warm"
-                      size="md"
-                      data-testid="breakdown-button"
-                      disabled={!learning.canOpen}
-                      aria-expanded={learning.isOpen}
-                      onClick={() => learning.openAt()}
-                    >
-                      {t('breakdown')}
-                    </Pill>
-                  </div>
-                )}
               {learning && (
                 <div
                   data-testid="tight-learning-slot"

@@ -483,7 +483,7 @@ textarea:focus-visible {
   line-height: 1.42;
   font-weight: 600;
   letter-spacing: -0.015em;
-  text-wrap: pretty;
+  text-wrap: wrap;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: keep-all;
@@ -493,10 +493,19 @@ textarea:focus-visible {
 }
 .result-cursor {
   display: inline-block;
-  margin-left: 2px;
-  width: 2px;
+  width: 0;
+  margin: 0;
+  position: relative;
   height: 1em;
   transform: translateY(3px);
+  background: transparent;
+}
+.result-cursor::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  width: 2px;
+  height: 100%;
   background: var(--color-accent);
 }
 .result-actions {
@@ -1013,11 +1022,11 @@ textarea:focus-visible {
 .word-source-meta {
   padding: 0;
   border: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 .word-source-meta > div {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 120px minmax(0, 1fr);
   gap: 8px 16px;
   margin-bottom: 8px;
 }
@@ -1027,11 +1036,11 @@ textarea:focus-visible {
 }
 .word-source-meta > div > p:first-child,
 .word-source-meta > div > span:first-child {
-  font-size: 13px;
+  font-size: 12px;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--color-warm);
-  font-weight: 650;
+  color: var(--color-ink-dim);
+  font-weight: 600;
   padding-top: 2px;
 }
 .word-source-meta > div > p:not(:first-child),
@@ -1614,9 +1623,8 @@ textarea:focus-visible {
   min-width: 0;
   width: 100%;
   max-width: 44rem;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
+  margin-top: 32px;
+  padding-top: 0;
   overflow: hidden;
 }
 .reference-scroll {
@@ -1646,8 +1654,8 @@ textarea:focus-visible {
   padding-block: 4px 0;
 }
 .translator-panels[data-layout='workspace'] .reference-panel {
-  margin-top: 24px;
-  padding-top: 16px;
+  margin-top: 32px;
+  padding-top: 0;
 }
 .translator-panels[data-short] .reference-panel {
   margin-top: 8px;
@@ -1713,15 +1721,16 @@ textarea:focus-visible {
   padding-block: max(6px, var(--safe-area-top)) 6px;
 }
 .result-main {
-  margin-bottom: 6px;
+  margin-bottom: 12px;
   font-size: clamp(22px, calc(15px + 1vw), 30px);
 }
 .main-explanation {
-  max-width: 42rem;
+  max-width: 64ch;
+  min-height: 3em;
   margin-bottom: 16px;
   color: var(--color-ink-soft);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .main-explanation .section-tag {
@@ -1729,11 +1738,55 @@ textarea:focus-visible {
   font-size: inherit;
 }
 .main-explanation-skeleton {
+  display: grid;
+  gap: 7px;
+  padding-block: 4px;
+  min-height: 3em;
+}
+.skeleton-line {
   display: block;
-  width: 62%;
-  height: 1lh;
-  border-radius: 6px;
+  height: 14px;
+  width: 92%;
+  border-radius: 4px;
   background: var(--color-panel-2);
+  animation: skeleton-breathe 1.6s ease-in-out infinite alternate;
+}
+.skeleton-line:last-child {
+  width: 68%;
+}
+@keyframes skeleton-breathe {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+@keyframes detail-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.detail-enter,
+.phrase-detail,
+.reference-heading,
+.learning-chunks > li {
+  animation: detail-in 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-enter,
+  .phrase-detail,
+  .reference-heading,
+  .learning-chunks > li,
+  .skeleton-line {
+    animation: none;
+  }
+  .result-cursor {
+    display: none;
+  }
 }
 .primary-result-actions .ui-pill {
   width: 112px;
@@ -1947,6 +2000,11 @@ textarea:focus-visible {
 .source-highlight mark {
   color: transparent;
 }
+.source-highlight .source-grammar {
+  text-decoration: underline dotted var(--color-warm);
+  text-underline-offset: 3px;
+}
+
 .learning-highlight {
   color: var(--color-warm);
   background: var(--color-warm-soft);
@@ -1986,8 +2044,7 @@ textarea:focus-visible {
   user-select: text;
   -webkit-user-select: text;
 }
-.word-details-trigger:hover,
-.word-details-trigger[aria-expanded='true'] {
+.word-details-trigger:hover {
   color: var(--color-warm);
 }
 .word-details-trigger:disabled {
@@ -2052,19 +2109,58 @@ textarea:focus-visible {
   min-height: 48px;
   align-items: center;
   gap: 12px;
-  padding: 8px 2px;
+  padding: 10px 8px;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 16px;
   color: var(--color-ink);
   text-align: left;
   cursor: pointer;
 }
-.learning-chunks button:hover {
-  background: var(--color-warm-soft);
+@media (hover: hover) and (pointer: fine) {
+  .learning-chunks button:hover {
+    background: var(--color-raised, var(--color-panel));
+  }
 }
-.learning-chunks button > :first-child {
+.learning-chunks button[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--color-warm-soft) 50%, transparent);
+}
+.learning-chunks button[aria-expanded='true'] > :first-child {
+  color: var(--color-warm);
+}
+.learning-chunks button > :nth-child(2) {
+  font-size: 14px;
+  opacity: 0.65;
+}
+.learning-chunks button > :last-child {
+  font-size: 15px;
+}
+.learning-chunks .learning-phrase {
+  font-size: inherit;
+  font-weight: 500;
+  margin: 0;
+}
+.phrase-detail {
+  padding: 16px 16px 24px;
+}
+.dictionary-label {
+  font-size: 12px;
   font-weight: 600;
+  color: var(--color-ink-dim);
+  margin-bottom: 4px;
+}
+.character-notes {
+  margin-block: 16px;
+  font-size: 15px;
+  color: var(--color-ink-soft);
+}
+.character-notes p {
+  margin-block: 4px;
+}
+
+.learning-chunks button > :first-child {
+  font-weight: 500;
 }
 .learning-chunks button > :not(:first-child) {
   color: var(--color-ink-soft);
@@ -2090,35 +2186,14 @@ textarea:focus-visible {
 }
 .learning-facts dt,
 .learning-subheading {
-  color: var(--color-warm);
+  color: var(--color-ink-dim);
   font-size: 12px;
   font-weight: 600;
 }
 .learning-facts dd {
   margin: 0;
-  color: var(--color-ink);
-}
-.learning-detail-skeleton > div {
-  margin-bottom: 20px;
-}
-.learning-detail-skeleton dt {
-  padding-top: 2px;
-}
-.learning-detail-skeleton dd {
-  display: grid;
-  gap: 8px;
-}
-.learning-skeleton-line {
-  display: block;
-  height: 10px;
-  border-radius: 3px;
-  background: color-mix(in oklab, var(--color-ink-dim) 22%, transparent);
-}
-.learning-detail-skeleton dt .learning-skeleton-line {
-  width: 70%;
-}
-.learning-detail-skeleton dd .learning-skeleton-line:last-child {
-  width: 72%;
+  color: var(--color-ink-soft);
+  font-size: 15px;
 }
 .learning-back {
   margin-top: 4px;
@@ -2381,7 +2456,10 @@ textarea:focus-visible {
   max-height: 100%;
   flex-shrink: 0;
 }
-.app-shell[data-short]:has(.adjust-content[data-open]) .reference-panel {
+.app-shell[data-short]:not([data-layout='workspace']):has(
+    .adjust-content[data-open]
+  )
+  .reference-panel {
   display: none;
 }
 /* With the software keyboard, dedicate the header to the focused custom field.
@@ -2811,5 +2889,558 @@ textarea:focus-visible {
       100cqw - var(--result-gutter) * 2 - var(--safe-area-left) -
         var(--safe-area-right)
     );
+  }
+}
+
+/* Bound the paired workspace together; spare desktop width belongs outside. */
+.app-shell {
+  max-width: 96rem;
+  margin-inline: auto;
+}
+@media (device-posture: folded) {
+  .app-shell {
+    max-width: none;
+  }
+}
+.translator-panels[data-layout='workspace']
+  :is(.composer, .reference-panel, .result-content) {
+  max-width: none;
+}
+
+/* Tone starts on the result reading edge, even when Adjust is absent. */
+@media (min-width: 1100px) {
+  .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+  }
+  .app-settings,
+  .app-settings:has(.adjust-menu) {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    padding-left: 24px;
+  }
+}
+
+/* Use one set of source actions at both sizes, without reparenting or remounts.
+   This query also applies before hydration and matches the 600px result pane. */
+@container workspace (min-width: 1202px) {
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas: 'head actions' 'context context' 'input input' 'meta meta';
+    gap: 8px;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-header {
+    align-self: center;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-field {
+    display: contents;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-actions {
+    position: static;
+    align-self: center;
+    background: transparent;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-actions
+    .ui-pill {
+    width: 112px;
+    min-width: 112px;
+    height: 44px;
+    padding-inline: 14px;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .source-input-area {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-panel);
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .translation-input {
+    padding: 12px;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-meta {
+    background: transparent;
+  }
+}
+
+/* An already-visible dictionary is not a selected target phrase. Activation
+   still brings its source reference into view, with a visible focus response. */
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .word-details-trigger {
+  color: inherit;
+  text-decoration: none;
+}
+.reference-heading {
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 4px;
+  margin: 4px 4px 12px;
+  border-radius: 4px;
+}
+.reference-panel[data-word-active] .reference-heading:focus {
+  color: var(--color-ink);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.translator-panels:is(
+    [data-layout='workspace'],
+    [data-layout='split'],
+    [data-layout='book']
+  )
+  .word-details-trigger:enabled:hover {
+  text-decoration: underline dotted var(--color-warm) 1px;
+  text-underline-offset: 0.18em;
+}
+
+/* A quiet desktop writing surface, with a focus line instead of a raised card.
+   Apply the same geometry to raw server markup before layout measurement. */
+@container workspace (min-width: 1100px) {
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-field {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .source-input-area {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .translation-input {
+    padding-inline: 0;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .source-input-area:focus-within {
+    box-shadow: none;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-meta,
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-actions {
+    background: transparent;
+  }
+}
+
+/* Writing and reference have distinct hierarchy without a filled input card. */
+@container workspace (min-width: 1100px) {
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer:focus-within {
+    box-shadow: inset 0 -2px 0 var(--color-focus);
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .translation-input {
+    font-size: 20px;
+    min-height: 56px;
+    line-height: 1.6;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .composer-meta
+    .context-toggle {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--color-ink-dim);
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .context-toggle
+    svg {
+    width: 16px;
+    height: 16px;
+  }
+  .translator-panels:is([data-layout='workspace'], [data-layout-pending])
+    .input-count {
+    font-size: 14px;
+  }
+}
+
+/* Adjustment disclosures float at every width; only the tight keyboard editor uses a header row. */
+.adjust-menu:not([data-inline]) .adjust-content[data-open][data-overlay] {
+  right: auto;
+  width: min(
+    320px,
+    calc(100vw - 32px - var(--safe-area-left) - var(--safe-area-right))
+  );
+  box-shadow: 0 10px 32px #0003;
+  animation: detail-in 120ms ease-out;
+}
+.app-shell[data-layout='workspace']:not([data-keyboard])
+  .adjust-menu:not([data-inline])
+  .refine-controls {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .adjust-menu:not([data-inline]) .adjust-content[data-open][data-overlay] {
+    animation: none;
+  }
+}
+
+/* Mobile reading is a focused full-size surface, closed explicitly by the user. */
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded])
+  .workspace-viewport {
+  position: fixed;
+  inset: var(--app-top, 0px) 0 auto;
+  height: var(--app-height, 100dvh);
+  z-index: 80;
+  background: var(--color-bg);
+}
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded]) .app-header {
+  visibility: hidden;
+}
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded])
+  .translator-panels {
+  display: block;
+  height: 100%;
+  padding: 0;
+}
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded])
+  .input-panel {
+  display: none;
+}
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded])
+  .output-panel {
+  display: grid;
+  height: 100%;
+  width: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 0;
+  border: 0;
+}
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded])
+  .output-panel
+  > :is(.target-toolbar, .result-scroll) {
+  display: none;
+}
+.app-shell:not([data-desktop]) .output-panel > .learning-panel[data-expanded] {
+  display: flex;
+  grid-row: 1;
+  grid-column: 1;
+  max-height: none;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-bg);
+}
+.app-shell:not([data-desktop]):has(.learning-panel[data-expanded])
+  .output-panel
+  > .result-actions {
+  grid-row: 2;
+}
+.learning-panel[data-expanded] .learning-panel-header {
+  padding: max(8px, var(--safe-area-top)) calc(12px + var(--safe-area-right))
+    8px calc(20px + var(--safe-area-left));
+}
+.learning-panel[data-expanded] .learning-panel-header h2 {
+  font-size: 15px;
+}
+.learning-panel[data-expanded] .learning-panel-body {
+  flex: 1;
+  padding: 12px calc(20px + var(--safe-area-right)) 20px
+    calc(20px + var(--safe-area-left));
+}
+/* Keep multiline editing generous; condensing is an explicit action only. */
+@container workspace (width < 1100px) {
+  .translator-panels:not([data-desktop]) .composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'head head' 'context context' 'input input' 'actions meta';
+    gap: 8px;
+  }
+  .translator-panels:not([data-desktop]) .composer-actions {
+    display: flex;
+    grid-area: actions;
+    flex-direction: row;
+    gap: 6px;
+    position: static;
+    padding: 0;
+    background: transparent;
+  }
+  .translator-panels:not([data-desktop]) .composer-actions .ui-pill {
+    width: auto;
+    min-width: 44px;
+    height: 44px;
+    padding-inline: 10px;
+    flex-direction: row;
+    font-size: 14px;
+  }
+  .translator-panels:not([data-desktop]) .composer-actions .ui-pill span {
+    display: inline;
+  }
+  .translator-panels:not([data-desktop]) .composer-meta {
+    grid-area: meta;
+    align-self: center;
+  }
+  .translator-panels:not([data-desktop]) .context-toggle-label,
+  .translator-panels:not([data-desktop])
+    .input-count:not(.input-count-visible) {
+    display: none;
+  }
+  .translator-panels:not([data-desktop]) .translation-input {
+    font-size: 18px;
+    min-height: 76px;
+    max-height: min(180px, max(100px, calc(var(--app-height, 100dvh) * 0.28)));
+  }
+  .translator-panels[data-keyboard]:not([data-desktop]) .translation-input {
+    min-height: 76px;
+    max-height: max(76px, calc(var(--app-height, 100dvh) * 0.35));
+  }
+  .translator-panels:not([data-desktop])
+    .input-panel[data-source-compact]
+    .translation-input {
+    min-height: 44px;
+    max-height: 44px;
+    font-size: 18px;
+  }
+  .translator-panels:not([data-desktop])
+    .input-panel[data-source-compact]
+    .composer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'input' 'actions';
+  }
+  .translator-panels[data-keyboard][data-layout='stack'] .input-panel {
+    max-height: calc(var(--app-height, 100dvh) * 0.6);
+  }
+}
+
+@container workspace (width < 1100px) {
+  .translator-panels:not([data-desktop]) .input-panel {
+    padding-inline: calc(12px + var(--safe-area-left))
+      calc(12px + var(--safe-area-right));
+  }
+  .translator-panels[data-tight][data-layout='stack'] .target-toolbar {
+    display: none;
+  }
+}
+
+@container workspace (width < 1100px) {
+  .translator-panels[data-keyboard]:not([data-desktop])
+    :is(.composer-actions, .composer-meta) {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-bg);
+  }
+}
+
+@container workspace (width < 1100px) {
+  .translator-panels:not([data-desktop]) .composer {
+    min-height: 0;
+    max-height: 100%;
+    flex-shrink: 1;
+    overflow: auto;
+    grid-template-areas: 'head head' 'input input' 'actions meta';
+  }
+  .translator-panels:not([data-desktop]) .composer:has(.composer-context) {
+    grid-template-areas: 'head head' 'context context' 'input input' 'actions meta';
+  }
+  .translator-panels:not([data-desktop])
+    :is(.composer-actions, .composer-meta) {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: var(--color-bg);
+  }
+  .translator-panels:is([data-short], [data-keyboard]):not([data-desktop])
+    .composer-header {
+    display: none;
+  }
+  .translator-panels:is([data-short], [data-keyboard]):not([data-desktop])
+    .composer {
+    grid-template-areas: 'input input' 'actions meta';
+  }
+  .translator-panels:is([data-short], [data-keyboard]):not([data-desktop])
+    .composer:has(.composer-context) {
+    grid-template-areas: 'context context' 'input input' 'actions meta';
+  }
+  .translator-panels[data-short]:not([data-desktop])
+    .composer:has(.composer-context:focus-within)
+    .source-input-area {
+    display: none;
+  }
+  .translator-panels[data-keyboard]:not([data-desktop]) .input-panel {
+    padding-bottom: 8px;
+  }
+}
+
+.learning-panel[data-expanded] .learning-facts > div {
+  grid-template-columns: 100px minmax(0, 1fr);
+}
+
+@container workspace (width < 1100px) {
+  .translator-panels:not([data-desktop]) .composer-field {
+    display: contents;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+}
+
+/* Match short mobile editor geometry before the first layout measurement. */
+@media (max-height: 459px) {
+  @container workspace (width < 1100px) {
+    .translator-panels[data-layout-pending] .composer-header {
+      display: none;
+    }
+    .translator-panels[data-layout-pending] .composer {
+      grid-template-areas: 'input input' 'actions meta';
+    }
+    .translator-panels[data-layout-pending] .composer:has(.composer-context) {
+      grid-template-areas: 'context context' 'input input' 'actions meta';
+    }
+  }
+}
+
+/* Paired narrow panes share a footer baseline. The editor and reference scroll
+   above it, while the existing action nodes stay mounted. */
+@container workspace (width < 1100px) {
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    > .input-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, auto) minmax(0, 1fr) auto;
+    grid-template-areas: 'head head' 'context context' 'input input' 'reference reference' 'actions meta';
+    row-gap: 0;
+    padding-block: 8px 0;
+    overflow: hidden;
+  }
+  .translator-panels:is([data-layout='split'], [data-layout='book']) .composer,
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    .composer-field {
+    display: contents;
+  }
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    .composer-header {
+    margin-bottom: 8px;
+  }
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    .composer-context {
+    margin-bottom: 8px;
+  }
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    .source-input-area {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    > .input-panel
+    > .reference-panel {
+    grid-area: reference;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    .composer-actions,
+  .translator-panels:is([data-layout='split'], [data-layout='book'])
+    .composer-meta {
+    position: static;
+    align-self: stretch;
+    align-items: center;
+    margin: 0;
+    padding-block: 8px max(8px, var(--safe-area-bottom));
+    background: var(--color-bg);
+  }
+
+  .translator-panels:is(
+      [data-layout='split'],
+      [data-layout='book']
+    )[data-keyboard]
+    > .input-panel {
+    padding-block: 0;
+  }
+  /* The visual viewport already excludes the keyboard and bottom unsafe area. */
+  .translator-panels:is(
+      [data-layout='split'],
+      [data-layout='book']
+    )[data-keyboard]
+    :is(.composer-actions, .composer-meta) {
+    padding-bottom: 8px;
+  }
+}
+/* Mirror the dock in raw SSR markup before the measured layout takes over. */
+@container workspace (560px <= width < 1100px) and (width > 100dvh) {
+  .translator-panels[data-layout-pending] > .input-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, auto) minmax(0, 1fr) auto;
+    grid-template-areas: 'head head' 'context context' 'input input' 'reference reference' 'actions meta';
+    row-gap: 0;
+    padding-block: 8px 0;
+    overflow: hidden;
+  }
+  .translator-panels[data-layout-pending] .composer,
+  .translator-panels[data-layout-pending] .composer-field {
+    display: contents;
+  }
+  .translator-panels[data-layout-pending] .composer-header {
+    margin-bottom: 8px;
+  }
+  .translator-panels[data-layout-pending] .composer-context {
+    margin-bottom: 8px;
+  }
+  .translator-panels[data-layout-pending] .source-input-area {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .translator-panels[data-layout-pending] > .input-panel > .reference-panel {
+    grid-area: reference;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+  .translator-panels[data-layout-pending] .composer-actions,
+  .translator-panels[data-layout-pending] .composer-meta {
+    position: static;
+    align-self: stretch;
+    align-items: center;
+    margin: 0;
+    padding-block: 8px max(8px, var(--safe-area-bottom));
+    background: var(--color-bg);
+  }
+}
+
+/* The keyboard editor shares the pane surface; its action row stays readable. */
+.context-toggle-short-label {
+  display: none;
+}
+@container workspace (width < 1100px) {
+  .translator-panels:not([data-desktop]) .context-toggle-short-label {
+    display: inline;
+  }
+  .translator-panels:not([data-desktop]) .context-toggle svg {
+    display: none;
+  }
+  .translator-panels:not([data-desktop]) .composer-meta .context-toggle {
+    padding-inline: 8px;
+    font-size: 14px;
+  }
+  .translator-panels[data-keyboard][data-layout='stack'] .composer {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .translator-panels[data-keyboard][data-layout='stack'] .translation-input,
+  .translator-panels[data-keyboard][data-layout='stack'] .source-input-area {
+    background: transparent;
   }
 }

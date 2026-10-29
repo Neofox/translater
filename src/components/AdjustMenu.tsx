@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { autoUpdate, offset, shift, useFloating } from '@floating-ui/react'
 import { useTranslatorContext } from '../context/TranslatorContext'
 import { useLearningContext } from '../context/LearningContext'
 import { useWorkspaceLayoutContext } from '../context/WorkspaceLayoutContext'
@@ -22,6 +23,40 @@ export default function AdjustMenu() {
   const focusChips = useRef(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const id = useId()
+  // Every ordinary disclosure floats, including phone/split layouts. Only the
+  // focused Custom editor needs the dedicated header when the keyboard is tight.
+  const overlay = !inline && !(layout.keyboard && layout.tight)
+  const { refs, floatingStyles } = useFloating({
+    open: open && overlay,
+    placement: 'bottom-start',
+    strategy: 'fixed',
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset(12),
+      shift({ padding: 16 }),
+      {
+        name: 'primaryActionsClearance',
+        fn: ({ x, y, rects }) => {
+          const actions = menu.current
+            ?.closest('.app-shell')
+            ?.querySelector('.primary-result-actions')
+            ?.getBoundingClientRect()
+          if (
+            !actions ||
+            y >= actions.bottom ||
+            y + rects.floating.height <= actions.top
+          )
+            return {}
+          return {
+            x: Math.max(
+              16,
+              Math.min(x, actions.left - rects.floating.width - 12),
+            ),
+          }
+        },
+      },
+    ],
+  })
   const compactOpen = open && !inline && layout.resultFirst
   const wasCompactOpen = useRef(false)
   useLayoutEffect(() => {
@@ -33,11 +68,11 @@ export default function AdjustMenu() {
     const header = root?.closest<HTMLElement>('.app-header')
     const content = root?.querySelector<HTMLElement>('.adjust-content')
     if (!header || !content) return
-    // Allocate real header space for the compact panel, including wrapped chips.
+    // Reserve space only for the dedicated tight-keyboard editor.
     const measure = () =>
       header.style.setProperty(
         '--adjust-panel-height',
-        open && !inline
+        open && !inline && !overlay
           ? `${content.getBoundingClientRect().height + 6}px`
           : '0px',
       )
@@ -56,7 +91,7 @@ export default function AdjustMenu() {
       cancelAnimationFrame(frame)
       header.style.removeProperty('--adjust-panel-height')
     }
-  }, [open, inline, live?.intent])
+  }, [open, inline, live?.intent, overlay])
   useLayoutEffect(() => {
     if (!input.trim()) setOpen(false)
   }, [input])
@@ -111,9 +146,19 @@ export default function AdjustMenu() {
       if (event.target instanceof Node && !menu.current?.contains(event.target))
         setOpen(false)
     }
-    // Let the clicked action run before removing the panel's reserved space.
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      trigger.current?.focus({ preventScroll: true })
+    }
+    // Touch browsers need not focus the trigger, so Escape must also work
+    // outside the menu. Preserve normal click actions before dismissing.
     document.addEventListener('click', dismiss)
-    return () => document.removeEventListener('click', dismiss)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('click', dismiss)
+      document.removeEventListener('keydown', escape)
+    }
   }, [open, inline])
   if (!live || live.intent !== 'sentence') return null
   const visible = open || inline
@@ -141,7 +186,10 @@ export default function AdjustMenu() {
       }}
     >
       <Pill
-        ref={trigger}
+        ref={(node) => {
+          trigger.current = node
+          refs.setReference(node)
+        }}
         size="md"
         tone={summary || open ? 'active' : 'neutral'}
         data-active={summary ? true : undefined}
@@ -173,6 +221,9 @@ export default function AdjustMenu() {
       </Pill>
       <div
         id={id}
+        ref={refs.setFloating}
+        style={overlay ? floatingStyles : undefined}
+        data-overlay={overlay || undefined}
         className="adjust-content"
         role="group"
         aria-label={t('adjust')}

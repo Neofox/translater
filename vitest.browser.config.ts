@@ -50,12 +50,6 @@ export default defineConfig({
     // Keep TanStack's generated server entrypoints out of the component runner
     // and make a paid speech request impossible even before module mocks load.
     alias: [
-      ...['../server/learning', '../../src/server/learning'].map((find) => ({
-        find,
-        replacement: fileURLToPath(
-          new URL('./tests/browser/learningTransport.ts', import.meta.url),
-        ),
-      })),
       {
         find: '@tanstack/react-start',
         replacement: fileURLToPath(

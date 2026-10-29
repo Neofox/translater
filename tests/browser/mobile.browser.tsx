@@ -30,7 +30,7 @@ const requestKey = (text: string) =>
   })
 
 const sourceText = 'Thanks for helping me today.'
-const learningTips = {
+const phraseNotes = {
   grammar: 'The polite ending makes this suitable for a friendly colleague.',
   vocab: '도와주다 means to help someone.',
   characters: [],
@@ -48,9 +48,65 @@ const sentence: LiveResult = {
     rationale: 'A warm and natural thank you.',
     alternatives: [],
     formalityNote: '',
-    learningTips,
+    learningPhrases: [
+      {
+        text: '오늘',
+        gloss: 'today',
+        sourceTexts: ['today'],
+        baseForm: '오늘',
+        literalMeaning: '',
+        naturalMeaning: 'today',
+        grammar: '',
+        omissions: '',
+        usageNote: '',
+        characters: [],
+        grammarHighlights: [],
+      },
+      {
+        text: '도와줘서',
+        gloss: 'for helping me',
+        sourceTexts: ['helping me'],
+        baseForm: '도와주다',
+        literalMeaning: 'because you helped',
+        naturalMeaning: 'for helping me',
+        grammar: '-어서 gives the reason for thanks.',
+        omissions: 'The participants are understood.',
+        usageNote: phraseNotes.vocab,
+        characters: [],
+        grammarHighlights: ['줘서'],
+      },
+      {
+        text: '고마워요',
+        gloss: 'thanks',
+        sourceTexts: ['Thanks'],
+        baseForm: '고맙다',
+        literalMeaning: 'to be grateful',
+        naturalMeaning: 'thanks',
+        grammar: phraseNotes.grammar,
+        omissions: '',
+        usageNote: '',
+        characters: [],
+        grammarHighlights: ['고마워요'],
+      },
+    ],
   },
 }
+const learningForText = (text: string) =>
+  [...new Intl.Segmenter('ko', { granularity: 'sentence' }).segment(text)]
+    .filter((part) => part.segment.trim())
+    .map((part) => ({
+      text: part.segment.trim(),
+      gloss: 'A sentence from this translation.',
+      sourceTexts: [],
+      baseForm: '',
+      literalMeaning: '',
+      naturalMeaning: '',
+      grammar: '',
+      omissions: '',
+      usageNote: '',
+      characters: [],
+      grammarHighlights: [],
+    }))
 const word: LiveResult = {
   intent: 'word',
   text: 'library',
@@ -82,7 +138,8 @@ const word: LiveResult = {
     synonyms: ['reading room'],
     etymology: 'From Latin librarium.',
     notes: '',
-    learningTips,
+    grammar: '도서관 is a noun; 에 and 에서 mark its use as a location.',
+    characters: [],
   },
 }
 
@@ -108,6 +165,7 @@ function Fixture({
   initialMode = 'casual',
   initialDetected = null,
   initialError = null,
+  flushPending = () => false,
 }: {
   initial?: LiveResult | null
   initialSource?: Context['source']
@@ -115,6 +173,7 @@ function Fixture({
   initialMode?: Context['mode']
   initialDetected?: Context['detected']
   initialError?: Context['error']
+  flushPending?: Context['flush']
 }) {
   const [state, setState] = useState<State>({
     input: initial?.text ?? '',
@@ -138,7 +197,6 @@ function Fixture({
     detected: initialDetected,
     refineError: null,
     refinements: [],
-    outputTips: state.live?.partial.learningTips,
     textareaRef,
     setInput: (input) => setState((old) => ({ ...old, input })),
     setSource: (source) => setState((old) => ({ ...old, source })),
@@ -152,7 +210,7 @@ function Fixture({
     setMode: vi.fn(),
     run: vi.fn(),
     reset: vi.fn(),
-    flush: () => false,
+    flush: flushPending,
     queueImmediate: vi.fn(),
     lookupWord: (text) =>
       setState((old) => ({ ...old, input: text, live: null })),
@@ -301,6 +359,8 @@ test.each([
   [580, 382],
   [594, 580],
   [1110, 760],
+  [1280, 760],
+  [2048, 982],
 ])(
   'server-rendered first paint respects usable-width edges at %i × %i',
   async (width, height) => {
@@ -340,11 +400,6 @@ function assertWithinViewport(element: Element) {
   expect(rect.right).toBeLessThanOrEqual(window.innerWidth + 1)
   expect(rect.top).toBeGreaterThanOrEqual(-1)
   expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight + 1)
-}
-
-async function expandSourceIfNeeded() {
-  if (document.querySelector('.input-panel[data-source-compact]'))
-    await page.getByTestId('source-expand').click()
 }
 
 test('main actions keep one stable slot while translation and explanation grow', async () => {
@@ -468,6 +523,91 @@ test('header settings keep their position when sentence adjustments first appear
   })
 })
 
+test('wide workspaces put excess space outside and align tone and mirrored actions', async () => {
+  if (window.innerWidth !== 1512) return
+  const original = [window.innerWidth, window.innerHeight] as const
+  try {
+    await render(
+      <Fixture
+        initial={{
+          ...word,
+          partial: {
+            ...word.partial,
+            grammar:
+              '도서관 is a noun; 에 and 에서 mark its use as a location.',
+            notes: '도서 means books; 관 means a building.',
+            characters: [],
+          },
+        }}
+      />,
+    )
+    for (const width of [1280, 1512, 1728, 2048]) {
+      await page.viewport(width, 982)
+      await expect
+        .poll(() =>
+          document.querySelector('.app-shell')?.getAttribute('data-layout'),
+        )
+        .toBe('workspace')
+      const shell = document
+        .querySelector('.app-shell')!
+        .getBoundingClientRect()
+      await expect
+        .poll(
+          () =>
+            document.querySelector('.app-shell')!.getBoundingClientRect().width,
+        )
+        .toBe(Math.min(width, 1536))
+      expect(
+        Math.abs(shell.left - (width - shell.width) / 2),
+      ).toBeLessThanOrEqual(1)
+      const result = page
+        .getByTestId('main-translation')
+        .element()
+        .getBoundingClientRect()
+      const tone = document
+        .querySelector('.mode-segment')!
+        .getBoundingClientRect()
+      expect(Math.abs(tone.left - result.left)).toBeLessThanOrEqual(1)
+      const paste = page
+        .getByTestId('paste-input')
+        .element()
+        .getBoundingClientRect()
+      const clear = page
+        .getByTestId('clear-input')
+        .element()
+        .getBoundingClientRect()
+      const copy = page
+        .getByTestId('output-toolbar')
+        .getByRole('button', { name: 'Copy', exact: true })
+        .element()
+        .getBoundingClientRect()
+      const languages = document
+        .querySelector('[aria-label="Source language"]')!
+        .getBoundingClientRect()
+      const editor = page
+        .getByTestId('input-textarea')
+        .element()
+        .getBoundingClientRect()
+      expect(Math.abs(paste.top - copy.top)).toBeLessThanOrEqual(1)
+      expect(Math.abs(clear.top - copy.top)).toBeLessThanOrEqual(1)
+      expect(languages.right).toBeLessThanOrEqual(paste.left)
+      expect(clear.bottom).toBeLessThanOrEqual(editor.top)
+      const output = document
+        .querySelector('.output-panel')!
+        .getBoundingClientRect()
+      const content = document
+        .querySelector('.result-content')!
+        .getBoundingClientRect()
+      expect(output.right - content.right).toBeLessThanOrEqual(32)
+      await settledScreenshot({
+        path: `../../test-results/workspace-alignment-${width}.png`,
+      })
+    }
+  } finally {
+    await page.viewport(...original)
+  }
+})
+
 test('dock speech failures stay visible inside the result pane', async () => {
   vi.mocked(speak).mockRejectedValue(new Error('Unavailable'))
   await render(<Fixture />)
@@ -543,7 +683,7 @@ test('Paste Clear and the main result actions remain visible and touch sized', a
 })
 
 test.each([false, true])(
-  'finished folded translation gives space back to results (keyboard %s)',
+  'folded translation keeps the editor expanded without a collapse control (keyboard %s)',
   async (keyboard) => {
     const original = [window.innerWidth, window.innerHeight] as const
     const viewport = Object.assign(new EventTarget(), {
@@ -611,9 +751,11 @@ test.each([false, true])(
       const source = document.querySelector<HTMLElement>('.input-panel')!
       await expect
         .poll(() => source.hasAttribute('data-source-compact'))
-        .toBe(true)
+        .toBe(false)
       // Labelled Paste/Clear use a second compact row instead of icon-only actions.
-      expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(160)
+      expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(
+        keyboard ? 180 : 300,
+      )
       expect(page.getByTestId('input-textarea').element()).toBe(input)
       expect(document.activeElement).toBe(input)
       expect([input.selectionStart, input.selectionEnd]).toEqual([3, 6])
@@ -621,7 +763,7 @@ test.each([false, true])(
         .querySelector('.composer')!
         .getBoundingClientRect()
       expect(composer.left).toBeGreaterThanOrEqual(12)
-      expect(composer.height).toBeLessThanOrEqual(110)
+      expect(composer.height).toBeGreaterThan(110)
       expect(composer.bottom).toBeLessThanOrEqual(
         source.getBoundingClientRect().bottom,
       )
@@ -662,19 +804,13 @@ test.each([false, true])(
       await settledScreenshot({
         path: `../../test-results/folded-result-first-${keyboard ? 'keyboard' : 'closed'}.png`,
       })
-      await page.getByTestId('source-expand').click()
       await expect
-        .poll(() => source.hasAttribute('data-source-compact'))
-        .toBe(false)
+        .element(page.getByTestId('source-expand'))
+        .not.toBeInTheDocument()
       expect(page.getByTestId('input-textarea').element()).toBe(input)
       await page.getByTestId('context-toggle').click()
       await page.getByTestId('context-textarea').fill('A friendly greeting.')
-      await page.getByTestId('source-expand').click()
-      await expect
-        .poll(() => source.hasAttribute('data-source-compact'))
-        .toBe(true)
-      expect(document.activeElement).toBe(input)
-      await page.getByTestId('source-expand').click()
+      await page.getByTestId('context-toggle').click()
       await page.getByTestId('context-toggle').click()
       await expect
         .element(page.getByTestId('context-textarea'))
@@ -691,7 +827,6 @@ test.each([false, true])(
 
 test('language menus stay within the viewport and support keyboard selection', async () => {
   await render(<Fixture />)
-  await expandSourceIfNeeded()
   for (const name of ['Source language', 'Target language']) {
     const trigger = page
       .getByRole('group', { name })
@@ -719,7 +854,6 @@ test('language menus stay within the viewport and support keyboard selection', a
 
 test('context and learner details remain usable without a popup', async () => {
   await render(<Fixture initial={word} />)
-  await expandSourceIfNeeded()
   await page.getByTestId('context-toggle').click()
   await page
     .getByTestId('context-textarea')
@@ -733,23 +867,12 @@ test('context and learner details remain usable without a popup', async () => {
   await page.getByTestId('word-details-trigger').click()
   // Pointer inspection waits for native selection before opening its panel.
   await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
-  const toggle = page.getByRole('button', {
-    name: 'Learning tips',
-    exact: true,
-  })
-  const collapsible = Boolean(toggle.query())
-  if (collapsible) await toggle.click()
   await expect
-    .element(page.getByText(learningTips.grammar, { exact: true }))
+    .element(page.getByText(word.partial.grammar!, { exact: true }))
     .toBeVisible()
-  if (collapsible) {
-    await page
-      .getByRole('button', { name: 'Learning tips', exact: true })
-      .click()
-    await expect
-      .element(page.getByRole('button', { name: 'Learning tips', exact: true }))
-      .toHaveAttribute('aria-expanded', 'false')
-  }
+  expect(
+    page.getByRole('heading', { name: 'Learning tips', exact: true }).query(),
+  ).toBeNull()
 })
 
 test('Listen stops explicitly, completes after audio ends, and replays without a new request', async () => {
@@ -889,11 +1012,17 @@ test('result switches honor the browser motion preference', async () => {
     },
   )
   await expect.element(page.getByText('도서관', { exact: true })).toBeVisible()
-  const animated = [...document.querySelectorAll('.animate-settle')]
+  const animated = [
+    ...document.querySelectorAll('.animate-settle, .detail-enter'),
+  ]
   expect(animated.length).toBeGreaterThan(0)
   for (const element of animated)
     expect(getComputedStyle(element).animationName).toBe(
-      reduced ? 'none' : 'settle-in',
+      reduced
+        ? 'none'
+        : element.classList.contains('detail-enter')
+          ? 'detail-in'
+          : 'settle-in',
     )
   await expect.poll(() => transition.mock.calls.length).toBeGreaterThan(0)
   const rules = [...document.styleSheets]
@@ -1020,8 +1149,9 @@ test('desktop source and reference share the left pane while alternatives stay r
       .getByRole('button', { name: /^Why this wording/, exact: true })
       .query(),
   ).toBeNull()
+  await page.getByTestId('learning-chunk').nth(2).click()
   await expect
-    .element(page.getByText(learningTips.grammar, { exact: true }))
+    .element(page.getByText(phraseNotes.grammar, { exact: true }))
     .toBeVisible()
   for (const row of document.querySelectorAll(
     '[data-testid="alternative-item"]',
@@ -1108,18 +1238,18 @@ test('reference notes track streaming clear and error without moving source focu
   expect(document.activeElement).toBe(input)
 })
 
-test('portrait keeps alternatives readable and learning in its own compact panel', async () => {
+test('portrait keeps alternatives readable with an expanded multiline source', async () => {
   if (window.innerWidth >= 1100 || window.innerWidth > window.innerHeight)
     return
   await render(<Fixture initial={withAlternatives} />)
   const source = document.querySelector('.input-panel')!
-  expect(source.hasAttribute('data-source-compact')).toBe(true)
-  expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(140)
+  expect(source.hasAttribute('data-source-compact')).toBe(false)
+  expect(source.getBoundingClientRect().height).toBeLessThanOrEqual(300)
   const editor = page
     .getByTestId('input-textarea')
     .element() as HTMLTextAreaElement
   const lineHeight = parseFloat(getComputedStyle(editor).lineHeight)
-  expect(Math.abs(editor.clientHeight / lineHeight - 1)).toBeLessThan(0.01)
+  expect(editor.clientHeight / lineHeight).toBeGreaterThanOrEqual(2)
   expect(
     document.querySelector('.detail-alternatives')!.closest('.output-panel'),
   ).not.toBeNull()
@@ -1204,9 +1334,7 @@ test.each([
           Math.min(pane.bottom, height - 34),
         )
       }
-      expect(
-        document.querySelector<HTMLElement>('.reference-scroll')!.clientHeight,
-      ).toBeGreaterThanOrEqual(44)
+      expect(document.querySelector('.reference-panel')).toBeNull() // Changed reply context makes the old learning result stale.
       updateUrgent({ error: { kind: 'server', message: 'Connection lost.' } })
       await expect
         .poll(() => document.querySelector('.reference-panel'))
@@ -1247,11 +1375,8 @@ test('A workspace keeps long source and result controls above the safe bottom ed
           partial: {
             ...sentence.partial,
             main: longTranslation.repeat(8),
+            learningPhrases: learningForText(longTranslation.repeat(8)),
             rationale: 'A clear explanation of the chosen wording. '.repeat(50),
-            learningTips: {
-              ...learningTips,
-              grammar: learningTips.grammar.repeat(60),
-            },
           },
         }}
       />,
@@ -1346,9 +1471,9 @@ test('long text keeps source learning separate from output wording without a res
       .element()
       .getBoundingClientRect()
     if (text.bottom > actions.top)
-      expect(
-        Math.abs(actions.bottom - output.getBoundingClientRect().bottom),
-      ).toBeLessThanOrEqual(1)
+      expect(actions.top).toBeGreaterThanOrEqual(
+        output.getBoundingClientRect().bottom,
+      )
   }
   assertWithinViewport(
     page
@@ -1356,16 +1481,7 @@ test('long text keeps source learning separate from output wording without a res
       .getByRole('button', { name: 'Copy', exact: true })
       .element(),
   )
-  if (document.querySelector('.translator-panels[data-desktop]')) {
-    const why = document
-      .querySelector('.output-panel .detail-why')!
-      .getBoundingClientRect()
-    const tips = page
-      .getByRole('heading', { name: 'Learning tips', exact: true })
-      .element()
-      .getBoundingClientRect()
-    expect(tips.right).toBeLessThanOrEqual(why.left)
-  }
+  expect(document.querySelector('.detail-learning')).toBeNull()
   await settledScreenshot({
     path: `../../test-results/design-${window.innerWidth}x${window.innerHeight}-long.png`,
   })
@@ -1373,7 +1489,6 @@ test('long text keeps source learning separate from output wording without a res
 
 test('source sizing keeps Clear reachable for long and short turns', async () => {
   await render(<Fixture />)
-  await expandSourceIfNeeded()
   const input = page.getByTestId('input-textarea')
   const textarea = input.element() as HTMLTextAreaElement
   await input.fill('Hi')
@@ -1748,7 +1863,6 @@ test.each([
       await expect
         .poll(() => shell.getBoundingClientRect().top)
         .toBe(offset + 20)
-      await expandSourceIfNeeded()
       await page.getByTestId('context-toggle').click()
       await page
         .getByTestId('context-textarea')
@@ -1788,9 +1902,14 @@ test.each([
   },
 )
 
-test.each(['book', 'laptop'] as const)(
-  'fold posture %s preserves the turn and reachable controls',
-  async (posture) => {
+test.each([
+  { posture: 'book', keyboard: false },
+  { posture: 'book', keyboard: true },
+  { posture: 'laptop', keyboard: false },
+  { posture: 'laptop', keyboard: true },
+] as const)(
+  'fold posture $posture preserves the turn and reachable controls (keyboard $keyboard)',
+  async ({ posture, keyboard }) => {
     const original = [window.innerWidth, window.innerHeight] as const
     const nativeMatchMedia = window.matchMedia.bind(window)
     let folded = false
@@ -1814,9 +1933,19 @@ test.each(['book', 'laptop'] as const)(
       }
       return media.get(query)!
     })
+    const viewport = Object.assign(new EventTarget(), {
+      width: 736,
+      height: 736,
+      offsetTop: 0,
+      scale: 1,
+    })
     try {
       await page.viewport(736, 736)
+      vi.stubGlobal('visualViewport', viewport)
       await render(<Fixture />)
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      shell.style.setProperty('--safe-area-bottom', '34px')
+
       const input = page.getByTestId('input-textarea')
       await input.fill('Keep this conversation while folding.')
       const node = input.element()
@@ -1829,6 +1958,11 @@ test.each(['book', 'laptop'] as const)(
             ?.getAttribute('data-layout'),
         )
         .toBe(posture)
+      if (keyboard) {
+        viewport.height = 300
+        viewport.dispatchEvent(new Event('resize'))
+        await expect.poll(() => shell.hasAttribute('data-keyboard')).toBe(true)
+      }
       expect(input.element()).toBe(node)
       expect(document.activeElement).toBe(node)
       for (const name of ['paste-input', 'clear-input'])
@@ -1842,6 +1976,22 @@ test.each(['book', 'laptop'] as const)(
       if (posture === 'book')
         expect(source.right).toBeLessThanOrEqual(result.left)
       else expect(result.bottom).toBeLessThanOrEqual(source.top)
+      const copy = page
+        .getByTestId('output-toolbar')
+        .getByRole('button', { name: 'Copy', exact: true })
+        .element()
+      const copyBox = copy.getBoundingClientRect()
+      expect(copyBox.bottom).toBeLessThanOrEqual(viewport.height)
+      if (posture === 'book') {
+        expect(
+          Math.abs(
+            page.getByTestId('paste-input').element().getBoundingClientRect()
+              .top - copyBox.top,
+          ),
+        ).toBeLessThanOrEqual(1)
+      }
+      viewport.height = 736
+      viewport.dispatchEvent(new Event('resize'))
       folded = false
       media.forEach((item) => item.dispatchEvent(new Event('change')))
       await expect
@@ -1856,6 +2006,7 @@ test.each(['book', 'laptop'] as const)(
         .toHaveValue('Keep this conversation while folding.')
     } finally {
       vi.restoreAllMocks()
+      vi.unstubAllGlobals()
       await page.viewport(...original)
     }
   },
@@ -2035,11 +2186,9 @@ test.each([
           ],
           synonyms: ['두근거리다', '들뜨다'],
           etymology: 'A native Korean word.',
-          learningTips: {
-            grammar: '설레다 becomes 설레요 in polite speech.',
-            vocab: '설렘 is the noun form.',
-            characters: [],
-          },
+          grammar: '설레다 becomes 설레요 in polite speech.',
+          notes: '설렘 is the noun form.',
+          characters: [],
         },
       }
       await render(
@@ -2094,7 +2243,7 @@ test.each([
       assertWithinViewport(meaning)
       expect(
         parseFloat(getComputedStyle(meaning).fontSize),
-      ).toBeGreaterThanOrEqual(16)
+      ).toBeGreaterThanOrEqual(15)
       await page
         .getByRole('group', { name: 'Source language' })
         .getByTestId('lang-more-trigger')
@@ -2322,6 +2471,9 @@ test('wording placeholder uses its real text line height while main Copy stays a
     path: `../../test-results/streaming-${window.innerWidth}x${window.innerHeight}-main-ready.png`,
   })
   const before = copy.element().getBoundingClientRect()
+  const placeholderBox = document
+    .querySelector('.main-explanation')!
+    .getBoundingClientRect()
   updateUrgent({
     live: {
       ...initial,
@@ -2339,11 +2491,22 @@ test('wording placeholder uses its real text line height while main Copy stays a
   expect(
     Math.abs(before.top - copy.element().getBoundingClientRect().top),
   ).toBeLessThanOrEqual(1)
+  const why = document.querySelector('.main-explanation')!
+  expect(getComputedStyle(why).fontSize).toBe('14px')
+  expect(
+    Math.abs(placeholderBox.height - why.getBoundingClientRect().height),
+  ).toBeLessThanOrEqual(1)
+  const main = page
+    .getByTestId('main-translation')
+    .element()
+    .getBoundingClientRect()
+  expect(why.getBoundingClientRect().top - main.bottom).toBeGreaterThanOrEqual(
+    12,
+  )
 })
 
-test('source field retains its neutral border while typing and controls keep keyboard focus', async () => {
+test('source surface stays stable while typing and controls keep keyboard focus', async () => {
   await render(<Fixture />)
-  await expandSourceIfNeeded()
   const input = page
     .getByTestId('input-textarea')
     .element() as HTMLTextAreaElement
@@ -2356,3 +2519,420 @@ test('source field retains its neutral border while typing and controls keep key
   await page.getByTestId('clear-input').click()
   expect(document.activeElement).toBe(input)
 })
+
+test('no-alternatives desktop example keeps all learning facts in phrase details', async () => {
+  if (window.innerWidth !== 1512) return
+  const original = [window.innerWidth, window.innerHeight] as const
+  const text =
+    'Your local changes are untouched, and your spec doc is still staged and uncommitted.'
+  const initial: LiveResult = {
+    ...sentence,
+    text,
+    requestKey: requestKey(text),
+    partial: {
+      sourceLang: 'en',
+      targetLang: 'ko',
+      main: '로컬 변경 사항은 그대로 건드리지 않았고, 사양 문서는 여전히 스테이징된 상태로 커밋되지 않았어요.',
+      rationale:
+        'The Git terms use standard Korean developer vocabulary, while 그대로 건드리지 않았고 emphasizes leaving the local changes untouched.',
+      learningPhrases: [
+        {
+          text: '로컬 변경 사항은',
+          gloss: 'your local changes',
+          sourceTexts: ['Your local changes'],
+          baseForm: '변경 사항',
+          literalMeaning: 'local changes',
+          naturalMeaning: 'your local changes',
+          grammar: '',
+          omissions: '',
+          usageNote: '',
+          characters: [
+            {
+              word: '변경 사항',
+              chars: [
+                { char: '變', meaning: 'change' },
+                { char: '更', meaning: 'renewal' },
+                { char: '事', meaning: 'matter' },
+                { char: '項', meaning: 'item' },
+              ],
+            },
+          ],
+          grammarHighlights: [],
+        },
+        {
+          text: '그대로 건드리지 않았고',
+          gloss: 'have been left untouched',
+          sourceTexts: ['untouched'],
+          baseForm: '건드리다',
+          literalMeaning: 'did not touch, and',
+          naturalMeaning: 'have been left untouched',
+          grammar:
+            '-지 않았다 negates the past action; -고 connects it to the next clause.',
+          omissions: 'The agent is understood from context.',
+          usageNote: '',
+          characters: [],
+          grammarHighlights: ['지 않았고'],
+        },
+        {
+          text: '사양 문서는',
+          gloss: 'your spec document',
+          sourceTexts: ['your spec doc'],
+          baseForm: '사양 문서',
+          literalMeaning: 'specification document',
+          naturalMeaning: 'your spec document',
+          grammar: '',
+          omissions: '',
+          usageNote: '',
+          characters: [],
+          grammarHighlights: [],
+        },
+        {
+          text: '여전히 스테이징된 상태로',
+          gloss: 'still staged',
+          sourceTexts: ['still staged'],
+          baseForm: '스테이징되다',
+          literalMeaning: 'still in the staged state',
+          naturalMeaning: 'still staged',
+          grammar:
+            '-된 상태로 describes a resulting state that remains in effect.',
+          omissions: '',
+          characters: [],
+          grammarHighlights: ['된 상태로'],
+          usageNote:
+            '스테이징 and 커밋 are Korean developer loanwords for Git operations.',
+        },
+        {
+          text: '커밋되지 않았어요',
+          gloss: 'has not been committed',
+          sourceTexts: ['uncommitted'],
+          baseForm: '커밋되다',
+          literalMeaning: 'has not been committed',
+          naturalMeaning: 'uncommitted',
+          grammar: '-지 않았어요 is a polite negative past ending.',
+          omissions: 'The specification document remains the subject.',
+          usageNote: '',
+          characters: [],
+          grammarHighlights: ['지 않았어요'],
+        },
+      ],
+      alternatives: [],
+    },
+  }
+  try {
+    await render(<Fixture initial={initial} />)
+    for (const width of [1512, 2048]) {
+      await page.viewport(width, 982)
+      await expect
+        .element(page.getByTestId('learning-chunk').first())
+        .toBeVisible()
+      expect(document.querySelector('.detail-learning')).toBeNull()
+      expect(
+        document.querySelectorAll('[data-testid="learning-chunk"]'),
+      ).toHaveLength(5)
+      expect(document.querySelector('.detail-alternatives')).toBeNull()
+      await settledScreenshot({
+        path: `../../test-results/learning-balance-${width}.png`,
+      })
+    }
+  } finally {
+    await page.viewport(...original)
+  }
+})
+
+test('technical translation description has a quieter measure and clear spacing', async () => {
+  if (window.innerWidth !== 1512) return
+  const text = "I'll put the split in a small helper under api/src/utils/"
+  await render(
+    <Fixture
+      initial={{
+        ...sentence,
+        text,
+        requestKey: requestKey(text),
+        partial: {
+          ...sentence.partial,
+          main: '분할 로직은 api/src/utils/ 아래에 작은 헬퍼로 넣을게요.',
+          learningPhrases: [],
+          rationale:
+            'The translation keeps the code path unchanged and renders “put … in a helper” as 넣다, a natural developer phrasing for implementing something as a helper function. 분할 로직 makes the implied programming object explicit without adding new technical detail.',
+        },
+      }}
+    />,
+  )
+  const why = document.querySelector('.main-explanation')!
+  expect(getComputedStyle(why).fontSize).toBe('14px')
+  const main = page
+    .getByTestId('main-translation')
+    .element()
+    .getBoundingClientRect()
+  expect(why.getBoundingClientRect().top - main.bottom).toBeGreaterThanOrEqual(
+    12,
+  )
+  await settledScreenshot({
+    path: '../../test-results/motion-description-1512.png',
+  })
+})
+
+test('mobile multiline source stays expanded while typing and after the result arrives', async () => {
+  if (window.innerWidth >= 560) return
+  await render(<Fixture initial={null} />)
+  const input = page.getByTestId('input-textarea')
+  const node = input.element() as HTMLTextAreaElement
+  await input.fill('First line\nSecond line\nThird line')
+  expect(
+    document.querySelector('.input-panel')?.hasAttribute('data-source-compact'),
+  ).toBe(false)
+  expect(getComputedStyle(node).fontSize).toBe('18px')
+  expect(node.getBoundingClientRect().height).toBeGreaterThanOrEqual(90)
+  node.setSelectionRange(12, 15)
+  updateUrgent({
+    live: { ...sentence, text: node.value, requestKey: requestKey(node.value) },
+  })
+  expect(input.element()).toBe(node)
+  expect([node.selectionStart, node.selectionEnd]).toEqual([12, 15])
+  expect(node.getBoundingClientRect().height).toBeGreaterThanOrEqual(90)
+  await settledScreenshot({
+    path: `../../test-results/mobile-multiline-${window.innerWidth}.png`,
+  })
+})
+
+test.each(['empty', 'translated', 'long'] as const)(
+  'split source and result actions share a bottom dock for %s turns',
+  async (state) => {
+    if (window.innerWidth >= 1100) return
+    const original = [window.innerWidth, window.innerHeight] as const
+    const initial =
+      state === 'empty'
+        ? null
+        : state === 'long'
+          ? {
+              ...sentence,
+              text: longSource,
+              requestKey: requestKey(longSource),
+              partial: {
+                ...sentence.partial,
+                main: longTranslation,
+                learningPhrases: learningForText(longTranslation),
+              },
+            }
+          : sentence
+    try {
+      await render(<Fixture initial={initial} />)
+      const input = page
+        .getByTestId('input-textarea')
+        .element() as HTMLTextAreaElement
+      for (const [width, height] of [
+        [580, 382],
+        [736, 594],
+        [960, 548],
+      ] as const) {
+        await page.viewport(width, height)
+        await expect
+          .poll(() =>
+            document.querySelector('.app-shell')?.getAttribute('data-layout'),
+          )
+          .toBe('split')
+        await expect
+          .poll(
+            () =>
+              document.querySelector('.app-shell')!.getBoundingClientRect()
+                .height,
+          )
+          .toBe(height)
+        const copy = page
+          .getByTestId('output-toolbar')
+          .getByRole('button', { name: 'Copy', exact: true })
+          .element()
+          .getBoundingClientRect()
+        for (const id of ['paste-input', 'clear-input', 'context-toggle']) {
+          const control = page.getByTestId(id).element()
+          expect(
+            Math.abs(control.getBoundingClientRect().top - copy.top),
+          ).toBeLessThanOrEqual(1)
+          assertWithinViewport(control)
+          expect(
+            document
+              .elementFromPoint(
+                control.getBoundingClientRect().left +
+                  control.getBoundingClientRect().width / 2,
+                control.getBoundingClientRect().top + 22,
+              )
+              ?.closest('button'),
+          ).toBe(control)
+        }
+        expect(page.getByTestId('input-textarea').element()).toBe(input)
+        await settledScreenshot({
+          path: `../../test-results/split-action-docks-${width}-${state}.png`,
+        })
+      }
+    } finally {
+      await page.viewport(...original)
+    }
+  },
+)
+
+test('Return adds a line even with a pending translation', async () => {
+  await render(<Fixture initial={null} flushPending={() => true} />)
+  const input = page.getByTestId('input-textarea')
+  await input.fill('First line')
+  const node = input.element() as HTMLTextAreaElement
+  node.focus()
+  node.setSelectionRange(node.value.length, node.value.length)
+  await userEvent.keyboard('{Enter}')
+  await expect.element(input).toHaveValue('First line\n')
+  expect(document.activeElement).toBe(node)
+})
+
+test('folded keyboard editor has a continuous surface and named actions', async () => {
+  const original = [window.innerWidth, window.innerHeight] as const
+  const viewport = Object.assign(new EventTarget(), {
+    height: 640,
+    width: 440,
+    offsetTop: 0,
+    scale: 1,
+  })
+  try {
+    await page.viewport(440, 640)
+    vi.stubGlobal('visualViewport', viewport)
+    await render(<Fixture initial={word} />)
+    const shell = document.querySelector<HTMLElement>('.app-shell')!
+    shell.style.setProperty('--safe-area-right', '80px')
+    window.dispatchEvent(new Event('resize'))
+    const input = page.getByTestId('input-textarea')
+    const node = input.element() as HTMLTextAreaElement
+    node.focus({ preventScroll: true })
+    viewport.height = 300
+    viewport.dispatchEvent(new Event('resize'))
+    await expect.poll(() => shell.hasAttribute('data-keyboard')).toBe(true)
+    await input.fill('Hello\nSecond line')
+    const composer = document.querySelector('.composer')!
+    expect(getComputedStyle(composer).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+    expect(getComputedStyle(composer).borderTopWidth).toBe('0px')
+    await expect
+      .element(page.getByTestId('source-expand'))
+      .not.toBeInTheDocument()
+    await expect
+      .element(
+        page
+          .getByTestId('context-toggle')
+          .getByText('Context', { exact: true }),
+      )
+      .toBeVisible()
+    for (const id of ['paste-input', 'clear-input', 'context-toggle']) {
+      assertWithinViewport(page.getByTestId(id).element())
+    }
+    expect(node.getBoundingClientRect().height).toBeGreaterThanOrEqual(76)
+    expect(document.activeElement).toBe(node)
+    await settledScreenshot({
+      path: '../../test-results/folded-keyboard-editor.png',
+    })
+  } finally {
+    vi.unstubAllGlobals()
+    await page.viewport(...original)
+  }
+})
+
+test.each([false, true])(
+  'folding and unfolding preserve multiline editing and reachable actions (keyboard %s)',
+  async (keyboard) => {
+    const original = [window.innerWidth, window.innerHeight] as const
+    const viewport = Object.assign(new EventTarget(), {
+      height: 580,
+      width: 382,
+      offsetTop: 0,
+      scale: 1,
+    })
+    const text =
+      'First line to translate.\nSecond line to edit.\nThird line stays here.'
+    try {
+      await page.viewport(382, 580)
+      vi.stubGlobal('visualViewport', viewport)
+      await render(
+        <Fixture
+          initial={{ ...withAlternatives, text, requestKey: requestKey(text) }}
+        />,
+      )
+      const input = page.getByTestId('input-textarea')
+      const node = input.element() as HTMLTextAreaElement
+      node.focus({ preventScroll: true })
+      node.setSelectionRange(12, 15)
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      shell.style.setProperty('--safe-area-bottom', '34px')
+      for (const [width, height, mode] of [
+        [382, 580, 'stack'],
+        [594, 736, 'stack'],
+        [736, 594, 'split'],
+        [580, 382, 'split'],
+        [382, 580, 'stack'],
+      ] as const) {
+        viewport.width = width
+        viewport.height = keyboard ? Math.round(height * 0.5) : height
+        await page.viewport(width, height)
+        viewport.dispatchEvent(new Event('resize'))
+        window.dispatchEvent(new Event('resize'))
+        await expect.poll(() => shell.dataset.layout).toBe(mode)
+        await expect
+          .poll(() => Math.round(shell.getBoundingClientRect().height))
+          .toBe(viewport.height)
+        await expect
+          .poll(() => shell.hasAttribute('data-keyboard'))
+          .toBe(keyboard)
+        expect(input.element()).toBe(node)
+        expect(document.activeElement).toBe(node)
+        expect([node.selectionStart, node.selectionEnd]).toEqual([12, 15])
+        expect(node.value).toBe(text)
+        expect(getComputedStyle(node).fontSize).toBe('18px')
+        expect(node.getBoundingClientRect().height).toBeGreaterThanOrEqual(76)
+        await expect
+          .element(page.getByTestId('source-expand'))
+          .not.toBeInTheDocument()
+        const toolbar = page.getByTestId('output-toolbar')
+        if (mode === 'split') {
+          const paste = page
+            .getByTestId('paste-input')
+            .element()
+            .getBoundingClientRect()
+          const copy = toolbar
+            .getByRole('button', { name: 'Copy', exact: true })
+            .element()
+            .getBoundingClientRect()
+          expect(Math.abs(paste.top - copy.top)).toBeLessThanOrEqual(1)
+        }
+        for (const button of [
+          page.getByTestId('paste-input').element(),
+          page.getByTestId('clear-input').element(),
+          page.getByTestId('context-toggle').element(),
+          toolbar.getByRole('button', { name: 'Copy', exact: true }).element(),
+          toolbar.getByTestId('listen-button').element(),
+        ]) {
+          const box = button.getBoundingClientRect()
+          expect(box.width).toBeGreaterThanOrEqual(44)
+          expect(box.height).toBeGreaterThanOrEqual(44)
+          expect(box.top).toBeGreaterThanOrEqual(0)
+          expect(box.bottom).toBeLessThanOrEqual(
+            viewport.height - (keyboard ? 0 : 34),
+          )
+          expect(box.left).toBeGreaterThanOrEqual(0)
+          expect(box.right).toBeLessThanOrEqual(width)
+          const hit = document.elementFromPoint(
+            box.left + box.width / 2,
+            box.top + box.height / 2,
+          )
+          expect(hit && button.contains(hit)).toBeTruthy()
+        }
+        expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width)
+        await settledScreenshot({
+          path: `../../test-results/mobile-audit-${width}x${height}-${keyboard ? 'keyboard' : 'closed'}.png`,
+        })
+      }
+      viewport.height = 580
+      viewport.dispatchEvent(new Event('resize'))
+      await expect.poll(() => shell.hasAttribute('data-keyboard')).toBe(false)
+      expect(input.element()).toBe(node)
+      expect(document.activeElement).toBe(node)
+      expect([node.selectionStart, node.selectionEnd]).toEqual([12, 15])
+    } finally {
+      vi.unstubAllGlobals()
+      await page.viewport(...original)
+    }
+  },
+)

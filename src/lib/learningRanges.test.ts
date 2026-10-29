@@ -48,6 +48,62 @@ const chunks = [
   },
 ]
 describe('validated learning spans', () => {
+  it('retains complete phrase details and resolves only quoted grammar highlights', () => {
+    const result = prepareLearningResult(input.text, input.translation, [
+      {
+        text: '오늘',
+        ...fact,
+        gloss: 'today',
+        sourceTexts: ['today'],
+        grammarHighlights: [],
+      },
+      {
+        text: '도와줘서',
+        ...fact,
+        sourceTexts: ['for helping me'],
+        grammarHighlights: ['줘서', 'missing'],
+      },
+      {
+        text: '고마워요',
+        ...fact,
+        gloss: 'thanks',
+        sourceTexts: ['Thanks'],
+        grammarHighlights: ['요'],
+      },
+    ])
+    expect(result?.chunks[1]).toMatchObject({
+      ...fact,
+      grammarHighlights: [{ start: 5, end: 7 }],
+    })
+    expect(result?.chunks[0]?.grammarHighlights).toEqual([])
+    expect(result?.chunks[2]?.grammarHighlights).toEqual([
+      { start: 11, end: 12 },
+    ])
+  })
+
+  it('does not underline ambiguous quotes or split a combining-character grapheme', () => {
+    const result = prepareLearningResult('', 'banana é', [
+      {
+        text: 'banana é',
+        ...fact,
+        sourceTexts: [],
+        grammarHighlights: ['a', 'e'],
+      },
+    ])
+    expect(result?.chunks[0]?.grammarHighlights).toEqual([])
+  })
+  it('requires a grammar explanation before an annotation can be underlined', () => {
+    const result = prepareLearningResult('today', '오늘', [
+      {
+        text: '오늘',
+        ...fact,
+        grammar: '',
+        sourceTexts: ['today'],
+        grammarHighlights: ['오늘'],
+      },
+    ])
+    expect(result?.chunks[0]?.grammarHighlights).toEqual([])
+  })
   it('validates Korean source chunks against the original when translating into the UI language', () => {
     const reading = {
       ...input,
@@ -99,6 +155,33 @@ describe('validated learning spans', () => {
       ),
     ).toEqual([0, 4])
     expect(prepareLearningResult('oui oui', 'yes yes', [phrase])).toBeNull()
+  })
+  it('keeps independent Korean details when model quotations overlap', () => {
+    const korean =
+      '평면도 작성 기능을 확인해 보실 수 있는 링크를 공유드립니다.\n직접 사용해 보시고, UX 흐름이나 사용성에 관한 의견이 있으시면 편하게 알려 주세요.'
+    const result = prepareLearningResult('An English translation.', korean, [
+      { ...fact, text: '평면도 작성 기능을', sourceTexts: [] },
+      { ...fact, text: '작성 기능을 확인해 보실 수 있는', sourceTexts: [] },
+      { ...fact, text: '링크를 공유드립니다', sourceTexts: [] },
+      { ...fact, text: '직접 사용해 보시고', sourceTexts: [] },
+    ])
+    expect(result?.chunks.map((c) => c.text)).toEqual([
+      '링크를 공유드립니다',
+      '직접 사용해 보시고',
+    ])
+    expect(result?.partial).toBe(true)
+  })
+  it('orders uniquely quoted details without inventing positions for ambiguous repeats', () => {
+    const result = prepareLearningResult('', 'one yes yes two', [
+      { ...fact, text: 'two', sourceTexts: [] },
+      { ...fact, text: 'one', sourceTexts: [] },
+      { ...fact, text: 'yes', sourceTexts: [] },
+    ])
+    expect(result?.chunks.map((c) => [c.text, c.start, c.end])).toEqual([
+      ['one', 0, 3],
+      ['two', 12, 15],
+    ])
+    expect(result?.partial).toBe(true)
   })
   it('keeps exact target text with reordered source correspondence', () => {
     const result = validateLearningResult(input, {

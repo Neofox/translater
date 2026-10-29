@@ -23,8 +23,8 @@ export default function AlternativeItem({
   return (
     <li
       data-testid="alternative-item"
-      className="alternative-item animate-settle group flow-root rounded-lg border border-border bg-panel px-3 py-2"
-      style={{ animationDelay: `${index * 60}ms` }}
+      className="alternative-item detail-enter group flow-root rounded-lg border border-border bg-panel px-3 py-2"
+      style={{ animationDelay: `${index * 40}ms` }}
     >
       {text && (
         <div className="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">

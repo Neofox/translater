@@ -70,6 +70,62 @@ function gesture(node: Element, type: string) {
     }),
   )
 }
+it('leaves ordinary text inert and underlines only the supplied grammar ranges', () => {
+  vi.useFakeTimers()
+  const inspect = vi.fn()
+  render(
+    <InspectableTranslation
+      text="오늘 도와줘서 고마워요."
+      language="ko"
+      disabled={false}
+      chunks={[{ start: 5, end: 7 }]}
+      onInspect={inspect}
+    />,
+  )
+  expect(screen.getByTestId('inspectable-phrase').textContent).toBe('줘서')
+  const main = screen.getByTestId('main-translation')
+  gesture(main, 'pointerdown')
+  gesture(main, 'pointerup')
+  act(() => vi.advanceTimersByTime(450))
+  expect(inspect).not.toHaveBeenCalled()
+})
+
+it('never makes a plain sentence without grammar highlights into an invisible tap target', () => {
+  vi.useFakeTimers()
+  const inspect = vi.fn()
+  render(
+    <InspectableTranslation
+      text="안녕"
+      language="ko"
+      disabled={false}
+      onInspect={inspect}
+    />,
+  )
+  const main = screen.getByTestId('main-translation')
+  gesture(main, 'pointerdown')
+  gesture(main, 'pointerup')
+  act(() => vi.advanceTimersByTime(450))
+  expect(inspect).not.toHaveBeenCalled()
+})
+it('opens a quoted grammar point after the native selection grace period', () => {
+  vi.useFakeTimers()
+  const inspect = vi.fn()
+  render(
+    <InspectableTranslation
+      text="안녕"
+      language="ko"
+      disabled={false}
+      chunks={[{ start: 0, end: 2 }]}
+      onInspect={inspect}
+    />,
+  )
+  const main = screen.getByTestId('main-translation')
+  gesture(main, 'pointerdown')
+  gesture(main, 'pointerup')
+  expect(inspect).not.toHaveBeenCalled()
+  act(() => vi.advanceTimersByTime(450))
+  expect(inspect).toHaveBeenCalledExactlyOnceWith(1)
+})
 it('cancels a pending phrase tap when the page is hidden', () => {
   vi.useFakeTimers()
   const inspect = vi.fn()
@@ -78,6 +134,7 @@ it('cancels a pending phrase tap when the page is hidden', () => {
       text="안녕"
       language="ko"
       disabled={false}
+      chunks={[{ start: 0, end: 2 }]}
       onInspect={inspect}
     />,
   )
@@ -96,6 +153,7 @@ it('a click dismissing an existing native selection does not inspect', () => {
       text="안녕"
       language="ko"
       disabled={false}
+      chunks={[{ start: 0, end: 2 }]}
       onInspect={inspect}
     />,
   )
@@ -117,6 +175,7 @@ it('invalidates a pending tap when request identity changes but the wording stay
     text: '안녕',
     language: 'ko',
     disabled: false,
+    chunks: [{ start: 0, end: 2 }],
     onInspect: inspect,
     resetKey: 'first request',
   }

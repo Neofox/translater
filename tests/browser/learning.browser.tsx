@@ -5,7 +5,6 @@ import { render } from 'vitest-browser-react'
 import TranslatorWorkspace from '../../src/components/TranslatorWorkspace'
 import { useTranslatorContext } from '../../src/context/TranslatorContext'
 import { UiLangProvider } from '../../src/hooks/useUiLang'
-import { learn } from '../../src/server/learning'
 import { translationRequestKey } from '../../src/lib/translationRequestKey'
 import type { LiveResult } from '../../src/hooks/useTranslate'
 import type { LearningResult } from '../../src/server/learningTypes'
@@ -14,7 +13,6 @@ vi.mock('../../src/context/TranslatorContext', () => ({
   useTranslatorContext: vi.fn(),
 }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('../../src/server/learning', () => ({ learn: vi.fn() }))
 const sourceText = 'Thanks for helping me today.'
 const translation = '오늘 도와줘서 고마워요.'
 const noRefinements: string[] = []
@@ -65,24 +63,47 @@ let update: (patch: {
 function Fixture({
   long = false,
   word = false,
-  prepared = false,
+  prepared = true,
   reading = false,
   uiLang = 'en',
+  noAlternatives = false,
 }: {
   long?: boolean
   word?: boolean
   prepared?: boolean
   reading?: boolean
   uiLang?: 'en' | 'ko'
+  noAlternatives?: boolean
 }) {
   const sourceLanguage = reading ? 'ko' : 'en'
   const targetLanguage = reading ? 'en' : 'ko'
   const learnsKorean = uiLang === 'en'
   const phraseMap = learnsKorean
-    ? analysis.chunks.map((c) => ({
+    ? analysis.chunks.map((c, index) => ({
         text: c.text,
         gloss: c.gloss,
         sourceTexts: c.sourceSpans.map((s) => s.text),
+        baseForm: index === 0 ? '오늘' : index === 1 ? '도와주다' : '고맙다',
+        literalMeaning:
+          index === 0
+            ? 'today'
+            : index === 1
+              ? 'because you helped'
+              : 'to be grateful',
+        naturalMeaning: c.gloss,
+        grammar:
+          index === 0
+            ? ''
+            : index === 1
+              ? fact.grammar
+              : '고마워요 is the polite present form of 고맙다.',
+        omissions:
+          index === 0 ? '' : 'The participants are understood from context.',
+        usageNote:
+          index === 1 ? '도와주다 emphasizes helping another person.' : '',
+        characters: [],
+        grammarHighlights:
+          index === 0 ? [] : index === 1 ? ['줘서'] : ['고마워요'],
       }))
     : analysis.chunks
         .flatMap((c) =>
@@ -90,10 +111,21 @@ function Fixture({
             ...span,
             gloss: c.text,
             sourceTexts: [c.text],
+            baseForm: '',
+            literalMeaning: '',
+            naturalMeaning: '',
+            grammar:
+              span.text === 'for helping me'
+                ? 'for + 동명사 helping은 감사하는 이유를 나타냅니다.'
+                : '',
+            omissions: '',
+            usageNote: '',
+            characters: [],
+            grammarHighlights:
+              span.text === 'for helping me' ? ['for helping'] : [],
           })),
         )
         .sort((a, b) => a.start - b.start)
-        .map(({ text, gloss, sourceTexts }) => ({ text, gloss, sourceTexts }))
   const initialText = word
     ? 'hello'
     : reading
@@ -144,6 +176,8 @@ function Fixture({
             ],
             synonyms: ['hi'],
             notes: '',
+            grammar: 'A polite greeting.',
+            characters: [],
             etymology: '',
             alternativeTranslations: [],
           },
@@ -154,21 +188,22 @@ function Fixture({
             sourceLang: sourceLanguage,
             targetLang: targetLanguage,
             main: initialTranslation,
-            learningPhrases: prepared ? phraseMap : undefined,
+            learningPhrases: prepared
+              ? long
+                ? Array.from({ length: 8 }, () => phraseMap).flat()
+                : phraseMap
+              : undefined,
             rationale: 'A polite, natural thank you.',
-            alternatives: [
-              {
-                text: reading
-                  ? 'I really appreciate your help today.'
-                  : '정말 고마워요.',
-                note: 'A warmer thank you.',
-              },
-            ],
-            learningTips: {
-              grammar: 'An ending used when thanking someone.',
-              vocab: '',
-              characters: [],
-            },
+            alternatives: noAlternatives
+              ? []
+              : [
+                  {
+                    text: reading
+                      ? 'I really appreciate your help today.'
+                      : '정말 고마워요.',
+                    note: 'A warmer thank you.',
+                  },
+                ],
           },
         }),
   })
@@ -225,18 +260,97 @@ function Fixture({
     </UiLangProvider>
   )
 }
+async function openOverview() {
+  if (
+    !document.querySelector('.learning-panel') &&
+    !document.querySelector('.app-shell[data-desktop]')
+  )
+    await page.getByTestId('main-translation').click()
+  if (!document.querySelector('.app-shell[data-desktop]'))
+    await expect.element(page.getByTestId('learning-panel')).toBeVisible()
+  const rows = [...document.querySelectorAll('[data-testid="learning-chunk"]')]
+  const selected = rows.findIndex(
+    (row) => row.getAttribute('aria-expanded') === 'true',
+  )
+  if (selected >= 0)
+    await page.getByTestId('learning-chunk').nth(selected).click()
+}
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(learn).mockResolvedValue(analysis)
 })
+
+test.each([
+  { word: false, reading: false },
+  { word: false, reading: true },
+  { word: true, reading: false },
+])(
+  'details stay with their phrase or dictionary entry beside source (%j)',
+  async ({ word, reading }) => {
+    await render(
+      <Fixture prepared word={word} reading={reading} noAlternatives />,
+    )
+    const desktop =
+      document
+        .querySelector('.translator-panels')
+        ?.getAttribute('data-layout') === 'workspace'
+    if (!desktop && !document.querySelector('.reference-panel')) {
+      if (word) await page.getByTestId('word-details-trigger').click()
+      else await openOverview()
+    }
+    expect(document.querySelector('.detail-learning')).toBeNull()
+    expect(
+      page.getByRole('heading', { name: 'Learning tips', exact: true }).query(),
+    ).toBeNull()
+    if (desktop) {
+      const source = page
+        .getByTestId('input-textarea')
+        .element() as HTMLTextAreaElement
+      const area = document.querySelector('.source-input-area')!
+      expect(getComputedStyle(area).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+      expect(getComputedStyle(area).borderRadius).toBe('0px')
+      expect(
+        Math.abs(
+          source.getBoundingClientRect().left -
+            document.querySelector('.composer-header')!.getBoundingClientRect()
+              .left,
+        ),
+      ).toBeLessThanOrEqual(1)
+      source.focus()
+      source.setSelectionRange(1, 3)
+      expect(
+        getComputedStyle(document.querySelector('.composer')!).boxShadow,
+      ).not.toBe('none')
+      if (!word) {
+        expect(
+          document.querySelector(
+            '.reference-panel [data-testid="learning-chunk"]',
+          ),
+        ).not.toBeNull()
+        await page.getByTestId('learning-chunk').first().click()
+        expect(
+          document.querySelectorAll('[data-testid="learning-chunk"]'),
+        ).toHaveLength(3)
+        expect(page.getByTestId('input-textarea').element()).toBe(source)
+        expect([source.selectionStart, source.selectionEnd]).toEqual([1, 3])
+      } else
+        expect(
+          document.querySelector('.reference-panel .word-source-meta'),
+        ).not.toBeNull()
+      await settledShot(
+        `balanced-learning-${word ? 'word' : reading ? 'source' : 'target'}`,
+      )
+    }
+  },
+)
 test('English UI breaks down original Korean when translating into English', async () => {
   await render(<Fixture reading prepared />)
   const main = page.getByTestId('main-translation').element()
   expect(main.textContent).toBe(sourceText)
-  expect(main.hasAttribute('data-inspectable')).toBe(false)
+  expect(main.hasAttribute('data-inspectable')).toBe(
+    !document.querySelector('.app-shell[data-desktop]'),
+  )
   expect(main.querySelector('[data-testid="inspectable-phrase"]')).toBeNull()
-  if (page.getByTestId('breakdown-button').query())
-    await page.getByTestId('breakdown-button').click()
+  await openOverview()
   const row = page.getByTestId('learning-chunk').nth(1)
   await expect.element(row).toBeVisible()
   expect(row.element().textContent).toContain('도와줘서')
@@ -244,46 +358,39 @@ test('English UI breaks down original Korean when translating into English', asy
     .getByTestId('input-textarea')
     .element() as HTMLTextAreaElement
   await row.click()
-  await expect
-    .poll(() =>
-      document
-        .querySelector('[data-testid="source-highlight"]')
-        ?.textContent.replace(/\u200b/g, ''),
-    )
-    .toBe(translation)
-  expect(
-    document.querySelector('[data-testid="source-highlight"] mark')
-      ?.textContent,
-  ).toBe('도와줘서')
+  if (document.querySelector('.app-shell[data-desktop]')) {
+    await expect
+      .poll(() =>
+        document
+          .querySelector('[data-testid="source-highlight"]')
+          ?.textContent.replace(/\u200b/g, ''),
+      )
+      .toBe(translation)
+    expect(
+      document.querySelector('[data-testid="source-highlight"] mark')
+        ?.textContent,
+    ).toBe('도와줘서')
+  }
   expect(document.querySelector('.learning-phrase')?.getAttribute('lang')).toBe(
     'ko',
   )
   expect(editor.value).toBe(translation)
-  expect(learn).not.toHaveBeenCalled()
   await settledShot('source-language-breakdown')
-  await page.getByRole('button', { name: 'More detail', exact: true }).click()
   await expect
     .element(page.getByText(fact.grammar, { exact: true }))
     .toBeVisible()
-  expect(vi.mocked(learn).mock.calls[0]?.[0].data).toMatchObject({
-    side: 'source',
-    text: translation,
-    translation: sourceText,
-    source: 'ko',
-    target: 'en',
-    sentenceStart: 0,
-    sentenceEnd: translation.length,
-    uiLang: 'en',
-  })
   visibleRect(mainCopy().element())
+  if (page.getByTestId('learning-panel').query())
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
   visibleRect(page.getByTestId('clear-input').element())
 })
 
 test('Korean UI breaks down original English when translating into Korean', async () => {
   localStorage.setItem('ui-lang', 'ko')
   await render(<Fixture prepared uiLang="ko" />)
-  if (page.getByTestId('breakdown-button').query())
-    await page.getByTestId('breakdown-button').click()
+  await openOverview()
   await expect.element(page.getByTestId('learning-chunk').first()).toBeVisible()
   expect(
     page.getByTestId('learning-chunk').first().element().textContent,
@@ -293,19 +400,20 @@ test('Korean UI breaks down original English when translating into Korean', asyn
       .getByTestId('main-translation')
       .element()
       .hasAttribute('data-inspectable'),
-  ).toBe(false)
+  ).toBe(!document.querySelector('.app-shell[data-desktop]'))
   await page.getByTestId('learning-chunk').first().click()
-  await expect
-    .poll(
-      () =>
-        document.querySelector('[data-testid="source-highlight"] mark')
-          ?.textContent,
-    )
-    .toBe('Thanks')
+  if (document.querySelector('.app-shell[data-desktop]')) {
+    await expect
+      .poll(
+        () =>
+          document.querySelector('[data-testid="source-highlight"] mark')
+            ?.textContent,
+      )
+      .toBe('Thanks')
+  }
   expect(document.querySelector('.learning-phrase')?.getAttribute('lang')).toBe(
     'en',
   )
-  expect(learn).not.toHaveBeenCalled()
 })
 test('word details open directly from the translated word without a redundant row or paid request', async () => {
   await render(<Fixture word />)
@@ -322,9 +430,15 @@ test('word details open directly from the translated word without a redundant ro
         }),
       )
       .toBeVisible()
-    expect(learn).not.toHaveBeenCalled()
   } else expect(document.querySelector('.word-source-meta')).toBeNull()
   const word = page.getByRole('button', { name: 'Word details: 안녕하세요' })
+  // Earlier clicks may leave the pointer over this newly mounted target.
+  await word.unhover()
+  const wordStyle = getComputedStyle(word.element())
+  expect(wordStyle.color).toBe(
+    getComputedStyle(page.getByTestId('main-translation').element()).color,
+  )
+  if (referenceLayout) expect(wordStyle.textDecorationLine).toBe('none')
   await word.click()
   await expect
     .element(
@@ -332,7 +446,6 @@ test('word details open directly from the translated word without a redundant ro
     )
     .toBeVisible()
   expect(document.querySelectorAll('.word-source-meta')).toHaveLength(1)
-  expect(learn).not.toHaveBeenCalled()
   expect(document.querySelector('.input-panel textarea')?.textContent).toBe(
     'hello',
   )
@@ -340,7 +453,7 @@ test('word details open directly from the translated word without a redundant ro
     .getByTestId('output-toolbar')
     .getByRole('button', { name: 'Copy', exact: true })
   await expect.element(copy).toBeEnabled()
-  if (document.querySelector('.reference-panel'))
+  if (document.querySelector('.app-shell[data-desktop]')) {
     await expect
       .poll(() =>
         document
@@ -348,7 +461,24 @@ test('word details open directly from the translated word without a redundant ro
           ?.contains(document.activeElement),
       )
       .toBe(true)
-  else {
+    await copy.click()
+    await word.click()
+    await expect
+      .poll(() =>
+        document
+          .querySelector('.reference-panel')
+          ?.contains(document.activeElement),
+      )
+      .toBe(true)
+    word.element().focus()
+    await userEvent.keyboard('{Enter}')
+    await expect
+      .poll(() =>
+        document.activeElement?.classList.contains('reference-heading'),
+      )
+      .toBe(true)
+    await settledShot('word-dictionary-focused')
+  } else {
     await page
       .getByRole('button', { name: 'Close learning', exact: true })
       .click()
@@ -363,56 +493,34 @@ test('word details open directly from the translated word without a redundant ro
       .toBeVisible()
   }
 })
-test('prepared phrases are available immediately and only explicit More detail starts a learning request', async () => {
+test('initial phrase details reveal locally and only grammar constructions are underlined', async () => {
   await render(<Fixture prepared />)
-  if (document.querySelector('.reference-panel'))
-    expect(
-      document.querySelector('[data-testid="breakdown-button"]'),
-    ).toBeNull()
-  else await expect.element(page.getByTestId('breakdown-button')).toBeVisible()
   expect(
-    document.querySelectorAll('[data-testid="inspectable-phrase"]'),
-  ).toHaveLength(3)
-  expect(learn).not.toHaveBeenCalled()
-  await page.getByTestId('inspectable-phrase').nth(1).click()
+    [...document.querySelectorAll('[data-testid="inspectable-phrase"]')].map(
+      (e) => e.textContent,
+    ),
+  ).toEqual(['줘서', '고마워요'])
+  expect(page.getByTestId('main-translation').element().textContent).toBe(
+    translation,
+  )
+  await page.getByTestId('inspectable-phrase').first().click()
   await expect
     .element(page.getByTestId('selected-phrase'))
     .toHaveTextContent('도와줘서')
   await expect
-    .element(page.getByText('for helping me', { exact: true }).last())
+    .element(page.getByText(fact.grammar, { exact: true }))
     .toBeVisible()
-  expect(learn).not.toHaveBeenCalled()
+  await expect
+    .element(page.getByText('도와주다', { exact: true }))
+    .toBeVisible()
   expect(
-    page
-      .getByTestId('selected-phrase')
-      .element()
-      .querySelector('.inspectable-phrase'),
+    page.getByRole('button', { name: 'More detail', exact: true }).query(),
   ).toBeNull()
-  let finishDetails!: (value: LearningResult) => void
-  vi.mocked(learn).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finishDetails = resolve
-      }),
-  )
-  await page.getByRole('button', { name: 'More detail', exact: true }).click()
-  await expect
-    .element(page.getByRole('status'))
-    .toHaveTextContent('Loading more detail…')
-  await expect
-    .element(page.getByTestId('learning-detail-skeleton'))
-    .toBeVisible()
-  await expect
-    .element(page.getByText('for helping me', { exact: true }).last())
-    .toBeVisible()
-  await settledShot('detail-loading')
-  finishDetails(analysis)
-  await expect
-    .element(
-      page.getByText('-어서 gives the reason for the thanks.', { exact: true }),
-    )
-    .toBeVisible()
-  expect(learn).toHaveBeenCalledTimes(1)
+  expect(
+    document.querySelector('[data-testid="learning-detail-skeleton"]'),
+  ).toBeNull()
+  visibleRect(mainCopy().element())
+  await settledShot('inline-phrase-details')
 })
 test('adjustments stay with tone in the header and expose chips when there is room', async () => {
   await render(<Fixture prepared />)
@@ -423,7 +531,6 @@ test('adjustments stay with tone in the header and expose chips when there is ro
     .querySelector('.adjust-menu')
     ?.hasAttribute('data-inline')
   await settledShot('header-adjustments-default')
-  if (window.innerWidth >= 1100) expect(inline).toBe(true)
   if (inline) {
     await expect.element(softer).toBeVisible()
     await expect.element(adjust).not.toBeVisible()
@@ -466,9 +573,7 @@ test('adjustments stay with tone in the header and expose chips when there is ro
   await expect.element(field).toHaveValue('gentler please')
   if (!inline) {
     const panel = document.querySelector('.adjust-content[data-open]')!
-    expect(panel.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-      document.querySelector('.translator-panels')!.getBoundingClientRect().top,
-    )
+    expect(panel.hasAttribute('data-overlay')).toBe(true)
     expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth)
     const source = page
       .getByTestId('input-textarea')
@@ -477,7 +582,9 @@ test('adjustments stay with tone in the header and expose chips when there is ro
     const actions = document
       .querySelector('.composer-actions')!
       .getBoundingClientRect()
-    expect(source.top + 24).toBeLessThanOrEqual(actions.top)
+    if (actions.bottom <= source.top) {
+      expect(actions.bottom).toBeLessThanOrEqual(source.top)
+    } else expect(source.top + 24).toBeLessThanOrEqual(actions.top)
     if (window.innerHeight < 460 && window.innerWidth >= 560)
       expect(source.bottom).toBeLessThanOrEqual(actions.top)
   }
@@ -515,6 +622,9 @@ test('opening Custom with phrase details already open keeps Copy clickable', asy
   await render(<Fixture prepared />)
   await page.getByTestId('inspectable-phrase').first().click()
   await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
+  await page
+    .getByRole('button', { name: 'Close learning', exact: true })
+    .click()
   await page.getByTestId('adjust-button').click()
   await page.getByTestId('refine-custom-trigger').click()
   await page.getByTestId('refine-freeform').fill('gentler please')
@@ -530,7 +640,8 @@ test('opening Custom with phrase details already open keeps Copy clickable', asy
     })
     .toBe(true)
   await settledShot('combined-learning-adjust')
-  await page.getByRole('button', { name: 'Show learning', exact: true }).click()
+  await page.getByTestId('adjust-button').click()
+  await page.getByTestId('main-translation').click()
   await expect.element(page.getByTestId('refine-freeform')).not.toBeVisible()
   await expect.element(page.getByTestId('learning-inspector')).toBeVisible()
 })
@@ -647,10 +758,9 @@ async function settledShot(name: string) {
     path: `../../test-results/learning-${window.innerWidth}x${window.innerHeight}-${name}.png`,
   })
 }
-test('learning is on demand and preserves Copy Paste Clear through overview and phrase detail', async () => {
+test('initial phrase details preserve Copy Paste Clear through overview and inspection', async () => {
   await render(<Fixture />)
-  expect(learn).not.toHaveBeenCalled()
-  await page.getByTestId('breakdown-button').click()
+  await openOverview()
   await expect.element(page.getByTestId('learning-chunk').nth(1)).toBeVisible()
   await page.getByTestId('learning-chunk').nth(1).click()
   await expect
@@ -665,6 +775,10 @@ test('learning is on demand and preserves Copy Paste Clear through overview and 
     .element() as HTMLTextAreaElement
   expect(textarea.value).toBe(sourceText)
   visibleRect(mainCopy().element())
+  if (page.getByTestId('learning-panel').query())
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
   visibleRect(page.getByTestId('paste-input').element())
   visibleRect(page.getByTestId('clear-input').element())
   for (const id of ['paste-input', 'clear-input']) {
@@ -676,12 +790,13 @@ test('learning is on demand and preserves Copy Paste Clear through overview and 
     expect(getComputedStyle(button).flexDirection).toBe('row')
   }
   await settledShot('phrase')
-  await page
-    .getByRole('button', { name: 'Whole sentence', exact: true })
-    .click()
+  await openOverview()
   await expect.element(page.getByTestId('learning-chunk').first()).toBeVisible()
-  expect(learn).toHaveBeenCalledTimes(1)
   await settledShot('overview')
+  if (page.getByTestId('learning-panel').query())
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
   await page.getByTestId('clear-input').click()
   await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
   expect(document.activeElement).toBe(textarea)
@@ -689,65 +804,38 @@ test('learning is on demand and preserves Copy Paste Clear through overview and 
 })
 test('a deliberate phrase tap selects its chunk without interfering with native selection', async () => {
   await render(<Fixture />)
-  const main = page.getByTestId('main-translation').element()
-  const range = document.createRange()
-  range.setStart(main.firstChild!, 3)
-  range.setEnd(main.firstChild!, 7)
-  const rect = range.getBoundingClientRect()
-  const root = main.getBoundingClientRect()
-  await page.getByTestId('main-translation').click({
-    position: {
-      x: rect.x - root.x + rect.width / 2,
-      y: rect.y - root.y + rect.height / 2,
-    },
-  })
+  await page.getByTestId('inspectable-phrase').first().click()
   await expect
     .element(page.getByTestId('selected-phrase'))
     .toHaveTextContent('도와줘서')
-  expect(learn).toHaveBeenCalledTimes(1)
+  if (page.getByTestId('learning-panel').query())
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
   window.getSelection()?.removeAllRanges()
   await userEvent.dblClick(page.getByTestId('main-translation'))
   await new Promise((r) => setTimeout(r, 450))
-  expect(learn).toHaveBeenCalledTimes(1)
   window.getSelection()?.removeAllRanges()
 })
-test('a delayed learning reply cannot reopen after Clear and a failure leaves main actions available', async () => {
-  let finish!: (result: LearningResult) => void
-  vi.mocked(learn).mockImplementationOnce(
-    () =>
-      new Promise((r) => {
-        finish = r
-      }),
-  )
+test('initial phrase inspection clears on input edits, translation errors and Clear', async () => {
   await render(<Fixture />)
-  await page.getByTestId('breakdown-button').click()
-  await expect.element(mainCopy()).toBeEnabled()
-  await page.getByTestId('clear-input').click()
-  finish(analysis)
-  await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
-  expect(document.querySelector('[data-testid="selected-phrase"]')).toBeNull()
-})
-test('learning failures expose explicit retry while native source editing keeps its cursor', async () => {
-  vi.mocked(learn).mockRejectedValueOnce(new Error('private provider contents'))
-  await render(<Fixture />)
-  const textarea = page
-    .getByTestId('input-textarea')
-    .element() as HTMLTextAreaElement
-  textarea.focus()
-  textarea.setSelectionRange(3, 8)
-  await page.getByTestId('breakdown-button').click()
+  await openOverview()
+  await page.getByTestId('learning-chunk').nth(1).click()
   await expect
-    .element(page.getByRole('button', { name: 'Retry', exact: true }))
-    .toBeVisible()
-  expect(document.body.textContent).not.toContain('private provider')
-  expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([3, 8])
-  await expect.element(mainCopy()).toBeEnabled()
-  expect(learn).toHaveBeenCalledTimes(1)
-  await page.getByRole('button', { name: 'Retry', exact: true }).click()
-  await expect.element(page.getByTestId('learning-chunk').first()).toBeVisible()
-  update({ input: 'Next message' })
+    .element(page.getByTestId('selected-phrase'))
+    .toHaveTextContent('도와줘서')
+  update({ input: 'An edited message' })
   await expect.element(mainCopy()).toBeDisabled()
   expect(document.querySelector('[data-testid="selected-phrase"]')).toBeNull()
+  update({ input: sourceText })
+  await openOverview()
+  await page.getByTestId('learning-chunk').nth(1).click()
+  update({ error: { kind: 'server', message: 'Unavailable' } })
+  await expect.element(mainCopy()).toBeDisabled()
+  expect(document.querySelector('[data-testid="selected-phrase"]')).toBeNull()
+  update({ error: null })
+  await page.getByTestId('clear-input').click()
+  await expect.element(page.getByTestId('input-textarea')).toHaveValue('')
 })
 
 test('long results keep primary actions visible through incremental keyboard shrink and pan', async () => {
@@ -765,11 +853,15 @@ test('long results keep primary actions visible through incremental keyboard shr
     const editor = page
       .getByTestId('input-textarea')
       .element() as HTMLTextAreaElement
-    await page.getByTestId('breakdown-button').click()
+    await openOverview()
     await expect
       .element(page.getByTestId('learning-chunk').nth(1))
       .toBeVisible()
     await page.getByTestId('learning-chunk').nth(1).click()
+    if (page.getByTestId('learning-panel').query())
+      await page
+        .getByRole('button', { name: 'Close learning', exact: true })
+        .click()
     editor.focus()
     editor.setSelectionRange(2, 8)
     for (const ratio of [0.85, 0.7, 0.55]) {
@@ -798,11 +890,7 @@ test('long results keep primary actions visible through incremental keyboard shr
     expect(page.getByTestId('input-textarea').element()).toBe(editor)
     expect(document.activeElement).toBe(editor)
     expect([editor.selectionStart, editor.selectionEnd]).toEqual([2, 8])
-    const panel = document.querySelector<HTMLElement>('.learning-panel')
-    if (panel && !panel.hidden)
-      expect(
-        panel.querySelector('.learning-panel-body')?.hasAttribute('hidden'),
-      ).toBe(true)
+    expect(document.querySelector('.learning-panel')).toBeNull()
     await settledShot('keyboard')
   } finally {
     document.documentElement.style.removeProperty('--safe-area-bottom')
@@ -817,7 +905,7 @@ test.each([440, 320])(
     try {
       await page.viewport(382, height)
       await render(<Fixture />)
-      await page.getByTestId('breakdown-button').click()
+      await openOverview()
       const show = page.getByRole('button', {
         name: 'Show learning',
         exact: true,
@@ -828,14 +916,16 @@ test.each([440, 320])(
         .toBeVisible()
       await page.getByTestId('learning-chunk').nth(1).click()
       await expect
-        .element(
-          page.getByRole('button', { name: 'Whole sentence', exact: true }),
-        )
+        .element(page.getByTestId('learning-chunk').nth(1))
         .toBeVisible()
-      if (height === 320)
-        expect(
-          document.querySelector('.learning-panel')?.closest('.result-scroll'),
-        ).not.toBeNull()
+      visibleRect(mainCopy().element())
+      expect(
+        page.getByTestId('learning-panel').element().getBoundingClientRect()
+          .height,
+      ).toBeGreaterThan(height * 0.7)
+      await page
+        .getByRole('button', { name: 'Close learning', exact: true })
+        .click()
       for (const control of [
         mainCopy().element(),
         page.getByTestId('paste-input').element(),
@@ -849,7 +939,7 @@ test.each([440, 320])(
   },
 )
 
-test('deselecting native text and a long press do not initiate paid inspection', async () => {
+test('deselecting native text and a long press do not inspect grammar', async () => {
   await render(<Fixture />)
   // Focus the application frame before creating a native selection. Otherwise
   // Playwright's first focus transfer can clear it before pointerdown arrives.
@@ -879,10 +969,451 @@ test('deselecting native text and a long press do not initiate paid inspection',
   await page.getByTestId('main-translation').click()
   await new Promise((r) => setTimeout(r, 450))
   expect(selectedAtDown).toEqual([true])
-  expect(learn).not.toHaveBeenCalled()
+  expect(document.querySelector('[data-testid="selected-phrase"]')).toBeNull()
   window.getSelection()?.removeAllRanges()
   await page.getByTestId('main-translation').click({ delay: 600 })
   await new Promise((r) => setTimeout(r, 450))
-  expect(learn).not.toHaveBeenCalled()
   window.getSelection()?.removeAllRanges()
+})
+
+test('whole-message breakdown keeps every phrase visible with inline details and no sentence pagination', async () => {
+  await render(<Fixture long prepared />)
+  await openOverview()
+  await expect
+    .poll(
+      () => document.querySelectorAll('[data-testid="learning-chunk"]').length,
+    )
+    .toBe(24)
+  expect(document.querySelector('.learning-sentences')).toBeNull()
+  const rows = page.getByTestId('learning-chunk')
+  await rows.nth(4).click()
+  await expect.element(rows.nth(4)).toHaveAttribute('aria-expanded', 'true')
+  expect(
+    document.querySelectorAll('[data-testid="learning-chunk"]'),
+  ).toHaveLength(24)
+  expect(document.querySelectorAll('.phrase-detail')).toHaveLength(1)
+  await expect
+    .element(
+      page.getByText('도와주다 emphasizes helping another person.', {
+        exact: true,
+      }),
+    )
+    .toBeVisible()
+  await rows.nth(7).click()
+  await expect.element(rows.nth(7)).toHaveAttribute('aria-expanded', 'true')
+  await expect.element(rows.nth(4)).toHaveAttribute('aria-expanded', 'false')
+  expect(document.querySelectorAll('.phrase-detail')).toHaveLength(1)
+  await rows.nth(7).click()
+  expect(document.querySelector('.phrase-detail')).toBeNull()
+  expect(
+    document.querySelectorAll('[data-testid="learning-chunk"]'),
+  ).toHaveLength(24)
+})
+
+test('desktop Adjust overlays without growing the header or covering primary actions', async () => {
+  if (window.innerWidth < 1100) return
+  await render(<Fixture prepared />)
+  const original = [window.innerWidth, window.innerHeight] as const
+  try {
+    for (const width of [1280, 1512, 2048]) {
+      await page.viewport(width, 982)
+      const header = document.querySelector('.app-header')!
+      const before = header.getBoundingClientRect()
+      const actions = [
+        mainCopy().element(),
+        page.getByTestId('paste-input').element(),
+      ]
+      const boxes = actions.map((node) => node.getBoundingClientRect())
+      await page.getByTestId('adjust-button').click()
+      await expect.element(page.getByTestId('refine-chip-softer')).toBeVisible()
+      await expect
+        .poll(() =>
+          Math.abs(header.getBoundingClientRect().height - before.height),
+        )
+        .toBeLessThanOrEqual(1)
+      const panel = document.querySelector('.adjust-content[data-open]')!
+      const box = panel.getBoundingClientRect()
+      expect(box.top).toBeGreaterThanOrEqual(before.bottom - 2)
+      actions.forEach((node, index) => {
+        const current = node.getBoundingClientRect()
+        expect(Math.abs(current.top - boxes[index]!.top)).toBeLessThanOrEqual(1)
+        expect(
+          document
+            .elementFromPoint(
+              current.left + current.width / 2,
+              current.top + current.height / 2,
+            )
+            ?.closest('button'),
+        ).toBe(node)
+      })
+      await settledShot(`adjust-overlay-${width}`)
+      await page.getByTestId('adjust-button').click()
+    }
+  } finally {
+    await page.viewport(...original)
+  }
+})
+
+test('mobile text opens a full learning view without a Breakdown button', async () => {
+  if (window.innerWidth >= 1100) return
+  await render(<Fixture prepared />)
+  expect(page.getByTestId('breakdown-button').query()).toBeNull()
+  const copy = mainCopy().element()
+  await page.getByTestId('main-translation').click()
+  await expect.element(page.getByTestId('learning-panel')).toBeVisible()
+  const panel = page
+    .getByTestId('learning-panel')
+    .element()
+    .getBoundingClientRect()
+  expect(panel.height).toBeGreaterThan(window.innerHeight * 0.75)
+  expect(mainCopy().element()).toBe(copy)
+  visibleRect(copy)
+  await settledShot('full-learning')
+  await page
+    .getByRole('button', { name: 'Close learning', exact: true })
+    .click()
+  expect(page.getByTestId('learning-panel').query()).toBeNull()
+  await expect.element(page.getByTestId('main-translation')).toBeVisible()
+})
+
+test('mobile Adjust floats without resizing the header or moving Copy in portrait and split views', async () => {
+  if (window.innerWidth >= 1100) return
+  const original = [window.innerWidth, window.innerHeight] as const
+  try {
+    await render(<Fixture prepared />)
+    for (const [width, height] of [
+      [382, 580],
+      [580, 382],
+      [736, 594],
+      [960, 548],
+    ]) {
+      await page.viewport(width!, height!)
+      await expect
+        .poll(() =>
+          document.querySelector('.app-shell')?.getAttribute('data-layout'),
+        )
+        .toBe(width! >= 560 ? 'split' : 'stack')
+      await expect.element(page.getByTestId('adjust-button')).toBeVisible()
+      const header = document.querySelector('.app-header')!
+      const before = header.getBoundingClientRect()
+      const target = document
+        .querySelector('.target-toolbar')!
+        .getBoundingClientRect()
+      const copy = mainCopy().element()
+      const copyBefore = copy.getBoundingClientRect()
+      await page.getByTestId('adjust-button').click()
+      await expect.element(page.getByTestId('refine-chip-softer')).toBeVisible()
+      await expect
+        .poll(() =>
+          Math.abs(header.getBoundingClientRect().height - before.height),
+        )
+        .toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(
+          document.querySelector('.target-toolbar')!.getBoundingClientRect()
+            .top - target.top,
+        ),
+      ).toBeLessThanOrEqual(1)
+      const copyAfter = copy.getBoundingClientRect()
+      expect(Math.abs(copyAfter.top - copyBefore.top)).toBeLessThanOrEqual(1)
+      expect(
+        document
+          .elementFromPoint(
+            copyAfter.left + copyAfter.width / 2,
+            copyAfter.top + copyAfter.height / 2,
+          )
+          ?.closest('button'),
+      ).toBe(copy)
+      const panel = document
+        .querySelector('.adjust-content[data-open]')!
+        .getBoundingClientRect()
+      expect(panel.left).toBeGreaterThanOrEqual(0)
+      expect(panel.right).toBeLessThanOrEqual(width!)
+      expect(panel.bottom).toBeLessThanOrEqual(height!)
+      await settledShot(`mobile-adjust-overlay-${width}`)
+      await userEvent.keyboard('{Escape}')
+      await expect
+        .element(page.getByTestId('adjust-button'))
+        .toHaveAttribute('aria-expanded', 'false')
+    }
+  } finally {
+    await page.viewport(...original)
+  }
+})
+
+test('source grammar is visible before selecting a phrase and never changes editing', async () => {
+  await render(<Fixture reading prepared />)
+  const input = page.getByTestId('input-textarea')
+  const node = input.element() as HTMLTextAreaElement
+  await expect
+    .poll(
+      () => document.querySelectorAll('[data-testid="source-grammar"]').length,
+    )
+    .toBe(2)
+  const mirror = page.getByTestId('source-highlight').element()
+  expect(mirror.textContent.replace(/\u200b/g, '')).toBe(translation)
+  expect(
+    [...mirror.querySelectorAll('[data-testid="source-grammar"]')].map(
+      (n) => n.textContent,
+    ),
+  ).toEqual(['줘서', '고마워요'])
+  expect(getComputedStyle(mirror).pointerEvents).toBe('none')
+  expect(
+    getComputedStyle(mirror.querySelector('[data-testid="source-grammar"]')!)
+      .textDecorationLine,
+  ).toBe('underline')
+  await settledShot('source-grammar-before-selection')
+  node.focus()
+  node.setSelectionRange(3, 7)
+  expect(input.element()).toBe(node)
+  expect([node.selectionStart, node.selectionEnd]).toEqual([3, 7])
+  await input.fill(translation + ' 수정')
+  expect(document.querySelector('[data-testid="source-highlight"]')).toBeNull()
+})
+
+test('Breakdown action never appears before phrase details arrive or after completion', async () => {
+  await render(<Fixture prepared={false} />)
+  const current = useTranslatorContext().live!
+  update({ live: { ...current, done: false }, streaming: true })
+  await expect.element(page.getByTestId('main-translation')).toBeVisible()
+  expect(page.getByTestId('breakdown-button').query()).toBeNull()
+  update({ live: current, streaming: false })
+  expect(page.getByTestId('breakdown-button').query()).toBeNull()
+})
+
+test('overlapping model quotes keep the remaining Korean source breakdown usable', async () => {
+  await render(<Fixture reading prepared />)
+  const text =
+    '평면도 작성 기능을 확인해 보실 수 있는 링크를 공유드립니다.\n직접 사용해 보시고, UX 흐름이나 사용성에 관한 의견이 있으시면 편하게 알려 주세요.'
+  const current = useTranslatorContext().live!
+  if (current.intent !== 'sentence')
+    throw new Error('Expected sentence fixture')
+  const phrases = [
+    '평면도 작성 기능을',
+    '작성 기능을 확인해 보실 수 있는',
+    '링크를 공유드립니다',
+    '직접 사용해 보시고',
+  ].map((phraseText, i) => ({
+    ...fact,
+    gloss: 'A source phrase.',
+    text: phraseText,
+    sourceTexts: [],
+    usageNote: '',
+    characters: [],
+    grammarHighlights: i === 2 ? ['드립니다'] : i === 3 ? ['보시고'] : [],
+  }))
+  update({
+    input: text,
+    live: {
+      ...current,
+      text,
+      requestKey: translationRequestKey({
+        text,
+        source: 'ko',
+        target: 'en',
+        mode: 'casual',
+        context: '',
+        refinements: [],
+        uiLang: 'en',
+      }),
+      partial: { ...current.partial, learningPhrases: phrases },
+    },
+  })
+  await expect
+    .poll(
+      () => document.querySelectorAll('[data-testid="source-grammar"]').length,
+    )
+    .toBe(2)
+  await openOverview()
+  await expect.element(page.getByTestId('learning-chunk').first()).toBeVisible()
+  expect(page.getByTestId('learning-chunk').elements()).toHaveLength(2)
+  expect(
+    page.getByTestId('learning-chunk').first().element().textContent,
+  ).toContain('링크를 공유드립니다')
+  await page.getByTestId('learning-chunk').first().click()
+  await expect
+    .element(page.getByText(fact.grammar, { exact: true }))
+    .toBeVisible()
+  expect(mainCopy().element().hasAttribute('disabled')).toBe(false)
+})
+
+function sourceGrammarPosition(input: HTMLTextAreaElement) {
+  const grammar = document.querySelector('[data-testid="source-grammar"]')!
+  const rect = grammar.getClientRects()[0]!
+  const field = input.getBoundingClientRect()
+  return {
+    x: rect.left + rect.width / 2 - field.left,
+    y: rect.top + rect.height / 2 - field.top,
+  }
+}
+
+test('tapping source grammar opens its phrase and preserves the editor caret', async () => {
+  await render(<Fixture reading prepared />)
+  const input = page.getByTestId('input-textarea')
+  const node = input.element() as HTMLTextAreaElement
+  await input.click({ position: sourceGrammarPosition(node) })
+  const caret = [node.selectionStart, node.selectionEnd]
+  await expect
+    .element(page.getByRole('region', { name: '도와줘서', exact: true }))
+    .toBeVisible()
+  expect(input.element()).toBe(node)
+  expect(node.value).toBe(translation)
+  expect([node.selectionStart, node.selectionEnd]).toEqual(caret)
+  if (page.getByTestId('learning-panel').query()) {
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
+  }
+  expect(document.activeElement).toBe(node)
+  expect([node.selectionStart, node.selectionEnd]).toEqual(caret)
+  await input.fill(translation + ' 수정')
+  expect(document.querySelector('.phrase-detail')).toBeNull()
+})
+
+test.each([
+  'double click',
+  'long press',
+  'selection',
+  'typing',
+  'outside click',
+  'arrow key',
+  'plain source',
+  'stale result',
+] as const)('source grammar keeps ordinary editing for %s', async (gesture) => {
+  await render(<Fixture reading prepared />)
+  const input = page.getByTestId('input-textarea')
+  const node = input.element() as HTMLTextAreaElement
+  const position = sourceGrammarPosition(node)
+  if (gesture === 'plain source')
+    position.x = parseFloat(getComputedStyle(node).paddingLeft) + 4
+  if (gesture === 'double click') await userEvent.dblClick(input, { position })
+  else if (gesture === 'long press') await input.click({ position, delay: 600 })
+  else {
+    await input.click({ position })
+    if (gesture === 'selection') node.setSelectionRange(3, 7)
+    if (gesture === 'typing') await userEvent.keyboard('x')
+    if (gesture === 'arrow key') await userEvent.keyboard('{ArrowLeft}')
+    if (gesture === 'stale result')
+      update({ error: { kind: 'server', message: 'Unavailable' } })
+    if (gesture === 'outside click')
+      await page.getByTestId('context-toggle').click()
+  }
+  await new Promise((r) => setTimeout(r, 450))
+  expect(document.querySelector('.phrase-detail')).toBeNull()
+  expect(page.getByTestId('learning-panel').query()).toBeNull()
+  expect(input.element()).toBe(node)
+  if (gesture === 'selection')
+    expect([node.selectionStart, node.selectionEnd]).toEqual([3, 7])
+  if (gesture === 'typing') expect(node.value).toContain('x')
+  if (gesture === 'double click')
+    expect(node.selectionEnd).toBeGreaterThan(node.selectionStart)
+})
+
+test.each([false, true])(
+  'scrolled source grammar stays accurate and scrolling cancels a pending tap (%s)',
+  async (cancelTap) => {
+    await render(<Fixture reading prepared />)
+    const current = useTranslatorContext().live!
+    if (current.intent !== 'sentence')
+      throw new Error('Expected sentence fixture')
+    const text =
+      Array(15).fill('다른 문장입니다.').join('\n') + '\n' + translation
+    update({
+      input: text,
+      live: {
+        ...current,
+        text,
+        requestKey: translationRequestKey({
+          text,
+          source: 'ko',
+          target: 'en',
+          mode: 'casual',
+          context: '',
+          refinements: [],
+          uiLang: 'en',
+        }),
+      },
+    })
+    const input = page.getByTestId('input-textarea')
+    const node = input.element() as HTMLTextAreaElement
+    await expect.element(input).toHaveValue(text)
+    node.focus()
+    node.setSelectionRange(text.length, text.length)
+    node.scrollTop = node.scrollHeight
+    await expect
+      .poll(() => page.getByTestId('source-highlight').element().scrollTop)
+      .toBe(node.scrollTop)
+    await input.click({ position: sourceGrammarPosition(node) })
+    const caret = [node.selectionStart, node.selectionEnd]
+    const scroll = node.scrollTop
+    if (cancelTap) {
+      node.scrollTop = 0
+      await new Promise((r) => setTimeout(r, 450))
+      expect(document.querySelector('.phrase-detail')).toBeNull()
+      expect(page.getByTestId('learning-panel').query()).toBeNull()
+    } else {
+      await expect
+        .element(page.getByRole('region', { name: '도와줘서', exact: true }))
+        .toBeVisible()
+      if (page.getByTestId('learning-panel').query())
+        await page
+          .getByRole('button', { name: 'Close learning', exact: true })
+          .click()
+      expect(input.element()).toBe(node)
+      expect(document.activeElement).toBe(node)
+      expect([node.selectionStart, node.selectionEnd]).toEqual(caret)
+      expect(node.scrollTop).toBe(scroll)
+    }
+  },
+)
+
+test('source grammar tap survives the keyboard opening on focus', async () => {
+  if (window.innerWidth >= 1100) return
+  const viewport = Object.assign(new EventTarget(), {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    offsetTop: 0,
+    scale: 1,
+  })
+  vi.stubGlobal('visualViewport', viewport)
+  try {
+    await render(<Fixture reading prepared />)
+    const input = page.getByTestId('input-textarea')
+    const node = input.element() as HTMLTextAreaElement
+    node.addEventListener(
+      'focus',
+      () => {
+        viewport.height = Math.floor(window.innerHeight * 0.5)
+        viewport.dispatchEvent(new Event('resize'))
+      },
+      { once: true },
+    )
+    await input.click({ position: sourceGrammarPosition(node) })
+    const caret = [node.selectionStart, node.selectionEnd]
+    await expect
+      .element(page.getByRole('region', { name: '도와줘서', exact: true }))
+      .toBeVisible()
+    await page
+      .getByRole('button', { name: 'Close learning', exact: true })
+      .click()
+    expect(document.activeElement).toBe(node)
+    expect([node.selectionStart, node.selectionEnd]).toEqual(caret)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test('dragging from a source grammar underline selects native editor text', async () => {
+  await render(<Fixture reading prepared />)
+  const input = page.getByTestId('input-textarea')
+  const node = input.element() as HTMLTextAreaElement
+  const start = sourceGrammarPosition(node)
+  await userEvent.dragAndDrop(input, input, {
+    sourcePosition: start,
+    targetPosition: { x: start.x + 50, y: start.y },
+  })
+  await new Promise((r) => setTimeout(r, 450))
+  expect(node.selectionEnd).toBeGreaterThan(node.selectionStart)
+  expect(document.querySelector('.phrase-detail')).toBeNull()
+  expect(input.element()).toBe(node)
 })

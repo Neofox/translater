@@ -5,7 +5,6 @@ import AlternativeItem from './AlternativeItem'
 import type { SpeechOptions } from '../hooks/useSpeech'
 import AlternativeItemSkeleton from './AlternativeItemSkeleton'
 import Tag from './ui/Tag'
-import LearningTips from './LearningTips'
 import ResultSection from './ResultSection'
 import WordSourceMeta from './WordSourceMeta'
 import { useUiLang } from '../hooks/useUiLang'
@@ -78,9 +77,6 @@ export default function WordView({
       )}
       {content === 'reference' && about}
       {content !== 'reference' && about}
-      {content !== 'alternatives' && (
-        <LearningTips tips={result.learningTips} />
-      )}
     </div>
   )
 }

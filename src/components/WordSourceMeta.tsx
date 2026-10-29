@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import type { WordResult } from '../server/schemas'
 import Tag from './ui/Tag'
+import CharacterNotes from './CharacterNotes'
 import { useUiLang } from '../hooks/useUiLang'
 
 type Props = {
@@ -10,7 +11,14 @@ type Props = {
   onLookup?: (text: string) => void
 }
 
-type SectionKey = 'primary' | 'other' | 'etymology' | 'notes' | 'synonyms'
+type SectionKey =
+  | 'primary'
+  | 'other'
+  | 'etymology'
+  | 'grammar'
+  | 'characters'
+  | 'notes'
+  | 'synonyms'
 
 export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
   const { t } = useUiLang()
@@ -33,6 +41,8 @@ export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
     other: hasOther,
     etymology: !!result.etymology,
     notes: !!result.notes,
+    grammar: !!result.grammar,
+    characters: !!result.characters?.length,
     synonyms: synonyms.length > 0,
   }
 
@@ -40,7 +50,9 @@ export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
     'primary',
     'other',
     'etymology',
+    'grammar',
     'notes',
+    'characters',
     'synonyms',
   ]
 
@@ -52,7 +64,7 @@ export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
     : null
 
   return (
-    <div className="word-source-meta shrink-0 border-t border-border py-4 text-sm text-ink-soft">
+    <div className="word-source-meta shrink-0 py-4 text-sm text-ink-soft">
       {posList.length > 1 && (
         <PosTabs
           posList={posList}
@@ -83,6 +95,15 @@ export default function WordSourceMeta({ result, streaming, onLookup }: Props) {
         <TextBlock label={t('etymology')} text={result.etymology!} />
       )}
       {streamingKey === 'etymology' && <SkeletonBlock label={t('etymology')} />}
+
+      {ready.grammar && (
+        <TextBlock label={t('grammar')} text={result.grammar!} />
+      )}
+      {streamingKey === 'grammar' && <SkeletonBlock label={t('grammar')} />}
+      {ready.characters && <CharacterNotes characters={result.characters} />}
+      {streamingKey === 'characters' && (
+        <SkeletonBlock label={t('characters')} />
+      )}
 
       {ready.notes && <TextBlock label={t('notes')} text={result.notes!} />}
       {streamingKey === 'notes' && <SkeletonBlock label={t('notes')} />}
@@ -155,7 +176,7 @@ function PosLabel({ pos, label }: { pos: string; label: string }) {
       className="animate-settle mb-3 flex items-baseline gap-2"
       style={{ animationDelay: '30ms' }}
     >
-      <span className="text-xs font-semibold uppercase tracking-wide text-warm">
+      <span className="dictionary-label text-xs font-semibold uppercase tracking-wide">
         {label}
       </span>
       <span className="italic text-ink">{pos}</span>
@@ -174,7 +195,7 @@ function PrimaryBlock({
 }) {
   return (
     <div className="animate-settle mb-3" style={{ animationDelay: '60ms' }}>
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-warm">
+      <p className="mb-1 dictionary-label text-xs font-semibold uppercase tracking-wide">
         {label}
       </p>
       <p className="text-ink">{primary.definition}</p>
@@ -216,7 +237,7 @@ function OtherBlock({
 }) {
   return (
     <div className="animate-settle mb-3">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
+      <p className="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide">
         {label}
       </p>
       <ol className="space-y-2 pl-4">
@@ -254,7 +275,7 @@ function OtherBlock({
 function TextBlock({ label, text }: { label: string; text: string }) {
   return (
     <div className="animate-settle mb-3">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-warm">
+      <p className="mb-1 dictionary-label text-xs font-semibold uppercase tracking-wide">
         {label}
       </p>
       <p className="text-ink">{text}</p>
@@ -273,7 +294,7 @@ function SynonymBlock({
 }) {
   return (
     <div className="animate-settle">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
+      <p className="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide">
         {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -296,7 +317,7 @@ function SynonymBlock({
 function SkeletonBlock({ label }: { label: string }) {
   return (
     <div className="mb-3">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-warm">
+      <p className="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide">
         {label}
       </p>
       <div className="animate-pulse space-y-2">

@@ -24,7 +24,6 @@ import {
 } from '../lib/resolveTranslationTarget'
 import { useSessionState } from '../lib/usePersistentState'
 import type { Intent, Mode } from '../lib/types'
-import type { LearningTips as LearningTipsType } from '../server/schemas'
 
 type TranslateHandle = ReturnType<typeof useTranslate>
 
@@ -72,7 +71,6 @@ type TranslatorContextValue = {
   flush: TranslateHandle['flush']
   /** Skip the debounce for the next paste/refinement run and record its trigger. */
   queueImmediate: TranslateHandle['queueImmediate']
-  outputTips?: Partial<LearningTipsType>
   textareaRef: RefObject<HTMLTextAreaElement | null>
   clearInput: () => void
   lookupWord: (text: string) => void
@@ -240,7 +238,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
 
   // Learning tips always belong to the translated result, so keep their
   // placement stable in the target panel regardless of the language pair.
-  const outputTips = live?.partial.learningTips
 
   // Focus input on mount, but not on touch devices (avoids popping the keyboard).
   useEffect(() => {
@@ -400,7 +397,6 @@ export function TranslatorProvider({ children }: { children: ReactNode }) {
     reset,
     flush,
     queueImmediate,
-    outputTips,
     textareaRef,
     clearInput,
     lookupWord,

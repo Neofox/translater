@@ -229,7 +229,10 @@ describe('useTranslate', () => {
       await act(async () => {
         controller.enqueue({
           type: 'delta',
-          raw: '하세요","rationale":"More details',
+          raw:
+            intent === 'sentence'
+              ? '하세요","learningPhrases":[{"text":"안녕하세요","grammar":"Still streaming phrase details'
+              : '하세요","rationale":"More details',
         })
       })
       expect(result.current.live).toMatchObject({
