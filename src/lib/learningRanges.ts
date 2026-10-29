@@ -9,6 +9,20 @@ import type { LearningInputData, LearningResult } from '../server/learningTypes'
 export type TextRange = { start: number; end: number }
 export const isLearningText = (text: string) => /[\p{L}\p{N}\p{S}]/u.test(text)
 
+// Models sometimes "explain" native Korean words by glossing their Hangul
+// syllables as characters. Keep a note only when every char is a real Han
+// character and, for a Hangul word, there is exactly one per syllable.
+export function isCharacterOrigin(note: {
+  word: string
+  chars: { char: string }[]
+}): boolean {
+  if (!note.chars.length) return false
+  if (!note.chars.every(({ char }) => /^\p{Script=Han}$/u.test(char)))
+    return false
+  const hangul = [...note.word].filter((c) => /\p{Script=Hangul}/u.test(c))
+  return !hangul.length || hangul.length === note.chars.length
+}
+
 export function sentenceRanges(text: string, language: string): TextRange[] {
   if (!text) return []
   try {
@@ -138,8 +152,9 @@ export function prepareLearningResult(
           grammar: phrase.grammar,
           omissions: phrase.omissions,
           usageNote: phrase.usageNote,
-          characters: phrase.characters.filter((note) =>
-            phrase.text.includes(note.word),
+          characters: phrase.characters.filter(
+            (note) =>
+              phrase.text.includes(note.word) && isCharacterOrigin(note),
           ),
           grammarHighlights: (phrase.grammar.trim()
             ? phrase.grammarHighlights

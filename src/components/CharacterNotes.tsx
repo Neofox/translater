@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition -- Nested streamed fields can be incomplete. */
 import type { CharacterBreakdownData } from '../server/learningTypes'
 import { useUiLang } from '../hooks/useUiLang'
+import { isCharacterOrigin } from '../lib/learningRanges'
 import type { StringKey } from '../lib/i18n'
 
 function characterLabelKey(word: string | undefined): StringKey {
@@ -17,8 +18,9 @@ export default function CharacterNotes({
   characters?: CharacterBreakdownData[]
 }) {
   const { t } = useUiLang()
+  // Streaming notes stay hidden until they validate as real character origins.
   const notes = (characters ?? []).filter(
-    (item) => item.word && Array.isArray(item.chars) && item.chars.length,
+    (item) => item.word && Array.isArray(item.chars) && isCharacterOrigin(item),
   )
   if (!notes.length) return null
   return (

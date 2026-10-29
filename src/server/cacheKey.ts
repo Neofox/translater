@@ -1,7 +1,7 @@
 import type { Intent, Mode } from '../lib/types'
 
 // Bump when the response schema or prompt changes so stale entries miss.
-export const CACHE_VERSION = 'v16-consolidated-details'
+export const CACHE_VERSION = 'v17-korean-accuracy'
 
 export type CacheKeyInput = {
   intent: Intent

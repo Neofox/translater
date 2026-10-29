@@ -81,6 +81,56 @@ describe('validated learning spans', () => {
     ])
   })
 
+  it('drops character notes that are not real hanja, kanji or hanzi for their word', () => {
+    const note = (word: string, ...chars: string[]) => ({
+      word,
+      chars: chars.map((char) => ({ char, meaning: 'm' })),
+    })
+    const result = prepareLearningResult(
+      'I am sorry, call me after lunch.',
+      '미안해, 점심 후에 전화해.',
+      [
+        {
+          text: '미안해',
+          ...fact,
+          sourceTexts: [],
+          grammarHighlights: [],
+          characters: [
+            note('미안', '未', '安'),
+            // Hangul syllables are not hanja.
+            note('미안해', '미', '안', '해'),
+          ],
+        },
+        {
+          text: '점심 후에 전화해',
+          ...fact,
+          sourceTexts: [],
+          grammarHighlights: [],
+          characters: [
+            note('점심', '點', '心'),
+            // One hanja per Hangul syllable, never more or fewer.
+            note('전화', '電'),
+            note('후', '後', '後'),
+          ],
+        },
+        // Japanese words keep their kana; only the kanji are listed.
+      ],
+    )
+    expect(result?.chunks.map((c) => c.characters?.map((n) => n.word))).toEqual(
+      [['미안'], ['점심']],
+    )
+    const japanese = prepareLearningResult('Nostalgic.', '懐かしい。', [
+      {
+        text: '懐かしい',
+        ...fact,
+        sourceTexts: [],
+        grammarHighlights: [],
+        characters: [note('懐かしい', '懐')],
+      },
+    ])
+    expect(japanese?.chunks[0]?.characters).toHaveLength(1)
+  })
+
   it('does not underline ambiguous quotes or split a combining-character grapheme', () => {
     const result = prepareLearningResult('', 'banana é', [
       {
