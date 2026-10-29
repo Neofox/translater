@@ -36,6 +36,7 @@ try {
       name: 'sentence_translation',
     }),
     maxRetries: 0,
+    reasoning: 'none',
     timeout: 60_000,
     providerOptions: gatewayProviderOptions({
       model,

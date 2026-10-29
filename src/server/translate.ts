@@ -1,15 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { Output, streamText } from 'ai'
+import { streamText } from 'ai'
 import { translationCache } from './cache'
-import { CACHE_VERSION, cacheKeyFor, promptCacheKeyFor } from './cacheKey'
-import {
-  gatewayProviderOptions,
-  gatewayTags,
-  resolveTranslateModel,
-} from './gateway'
-import { sentencePrompt, wordPrompt } from './prompts'
-import { SentenceResult, WordResult } from './schemas'
+import { CACHE_VERSION, cacheKeyFor } from './cacheKey'
+import { resolveTranslateModel } from './gateway'
+import type { SentenceResult, WordResult } from './schemas'
 import { consumeStructuredStream } from './structuredStream'
 import {
   prepareTranslationTelemetry,
@@ -21,6 +16,7 @@ import {
   isTranslationAbort,
   publicTranslationError,
 } from './translationError'
+import { translationRequest } from './translationRequest'
 import { TranslateInput } from './translateTypes'
 import type { TranslateInputData } from './translateTypes'
 
@@ -76,36 +72,13 @@ export async function handleTranslate(
   const nativeTelemetry = await runtime.prepareTelemetry()
 
   const isWord = data.intent === 'word'
-  const requestKind =
-    data.refinements.length > 0
-      ? ('refinement' as const)
-      : data.context
-        ? ('context' as const)
-        : ('initial' as const)
-  const prompt = isWord ? wordPrompt(data) : sentencePrompt(data)
-  const structuredOutput = isWord
-    ? Output.object({ schema: WordResult, name: 'word_translation' })
-    : Output.object({ schema: SentenceResult, name: 'sentence_translation' })
 
   return new ReadableStream<TranslateChunk>({
     async start(controller) {
       try {
         const result = runtime.streamText({
-          model: MODEL,
-          instructions: prompt.instructions,
-          messages: prompt.messages,
-          output: structuredOutput,
+          ...translationRequest(data, MODEL),
           abortSignal: requestSignal,
-          maxRetries: 0,
-          providerOptions: gatewayProviderOptions({
-            model: MODEL,
-            promptCacheKey: promptCacheKeyFor(data),
-            tags: gatewayTags({
-              intent: data.intent,
-              requestKind,
-              promptVersion: CACHE_VERSION,
-            }),
-          }),
           runtimeContext: translationRuntimeContext(data, MODEL, CACHE_VERSION),
           telemetry: translationTelemetryOptions(nativeTelemetry.enabled),
         })

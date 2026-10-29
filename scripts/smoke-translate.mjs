@@ -28,6 +28,7 @@ async function callStructured(intent, args) {
       name: intent === 'word' ? 'word_translation' : 'sentence_translation',
     }),
     maxRetries: 0,
+    reasoning: 'none',
     providerOptions: gatewayProviderOptions({
       model: MODEL,
       promptCacheKey: promptCacheKeyFor(promptArgs),

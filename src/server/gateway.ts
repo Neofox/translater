@@ -1,6 +1,6 @@
 import type { JSONValue } from 'ai'
 
-export const DEFAULT_TRANSLATE_MODEL = 'openai/gpt-5.6-luna'
+export const DEFAULT_TRANSLATE_MODEL = 'openai/gpt-6-luna'
 
 export class GatewayConfigurationError extends Error {
   constructor(message: string) {

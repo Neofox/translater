@@ -11,7 +11,7 @@ import {
 describe('resolveTranslateModel', () => {
   it('defaults to the exact Gateway model id', () => {
     expect(resolveTranslateModel({})).toBe(DEFAULT_TRANSLATE_MODEL)
-    expect(DEFAULT_TRANSLATE_MODEL).toBe('openai/gpt-5.6-luna')
+    expect(DEFAULT_TRANSLATE_MODEL).toBe('openai/gpt-6-luna')
   })
 
   it('accepts one exact provider/model id', () => {

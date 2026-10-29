@@ -114,8 +114,9 @@ describe('handleTranslate via AI Gateway', () => {
 
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'openai/gpt-5.6-luna',
+        model: 'openai/gpt-6-luna',
         maxRetries: 0,
+        reasoning: 'none',
         abortSignal: requestSignal,
         instructions: [
           expect.objectContaining({ role: 'system' }),
@@ -129,7 +130,7 @@ describe('handleTranslate via AI Gateway', () => {
         output: expect.anything(),
         runtimeContext: expect.objectContaining({
           intent: 'sentence',
-          requestedModel: 'openai/gpt-5.6-luna',
+          requestedModel: 'openai/gpt-6-luna',
           gatewayCacheMode: 'auto',
         }),
         telemetry: {
@@ -142,19 +143,12 @@ describe('handleTranslate via AI Gateway', () => {
         providerOptions: {
           gateway: {
             caching: 'auto',
-            tags: [
-              'translation',
-              'sentence',
-              'initial',
-              'v16-consolidated-details',
-            ],
+            tags: ['translation', 'sentence', 'initial', 'v17-korean-accuracy'],
           },
           openai: {
             reasoningEffort: 'none',
             store: false,
-            promptCacheKey: expect.stringContaining(
-              'nt:v16-consolidated-details',
-            ),
+            promptCacheKey: expect.stringContaining('nt:v17-korean-accuracy'),
             promptCacheOptions: {
               mode: 'explicit',
               ttl: '30m',
