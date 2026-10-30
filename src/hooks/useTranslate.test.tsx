@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_TRANSLATE_DEBOUNCE_MS, useTranslate } from './useTranslate'
+import {
+  DEFAULT_TRANSLATE_DEBOUNCE_MS,
+  FINISHED_TEXT_DEBOUNCE_MS,
+  WARM_INTERVAL_MS,
+  debounceFor,
+  useTranslate,
+} from './useTranslate'
 import type { LiveResult, TranslateArgs } from './useTranslate'
 import { UiLangProvider } from './useUiLang'
 import type { SetStateAction } from 'react'
@@ -54,6 +60,7 @@ vi.mock('@tanstack/react-start', () => ({
 
 vi.mock('../server/translate', () => ({
   translate: vi.fn(),
+  warmTranslation: vi.fn(() => Promise.resolve(null)),
 }))
 
 function makeCacheStream(main: string): ReadableStream<TranslateChunk> {
@@ -133,6 +140,68 @@ describe('useTranslate', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(translateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('translates finished-looking text sooner, but not after a pause mid-sentence', async () => {
+    const { rerender } = renderHook(
+      (props: TranslateArgs) => useTranslate(props),
+      { initialProps: { ...baseArgs, text: 'see you tomorrow.' }, wrapper },
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FINISHED_TEXT_DEBOUNCE_MS - 1)
+    })
+    expect(translateMock).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(translateMock).toHaveBeenCalledTimes(1)
+
+    // A space after the period means the next sentence is coming.
+    rerender({ ...baseArgs, text: 'see you tomorrow. ' })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_TRANSLATE_DEBOUNCE_MS - 1)
+    })
+    expect(translateMock).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(translateMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('only shortens the debounce for sentence-final punctuation or emoji', () => {
+    const fast = FINISHED_TEXT_DEBOUNCE_MS
+    const full = DEFAULT_TRANSLATE_DEBOUNCE_MS
+    expect(debounceFor('내일 봐요?', full)).toBe(fast)
+    expect(debounceFor('He said "fine."', full)).toBe(fast)
+    expect(debounceFor('고마워~', full)).toBe(fast)
+    expect(debounceFor('明日ね。', full)).toBe(fast)
+    expect(debounceFor('see you 👍🏽', full)).toBe(fast)
+    expect(debounceFor('see you', full)).toBe(full)
+    expect(debounceFor('내일 ㅂ', full)).toBe(full)
+    expect(debounceFor('Done.\n', full)).toBe(full)
+    expect(debounceFor('Done.', 0)).toBe(0)
+  })
+
+  it('warms the server on focus at most once per interval, without translating', async () => {
+    const mod = (await import('../server/translate')) as unknown as {
+      warmTranslation: ReturnType<typeof vi.fn>
+    }
+    mod.warmTranslation.mockClear()
+    vi.setSystemTime(Date.now() + WARM_INTERVAL_MS)
+    renderHook(() => useTranslate({ ...baseArgs, text: '' }), { wrapper })
+
+    act(() => {
+      document.dispatchEvent(new FocusEvent('focusin'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(mod.warmTranslation).toHaveBeenCalledTimes(1)
+
+    vi.setSystemTime(Date.now() + WARM_INTERVAL_MS)
+    act(() => {
+      document.dispatchEvent(new FocusEvent('focusin'))
+    })
+    expect(mod.warmTranslation).toHaveBeenCalledTimes(2)
+    expect(translateMock).not.toHaveBeenCalled()
   })
 
   it('keeps new-run and streamed text updates urgent while completed results can animate', async () => {

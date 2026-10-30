@@ -13,7 +13,14 @@ const config = defineConfig({
     devtools(),
     nitro({
       preset: 'vercel',
-      vercel: { functions: { runtime: 'nodejs22.x' } },
+      vercel: {
+        functions: {
+          runtime: 'nodejs22.x',
+          // Without this Vercel keeps running a request the browser aborted,
+          // so superseded translations/speech still generate and bill.
+          supportsCancellation: true,
+        },
+      },
       rollupConfig: { external: [/^@sentry\//] },
     }),
     tailwindcss(),
