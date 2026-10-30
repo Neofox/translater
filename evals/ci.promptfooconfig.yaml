@@ -8,10 +8,11 @@ prompts:
 
 providers:
   - id: file://translationProvider.ts
-    label: gpt-6-luna reasoning=none
+    label: gpt-6.1-terra reasoning=none fast
     config:
-      model: openai/gpt-6-luna
+      model: gpt-6.1-terra
       reasoning: none
+      serviceTier: fast
 
 evaluateOptions:
   maxConcurrency: 16
@@ -26,7 +27,11 @@ defaultTest:
     previousMain: ''
     situation: ''
   options:
-    provider: vercel:anthropic/claude-sonnet-5.5
+    provider:
+      id: openai:responses:gpt-6.1-sol
+      config:
+        reasoning:
+          effort: low
   assert:
     - type: javascript
       value: file://checks.ts

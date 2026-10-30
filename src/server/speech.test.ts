@@ -11,7 +11,7 @@ import type * as AiSdk from 'ai'
 const sdk = vi.hoisted(() => ({
   generateSpeech: vi.fn(),
   streamSpeech: vi.fn(() => {
-    throw new Error('Gateway does not support WebSocket speech')
+    throw new Error('Speech is generated over HTTPS, never streamed')
   }),
 }))
 vi.mock('ai', () => ({
@@ -101,26 +101,26 @@ describe('speech input and deployment configuration', () => {
   })
   it('uses the chosen default and permits exact deployment model/voice overrides', () => {
     expect(resolveSpeechConfig({})).toEqual({
-      model: 'google/gemini-3.8-flash-lite-tts',
-      voice: 'Kore',
+      model: 'gpt-4o-mini-tts',
+      voice: 'marin',
     })
     expect(
       resolveSpeechConfig({
-        SPEECH_MODEL: ' google/other ',
-        SPEECH_VOICE: ' Aoede ',
+        SPEECH_MODEL: ' tts-1-hd ',
+        SPEECH_VOICE: ' coral ',
       }),
-    ).toEqual({ model: 'google/other', voice: 'Aoede' })
-    expect(resolveSpeechConfig({ SPEECH_MODEL: 'vendor/tts' })).toEqual({
-      model: 'vendor/tts',
-    })
+    ).toEqual({ model: 'tts-1-hd', voice: 'coral' })
+    expect(
+      resolveSpeechConfig({ SPEECH_MODEL: 'openai/gpt-4o-mini-tts' }).model,
+    ).toBe('gpt-4o-mini-tts')
   })
   it.each([
     '',
-    'google',
-    'google/one/google/two',
-    'google/model other',
-    'google/model,other',
-    'google/\nmodel',
+    'google/gemini-3.8-flash-lite-tts',
+    'openai/one/two',
+    'model other',
+    'model,other',
+    'mo\ndel',
   ])('rejects ambiguous model configuration %j', (model) => {
     expect(() => resolveSpeechConfig({ SPEECH_MODEL: model })).toThrow()
   })
@@ -132,7 +132,7 @@ describe('speech input and deployment configuration', () => {
   )
 })
 
-describe('Gateway HTTPS speech boundary', () => {
+describe('OpenAI HTTPS speech boundary', () => {
   it('uses supported HTTPS generation and strips WAV headers/metadata before PCM playback', async () => {
     sdk.generateSpeech.mockResolvedValue({
       audio: { uint8Array: wav(undefined, { metadata: true }) },
@@ -149,9 +149,15 @@ describe('Gateway HTTPS speech boundary', () => {
     expect(sdk.streamSpeech).not.toHaveBeenCalled()
     expect(sdk.generateSpeech).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        model: 'google/gemini-3.8-flash-lite-tts',
-        voice: 'Kore',
+        model: expect.objectContaining({
+          provider: 'openai.speech',
+          modelId: 'gpt-4o-mini-tts',
+        }),
+        voice: 'marin',
         text: '안녕하세요',
+        providerOptions: {
+          openai: { instructions: expect.stringContaining('in Korean') },
+        },
         outputFormat: 'wav',
         maxRetries: 0,
         telemetry: {
@@ -163,26 +169,23 @@ describe('Gateway HTTPS speech boundary', () => {
     )
     expect(sdk.generateSpeech.mock.calls[0]![0]).not.toHaveProperty('language')
   })
-  it('uses the selected non-Google model with its supported language option', async () => {
+  it('uses the selected model and voice, naming the language in instructions', async () => {
     await collect(
-      await handleSpeech(input, new AbortController().signal, {
-        env: { SPEECH_MODEL: 'vendor/tts', SPEECH_VOICE: 'voice-id' },
-      }),
-    )
-    expect(sdk.generateSpeech.mock.calls[0]![0]).toMatchObject({
-      model: 'vendor/tts',
-      voice: 'voice-id',
-      language: 'ko',
-    })
-  })
-  it('does not preflight request-scoped OIDC environment credentials', async () => {
-    vi.stubEnv('AI_GATEWAY_API_KEY', '')
-    vi.stubEnv('VERCEL_OIDC_TOKEN', '')
-    expect(
-      await collect(
-        await handleSpeech(input, new AbortController().signal, { env: {} }),
+      await handleSpeech(
+        { ...input, text: 'Bonjour', language: 'fr' },
+        new AbortController().signal,
+        { env: { SPEECH_MODEL: 'tts-1-hd', SPEECH_VOICE: 'voice-id' } },
       ),
-    ).toHaveLength(2)
+    )
+    const request = sdk.generateSpeech.mock.calls[0]![0]
+    expect(request).toMatchObject({
+      model: expect.objectContaining({ modelId: 'tts-1-hd' }),
+      voice: 'voice-id',
+      providerOptions: {
+        openai: { instructions: expect.stringContaining('in French') },
+      },
+    })
+    expect(request).not.toHaveProperty('language')
   })
   it('rejects invalid input/configuration before paid generation', async () => {
     await expect(
@@ -192,7 +195,7 @@ describe('Gateway HTTPS speech boundary', () => {
     ).rejects.toThrow()
     await expect(
       handleSpeech(input, new AbortController().signal, {
-        env: { SPEECH_MODEL: 'private' },
+        env: { SPEECH_MODEL: 'private/model' },
       }),
     ).rejects.toThrow('Pronunciation is not configured correctly.')
     expect(sdk.generateSpeech).not.toHaveBeenCalled()
@@ -250,6 +253,25 @@ describe('Gateway HTTPS speech boundary', () => {
         await handleSpeech(input, new AbortController().signal, { env: {} }),
       ),
     ).rejects.toThrow('Pronunciation failed.')
+  })
+  it('accepts the streaming WAV sizes OpenAI writes before the audio exists', async () => {
+    const streamed = wav(new Uint8Array([1, 0, 2, 0, 3, 0]))
+    const view = new DataView(streamed.buffer)
+    view.setUint32(4, 0xffffffff, true)
+    view.setUint32(40, 0xffffffff, true)
+    sdk.generateSpeech.mockResolvedValue({ audio: { uint8Array: streamed } })
+    expect(
+      await collect(
+        await handleSpeech(input, new AbortController().signal, { env: {} }),
+      ),
+    ).toEqual([
+      {
+        type: 'audio',
+        audio: new Uint8Array([1, 0, 2, 0, 3, 0]),
+        sampleRate: 24000,
+      },
+      { type: 'done' },
+    ])
   })
   it('honors the sample rate reported in a valid WAV', async () => {
     sdk.generateSpeech.mockResolvedValue({

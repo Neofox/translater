@@ -1,20 +1,24 @@
 import '../src/server/aiSdkWarnings.server.ts'
 import './http.ts'
 import { createHash } from 'node:crypto'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { streamText } from 'ai'
 import promptfoo from 'promptfoo'
 import { z } from 'zod'
+import { resolveTranslateConfig } from '../src/server/openai.ts'
+import type { TranslateConfig } from '../src/server/openai.ts'
 import { SentenceResult, WordResult } from '../src/server/schemas.ts'
 import { translationRequest } from '../src/server/translationRequest.ts'
 import { TranslateInput } from '../src/server/translateTypes.ts'
 import { SENTENCE_SYSTEMS } from './promptVariants.ts'
 import type { PromptVariant } from './promptVariants.ts'
-
-type ReasoningLevel = NonNullable<Parameters<typeof streamText>[0]['reasoning']>
+import { estimateCost } from './pricing.ts'
 
 type Config = {
   model: string
-  reasoning?: ReasoningLevel
+  reasoning?: string
+  serviceTier?: string
   promptVariant?: PromptVariant
 }
 
@@ -24,19 +28,53 @@ type CallContext = {
   bustCache?: boolean
 }
 
+// One file per translation. promptfoo's own cache is a single JSON file, and
+// this module gets a separate cache instance from the CLI's: whichever saved
+// last overwrote the other's entries, so almost no translations survived a
+// run that also cached judge results.
+const CACHE_DIR = join(
+  process.env.PROMPTFOO_CACHE_PATH ?? '.promptfoo-cache',
+  'translations',
+)
+
+async function readCached(key: string): Promise<object | undefined> {
+  try {
+    return JSON.parse(await readFile(join(CACHE_DIR, `${key}.json`), 'utf8'))
+  } catch {
+    return undefined
+  }
+}
+
+async function writeCached(key: string, value: object) {
+  await mkdir(CACHE_DIR, { recursive: true })
+  const file = join(CACHE_DIR, `${key}.json`)
+  const temp = `${file}.${process.pid}.tmp`
+  await writeFile(temp, JSON.stringify(value))
+  await rename(temp, file)
+}
+
 // Runs the production translation request for one promptfoo test case. Only
-// the model and reasoning level vary between providers in the config.
+// the model, reasoning effort, service tier and prompt variant differ.
 export default class TranslationProvider {
   config: Config
+  translateConfig: TranslateConfig
   label: string
 
   constructor(options: { id?: string; label?: string; config: Config }) {
     this.config = options.config
+    // Same validation as the deployment environment.
+    this.translateConfig = resolveTranslateConfig({
+      TRANSLATE_MODEL: options.config.model,
+      TRANSLATE_REASONING: options.config.reasoning,
+      TRANSLATE_SERVICE_TIER: options.config.serviceTier,
+    })
+    const { model, reasoning, serviceTier } = this.translateConfig
     this.label =
       options.label ??
       [
-        options.config.model,
-        `reasoning=${options.config.reasoning ?? 'none'}`,
+        model,
+        `reasoning=${reasoning}`,
+        serviceTier === 'fast' ? 'fast' : '',
         options.config.promptVariant
           ? `prompt=${options.config.promptVariant}`
           : '',
@@ -46,7 +84,8 @@ export default class TranslationProvider {
   }
 
   id() {
-    return `translate:${this.config.model}:${this.config.reasoning ?? 'none'}:${this.config.promptVariant ?? 'production'}`
+    const { model, reasoning, serviceTier } = this.translateConfig
+    return `translate:${model}:${reasoning}:${serviceTier}:${this.config.promptVariant ?? 'production'}`
   }
 
   async callApi(_prompt: string, context?: CallContext) {
@@ -60,30 +99,20 @@ export default class TranslationProvider {
         .map((line) => line.trim())
         .filter(Boolean),
     })
-    const reasoning = this.config.reasoning ?? 'none'
+    const config = this.translateConfig
     const request = translationRequest(
       data,
-      this.config.model,
+      config,
       SENTENCE_SYSTEMS[this.config.promptVariant ?? 'production'],
     )
-    // Keep eval spend out of production Gateway reporting.
-    const gateway = request.providerOptions.gateway as { tags: string[] }
-    gateway.tags = ['eval', ...gateway.tags.filter((t) => t !== 'translation')]
-    const openai = request.providerOptions.openai as
-      Record<string, unknown> | undefined
-    if (openai) {
-      // Provider-specific effort wins over the portable setting.
-      if (reasoning === 'provider-default') delete openai.reasoningEffort
-      else openai.reasoningEffort = reasoning
-    }
 
-    // Any change to the prompt, schema, model, reasoning or repeat index is a
-    // new key, so prompt edits never reuse stale outputs.
-    const cacheKey = `neotranslate:${createHash('sha256')
+    // Any change to the prompt, schema, model, reasoning, tier or repeat index
+    // is a new key, so prompt edits never reuse stale outputs.
+    const cacheKey = createHash('sha256')
       .update(
         JSON.stringify({
-          model: this.config.model,
-          reasoning,
+          provider: 'openai',
+          model: config.model,
           instructions: request.instructions,
           messages: request.messages,
           providerOptions: request.providerOptions,
@@ -93,10 +122,10 @@ export default class TranslationProvider {
           repeatIndex: context?.repeatIndex ?? 0,
         }),
       )
-      .digest('hex')}`
+      .digest('hex')
     const useCache = promptfoo.cache.isCacheEnabled() && !context?.bustCache
     if (useCache) {
-      const hit = await promptfoo.cache.getCache().get<object>(cacheKey)
+      const hit = await readCached(cacheKey)
       if (hit) return { ...hit, cached: true }
     }
 
@@ -104,7 +133,6 @@ export default class TranslationProvider {
     try {
       const result = streamText({
         ...request,
-        reasoning,
         timeout: 120_000,
         telemetry: { isEnabled: false },
       })
@@ -126,29 +154,42 @@ export default class TranslationProvider {
         result.usage,
         result.providerMetadata,
       ])
-      const cost = Number(
-        (providerMetadata?.gateway as { cost?: unknown } | undefined)?.cost,
-      )
+      const cached = usage.inputTokenDetails.cacheReadTokens ?? 0
+      // OpenAI silently serves the default tier when Fast is unavailable;
+      // price what was actually used.
+      const servedTier =
+        (providerMetadata?.openai as { serviceTier?: string } | undefined)
+          ?.serviceTier === 'default'
+          ? 'default'
+          : config.serviceTier
+      const cost = estimateCost(config.model, servedTier, {
+        input: usage.inputTokens ?? 0,
+        cached,
+        output: usage.outputTokens ?? 0,
+      })
       const response = {
         output: JSON.stringify(output, null, 2),
         tokenUsage: {
           prompt: usage.inputTokens,
           completion: usage.outputTokens,
           total: usage.totalTokens,
-          cached: usage.inputTokenDetails.cacheReadTokens,
+          cached,
           completionDetails: {
             reasoning: usage.outputTokenDetails.reasoningTokens,
           },
         },
-        ...(Number.isFinite(cost) ? { cost } : {}),
+        ...(cost !== undefined ? { cost } : {}),
         metadata: {
           ttftMs: ttftMs && Math.round(ttftMs),
           mainReadyMs: mainReadyMs && Math.round(mainReadyMs),
           totalMs: Math.round(performance.now() - started),
           reasoningTokens: usage.outputTokenDetails.reasoningTokens ?? 0,
+          serviceTier:
+            (providerMetadata?.openai as { serviceTier?: string } | undefined)
+              ?.serviceTier ?? null,
         },
       }
-      if (useCache) await promptfoo.cache.getCache().set(cacheKey, response)
+      if (useCache) await writeCached(cacheKey, response)
       return response
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) }

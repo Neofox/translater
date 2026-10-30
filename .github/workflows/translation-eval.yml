@@ -9,7 +9,7 @@ on:
       - src/server/schemas.ts
       - src/server/learningTypes.ts
       - src/server/translationRequest.ts
-      - src/server/gateway.ts
+      - src/server/openai.ts
       - evals/**
       - .github/workflows/translation-eval.yml
   workflow_dispatch:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   eval:
-    # Fork PRs do not receive the Gateway secret.
+    # Fork PRs do not receive the OpenAI secret.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -50,7 +50,8 @@ jobs:
 
       - uses: promptfoo/promptfoo-action@04839e664f52212b877170219dab0d7ad2bf6440 # promptfoo-action-v1.3.4
         env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          # Translations and the judge both call OpenAI.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PROMPTFOO_DISABLE_TELEMETRY: '1'
           PROMPTFOO_DISABLE_UPDATE: '1'
         with:
@@ -62,4 +63,8 @@ jobs:
           no-share: true
           cache-path: .promptfoo-cache
           max-concurrency: '16'
+          # Gate on the suite pass rate, not on every case: a judge always
+          # fails a few cases (sol-low itself passes ~80%). Production terra
+          # passes 66-76%; the previous luna setup 34-42%.
+          fail-on-threshold: '60'
           no-progress-bar: true

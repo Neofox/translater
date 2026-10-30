@@ -1,4 +1,9 @@
-import { APICallError, NoObjectGeneratedError, NoSuchProviderError } from 'ai'
+import {
+  APICallError,
+  LoadAPIKeyError,
+  NoObjectGeneratedError,
+  NoSuchProviderError,
+} from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   classifyTranslationError,
@@ -6,12 +11,12 @@ import {
   publicTranslationError,
 } from './translationError'
 
-function apiError(statusCode: number): unknown {
+function apiError(statusCode: number, body = 'private provider body'): unknown {
   return {
     name: 'AI_APICallError',
     statusCode,
     message: 'upstream echoed private source text',
-    responseBody: 'private provider body',
+    responseBody: body,
   }
 }
 
@@ -23,14 +28,23 @@ describe('classifyTranslationError', () => {
     [403, 'authentication'],
     [402, 'budget'],
     [429, 'rate_limit'],
+    [429, 'budget', '{"error":{"code":"insufficient_quota"}}'],
     [400, 'model_configuration'],
     [404, 'model_configuration'],
-  ] as const)('maps HTTP %i to %s', (status, expected) => {
-    const error = apiError(status)
+  ] as const)('maps HTTP %i to %s', (status, expected, body?: string) => {
+    const error = apiError(status, body)
     vi.spyOn(APICallError, 'isInstance').mockImplementation(
       (candidate): candidate is APICallError => candidate === error,
     )
     expect(classifyTranslationError(error)).toBe(expected)
+  })
+
+  it('maps a missing OpenAI key to a configuration error', () => {
+    expect(
+      classifyTranslationError(
+        new LoadAPIKeyError({ message: 'OPENAI_API_KEY is missing' }),
+      ),
+    ).toBe('configuration')
   })
 
   it('maps provider resolution and structured output failures', () => {
@@ -57,8 +71,7 @@ describe('classifyTranslationError', () => {
       classifyTranslationError(error),
       'en',
     )
-    expect(publicError.message).toContain('OIDC')
-    expect(publicError.message).toContain('AI_GATEWAY_API_KEY')
+    expect(publicError.message).toContain('OPENAI_API_KEY')
     expect(publicError.message).not.toContain('private')
     expect(publicError).not.toHaveProperty('cause')
   })

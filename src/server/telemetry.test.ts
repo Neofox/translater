@@ -43,7 +43,7 @@ describe('translationRuntimeContext', () => {
         analyticsSupersedesRunId: 'old-run-id',
         analyticsInputRevision: 3,
       },
-      'openai/gpt-5.6-luna',
+      { model: 'gpt-6-luna', reasoning: 'none', serviceTier: 'fast' },
       'v12-ai-gateway',
     )
 

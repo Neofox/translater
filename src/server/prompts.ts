@@ -11,7 +11,7 @@ export type TranslationPrompt = {
 }
 
 // Stable instructions and few-shot messages stay before live content so
-// Gateway/provider prefix caching can reuse the longest possible prefix.
+// Provider prefix caching can reuse the longest possible prefix.
 function finalUserContent(
   instruction: string,
   liveInput: string,

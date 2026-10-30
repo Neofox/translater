@@ -1,7 +1,12 @@
-import { APICallError, NoObjectGeneratedError, NoSuchProviderError } from 'ai'
+import {
+  APICallError,
+  LoadAPIKeyError,
+  NoObjectGeneratedError,
+  NoSuchProviderError,
+} from 'ai'
 import { STRINGS } from '../lib/i18n'
 import type { UiLang } from '../lib/i18n'
-import { GatewayConfigurationError } from './gateway'
+import { TranslationConfigurationError } from './openai'
 
 export type TranslationErrorKind =
   | 'configuration'
@@ -13,7 +18,11 @@ export type TranslationErrorKind =
   | 'provider'
 
 export function classifyTranslationError(error: unknown): TranslationErrorKind {
-  if (error instanceof GatewayConfigurationError) return 'configuration'
+  if (
+    error instanceof TranslationConfigurationError ||
+    LoadAPIKeyError.isInstance(error)
+  )
+    return 'configuration'
   if (NoSuchProviderError.isInstance(error)) return 'model_configuration'
   if (NoObjectGeneratedError.isInstance(error)) return 'structured_output'
 
@@ -22,7 +31,11 @@ export function classifyTranslationError(error: unknown): TranslationErrorKind {
       return 'authentication'
     }
     if (error.statusCode === 402) return 'budget'
-    if (error.statusCode === 429) return 'rate_limit'
+    // OpenAI reports exhausted credit as 429 insufficient_quota.
+    if (error.statusCode === 429)
+      return /insufficient_quota/.test(error.responseBody ?? '')
+        ? 'budget'
+        : 'rate_limit'
     if (error.statusCode === 400 || error.statusCode === 404) {
       return 'model_configuration'
     }
@@ -50,12 +63,12 @@ export function publicTranslationError(
 ): Error {
   const strings = STRINGS[uiLang]
   const message = {
-    configuration: strings.gatewayConfigurationFailed,
-    authentication: strings.gatewayAuthenticationFailed,
-    budget: strings.gatewayBudgetUnavailable,
-    rate_limit: strings.gatewayRateLimited,
-    model_configuration: strings.gatewayModelInvalid,
-    structured_output: strings.gatewayStructuredOutputInvalid,
+    configuration: strings.providerConfigurationFailed,
+    authentication: strings.providerAuthenticationFailed,
+    budget: strings.providerBudgetUnavailable,
+    rate_limit: strings.providerRateLimited,
+    model_configuration: strings.providerModelInvalid,
+    structured_output: strings.providerStructuredOutputInvalid,
     provider: strings.translationFailed,
   }[kind]
 

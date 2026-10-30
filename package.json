@@ -27,6 +27,7 @@
     "eval:view": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo view"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.105",
     "@floating-ui/react": "0.27.20",
     "@langfuse/otel": "6.0.2",
     "@langfuse/vercel-ai-sdk": "6.0.2",

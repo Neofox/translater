@@ -1,65 +1,40 @@
 import 'dotenv/config'
-import { Output, streamText } from 'ai'
-import { SentenceResult, WordResult } from '../src/server/schemas.ts'
-import { sentencePrompt, wordPrompt } from '../src/server/prompts.ts'
-import { CACHE_VERSION, promptCacheKeyFor } from '../src/server/cacheKey.ts'
+import { streamText } from 'ai'
 import {
-  assertGatewayAuthentication,
-  gatewayProviderOptions,
-  gatewayTags,
-  resolveTranslateModel,
-} from '../src/server/gateway.ts'
+  resolveTranslateConfig,
+  translateConfigLabel,
+} from '../src/server/openai.ts'
+import { translationRequest } from '../src/server/translationRequest.ts'
+import { TranslateInput } from '../src/server/translateTypes.ts'
 
-const MODEL = resolveTranslateModel()
-assertGatewayAuthentication()
-console.log(`[smoke] model=${MODEL}`)
+const CONFIG = resolveTranslateConfig()
+console.log(`[smoke] ${translateConfigLabel(CONFIG)}`)
 
 async function callStructured(intent, args) {
-  const promptArgs = { uiLang: 'en', ...args, intent }
-  const prompt =
-    intent === 'word' ? wordPrompt(promptArgs) : sentencePrompt(promptArgs)
+  const data = TranslateInput.parse({ uiLang: 'en', ...args, intent })
   const t0 = Date.now()
-  const result = streamText({
-    model: MODEL,
-    instructions: prompt.instructions,
-    messages: prompt.messages,
-    output: Output.object({
-      schema: intent === 'word' ? WordResult : SentenceResult,
-      name: intent === 'word' ? 'word_translation' : 'sentence_translation',
-    }),
-    maxRetries: 0,
-    reasoning: 'none',
-    providerOptions: gatewayProviderOptions({
-      model: MODEL,
-      promptCacheKey: promptCacheKeyFor(promptArgs),
-      tags: gatewayTags({
-        intent,
-        requestKind:
-          promptArgs.refinements?.length > 0
-            ? 'refinement'
-            : promptArgs.context
-              ? 'context'
-              : 'initial',
-        promptVersion: CACHE_VERSION,
-      }),
-    }),
-  })
+  const result = streamText(translationRequest(data, CONFIG))
 
   for await (const _delta of result.textStream) {
     // Drain the stream; production renders each delta in the browser.
   }
-  const [data, usage] = await Promise.all([result.output, result.usage])
+  const [output, usage, providerMetadata] = await Promise.all([
+    result.output,
+    result.usage,
+    result.providerMetadata,
+  ])
   return {
-    data,
+    data: output,
     ms: Date.now() - t0,
     usage,
+    serviceTier: providerMetadata?.openai?.serviceTier,
   }
 }
 
 async function run(label, intent, args) {
-  const { data, ms, usage } = await callStructured(intent, args)
+  const { data, ms, usage, serviceTier } = await callStructured(intent, args)
   console.log(
-    `\n=== ${label} ===  ${ms} ms | in=${usage?.inputTokens} cached=${usage?.inputTokenDetails?.cacheReadTokens ?? 0} write=${usage?.inputTokenDetails?.cacheWriteTokens ?? 0} out=${usage?.outputTokens} total=${usage?.totalTokens}`,
+    `\n=== ${label} ===  ${ms} ms | tier=${serviceTier} in=${usage?.inputTokens} cached=${usage?.inputTokenDetails?.cacheReadTokens ?? 0} write=${usage?.inputTokenDetails?.cacheWriteTokens ?? 0} out=${usage?.outputTokens} total=${usage?.totalTokens}`,
   )
   console.log(JSON.stringify(data, null, 2))
   return { data, ms, usage }

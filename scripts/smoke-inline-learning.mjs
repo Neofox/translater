@@ -1,48 +1,35 @@
 import 'dotenv/config'
 import '../src/server/aiSdkWarnings.server.ts'
 import assert from 'node:assert/strict'
-import { Output, streamText } from 'ai'
-import { sentencePrompt } from '../src/server/prompts.ts'
+import { streamText } from 'ai'
 import { SentenceResult } from '../src/server/schemas.ts'
 import { prepareLearningResult } from '../src/lib/learningRanges.ts'
 import { partialParse } from '../src/lib/partialParse.ts'
-import { CACHE_VERSION, promptCacheKeyFor } from '../src/server/cacheKey.ts'
 import {
-  assertGatewayAuthentication,
-  gatewayProviderOptions,
-  resolveTranslateModel,
-} from '../src/server/gateway.ts'
+  resolveTranslateConfig,
+  translateConfigLabel,
+} from '../src/server/openai.ts'
 import { classifyTranslationError } from '../src/server/translationError.ts'
+import { translationRequest } from '../src/server/translationRequest.ts'
+import { TranslateInput } from '../src/server/translateTypes.ts'
 
 // One real, potentially billed translation. Print aggregate checks, never the
 // source, generated content, credentials or raw provider errors. No retries.
-const args = {
+const args = TranslateInput.parse({
   text: 'Thanks for helping me today.',
   source: 'en',
   target: 'ko',
   mode: 'casual',
   uiLang: 'en',
   intent: 'sentence',
-}
+})
 try {
-  assertGatewayAuthentication()
-  const model = resolveTranslateModel()
+  const config = resolveTranslateConfig()
+  const model = translateConfigLabel(config)
   const started = Date.now()
   const response = streamText({
-    model,
-    ...sentencePrompt(args),
-    output: Output.object({
-      schema: SentenceResult,
-      name: 'sentence_translation',
-    }),
-    maxRetries: 0,
-    reasoning: 'none',
+    ...translationRequest(args, config),
     timeout: 60_000,
-    providerOptions: gatewayProviderOptions({
-      model,
-      promptCacheKey: promptCacheKeyFor(args),
-      tags: ['translation', CACHE_VERSION, 'inline-learning-smoke'],
-    }),
     telemetry: { isEnabled: false, recordInputs: false, recordOutputs: false },
   })
   let raw = ''

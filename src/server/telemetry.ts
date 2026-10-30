@@ -1,4 +1,5 @@
 import type { Telemetry, TelemetryOptions } from 'ai'
+import type { ReasoningEffort, ServiceTier, TranslateConfig } from './openai'
 import { characterCountBucket } from './translationDimensions'
 import type { TranslateInputData } from './translateTypes'
 
@@ -15,7 +16,8 @@ export const SAFE_TRANSLATION_CONTEXT_KEYS = {
   isPolish: true,
   promptVersion: true,
   requestedModel: true,
-  gatewayCacheMode: true,
+  reasoningEffort: true,
+  serviceTier: true,
   trigger: true,
   analyticsSessionId: true,
   clientRunId: true,
@@ -47,7 +49,8 @@ export type TranslationRuntimeContext = {
   isPolish: boolean
   promptVersion: string
   requestedModel: string
-  gatewayCacheMode: 'auto'
+  reasoningEffort: ReasoningEffort
+  serviceTier: ServiceTier
   trigger: TranslateInputData['analyticsTrigger']
   analyticsSessionId: string
   clientRunId: string
@@ -112,7 +115,7 @@ export function translationTelemetryOptions(
 
 export function translationRuntimeContext(
   data: TranslateInputData,
-  model: string,
+  config: TranslateConfig,
   promptVersion: string,
 ): TranslationRuntimeContext {
   const requestKind =
@@ -134,8 +137,9 @@ export function translationRuntimeContext(
     inputLengthBucket: characterCountBucket(data.text.length),
     isPolish: data.source === data.target,
     promptVersion,
-    requestedModel: model,
-    gatewayCacheMode: 'auto',
+    requestedModel: config.model,
+    reasoningEffort: config.reasoning,
+    serviceTier: config.serviceTier,
     trigger: data.analyticsTrigger,
     analyticsSessionId: data.analyticsSessionId ?? '',
     clientRunId: data.analyticsRunId ?? '',

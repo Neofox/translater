@@ -83,6 +83,23 @@ type Options = {
 
 export const DEFAULT_TRANSLATE_DEBOUNCE_MS = 800
 
+// Some models wrap the main translation in newlines, which the pre-wrap main
+// text would show as blank lines. Trim once here so display, Copy and learning
+// offsets share one string; keep trailing spaces while main is still streaming.
+function trimMain<T extends { main?: unknown; primaryTranslation?: unknown }>(
+  data: T,
+  closed: boolean,
+): T {
+  const trim = (text: string) => (closed ? text.trim() : text.trimStart())
+  return {
+    ...data,
+    ...(typeof data.main === 'string' && { main: trim(data.main) }),
+    ...(typeof data.primaryTranslation === 'string' && {
+      primaryTranslation: trim(data.primaryTranslation),
+    }),
+  }
+}
+
 export function useTranslate(
   args: TranslateArgs,
   {
@@ -279,9 +296,8 @@ export function useTranslate(
               sourceLang: parsed.sourceLang,
             })
           }
-          setLive((prev) =>
-            prev ? { ...prev, partial: parsed, mainReady } : prev,
-          )
+          const partial = trimMain(parsed, mainReady)
+          setLive((prev) => (prev ? { ...prev, partial, mainReady } : prev))
         } else {
           commit(chunk.done)
         }
@@ -299,7 +315,7 @@ export function useTranslate(
         startTransition(() => {
           setLive({
             intent: done.intent,
-            partial: done.data,
+            partial: trimMain(done.data, true),
             done: true,
             requestSource: source,
             requestKey,
