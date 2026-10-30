@@ -126,6 +126,15 @@ export async function handleTranslate(
   })
 }
 
+// Free warm-up: boots the function instance and loads this module (and the
+// optional telemetry) before the user's first translation. No OpenAI request.
+export const warmTranslation = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    await prepareTranslationTelemetry()
+    return null
+  },
+)
+
 export const translate = createServerFn({ method: 'POST' })
   .validator(TranslateInput)
   .handler(async ({ data }): Promise<ReadableStream<TranslateChunk>> => {

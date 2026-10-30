@@ -6,7 +6,7 @@ import {
   useState,
 } from 'react'
 import { useServerFn } from '@tanstack/react-start'
-import { translate } from '../server/translate'
+import { translate, warmTranslation } from '../server/translate'
 import { partialParse } from '../lib/partialParse'
 import type { TranslateChunk, TranslateDone } from '../server/translate'
 import type { SentenceResult, WordResult } from '../server/schemas'
@@ -82,6 +82,24 @@ type Options = {
 }
 
 export const DEFAULT_TRANSLATE_DEBOUNCE_MS = 800
+export const FINISHED_TEXT_DEBOUNCE_MS = 400
+// At most one free warm-up per interval keeps a function instance ready.
+export const WARM_INTERVAL_MS = 2 * 60_000
+
+// Text ending in sentence-final punctuation (or an emoji) is probably done, so
+// it translates sooner. Anything else, including punctuation followed by a
+// space or newline, may be a pause mid-sentence and keeps the full debounce.
+// Never match letters: Korean IMEs pass through partial jamo on every key.
+const FINISHED_TEXT =
+  /(?:[.!?…。！？~～]|\p{Extended_Pictographic}[\p{Emoji_Modifier}️]*)['"’”)\]」』]*$/u
+
+export function debounceFor(text: string, debounceMs: number): number {
+  return FINISHED_TEXT.test(text)
+    ? Math.min(debounceMs, FINISHED_TEXT_DEBOUNCE_MS)
+    : debounceMs
+}
+
+let lastWarmAt = Number.NEGATIVE_INFINITY
 
 // Some models wrap the main translation in newlines, which the pre-wrap main
 // text would show as blank lines. Trim once here so display, Copy and learning
@@ -108,6 +126,7 @@ export function useTranslate(
   }: Options = {},
 ) {
   const translateFn = useServerFn(translate)
+  const warmFn = useServerFn(warmTranslation)
   const { lang: uiLang } = useUiLang()
 
   const [live, setLive] = useState<LiveResult | null>(null)
@@ -399,7 +418,9 @@ export function useTranslate(
       suppressAutoRunRef.current = false
       return
     }
-    const delay = skipDebounceRef.current ? 0 : debounceMs
+    const delay = skipDebounceRef.current
+      ? 0
+      : debounceFor(args.text, debounceMs)
     const trigger = immediateTriggerRef.current ?? 'debounce'
     skipDebounceRef.current = false
     immediateTriggerRef.current = null
@@ -429,6 +450,24 @@ export function useTranslate(
     debounceMs,
     abortActiveRun,
   ])
+
+  // Focusing the page (usually the editor) or returning to the tab signals an
+  // upcoming translation; boot the server function now instead of on submit.
+  useEffect(() => {
+    const warm = () => {
+      if (document.hidden) return
+      const now = Date.now()
+      if (now - lastWarmAt < WARM_INTERVAL_MS) return
+      lastWarmAt = now
+      warmFn().catch(() => {})
+    }
+    document.addEventListener('focusin', warm)
+    document.addEventListener('visibilitychange', warm)
+    return () => {
+      document.removeEventListener('focusin', warm)
+      document.removeEventListener('visibilitychange', warm)
+    }
+  }, [warmFn])
 
   const streaming = isPending && !live?.done
 
