@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CACHE_VERSION } from './cacheKey'
 import { SAFE_TRANSLATION_CONTEXT_KEYS } from './telemetry'
 import { handleTranslate } from './translate'
 import type { TranslateChunk } from './translate'
@@ -60,29 +61,9 @@ function cacheDouble() {
   }
 }
 
-describe('handleTranslate via AI Gateway', () => {
-  beforeEach(() => vi.stubEnv('AI_GATEWAY_API_KEY', 'test-gateway-key'))
+describe('handleTranslate via OpenAI', () => {
+  beforeEach(() => vi.stubEnv('OPENAI_API_KEY', 'test-openai-key'))
   afterEach(() => vi.unstubAllEnvs())
-
-  it('lets the AI SDK resolve request-scoped OIDC without auth env vars', async () => {
-    vi.stubEnv('AI_GATEWAY_API_KEY', '')
-    vi.stubEnv('VERCEL_OIDC_TOKEN', '')
-    const streamText = vi.fn(() => ({
-      textStream: deltas(),
-      output: Promise.resolve(validSentenceResult),
-    }))
-
-    const stream = await handleTranslate(data, new AbortController().signal, {
-      streamText: streamText as never,
-      cache: cacheDouble(),
-    })
-
-    await expect(readChunks(stream)).resolves.toContainEqual({
-      type: 'done',
-      done: { intent: 'sentence', data: validSentenceResult },
-    })
-    expect(streamText).toHaveBeenCalledTimes(1)
-  })
 
   it('sends one exact-model structured request and preserves raw deltas', async () => {
     const streamText = vi.fn((_request: Record<string, unknown>) => ({
@@ -114,7 +95,10 @@ describe('handleTranslate via AI Gateway', () => {
 
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'openai/gpt-6-luna',
+        model: expect.objectContaining({
+          provider: 'openai.responses',
+          modelId: 'gpt-6.1-terra',
+        }),
         maxRetries: 0,
         reasoning: 'none',
         abortSignal: requestSignal,
@@ -130,8 +114,9 @@ describe('handleTranslate via AI Gateway', () => {
         output: expect.anything(),
         runtimeContext: expect.objectContaining({
           intent: 'sentence',
-          requestedModel: 'openai/gpt-6-luna',
-          gatewayCacheMode: 'auto',
+          requestedModel: 'gpt-6.1-terra',
+          reasoningEffort: 'none',
+          serviceTier: 'fast',
         }),
         telemetry: {
           isEnabled: true,
@@ -141,14 +126,11 @@ describe('handleTranslate via AI Gateway', () => {
           includeRuntimeContext: SAFE_TRANSLATION_CONTEXT_KEYS,
         },
         providerOptions: {
-          gateway: {
-            caching: 'auto',
-            tags: ['translation', 'sentence', 'initial', 'v17-korean-accuracy'],
-          },
           openai: {
             reasoningEffort: 'none',
+            serviceTier: 'fast',
             store: false,
-            promptCacheKey: expect.stringContaining('nt:v17-korean-accuracy'),
+            promptCacheKey: expect.stringContaining(`nt:${CACHE_VERSION}`),
             promptCacheOptions: {
               mode: 'explicit',
               ttl: '30m',
@@ -159,9 +141,9 @@ describe('handleTranslate via AI Gateway', () => {
     )
     expect(streamText).toHaveBeenCalledTimes(1)
     const sdkRequest = streamText.mock.calls[0]![0] as {
-      providerOptions: { gateway: Record<string, unknown> }
+      providerOptions: Record<string, unknown>
     }
-    expect(sdkRequest.providerOptions.gateway).not.toHaveProperty('models')
+    expect(Object.keys(sdkRequest.providerOptions)).toEqual(['openai'])
     expect(sdkRequest).not.toHaveProperty('allowSystemInMessages')
     expect(sdkRequest).not.toHaveProperty('include')
     expect(sdkRequest).not.toHaveProperty('metadata')

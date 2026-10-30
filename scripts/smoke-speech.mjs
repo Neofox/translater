@@ -55,7 +55,7 @@ try {
   )
 } catch {
   console.error(
-    'Speech smoke failed. Check Gateway configuration, authentication, and service availability. No automatic retry was made.',
+    'Speech smoke failed. Check OPENAI_API_KEY, SPEECH_MODEL and SPEECH_VOICE. No automatic retry was made.',
   )
   process.exitCode = 1
 }

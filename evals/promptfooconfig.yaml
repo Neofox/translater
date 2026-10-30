@@ -6,71 +6,58 @@ description: Translation and explanation quality across models and reasoning lev
 prompts:
   - '{{text}}'
 
-# Each provider is one variant. Only model and reasoning differ; prompts,
-# schema and Gateway options come from src/server/translationRequest.ts.
+# Each provider is one variant. Only model, reasoning effort and service tier
+# (Fast costs 2x Standard) differ; prompts, schema and OpenAI options come from
+# src/server/translationRequest.ts. Calls go directly to OpenAI.
 providers:
-  - id: file://translationProvider.ts
-    label: deepseek-flash reasoning=none
-    config:
-      model: deepseek/deepseek-v4.1-flash-1017
-      reasoning: none
-  - id: file://translationProvider.ts
-    label: deepseek-flash reasoning=default
-    config:
-      model: deepseek/deepseek-v4.1-flash-1017
-      reasoning: provider-default
-  # Production model and setting.
+  # Production before the OpenAI switch (via Gateway, Standard tier).
   - id: file://translationProvider.ts
     label: gpt-6-luna reasoning=none
     config:
-      model: openai/gpt-6-luna
+      model: gpt-6-luna
       reasoning: none
+      serviceTier: default
   - id: file://translationProvider.ts
-    label: gpt-6-luna lean-prompt
+    label: gpt-6-luna reasoning=none fast
     config:
-      model: openai/gpt-6-luna
+      model: gpt-6-luna
       reasoning: none
-      promptVariant: lean
+      serviceTier: fast
   - id: file://translationProvider.ts
-    label: gpt-6-luna lean-prompt no-characters
+    label: gpt-6-luna reasoning=low fast
     config:
-      model: openai/gpt-6-luna
-      reasoning: none
-      promptVariant: lean-nochars
-  - id: file://translationProvider.ts
-    label: gpt-6-luna reasoning=low
-    config:
-      model: openai/gpt-6-luna
+      model: gpt-6-luna
       reasoning: low
+      serviceTier: fast
+  # Production since 2026-10-30.
   - id: file://translationProvider.ts
-    label: glm-5.3-flash reasoning=none
+    label: gpt-6.1-terra reasoning=none fast
     config:
-      model: zai/glm-5.3-flash
+      model: gpt-6.1-terra
       reasoning: none
+      serviceTier: fast
   - id: file://translationProvider.ts
-    label: glm-5.3-flash reasoning=default
+    label: gpt-6.1-terra reasoning=low fast
     config:
-      model: zai/glm-5.3-flash
-      reasoning: provider-default
+      model: gpt-6.1-terra
+      reasoning: low
+      serviceTier: fast
+  # Quality yardstick; its lowest effort is low (no none).
   - id: file://translationProvider.ts
-    label: claude-haiku-5.5 reasoning=none
+    label: gpt-6.1-sol reasoning=low fast
     config:
-      model: anthropic/claude-haiku-5.5
-      reasoning: none
-  # Quality ceiling only: reasoning makes it too slow for production.
+      model: gpt-6.1-sol
+      reasoning: low
+      serviceTier: fast
   - id: file://translationProvider.ts
     label: gpt-6.1-sol reasoning=low
     config:
-      model: openai/gpt-6.1-sol
+      model: gpt-6.1-sol
       reasoning: low
-  - id: file://translationProvider.ts
-    label: gpt-6.1-terra reasoning=none
-    config:
-      model: openai/gpt-6.1-terra
-      reasoning: none
+      serviceTier: default
 
 evaluateOptions:
-  # AI Gateway handles this easily; promptfoo backs off on rate limits.
+  # promptfoo backs off on rate limits.
   maxConcurrency: 16
 
 defaultTest:
@@ -86,7 +73,15 @@ defaultTest:
     # Judges grade one anonymous output at a time. No select-best: promptfoo
     # shows variants in config order and the judge favoured the first one, so
     # `npm run eval:summary` ranks variants from these scores instead.
-    provider: vercel:anthropic/claude-sonnet-5.5
+    # Judged by OpenAI's strongest model (paid from the OpenAI credit). It is
+    # the same family as the candidates and also the sol variant itself, so
+    # read a small sol lead with care; scores before 2026-10-30 came from
+    # Claude Sonnet and are not directly comparable.
+    provider:
+      id: openai:responses:gpt-6.1-sol
+      config:
+        reasoning:
+          effort: low
   assert:
     - type: javascript
       value: file://checks.ts

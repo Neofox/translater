@@ -24,6 +24,6 @@ export function copyableMainText(
 ): string | null {
   if (!live || !(live.done || live.mainReady)) return null
   if ((live.done && isPending) || !resultIsCurrent(live, request)) return null
-  const text = mainText(live)
-  return text?.trim() ? text : null
+  // Some models wrap main in newlines; never paste them into a message.
+  return mainText(live)?.trim() || null
 }

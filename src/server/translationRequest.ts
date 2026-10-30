@@ -1,6 +1,7 @@
 import { Output } from 'ai'
-import { CACHE_VERSION, promptCacheKeyFor } from './cacheKey'
-import { gatewayProviderOptions, gatewayTags } from './gateway'
+import { promptCacheKeyFor } from './cacheKey'
+import { openai, openaiProviderOptions } from './openai'
+import type { TranslateConfig } from './openai'
 import { sentencePrompt, wordPrompt } from './prompts'
 import type { SentenceSystemContext } from './prompts'
 import { SentenceResult, WordResult } from './schemas'
@@ -22,7 +23,7 @@ export function translationRequestKind(
 // smoke scripts and quality evals so they all measure the production request.
 export function translationRequest(
   data: TranslateInputData,
-  model: string,
+  config: TranslateConfig,
   // Evals only: try alternative sentence instructions on the same request.
   sentenceSystem?: (ctx: SentenceSystemContext) => string,
 ) {
@@ -31,24 +32,19 @@ export function translationRequest(
     ? wordPrompt(data)
     : sentencePrompt(data, sentenceSystem)
   return {
-    model,
+    model: openai.responses(config.model),
     instructions: prompt.instructions,
     messages: prompt.messages,
     output: isWord
       ? Output.object({ schema: WordResult, name: 'word_translation' })
       : Output.object({ schema: SentenceResult, name: 'sentence_translation' }),
     maxRetries: 0,
-    // Portable across Gateway models: hidden reasoning delays the first token
-    // by seconds and is billed as output.
-    reasoning: 'none' as const,
-    providerOptions: gatewayProviderOptions({
-      model,
+    // Hidden reasoning delays the first token by seconds and is billed as
+    // output; the OpenAI effort in providerOptions takes precedence.
+    reasoning: config.reasoning,
+    providerOptions: openaiProviderOptions({
+      config,
       promptCacheKey: promptCacheKeyFor(data),
-      tags: gatewayTags({
-        intent: data.intent,
-        requestKind: translationRequestKind(data),
-        promptVersion: CACHE_VERSION,
-      }),
     }),
   }
 }

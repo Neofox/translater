@@ -3,7 +3,7 @@ import { getRequest } from '@tanstack/react-start/server'
 import { streamText } from 'ai'
 import { translationCache } from './cache'
 import { CACHE_VERSION, cacheKeyFor } from './cacheKey'
-import { resolveTranslateModel } from './gateway'
+import { resolveTranslateConfig, translateConfigLabel } from './openai'
 import type { SentenceResult, WordResult } from './schemas'
 import { consumeStructuredStream } from './structuredStream'
 import {
@@ -43,7 +43,8 @@ type TranslationDependencies = {
   prepareTelemetry: typeof prepareTranslationTelemetry
 }
 
-const MODEL = resolveTranslateModel()
+const CONFIG = resolveTranslateConfig()
+const CONFIG_LABEL = translateConfigLabel(CONFIG)
 
 const defaultDependencies: TranslationDependencies = {
   streamText,
@@ -57,7 +58,7 @@ export async function handleTranslate(
   dependencies: Partial<TranslationDependencies> = {},
 ): Promise<ReadableStream<TranslateChunk>> {
   const runtime = { ...defaultDependencies, ...dependencies }
-  const cacheKey = cacheKeyFor(data, MODEL)
+  const cacheKey = cacheKeyFor(data, CONFIG_LABEL)
   const cached = runtime.cache.get(cacheKey) as TranslateDone | undefined
 
   if (cached) {
@@ -77,9 +78,13 @@ export async function handleTranslate(
     async start(controller) {
       try {
         const result = runtime.streamText({
-          ...translationRequest(data, MODEL),
+          ...translationRequest(data, CONFIG),
           abortSignal: requestSignal,
-          runtimeContext: translationRuntimeContext(data, MODEL, CACHE_VERSION),
+          runtimeContext: translationRuntimeContext(
+            data,
+            CONFIG,
+            CACHE_VERSION,
+          ),
           telemetry: translationTelemetryOptions(nativeTelemetry.enabled),
         })
 

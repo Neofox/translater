@@ -1,20 +1,39 @@
 import { generateSpeech } from 'ai'
 import './aiSdkWarnings.server'
+import { openai } from './openai'
 import { MAX_SPEECH_AUDIO_BYTES, SpeechInput } from './speechTypes'
 import type { SpeechChunk, SpeechInputData } from './speechTypes'
 
 const SPEECH_TIMEOUT_MS = 90_000
-const DEFAULT_SPEECH_MODEL = 'google/gemini-3.8-flash-lite-tts'
+const STREAMING_SIZE = 0xffffffff
+const DEFAULT_SPEECH_MODEL = 'gpt-4o-mini-tts'
+const DEFAULT_SPEECH_VOICE = 'marin'
+
+// OpenAI speech has no language parameter; the voice instructions carry it so
+// short or mixed-script text is still read with native pronunciation.
+const LANGUAGE_NAMES: Record<SpeechInputData['language'], string> = {
+  en: 'English',
+  ko: 'Korean',
+  ja: 'Japanese',
+  fr: 'French',
+  es: 'Spanish',
+  zh: 'Mandarin Chinese',
+  auto: '',
+}
 
 type SpeechEnvironment = { SPEECH_MODEL?: string; SPEECH_VOICE?: string }
 
 export function resolveSpeechConfig(env: SpeechEnvironment = process.env): {
   model: string
-  voice?: string
+  voice: string
 } {
-  const model = env.SPEECH_MODEL?.trim() ?? DEFAULT_SPEECH_MODEL
-  if (!/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i.test(model)) {
-    throw new Error('SPEECH_MODEL must be one exact provider/model identifier.')
+  // Older deployments used Gateway ids; `openai/<id>` is the same model.
+  const model = (env.SPEECH_MODEL?.trim() ?? DEFAULT_SPEECH_MODEL).replace(
+    /^openai\//,
+    '',
+  )
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(model)) {
+    throw new Error('SPEECH_MODEL must be one exact OpenAI speech model id.')
   }
   const voice = env.SPEECH_VOICE?.trim()
   if (
@@ -28,9 +47,16 @@ export function resolveSpeechConfig(env: SpeechEnvironment = process.env): {
   ) {
     throw new Error('SPEECH_VOICE must be a nonempty voice identifier.')
   }
-  const selectedVoice =
-    voice ?? (model.startsWith('google/') ? 'Kore' : undefined)
-  return { model, ...(selectedVoice && { voice: selectedVoice }) }
+  return { model, voice: voice ?? DEFAULT_SPEECH_VOICE }
+}
+
+export function speechInstructions(
+  language: SpeechInputData['language'],
+): string {
+  const name = LANGUAGE_NAMES[language]
+  return name
+    ? `Read the text aloud in ${name} with natural native pronunciation, at a clear, relaxed pace.`
+    : 'Read the text aloud with natural native pronunciation, at a clear, relaxed pace.'
 }
 
 type SpeechDependencies = {
@@ -47,10 +73,14 @@ function pcmFromWav(wav: Uint8Array) {
   const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength)
   const tag = (offset: number) =>
     String.fromCharCode(...wav.subarray(offset, offset + 4))
+  // OpenAI writes its WAV header before the audio exists, so the RIFF and data
+  // sizes are the streaming placeholder 0xFFFFFFFF; the data then runs to the
+  // end of the response.
+  const riffSize = view.getUint32(4, true)
   if (
     tag(0) !== 'RIFF' ||
     tag(8) !== 'WAVE' ||
-    view.getUint32(4, true) + 8 !== wav.byteLength
+    (riffSize !== STREAMING_SIZE && riffSize + 8 !== wav.byteLength)
   )
     throw new Error('Incomplete WAV container')
   let sampleRate: number | undefined
@@ -59,7 +89,11 @@ function pcmFromWav(wav: Uint8Array) {
   while (offset < wav.byteLength) {
     if (offset + 8 > wav.byteLength) throw new Error('Incomplete WAV chunk')
     const kind = tag(offset)
-    const length = view.getUint32(offset + 4, true)
+    const declared = view.getUint32(offset + 4, true)
+    const length =
+      kind === 'data' && declared === STREAMING_SIZE
+        ? wav.byteLength - offset - 8
+        : declared
     const start = offset + 8
     const end = start + length
     const next = end + (length % 2)
@@ -166,17 +200,18 @@ export async function handleSpeech(
         }
         requestSignal.addEventListener('abort', onAbort, { once: true })
         timer = setTimeout(fail, SPEECH_TIMEOUT_MS)
-        // Gateway currently returns complete audio over HTTPS. Its experimental
-        // WebSocket speech surface is not supported by the deployed service.
+        // OpenAI returns the complete WAV over HTTPS; PCM is forwarded only
+        // after the whole container validates.
         // Do not return this promise from start: Stop must cancel while pending.
         void (async () => {
           try {
             const result = await synthesize({
-              ...config,
+              model: openai.speech(config.model),
+              voice: config.voice,
               text: data.text,
-              ...(config.model.startsWith('google/')
-                ? {}
-                : { language: data.language }),
+              providerOptions: {
+                openai: { instructions: speechInstructions(data.language) },
+              },
               outputFormat: 'wav',
               maxRetries: 0,
               // A translation may have registered a global integration. Speech

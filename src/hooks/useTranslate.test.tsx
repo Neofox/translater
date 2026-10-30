@@ -248,6 +248,50 @@ describe('useTranslate', () => {
     },
   )
 
+  it('drops the newlines some models wrap around the main translation', async () => {
+    let controller!: ReadableStreamDefaultController<TranslateChunk>
+    translateMock.mockResolvedValueOnce(
+      new ReadableStream<TranslateChunk>({
+        start(next) {
+          controller = next
+        },
+      }),
+    )
+    const { result } = renderHook(
+      () => useTranslate(baseArgs, { debounceMs: 0 }),
+      { wrapper },
+    )
+    let running!: Promise<void>
+    await act(async () => {
+      running = result.current.run()
+    })
+    await act(async () => {
+      controller.enqueue({ type: 'delta', raw: '{"main":"\\n내일 ' })
+    })
+    expect(result.current.live?.partial).toMatchObject({
+      main: expect.stringMatching(/^내일/),
+    })
+    await act(async () => {
+      controller.enqueue({ type: 'delta', raw: '봐요\\n","rationale":"' })
+    })
+    expect(result.current.live?.partial).toMatchObject({ main: '내일 봐요' })
+    await act(async () => {
+      controller.enqueue({
+        type: 'done',
+        done: {
+          intent: 'sentence',
+          data: { main: '\n내일 봐요\n' },
+        } as unknown as TranslateDone,
+      })
+      controller.close()
+      await running
+    })
+    expect(result.current.live).toMatchObject({
+      done: true,
+      partial: { main: '내일 봐요' },
+    })
+  })
+
   it('reports sourceLang from a cache-only final result before publishing it', async () => {
     const trace: string[] = []
     const onSourceDetected = vi.fn(() => trace.push('source'))
