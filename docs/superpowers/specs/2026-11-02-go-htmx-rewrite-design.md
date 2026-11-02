@@ -39,6 +39,14 @@ about:
 
 ## Non-goals
 
+- **No legacy or dead code paths** (user decision 2026-11-02): this is a new app.
+  Port only live behaviour. Not ported: the legacy-localStorage preference
+  migration, `openai/` model-prefix stripping, compatibility with older
+  page-memory/gloss-only result shapes, legacy defaults kept only for old
+  callers (e.g. learning `side` omitted ⇒ target), unused analytics fields.
+  Schema/prompt field names stay as they are (they are prompt content, and
+  the golden requests must match).
+
 - No change to model, reasoning effort, service tier, prompt content, schema
   or few-shot examples. Otherwise the comparison measures the prompt, not the
   stack.
@@ -135,7 +143,7 @@ rather than memory. Relevant to this design:
   otherwise a thin hand-written client — builder's call after checking).
   Same env vars: `OPENAI_API_KEY`, `TRANSLATE_MODEL`, `TRANSLATE_REASONING`,
   `TRANSLATE_SERVICE_TIER`, `SPEECH_MODEL`, `SPEECH_VOICE`; same defaults,
-  same `openai/` prefix stripping, zero retries, same error classification
+  zero retries, same error classification
   (including 429 `insufficient_quota` → budget).
 - In-memory LRU (50 entries) keyed exactly like `src/server/cacheKey.ts`
   (model, reasoning, tier, `CACHE_VERSION`, inputs).
@@ -269,9 +277,7 @@ Evals' prompt variants become alternative template files. Matching
 
 Same `nt.preferences` cookie (version 1 JSON, same validation rules), read on
 every request so the first server render is already correct; HTML responses
-`private, no-store`, `Vary: Cookie, Accept-Language`. The legacy-localStorage
-migration bootstrap is ported only if users of the old app would otherwise
-lose settings; same cookie means a shared domain carries them over.
+`private, no-store`, `Vary: Cookie, Accept-Language`. No legacy-localStorage migration bootstrap (user decision: new app, no legacy ports).
 
 ### Telemetry
 
