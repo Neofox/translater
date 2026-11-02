@@ -461,22 +461,110 @@ test('late events from a superseded run are ignored @core', async ({
   await recordResult(page)
   await fillSource(page, sentence('slow'))
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
-  const edit = (await resultLog(page)).length
+  // Mark the log at the edit's input event itself, not at some earlier
+  // await, so stream updates of the old run cannot slip in between.
+  await page.evaluate(() => {
+    const w = window as unknown as { __resultLog: unknown[]; __editAt?: number }
+    document
+      .querySelector('[data-testid="input-textarea"]')!
+      .addEventListener('input', () => (w.__editAt = w.__resultLog.length), {
+        once: true,
+      })
+  })
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
   await waitForMain(page, second)
   await waitForDone(page)
 
-  const log = (await resultLog(page)).slice(edit)
-  // The new run starts with an empty main; from then on only the new
-  // result may appear, and Copy only for its complete main.
+  const editAt = await page.evaluate(
+    () => (window as unknown as { __editAt: number }).__editAt,
+  )
+  const log = (await resultLog(page)).slice(editAt)
+  // The new run starts with an empty main. Until then the old main never
+  // grows and Copy stays off; from then on only the new result may appear,
+  // and Copy only for its complete main.
   const start = log.findIndex((entry) => entry.text === '')
   expect(start).toBeGreaterThanOrEqual(0)
+  for (let i = 0; i < start; i++) {
+    expect(log[i]!.copy).toBe(false)
+    if (i > 0)
+      expect(log[i]!.text!.length).toBeLessThanOrEqual(log[i - 1]!.text!.length)
+  }
   for (const entry of log.slice(start)) {
     expect(second.startsWith(entry.text ?? '')).toBe(true)
     if (entry.copy) expect(entry.text).toBe(second)
   }
+  expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
+})
+
+test('stale events of a superseded run cannot touch the result @core', async ({
+  page,
+  fake,
+}) => {
+  test.skip(APP === 'ts', "Dispatches the Go app's nt-* DOM events directly")
+  const runInput = page.locator('#translate-form [name="run"]')
+  await fillSource(page, sentence('slow'))
+  await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
+  const old = await runInput.inputValue()
+  const second = fixture('second').result.main!
+
+  // Replay every kind of event for the old run, as if still in flight, and
+  // snapshot the result after each one.
+  const replay = () =>
+    page.evaluate((run) => {
+      const form = document.getElementById('translate-form')!
+      const events: Array<[string, Record<string, string>]> = [
+        ['nt-main-delta', { text: 'STALE' }],
+        ['nt-main-ready', { main: 'STALE' }],
+        ['nt-text-delta', { field: 'rationale', text: 'STALE' }],
+        ['nt-text-delta', { field: 'formalityNote', text: 'STALE' }],
+        ['nt-done', {}],
+        ['nt-error', { kind: 'provider', message: 'STALE' }],
+      ]
+      return events.map(([name, payload]) => {
+        form.dispatchEvent(
+          new CustomEvent(name, {
+            bubbles: true,
+            detail: { data: JSON.stringify({ run, ...payload }) },
+          }),
+        )
+        const copy = document.querySelector<HTMLButtonElement>(
+          '[data-testid="output-toolbar"] [data-testid="copy-button"]',
+        )!
+        return {
+          name,
+          main:
+            document.querySelector('[data-testid="main-translation"]')
+              ?.textContent ?? '',
+          copy: !copy.disabled,
+          error: !document.getElementById('result-error')!.hidden,
+          explanation:
+            document.getElementById('main-explanation')?.textContent ?? '',
+        }
+      })
+    }, old)
+
+  await fillSource(page, sentence('second'))
+  // Old run aborted, new run not started yet (debounce).
+  const pending = await replay()
+  await expect.poll(() => runInput.inputValue()).not.toBe(old)
+  await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
+  // New run streaming: the old run id no longer matches.
+  const streaming = await replay()
+  await waitForMain(page, second)
+  await waitForDone(page)
+
+  for (const snap of [...pending, ...streaming]) {
+    expect(snap.main, snap.name).not.toContain('STALE')
+    expect(snap.explanation, snap.name).not.toContain('STALE')
+    expect(snap.error, snap.name).toBe(false)
+    if (snap.copy) expect(snap.main, snap.name).toBe(second)
+  }
+  for (const snap of pending) expect(snap.copy, snap.name).toBe(false)
+  await expect(page.locator('#result-error')).toBeHidden()
+  await expect(page.locator('#main-explanation')).not.toContainText('STALE')
+  expect(await mainText(page)).toBe(second)
   expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
 })
 
