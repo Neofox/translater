@@ -23,7 +23,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { connect } from 'node:net'
-import { tmpdir } from 'node:os'
+import { arch, cpus, platform, release, tmpdir, totalmem } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { constants as zlibConstants, gzipSync } from 'node:zlib'
@@ -619,10 +619,18 @@ async function measureFirstTypeable(page: Page, url: string) {
   const survivors = value.length
   const firstInput = events[0] ?? null
   if (value.trim() !== '' || survivors === 0 || survivors > events.length)
-    return { firstTypeable: null, firstInput, attempts: events.length }
+    return {
+      firstTypeable: null,
+      firstInput,
+      lastLost: null,
+      attempts: events.length,
+    }
   return {
     firstTypeable: events[events.length - survivors]!,
     firstInput,
+    // The keystroke just before the first kept one, which was lost: brackets
+    // the moment the field started keeping input (measurement resolution).
+    lastLost: events[events.length - survivors - 1] ?? null,
     attempts: events.length,
   }
 }
@@ -808,6 +816,7 @@ async function interactRun(
     return {
       firstTypeable: typeable.firstTypeable,
       firstInput: typeable.firstInput,
+      lastLostInput: typeable.lastLost,
       typeableAttempts: typeable.attempts,
       ...translation,
       ...keyboard,
@@ -920,6 +929,13 @@ async function measure(): Promise<void> {
       dirty: git('status', '--porcelain') !== '',
       runs,
       node: process.version,
+      machine: {
+        platform: `${platform()} ${release()}`,
+        arch: arch(),
+        cpu: cpus()[0]?.model ?? 'unknown',
+        cores: cpus().length,
+        memoryGiB: Math.round(totalmem() / 2 ** 30),
+      },
       playwright: (
         JSON.parse(
           readFileSync(

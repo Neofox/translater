@@ -47,11 +47,17 @@ export type InteractRun = {
   /** Earliest keystroke the field showed at all (it may be lost later, e.g.
    * when hydration resets a pre-hydration value). */
   firstInput: number | null
+  /** The lost keystroke just before the first kept one (null when none was
+   * lost): firstTypeable - lastLostInput is the measurement resolution. */
+  lastLostInput: number | null
   typeableAttempts: number
   keyToFirstChar: number | null
   keyToCopy: number | null
   keyToDone: number | null
   upstreamRequests: number | null
+  /** Sum of every layout-shift value during the simulated keyboard shrink
+   * (the focus is programmatic, so no entry has hadRecentInput). Not the Web
+   * Vitals CLS session window; an app-vs-app layout-movement number. */
   keyboardCls: number | null
   keyboardMainDy: number | null
   keyboardSourceDy: number | null
@@ -75,6 +81,14 @@ export type PerfFile = {
     dirty: boolean
     runs: number
     node: string
+    /** Absent in files written before it was recorded. */
+    machine?: {
+      platform: string
+      arch: string
+      cpu: string
+      cores: number
+      memoryGiB: number
+    }
     playwright: string
     text: string
     debounce: string
@@ -152,7 +166,11 @@ export const INTERACT_METRICS: Metric<InteractRun>[] = [
   },
   { key: 'keyToCopy', label: 'Last key to Copy enabled', unit: 'ms' },
   { key: 'keyToDone', label: 'Last key to done', unit: 'ms' },
-  { key: 'keyboardCls', label: 'Keyboard open: CLS', unit: 'score' },
+  {
+    key: 'keyboardCls',
+    label: 'Keyboard open: layout-shift sum',
+    unit: 'score',
+  },
   { key: 'keyboardMainDy', label: 'Keyboard open: main text dy', unit: 'px' },
   {
     key: 'keyboardSourceDy',
@@ -289,6 +307,18 @@ export function markdownTables(files: PerfFile[]): string {
     )
   }
   out.push('', ...files.map((f) => `- ${fileLabel(f)}: ${f.server.note}`), '')
+  out.push(
+    '#### Measured on',
+    '',
+    ...files.map((f) => {
+      const m = f.meta.machine
+      const machine = m
+        ? `${m.cpu}, ${m.cores} cores, ${m.memoryGiB} GiB, ${m.platform} ${m.arch}`
+        : 'machine not recorded'
+      return `- ${fileLabel(f)}: ${f.meta.date}, commit ${f.meta.commit.slice(0, 12)}${f.meta.dirty ? ' (dirty)' : ''}, ${machine}`
+    }),
+    '',
+  )
   return out.join('\n')
 }
 
