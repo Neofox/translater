@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import sentencePolishKo from '../../shared/translation/fewshots/sentence-polish-ko.json'
+import sentenceReadingEn from '../../shared/translation/fewshots/sentence-reading-en.json'
+import sentenceTranslateEn from '../../shared/translation/fewshots/sentence-translate-en.json'
+import sentenceTranslateKo from '../../shared/translation/fewshots/sentence-translate-ko.json'
 import {
+  LearningPhrases,
   SENTENCE_RESULT_SCHEMA,
   SentenceResult,
   WORD_RESULT_SCHEMA,
 } from './schemas'
-import { LegacyLearningPhrases } from './learningTypes'
+import { LegacyLearningPhrase, LegacyLearningPhrases } from './learningTypes'
 
 const characterEntry = (char: string) => ({
   word: char,
@@ -121,5 +126,29 @@ describe('LegacyLearningPhrases', () => {
       LegacyLearningPhrases.safeParse([{ text: 'School life', gloss: 'x' }])
         .success,
     ).toBe(false)
+  })
+
+  it('has the same fields as the shared phrase schema', () => {
+    const shared = SENTENCE_RESULT_SCHEMA.properties.learningPhrases.items
+    expect(Object.keys(LegacyLearningPhrase.shape).sort()).toEqual(
+      Object.keys(shared.properties).sort(),
+    )
+    expect([...shared.required].sort()).toEqual(
+      Object.keys(LegacyLearningPhrase.shape).sort(),
+    )
+  })
+
+  it('keeps every strict phrase unchanged', () => {
+    const phrases = [
+      ...validResult.learningPhrases,
+      ...[
+        sentencePolishKo,
+        sentenceReadingEn,
+        sentenceTranslateEn,
+        sentenceTranslateKo,
+      ].flatMap((shot) => shot.assistant.learningPhrases),
+    ]
+    expect(LearningPhrases.parse(phrases)).toEqual(phrases)
+    expect(LegacyLearningPhrases.parse(phrases)).toEqual(phrases)
   })
 })

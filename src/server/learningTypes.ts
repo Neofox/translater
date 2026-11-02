@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { SENTENCE_RESULT_SCHEMA, fromSharedSchema } from './schemas'
 import {
   MAX_CONTEXT_CHARS,
   MAX_INPUT_CHARS,
@@ -10,48 +9,37 @@ import type {
   LearningPhraseData,
 } from './resultTypes.generated'
 
+// Client-safe: this module reaches the browser through src/lib/learningRanges.
+// Never value-import ./schemas here; the strict result validators (and the
+// shared JSON Schemas with their prompt-text descriptions) are server-only.
+
 export { MAX_LEARNING_TRANSLATION_CHARS }
 export type { CharacterBreakdownData, LearningPhraseData }
 
-// Phrase and character parts of the shared sentence result schema
-// (shared/translation/schemas/sentence.json), validated by zod.
-const learningPhrasesSchema = SENTENCE_RESULT_SCHEMA.properties.learningPhrases
-const phraseSchema = learningPhrasesSchema.items
-const characterSchema = phraseSchema.properties.characters.items
-
-export const CharacterBreakdown =
-  fromSharedSchema<CharacterBreakdownData>(characterSchema)
-export const LearningPhrase = fromSharedSchema<LearningPhraseData>(phraseSchema)
-export const LearningPhrases = fromSharedSchema<LearningPhraseData[]>(
-  learningPhrasesSchema,
-)
-
 // Page-memory compatibility only: older gloss-only results may lack every
-// detail field, and (as with the earlier non-strict zod objects) unknown keys
-// do not reject the map. The generated schema still requires all fields.
-const LEGACY_PHRASE_REQUIRED = ['text', 'gloss', 'sourceTexts']
-function lenient(schema: unknown): unknown {
-  if (Array.isArray(schema)) return schema.map(lenient)
-  if (!schema || typeof schema !== 'object') return schema
-  return Object.fromEntries(
-    Object.entries(schema)
-      .filter(([key]) => key !== 'additionalProperties')
-      .map(([key, value]) => [key, lenient(value)]),
-  )
-}
-export type LegacyLearningPhraseData = Pick<
-  LearningPhraseData,
-  'text' | 'gloss' | 'sourceTexts'
-> &
-  Partial<LearningPhraseData>
-export const LegacyLearningPhrases = fromSharedSchema<
-  LegacyLearningPhraseData[]
->(
-  lenient({
-    ...learningPhrasesSchema,
-    items: { ...phraseSchema, required: LEGACY_PHRASE_REQUIRED },
-  }) as object,
-)
+// detail field; unknown keys are stripped. Same fields and bounds as the
+// learning phrase in shared/translation/schemas/sentence.json, without its
+// descriptions (schemas.test.ts keeps the field set in sync). The strict
+// generated schema still requires every field.
+const LegacyCharacter = z.object({
+  word: z.string(),
+  chars: z.array(z.object({ char: z.string(), meaning: z.string() })).max(10),
+})
+export const LegacyLearningPhrase = z.object({
+  text: z.string().min(1).max(MAX_LEARNING_TRANSLATION_CHARS),
+  gloss: z.string().max(600),
+  sourceTexts: z.array(z.string().min(1).max(4000)).max(8),
+  baseForm: z.string().max(600).optional(),
+  literalMeaning: z.string().max(600).optional(),
+  naturalMeaning: z.string().max(600).optional(),
+  grammar: z.string().max(1000).optional(),
+  omissions: z.string().max(600).optional(),
+  usageNote: z.string().max(1000).optional(),
+  characters: z.array(LegacyCharacter).max(3).optional(),
+  grammarHighlights: z.array(z.string().min(1).max(4000)).max(4).optional(),
+})
+export type LegacyLearningPhraseData = z.infer<typeof LegacyLearningPhrase>
+export const LegacyLearningPhrases = z.array(LegacyLearningPhrase).max(64)
 export const LearningInput = z
   .object({
     text: z.string().min(1).max(MAX_INPUT_CHARS),

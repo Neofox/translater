@@ -15,7 +15,9 @@ export async function captureRequestBody(
   const original = globalThis.fetch
   const originalKey = process.env.OPENAI_API_KEY
   const bodies: unknown[] = []
-  process.env.OPENAI_API_KEY = originalKey || 'capture-only-no-network'
+  // Always a dummy key: even if a future SDK bypassed the fetch stub, the
+  // request could not be billed to a real account.
+  process.env.OPENAI_API_KEY = 'capture-only-no-network'
   globalThis.fetch = async (_url: unknown, init?: RequestInit) => {
     bodies.push(JSON.parse(String(init?.body)))
     return new Response(
