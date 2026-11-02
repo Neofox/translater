@@ -56,11 +56,23 @@ type Server struct {
 	llm     *llm.Client
 	schemas map[string]*jsonschema.Schema
 	cache   *lru.Cache[string, string]
+	// cfgErr is an invalid TRANSLATE_* setting: every run then ends with a
+	// configuration error, as the TS app does per request; the page still
+	// works.
+	cfgErr error
 }
+
+// Option configures a Server.
+type Option func(*Server)
+
+// WithConfigError marks the deployment configuration invalid (cfg is then
+// unused): /translate answers each valid request with the localized
+// "configuration" nt-error and makes no upstream call.
+func WithConfigError(err error) Option { return func(s *Server) { s.cfgErr = err } }
 
 // NewServer builds the handlers. The embedded schemas always compile; a
 // failure is a build defect and panics.
-func NewServer(c *contract.Contract, cfg config.Translate, client *llm.Client) *Server {
+func NewServer(c *contract.Contract, cfg config.Translate, client *llm.Client, opts ...Option) *Server {
 	schemas, err := compileSchemas(c)
 	if err != nil {
 		panic(err)
@@ -69,7 +81,11 @@ func NewServer(c *contract.Contract, cfg config.Translate, client *llm.Client) *
 	if err != nil {
 		panic(err)
 	}
-	return &Server{c: c, cfg: cfg, llm: client, schemas: schemas, cache: cache}
+	s := &Server{c: c, cfg: cfg, llm: client, schemas: schemas, cache: cache}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // HandleWarm is POST /warm: it lets a cold instance boot before the user
@@ -88,6 +104,10 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	run, in, err := s.parse(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if s.cfgErr != nil {
+		s.failStream(w, run, in, llm.KindConfiguration)
 		return
 	}
 	key := prompt.CacheKey(in, s.c.CacheVersion, s.cfg.Label())
@@ -152,6 +172,19 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cache.Add(key, doc)
 	out.event(evDone, runPayload{Run: run})
+}
+
+// failStream answers a valid request with the skeleton and one nt-error.
+func (s *Server) failStream(w http.ResponseWriter, run string, in prompt.TranslateInput, kind llm.Kind) {
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache, no-transform")
+	h.Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	out := newSSEWriter(w)
+	if newProcessor(out, s.c, run, in.Intent, in.UILang).start() {
+		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
+	}
 }
 
 // errBadForm is a content-free parse failure.

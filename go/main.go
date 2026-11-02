@@ -34,15 +34,20 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config.LoadTranslate(getenv)
-	if err != nil {
-		return nil, err
-	}
 	static, err := web.NewStatic(assets.FS)
 	if err != nil {
 		return nil, err
 	}
-	tr := translate.NewServer(c, cfg, llm.New(getenv))
+	// An invalid TRANSLATE_* setting must not take the page down: runs end
+	// with the localized configuration error instead (as in the TS app and
+	// for a missing OPENAI_API_KEY). The message names the variable only.
+	var opts []translate.Option
+	cfg, err := config.LoadTranslate(getenv)
+	if err != nil {
+		log.Printf("translation disabled: %v", err)
+		opts = append(opts, translate.WithConfigError(err))
+	}
+	tr := translate.NewServer(c, cfg, llm.New(getenv), opts...)
 	pages := web.NewPages(c, static)
 
 	mux := http.NewServeMux()
