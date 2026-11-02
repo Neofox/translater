@@ -50,7 +50,23 @@ export function detectLanguage(text) {
   return latin === 0 ? null : 'en'
 }
 
-export const fallbackTargetFor = (detected) => (detected === 'en' ? 'ko' : 'en')
+/**
+ * Language that routes an Auto-source run. While the text is unchanged
+ * since the current result's run, that run's own routing stays pinned
+ * (live.detected): the model's later report (nt-source-lang) only relabels
+ * the Auto chip, so the result's request key keeps matching and Copy/Listen
+ * stay usable. Otherwise the model's report for this exact text wins over
+ * the script heuristic.
+ */
+export function routingDetected({ source, text, live, model }) {
+  if (source !== 'auto') return null
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  if (live && live.source === 'auto' && live.text === trimmed) return live.detected
+  return model?.text === trimmed ? model.lang : detectLanguage(trimmed)
+}
+
+export const fallbackTargetFor =(detected) => (detected === 'en' ? 'ko' : 'en')
 
 /** Auto source never translates into its own language. */
 export function resolveTarget({ source, target, detected }) {
@@ -114,8 +130,13 @@ export function initComposer(app, ta) {
     }
     changed()
   })
+  // The paste's own input event consumes the flag; a paste that changes
+  // nothing must not make the next keystroke immediate.
   ta.addEventListener('paste', () => {
     immediate = true
+    setTimeout(() => {
+      immediate = false
+    })
   })
   ta.addEventListener('blur', (event) => {
     const next = event.relatedTarget
@@ -180,6 +201,8 @@ export function initComposer(app, ta) {
   }
 
   window.addEventListener('keydown', (event) => {
+    // Keys during IME composition belong to the IME (Enter commits it).
+    if (event.isComposing || composing) return
     const meta = event.metaKey || event.ctrlKey
     if (meta && event.key === 'Enter') {
       // One request only: the forced run replaces any pending debounce.

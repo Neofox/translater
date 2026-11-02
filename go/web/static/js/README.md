@@ -23,6 +23,10 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 - "distinguishes French from English" (`Bonjour, comment ça va aujourd'hui ?` → `fr`)
 - "distinguishes Spanish from English" (`Hola, ¿cómo estás hoy? …` → `es`)
 
-Consequence: with Auto source and target English, French or Spanish input is
-routed to Korean (the client sees `en` = target and flips), where the TS app
-would keep English.
+Consequence: under Auto source with target English, Latin-script input in
+another language (French, Spanish, …) is translated to Korean (the client
+sees `en` = target and flips), where the TS app would keep English. This is
+accepted: the real use is EN↔KO. The model's `nt-source-lang` then only
+relabels the Auto chip; a result's routing stays pinned to its run while the
+text is unchanged (`routingDetected`), so its Copy/Listen stay usable and no
+second request is made.

@@ -2,7 +2,14 @@
 // #translate-form (hx-trigger="nt-run", hx-sync="this:replace"); the form
 // holds only hidden inputs, so the textarea is never part of any swap.
 
-import { detectIntent, detectLanguage, fallbackTargetFor, initComposer, resolveTarget } from './composer.js'
+import {
+  detectIntent,
+  detectLanguage,
+  fallbackTargetFor,
+  initComposer,
+  resolveTarget,
+  routingDetected,
+} from './composer.js'
 import { initCopy, requestKey } from './copy.js'
 import { initPrefs } from './prefs.js'
 import { initStream } from './stream.js'
@@ -21,8 +28,9 @@ let flipGuard = null
 
 const app = {
   prefs: data.prefs,
-  /** The current run: { run, key, text, intent, source, target, raw, main,
-   * mainReady, done, error, aborted, sourceLang, rationale, formality }. */
+  /** The current run: { run, key, detected (its routing language), text,
+   * intent, source, target, raw, main, mainReady, done, error, aborted,
+   * sourceLang, rationale, formality, register }. */
   live: null,
   pending: false,
   t: (key) => data.strings[app.prefs.uiLang]?.[key] ?? data.strings.en[key] ?? key,
@@ -40,11 +48,8 @@ const app = {
     if (modelDetected?.text === trimmed) return modelDetected.lang
     return detectLanguage(trimmed)
   },
-  routingDetected() {
-    if (app.prefs.source !== 'auto') return null
-    const trimmed = ta.value.trim()
-    return modelDetected?.text === trimmed ? modelDetected.lang : detectLanguage(trimmed)
-  },
+  routingDetected: () =>
+    routingDetected({ source: app.prefs.source, text: ta.value, live: app.live, model: modelDetected }),
   translationTarget() {
     const { source, target } = app.prefs
     const detected = flipGuard === ta.value.trim() ? null : app.routingDetected()
@@ -107,7 +112,8 @@ const app = {
     const target = app.translationTarget()
     const intent = detectIntent(text)
     const live = {
-      run: crypto.randomUUID(), key: app.currentKey(), text: trimmed, intent, source, target,
+      run: crypto.randomUUID(), key: app.currentKey(), detected: app.routingDetected(),
+      text: trimmed, intent, source, target,
       raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
       sourceLang: null, rationale: '', formality: '',
       register: intent === 'sentence' && target === 'ko' ? REGISTER[mode] : '',

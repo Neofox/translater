@@ -7,7 +7,9 @@ import {
   detectIntent,
   detectLanguage,
   resolveTarget,
+  routingDetected,
 } from './composer.js'
+import { requestKey } from './copy.js'
 
 // Cases from src/hooks/useTranslate.test.tsx.
 test('debounceFor shortens only for sentence-final punctuation or emoji', () => {
@@ -49,6 +51,30 @@ test('detectLanguage', () => {
   assert.equal(detectLanguage('   '), null)
   assert.equal(detectLanguage('1234 !?'), null)
   assert.equal(detectLanguage('Ich möchte heute in die Bibliothek gehen.'), 'en')
+})
+
+// Review fix: French under Auto -> English routes as 'en' (Korean target);
+// the model then reports 'fr'. The result's key must still match the
+// unchanged input, or Copy/Listen would stay disabled for good.
+test('the model report does not re-route the current result', () => {
+  const text = "Bonjour, comment ça va aujourd'hui ?"
+  const prefs = { source: 'auto', target: 'en', mode: 'casual', context: '', refinements: [], uiLang: 'en' }
+  const keyFor = (live, model) => {
+    const detected = routingDetected({ source: prefs.source, text, live, model })
+    return requestKey({ ...prefs, text, target: resolveTarget({ ...prefs, detected }) })
+  }
+  const runDetected = routingDetected({ source: 'auto', text, live: null, model: null })
+  assert.equal(runDetected, 'en')
+  const live = { source: 'auto', text: text.trim(), detected: runDetected, key: keyFor(null, null) }
+  assert.match(live.key, /"ko"/)
+  const model = { text: text.trim(), lang: 'fr' }
+  assert.equal(keyFor(live, model), live.key, 'Copy stays enabled after nt-source-lang')
+  // Without the pin the key would change (the dead result).
+  assert.notEqual(keyFor(null, model), live.key)
+  // After an edit the pin no longer applies; the model report applies to
+  // exactly the text it was made for.
+  assert.equal(routingDetected({ source: 'auto', text: `${text} !`, live, model }), 'en')
+  assert.equal(routingDetected({ source: 'ko', text, live, model }), null)
 })
 
 // Cases from src/lib/resolveTranslationTarget.test.ts.
