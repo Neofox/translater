@@ -15,8 +15,8 @@ and must produce **identical** OpenAI request bodies.
 | `schemas/sentence.json`, `schemas/word.json` | Strict result JSON Schemas, sent verbatim as `text.format.schema`. Descriptions are prompt text. |
 | `i18n/strings.json` | UI strings, `{ en: {...}, ko: {...} }`, same keys in both |
 | `languages.json` | `[{ code, label, promptName }]`; `promptName` is used in prompts |
-| `limits.json` | Input limits (characters are UTF-16 code units, JS `length`) |
-| `preferences.json` | `nt.preferences` cookie name, version, max age, max raw length and per-field rules (rule order = cookie field order) |
+| `limits.json` | Input limits (characters are UTF-16 code units, JS `length`). `maxLearningTranslationChars` mirrors the `maxLength` already in `schemas/sentence.json` and is used only by the TypeScript learning code. |
+| `preferences.json` | `nt.preferences` cookie: `cookie` (name), `version`, `maxAgeSeconds`, `maxCookieLength` (max raw length) and `rules` (each rule's `values`; rule order = cookie field order). Each rule's `storage`/`raw` belong to the TypeScript app's legacy localStorage migration only; the Go app ignores them. |
 | `meta.json` | `cacheVersion` (cache keys, `prompt_cache_key`) and `defaultModel` |
 | `fixtures/requests.json` | Golden request bodies: `[{ name, input, config, body }]` |
 | `fixtures/variants.json` | Same for eval variants, plus `variant` |
@@ -51,7 +51,10 @@ Go `github.com/cbroglie/mustache`) with these rules:
 3. **Strip exactly one trailing `\n`** from the rendered top-level result.
    Every template file ends with a single newline; that newline is not part
    of the text. Partials are inserted with their trailing newline (so a
-   standalone `{{> p}}` line yields the partial's lines).
+   standalone `{{> p}}` line yields the partial's lines). Standalone tags
+   inside a partial are removed within the partial too: `detail-guidance`
+   starts with a standalone comment line that contributes nothing, so its
+   rendered text starts directly with `The user reads …`.
 4. **Standalone tags** (spec behaviour): a line containing only a section
    open/close (`{{#x}}`, `{{^x}}`, `{{/x}}`), a comment (`{{! … }}`) or a
    partial (`{{> p}}`), plus surrounding whitespace, is removed together with
@@ -131,10 +134,13 @@ The user turn is `user` verbatim. The assistant turn is `assistant`
 serialized as **compact JSON in the file's key order**, strings escaped as
 JavaScript `JSON.stringify` does (only `"`, `\`, and control characters;
 non-ASCII and `<>&` literal). Because the files are kept in
-`JSON.stringify(v, null, 2)` form, Go gets the identical bytes with
-`json.Compact` (v1 `encoding/json`) on the raw `assistant` value
-(`json.RawMessage`/`jsontext.Value`). Do not `json.Marshal` a Go map/struct:
-it sorts keys and HTML-escapes `<>&`.
+`JSON.stringify(v, null, 2)` form (enforced by a test), the requirement for
+other implementations is: take the raw bytes of the `assistant` value and
+**remove insignificant whitespace only**; string bytes stay untouched (no
+re-escaping, no HTML escaping, no key reordering). v1 `json.Compact` on a
+`json.RawMessage` is one known-correct implementation; verify any
+`encoding/json/v2`/`jsontext` equivalent against the fixtures. Do not marshal
+a Go map/struct: that sorts keys and HTML-escapes `<>&`.
 
 ## Live text (code, not templates)
 
