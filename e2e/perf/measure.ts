@@ -45,6 +45,7 @@ import type {
 } from 'playwright'
 import { Fake, fixture, nonce, userText } from '../tests/helpers'
 import {
+  checkDone,
   focusSource,
   installFakeVisualViewport,
   installInputTracker,
@@ -74,9 +75,16 @@ const GO_DIR = join(ROOT, 'go')
 const BIN_DIR = join(tmpdir(), 'neotranslate-perf')
 // Separate from the e2e suite's ports (fake 3901+, ts 3100+, go 3200+) so a
 // running parity suite is never measured or disturbed.
-const PORTS = { fake: 3951, ts: 3150, go: 3250, proxy: 3960 } as const
+const PORTS = {
+  fake: 3951,
+  gateway: 3955,
+  ts: 3150,
+  go: 3250,
+  proxy: 3960,
+} as const
 /** Nothing listens here: in --fake every non-loopback request (CDN fonts,
- * analytics) is sent to it and fails, identically for both apps. */
+ * analytics) is sent to it and fails, identically for both apps. Same-origin
+ * fonts are refused by e2e/perf/gateway.ts. */
 const BLACKHOLE_PROXY = 'http://127.0.0.1:9'
 const FIXTURE = 'stream'
 const S: Selectors = {
@@ -89,6 +97,14 @@ const CLEAR = '[data-testid="clear-input"]'
 /** Keys typed one by one at the end of the settled-page translation text. */
 const TYPED_TAIL = 6
 const TYPE_DELAY_MS = 60
+/** "Done" = Copy enabled, main text present, the translation request (a
+ * fetch/XHR started after the last keystroke) has ended, and no DOM change
+ * for this long afterwards (see page-scripts.ts checkDone); the done time is
+ * the latest of those events. DOM quiet alone is not enough: the TS app
+ * renders nothing for ~2.5 s while learner details stream after main. */
+const DONE_QUIET_MS = 500
+/** Keyboard pan margin below the caret line (browser scroll-into-view). */
+const CARET_MARGIN_PX = 16
 
 // ----- CLI ---------------------------------------------------------------------
 
@@ -426,7 +442,7 @@ async function startProxy(profile: Profile, target: string | null) {
     throw new Error(`port ${PORTS.proxy} (throttle proxy) is already in use`)
   const proc = start(
     process.execPath,
-    [join(ROOT, 'e2e/perf/throttle-proxy.mjs')],
+    [join(ROOT, 'e2e/perf/throttle-proxy.ts')],
     {
       ...process.env,
       PORT: String(PORTS.proxy),
@@ -438,6 +454,20 @@ async function startProxy(profile: Profile, target: string | null) {
     ROOT,
   )
   await waitForPort(PORTS.proxy, proc.child, 'throttle proxy')
+  return proc
+}
+
+/** --fake: the font-blocking pass-through gateway in front of the app. */
+async function startGateway(target: string) {
+  if (await portOpen(PORTS.gateway))
+    throw new Error(`port ${PORTS.gateway} (gateway) is already in use`)
+  const proc = start(
+    process.execPath,
+    [join(ROOT, 'e2e/perf/gateway.ts')],
+    { ...process.env, PORT: String(PORTS.gateway), TARGET: target },
+    ROOT,
+  )
+  await waitForPort(PORTS.gateway, proc.child, 'gateway')
   return proc
 }
 
@@ -489,7 +519,8 @@ const EXECUTABLE_SCRIPT_TYPES = new Set([
 
 /** Inline <script> and <style> bodies of the served HTML (parsed with
  * parse5, the HTML parser jsdom uses), split into executable JS, CSS and
- * non-executable script data (JSON, import maps). */
+ * non-executable script data (JSON, import maps). Inline event handler
+ * attributes (`on*`, htmx `hx-on:*` / `hx-on::*` / `hx-on-*`) count as JS. */
 function inlineCode(html: string) {
   const js: string[] = []
   const css: string[] = []
@@ -505,6 +536,9 @@ function inlineCode(html: string) {
     } else if (node.nodeName === 'style') {
       css.push(text(node))
     }
+    for (const a of node.attrs ?? [])
+      if (/^on[a-z]+$/i.test(a.name) || /^(?:data-)?hx-on[:-]/i.test(a.name))
+        js.push(a.value)
     for (const child of node.childNodes ?? []) walk(child)
     if (node.content) walk(node.content)
   }
@@ -704,15 +738,42 @@ function tracker(page: Page) {
   return page.evaluate(() => (window as unknown as PageGlobals).__tr)
 }
 
-async function waitForTracker(
-  page: Page,
-  field: 'first' | 'done',
-  timeout: number,
-): Promise<boolean> {
+async function waitForFirst(page: Page, timeout: number): Promise<boolean> {
   return page
     .waitForFunction(
-      (f) => (window as unknown as PageGlobals).__tr?.[f] != null,
-      field,
+      () => (window as unknown as PageGlobals).__tr?.first != null,
+      null,
+      { timeout, polling: 50 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+}
+
+/** App-agnostic completion (no Listen button needed): see checkDone. */
+async function waitForDone(page: Page, timeout: number): Promise<boolean> {
+  return page
+    .waitForFunction(
+      checkDone,
+      { quietMs: DONE_QUIET_MS, main: S.main },
+      { timeout, polling: 50 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+}
+
+/** In --fake, the full fixture main text, not a partial one, is on screen. */
+async function waitForFullMain(page: Page, timeout: number): Promise<boolean> {
+  if (mode !== 'fake') return true
+  const main = fixture(FIXTURE).result.main ?? ''
+  return page
+    .waitForFunction(
+      ([selector, expected]) =>
+        document.querySelector(selector)?.textContent.trim() === expected,
+      [S.main, main] as const,
       { timeout, polling: 50 },
     )
     .then(
@@ -783,8 +844,9 @@ async function typeAtFirstFocus(
   const kept = value === text
   const acted =
     kept &&
-    (await waitForTracker(page, 'first', ACT_WAIT_MS)) &&
-    (await upstreamSaw(fake, text))
+    (await waitForFirst(page, ACT_WAIT_MS)) &&
+    (await upstreamSaw(fake, text)) &&
+    (await waitForFullMain(page, 20_000))
   const fcp = await page.evaluate(
     () => (window as unknown as PageGlobals).__perf.fcp,
   )
@@ -806,21 +868,19 @@ async function typeAtFirstFocus(
     await clearSource(page)
     await page.evaluate(() => (window as unknown as PageGlobals).__trStart())
     await page.evaluate((selector) => {
-      document
-        .querySelector<HTMLTextAreaElement>(selector)!
-        .focus({ preventScroll: true })
+      document.querySelector<HTMLTextAreaElement>(selector)!.focus()
     }, S.source)
     await page.keyboard.type(retype)
     if ((await page.locator(S.source).inputValue()) !== retype)
       throw new Error('the retyped text did not stay in the field')
-    if (!(await waitForTracker(page, 'first', 60_000)))
+    if (!(await waitForFirst(page, 60_000)))
       throw new Error('no translation after retyping on the settled page')
     if (!(await upstreamSaw(fake, retype)))
       throw new IsolationError('the fake upstream never saw the retyped text')
     counted = await tracker(page)
     result.retypeFirstKey = counted?.firstKey ?? null
   }
-  if (!(await waitForTracker(page, 'done', 60_000)))
+  if (!(await waitForDone(page, 60_000)))
     throw new Error('the counted translation never completed')
   counted = await tracker(page)
   const keystroke = counted?.firstKey ?? null
@@ -846,8 +906,10 @@ async function settledTranslation(page: Page, fake: Fake | null) {
     throw new Error(
       `source holds ${JSON.stringify(typed)}, expected the typed text`,
     )
-  if (!(await waitForTracker(page, 'done', 60_000)))
+  if (!(await waitForDone(page, 60_000)))
     throw new Error('the settled-page translation never completed')
+  if (!(await waitForFullMain(page, 1000)))
+    throw new Error('the settled-page translation is not the full fixture text')
   const tr = (await tracker(page))!
   let upstreamRequests: number | null = null
   if (fake) {
@@ -864,6 +926,7 @@ async function settledTranslation(page: Page, fake: Fake | null) {
     keyToFirstChar: since(tr.first),
     keyToCopy: since(tr.copy),
     keyToDone: since(tr.done),
+    keyToListen: since(tr.listen),
     upstreamRequests,
   }
 }
@@ -890,7 +953,7 @@ function keyboardResult(
   before: { mainTop: number | null; sourceTop: number | null },
   after: ReturnType<typeof layoutSnapshot>,
   shiftSum: number | null,
-): KeyboardRun {
+): Omit<KeyboardRun, 'panOffset'> {
   const dy = (a: number | null, b: number | null) =>
     a === null || b === null ? null : Math.abs(b - a)
   return {
@@ -911,85 +974,111 @@ async function blurAndRest(page: Page): Promise<void> {
   await page.waitForTimeout(400)
 }
 
+/** Focus the source as a tap on it would (the browser may scroll it into
+ * view), caret at the end. */
 async function focusEnd(page: Page): Promise<void> {
   await page.evaluate((selector) => {
     const el = document.querySelector<HTMLTextAreaElement>(selector)!
-    el.focus({ preventScroll: true })
+    el.focus()
     el.setSelectionRange(el.value.length, el.value.length)
   }, S.source)
 }
 
-/** Overlays-content keyboard (iOS Safari, Android default): the layout
- * viewport keeps its size; the visual viewport shrinks in 50 px steps, 50 ms
- * apart, to half the window, then pans down (offsetTop), as in
- * tests/browser/mobile.browser.tsx. resize + scroll fire on every step. */
-async function keyboardVisual(page: Page): Promise<KeyboardRun> {
-  await blurAndRest(page)
-  const before = await page.evaluate(layoutSnapshot, {
+function snapshot(page: Page, band: { top: number; height: number } | null) {
+  return page.evaluate(layoutSnapshot, {
     main: S.main,
     source: S.source,
-    band: null,
+    band,
   })
+}
+
+/** Overlays-content keyboard (iOS Safari, Android default): the layout
+ * viewport keeps its size; the visual viewport shrinks in 50 px steps, 50 ms
+ * apart, to half the window, with resize + scroll on every step (the
+ * technique of tests/browser/mobile.browser.tsx). The browser's own
+ * scroll-to-focused-field is imitated identically for every app: after each
+ * step, if the caret line is not inside the visible band, the visual
+ * viewport pans (offsetTop) so it is, with a 16 px margin:
+ * offsetTop = clamp(caretBottom - visibleHeight + margin, 0,
+ * layoutHeight - visibleHeight) (or caretTop - margin when the caret is
+ * above the band); a caret already visible keeps the current offsetTop. */
+async function keyboardVisual(page: Page): Promise<KeyboardRun> {
+  await blurAndRest(page)
+  const before = await snapshot(page, null)
   await page.evaluate(startShiftObserver)
   await focusEnd(page)
   const full = await page.evaluate(() => window.innerHeight)
   const visible = Math.round(full * 0.5)
-  const offset = Math.round(full * 0.125)
   const set = (height: number | null, top: number | null) =>
     page.evaluate(
       ([h, t]) => (window as unknown as PageGlobals).__keyboard!.set(h, t),
       [height, top] as const,
     )
-  for (let h = full - 50; h > visible; h -= 50) {
-    await set(h, 0)
+  let offset = 0
+  const heights: number[] = []
+  for (let h = full - 50; h > visible; h -= 50) heights.push(h)
+  heights.push(visible)
+  for (const h of heights) {
+    await set(h, offset)
     await page.waitForTimeout(50)
+    const at = await snapshot(page, { top: offset, height: h })
+    if (at.caretTop !== null && at.caretBottom !== null) {
+      const clamp = (v: number) => Math.min(Math.max(v, 0), full - h)
+      const next =
+        at.caretBottom + CARET_MARGIN_PX > offset + h
+          ? clamp(at.caretBottom - h + CARET_MARGIN_PX)
+          : at.caretTop - CARET_MARGIN_PX < offset
+            ? clamp(at.caretTop - CARET_MARGIN_PX)
+            : offset
+      if (next !== offset) {
+        offset = next
+        await set(h, offset)
+      }
+    }
   }
-  await set(visible, offset)
   await page.waitForTimeout(600)
   const shiftSum = await page.evaluate(stopShiftObserver)
-  const after = await page.evaluate(layoutSnapshot, {
-    main: S.main,
-    source: S.source,
-    band: { top: offset, height: visible },
-  })
+  const after = await snapshot(page, { top: offset, height: visible })
   await blurAndRest(page)
   await set(null, null)
   await page.waitForTimeout(600)
-  return keyboardResult(before, after, shiftSum)
+  return { ...keyboardResult(before, after, shiftSum), panOffset: offset }
 }
 
 /** Resizes-content keyboard: the layout viewport itself shrinks
- * (page.setViewportSize) in 50 px steps, 50 ms apart, to half its height. */
+ * (page.setViewportSize) in 50 px steps, 50 ms apart, to half its height.
+ * After each step the focused field is scrolled into view as browsers do
+ * (scrollIntoView with block "nearest" on the textarea: a no-op when it is
+ * visible or nothing can scroll). */
 async function keyboardResize(
   page: Page,
   profile: Profile,
 ): Promise<KeyboardRun> {
   const size = profile.context.viewport!
   await blurAndRest(page)
-  const before = await page.evaluate(layoutSnapshot, {
-    main: S.main,
-    source: S.source,
-    band: null,
-  })
+  const before = await snapshot(page, null)
   await page.evaluate(startShiftObserver)
   await focusEnd(page)
   const visible = Math.round(size.height * 0.5)
-  for (let h = size.height - 50; h > visible; h -= 50) {
+  const heights: number[] = []
+  for (let h = size.height - 50; h > visible; h -= 50) heights.push(h)
+  heights.push(visible)
+  for (const h of heights) {
     await page.setViewportSize({ width: size.width, height: h })
     await page.waitForTimeout(50)
+    await page.evaluate((selector) => {
+      document
+        .querySelector<HTMLElement>(selector)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }, S.source)
   }
-  await page.setViewportSize({ width: size.width, height: visible })
   await page.waitForTimeout(600)
   const shiftSum = await page.evaluate(stopShiftObserver)
-  const after = await page.evaluate(layoutSnapshot, {
-    main: S.main,
-    source: S.source,
-    band: { top: 0, height: visible },
-  })
+  const after = await snapshot(page, { top: 0, height: visible })
   await blurAndRest(page)
   await page.setViewportSize(size)
   await page.waitForTimeout(600)
-  return keyboardResult(before, after, shiftSum)
+  return { ...keyboardResult(before, after, shiftSum), panOffset: null }
 }
 
 async function interactRun(
@@ -1037,6 +1126,7 @@ async function probeRun(
 ): Promise<ProbeRun> {
   const { context, page } = await newPage(browser, profile)
   try {
+    await page.addInitScript(installPerfObservers)
     await page.addInitScript(installInputTracker, S)
     const before = fake ? await fake.requests() : null
     await page.goto(url, { waitUntil: 'commit', timeout: 120_000 })
@@ -1062,10 +1152,14 @@ async function probeRun(
     )
     const value = await page.locator(S.source).inputValue()
     const whitespaceRequests = fake ? (await fake.requests()) - before! : null
+    const fcp = await page.evaluate(
+      () => (window as unknown as PageGlobals).__perf.fcp,
+    )
     const survivors = value.length
     const shown = events[0] ?? null
     if (value.trim() !== '' || survivors === 0 || survivors > events.length)
       return {
+        fcp,
         kept: null,
         shown,
         lastLost: null,
@@ -1073,6 +1167,7 @@ async function probeRun(
         whitespaceRequests,
       }
     return {
+      fcp,
       kept: events[events.length - survivors]!,
       shown,
       lastLost: events[events.length - survivors - 1] ?? null,
@@ -1105,6 +1200,7 @@ async function measureProfile(
   fake: Fake | null,
   warmUp: boolean,
 ): Promise<ProfileResult> {
+  // --fake: browser -> [throttle proxy] -> font-blocking gateway -> app.
   let url = appUrl
   let proxy: ReturnType<typeof start> | null = null
   const launch: LaunchOptions = {}
@@ -1178,6 +1274,17 @@ async function measureProfile(
   }
 }
 
+/** sha256 over the harness sources (e2e/perf/*.ts|mjs), so results measured
+ * with different harness code are not compared silently. */
+function harnessHash(): string {
+  const dir = join(ROOT, 'e2e/perf')
+  const hash = createHash('sha256')
+  for (const name of readdirSync(dir).sort())
+    if (/\.(?:ts|mjs)$/.test(name) && !name.endsWith('.test.ts'))
+      hash.update(name).update(readFileSync(join(dir, name)))
+  return hash.digest('hex')
+}
+
 function git(...argv: string[]): string {
   return execFileSync('git', argv, { cwd: ROOT, encoding: 'utf8' }).trim()
 }
@@ -1188,15 +1295,21 @@ async function measure(): Promise<void> {
   let server: PerfFile['server']
   let build: PerfFile['meta']['build'] = null
   let appProc: ReturnType<typeof start> | null = null
+  let gateway: ReturnType<typeof start> | null = null
   if (mode === 'fake') {
     const prepared = await prepareFake()
     fake = prepared.fake
     build = prepared.build
-    url = prepared.server.url
     console.log(`server TTFB: ${runs} cold restarts…`)
     server = await serverTtfbFake(prepared.server, runs)
     appProc = prepared.server.start()
-    await waitForPort(Number(new URL(url).port), appProc.child, `${app} app`)
+    await waitForPort(
+      Number(new URL(prepared.server.url).port),
+      appProc.child,
+      `${app} app`,
+    )
+    gateway = await startGateway(new URL(prepared.server.url).host)
+    url = `http://127.0.0.1:${PORTS.gateway}`
   } else {
     url = args.url!.replace(/\/$/, '')
     server = await serverTtfbLive(url, runs)
@@ -1240,6 +1353,7 @@ async function measure(): Promise<void> {
         ) as { version: string }
       ).version,
       build,
+      harness: harnessHash(),
       text: `${mode === 'fake' ? `${fixture(FIXTURE).match} ` : ''}<nonce> How are you doing today, my friend?`,
       debounce:
         'The text ends in "?", so both apps use the 400 ms sentence-final debounce; it is inside every translation timing.',
@@ -1248,13 +1362,15 @@ async function measure(): Promise<void> {
           ? 'Local servers send everything uncompressed (one policy for every app); compare the computed gzip sizes.'
           : 'As served by the deployment (see each resource’s encoding).',
       network:
-        `Throttled profiles (${network || 'none'}) go through e2e/perf/throttle-proxy.mjs: one shared link, ` +
-        'RTT per request, +1 RTT per new connection, shared down/up bandwidth, for both engines. ' +
+        `Throttled profiles (${network || 'none'}) go through e2e/perf/throttle-proxy.ts: one shared link, ` +
+        'RTT per request, +1 RTT per new connection (per connection, never delaying others), shared down/up bandwidth, for both engines. ' +
         (mode === 'fake'
-          ? 'Every non-loopback request (CDN fonts, analytics) is sent to a closed proxy port and fails, for every app.'
+          ? 'Every non-loopback request (CDN fonts, analytics) is sent to a closed proxy port and fails, and e2e/perf/gateway.ts answers every font request with 404, for every app.'
           : 'In --live the proxy is the browser’s HTTP CONNECT proxy, so third-party requests are throttled too.'),
       notes: [
         'TTFB/FCP/LCP/DOMContentLoaded/load are ms from navigation start (Navigation and Paint Timing, PerformanceObserver).',
+        `Done = Copy enabled, main text present, the translation fetch/XHR (started after the last keystroke) ended per Resource Timing, and no DOM change outside <head> for ${DONE_QUIET_MS} ms after; the done time is the latest of these (no Listen button needed).`,
+        'Input kept and acted on from = max(FCP, earliest kept keystroke); the space probe gives the kept keystroke, the burst shows whether input is acted on.',
         'First typeable = max(FCP, earliest kept keystroke, earliest acted-on keystroke) for one sentence typed as a burst at the first moment the textarea takes focus; a dropped burst is cleared and retyped after the page settles (network idle + 500 ms) and that penalty is included.',
         'TBT = sum over long tasks of the part after FCP beyond 50 ms, until 1 s after network idle (Chromium only: WebKit has no longtask entries).',
         'LCP and CLS need largest-contentful-paint / layout-shift entries; supportedEntryTypes per profile says which engine has them.',
@@ -1271,6 +1387,7 @@ async function measure(): Promise<void> {
   writeFileSync(outPath, `${JSON.stringify(file, null, 2)}\n`)
   console.log(`\nwrote ${outPath}\n`)
   console.log(markdownTables([file]))
+  if (gateway) await stop(gateway.child)
   if (appProc) await stop(appProc.child)
 }
 

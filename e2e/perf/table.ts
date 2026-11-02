@@ -96,6 +96,9 @@ export type KeyboardRun = {
   textareaVisible: boolean | null
   caretVisible: boolean | null
   sourceFocused: boolean | null
+  /** Final visual-viewport offsetTop chosen by the scroll-to-caret model
+   * (visual mode only). */
+  panOffset: number | null
 }
 
 /** One interaction run: fresh context; typing at first focus, a translation
@@ -110,6 +113,9 @@ export type InteractRun = {
   upstreamRequests: number | null
   /** All JS the page loaded from navigation through the settled translation's
    * "done" (external bodies + the document's inline scripts). */
+  /** Diagnostic: last key to the main Listen button enabling, if the app has
+   * one (not used for "done"). */
+  keyToListen: number | null
   jsThroughDoneRaw: number
   jsThroughDoneGzip: number
   /** visualViewport shrink + offsetTop pan (overlays-content keyboards). */
@@ -121,6 +127,7 @@ export type InteractRun = {
 /** Diagnostic run: spaces typed whenever the textarea can take focus during
  * load (the original first-typeable probe). */
 export type ProbeRun = {
+  fcp: number | null
   /** Earliest keystroke still in the field after settle. */
   kept: number | null
   /** Earliest input event at all (it may be lost later). */
@@ -164,6 +171,8 @@ export type PerfFile = {
     node: string
     machine: Machine
     playwright: string
+    /** sha256 over e2e/perf sources at measure time. */
+    harness: string
     build: {
       skipped: boolean
       /** sha256 over the served build (TS: .vercel/output; Go: binary). */
@@ -327,54 +336,86 @@ const REPEAT_SIZE_METRICS: Metric<LoadRun>[] = [
   },
 ]
 
-const typeableMetrics = (which: 'cold' | 'repeat'): Metric<InteractRun>[] => {
+type Paired = { interact: InteractRun; probe: ProbeRun }
+
+/** Interaction and probe runs of the same iteration, both successful. */
+function paired(r: ProfileResult): Array<Paired | Failed> {
+  return r.interact.map((interact, i) => {
+    const probe = r.probe[i]
+    if ('error' in interact) return interact
+    if (!probe || 'error' in probe) return { error: 'probe failed' }
+    return { interact, probe }
+  })
+}
+
+/** max(FCP, earliest kept keystroke) of the probe run. */
+function keptFrom(probe: ProbeRun): number | null {
+  return probe.kept === null ? null : Math.max(probe.fcp ?? 0, probe.kept)
+}
+
+const gateMetrics = (which: 'cold' | 'repeat'): Metric<Paired>[] => {
   const s = which === 'cold' ? '' : ' (repeat visit)'
   return [
     {
-      label: `**First typeable**${s}`,
-      unit: 'ms',
-      get: (r) => r[which].firstTypeable,
-    },
-    {
-      label: `**Nav start to first main char, typing at first focus**${s}`,
-      unit: 'ms',
-      get: (r) => r[which].navToFirstChar,
-    },
-    {
-      label: `Typing at first focus wiped${s}`,
+      label: `Gate: typing at first focus wiped${s}`,
       unit: 'flag',
-      get: (r) => r[which].dropped === 'wiped',
+      get: (r) => r.interact[which].dropped === 'wiped',
     },
     {
-      label: `Typing at first focus ignored${s}`,
+      label: `Gate: typing at first focus ignored${s}`,
       unit: 'flag',
-      get: (r) => r[which].dropped === 'ignored',
-    },
-    {
-      label: `First focus (burst first keystroke)${s}`,
-      unit: 'ms',
-      get: (r) => r[which].burstFirstKey,
-    },
-    {
-      label: `Harness settle point (dropped runs)${s}`,
-      unit: 'ms',
-      get: (r) => (r[which].dropped ? r[which].settledAt : null),
-    },
-    {
-      label: `Clear + retype after settle (dropped runs)${s}`,
-      unit: 'ms',
-      get: (r) =>
-        r[which].retypeFirstKey === null || r[which].settledAt === null
-          ? null
-          : r[which].retypeFirstKey - r[which].settledAt,
+      get: (r) => r.interact[which].dropped === 'ignored',
     },
     {
       label: `Wiped and the remainder translated (extra upstream request)${s}`,
       unit: 'flag',
       get: (r) =>
-        r[which].upstreamRequests === null
+        r.interact[which].upstreamRequests === null
           ? null
-          : r[which].dropped === 'wiped' && r[which].upstreamRequests > 1,
+          : r.interact[which].dropped === 'wiped' &&
+            r.interact[which].upstreamRequests > 1,
+    },
+    {
+      label: `First focus (burst first keystroke)${s}`,
+      unit: 'ms',
+      get: (r) => r.interact[which].burstFirstKey,
+    },
+    {
+      label: `Secondary: first typeable incl. the retype model${s}`,
+      unit: 'ms',
+      get: (r) => r.interact[which].firstTypeable,
+    },
+    {
+      label: `of which harness wait (settle point - input kept from), dropped runs${s}`,
+      unit: 'ms',
+      get: (r) => {
+        const kept = keptFrom(r.probe)
+        const t = r.interact[which]
+        return t.dropped && t.settledAt !== null && kept !== null
+          ? t.settledAt - kept
+          : null
+      },
+    },
+    {
+      label: `Harness settle point, dropped runs${s}`,
+      unit: 'ms',
+      get: (r) =>
+        r.interact[which].dropped ? r.interact[which].settledAt : null,
+    },
+    {
+      label: `Clear + retype after settle, dropped runs${s}`,
+      unit: 'ms',
+      get: (r) => {
+        const t = r.interact[which]
+        return t.retypeFirstKey === null || t.settledAt === null
+          ? null
+          : t.retypeFirstKey - t.settledAt
+      },
+    },
+    {
+      label: `Nav start to first main char, typing at first focus${s}`,
+      unit: 'ms',
+      get: (r) => r.interact[which].navToFirstChar,
     },
   ]
 }
@@ -383,6 +424,12 @@ const keyboardMetrics = (
   which: 'keyboardVisual' | 'keyboardResize',
   name: string,
 ): Metric<InteractRun>[] => [
+  {
+    label: `${name}: final visual viewport offsetTop (scroll-to-caret model)`,
+    unit: 'px',
+    get: (r) => r[which]?.panOffset ?? null,
+    keyboard: true,
+  },
   {
     label: `${name}: layout-shift sum`,
     unit: 'score',
@@ -433,11 +480,18 @@ const SECTIONS: Section[] = [
     rows: rows((r) => r.load, [...loadMetrics(''), ...SIZE_METRICS]),
   },
   {
-    title: 'Typing at first focus',
-    rows: rows(
-      (r) => r.interact,
-      [...typeableMetrics('cold'), ...typeableMetrics('repeat')],
-    ),
+    title:
+      'Typing during load (headline: input kept and acted on from; gate: wiped/ignored; secondary: first typeable incl. the retype model)',
+    rows: rows(paired, [
+      {
+        label:
+          '**Input kept and acted on from** (max(FCP, earliest kept keystroke))',
+        unit: 'ms',
+        get: (r) => keptFrom(r.probe),
+      },
+      ...gateMetrics('cold'),
+      ...gateMetrics('repeat').filter((m) => !m.label.startsWith('of which')),
+    ]),
   },
   {
     title: 'Page load, repeat visit (same context, warm cache)',
@@ -466,7 +520,16 @@ const SECTIONS: Section[] = [
           unit: 'ms',
           get: (r) => r.keyToCopy,
         },
-        { label: 'Last key to done', unit: 'ms', get: (r) => r.keyToDone },
+        {
+          label: 'Last key to done (stream ended + Copy + DOM quiet 500 ms)',
+          unit: 'ms',
+          get: (r) => r.keyToDone,
+        },
+        {
+          label: 'Diagnostic: last key to Listen enabled (if the app has it)',
+          unit: 'ms',
+          get: (r) => r.keyToListen,
+        },
         {
           label: 'JS loaded through done, gzip -9',
           unit: 'bytes',
@@ -509,7 +572,7 @@ const SECTIONS: Section[] = [
             r.kept === null || r.lastLost === null ? null : r.kept - r.lastLost,
         },
         {
-          label: 'Upstream requests from whitespace input',
+          label: 'Whitespace input reached upstream',
           unit: 'flag',
           get: (r) =>
             r.whitespaceRequests === null ? null : r.whitespaceRequests > 0,
@@ -586,6 +649,12 @@ export function comparability(
           `${p.profile.id}: browser ${match.browserVersion} vs ${p.browserVersion} (${pair})`,
         )
     }
+    if (first!.meta.mode !== other.meta.mode)
+      warnings.push(`mode ${first!.meta.mode} vs ${other.meta.mode} (${pair})`)
+    if (first!.meta.harness !== other.meta.harness)
+      warnings.push(
+        `harness ${first!.meta.harness.slice(0, 12)} vs ${other.meta.harness.slice(0, 12)} (${pair}): e2e/perf changed between the runs`,
+      )
     if (first!.meta.playwright !== other.meta.playwright)
       warnings.push(
         `Playwright ${first!.meta.playwright} vs ${other.meta.playwright} (${pair})`,
@@ -686,7 +755,7 @@ export function markdownTables(
         : ''
       return (
         `- ${fileLabel(f)}: ${f.meta.date}, commit ${f.meta.commit.slice(0, 12)}` +
-        `${f.meta.dirty ? ' (dirty)' : ''}${build}, ${m.cpu}, ${m.cores} cores, ` +
+        `${f.meta.dirty ? ' (dirty)' : ''}${build}, harness ${f.meta.harness.slice(0, 12)}, ${m.cpu}, ${m.cores} cores, ` +
         `${m.memoryGiB} GiB, ${m.platform} ${m.arch}, Playwright ${f.meta.playwright}, ` +
         f.profiles
           .map((p) => `${p.profile.browser} ${p.browserVersion}`)

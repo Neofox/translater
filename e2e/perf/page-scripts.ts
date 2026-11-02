@@ -14,11 +14,24 @@ export type Tracker = {
   /** timeStamp of the first / last `input` event on the source since start. */
   firstKey: number | null
   last: number
-  /** performance.now() when main first shows text, Copy enables, Listen
-   * enables (the whole result is done). */
+  /** performance.now() when main first shows text and when Copy enables
+   * (main ready). */
   first: number | null
   copy: number | null
+  /** performance.now() of the latest DOM change outside <head> (content,
+   * text or a `disabled` flip) since the last keystroke. */
+  lastMutation: number | null
+  /** responseEnd of the latest fetch/XHR that started after the last
+   * keystroke (Resource Timing adds the entry when the response has fully
+   * arrived): the translation stream has ended. */
+  streamEnd: number | null
+  /** Done: Copy enabled, main text present, a fetch/XHR started after the
+   * last keystroke has ended, and the DOM unchanged for the quiet period
+   * after both; the value is max(Copy, last DOM change, stream end). Set by
+   * `checkDone`. App-agnostic: no Listen button needed. */
   done: number | null
+  /** Diagnostic only: when a main Listen button enabled, if the app has one. */
+  listen: number | null
 }
 
 export type PageGlobals = {
@@ -77,7 +90,16 @@ export function installInputTracker(s: Selectors): void {
   w.__inputs = []
   w.__tr = null
   w.__trStart = () => {
-    w.__tr = { firstKey: null, last: 0, first: null, copy: null, done: null }
+    w.__tr = {
+      firstKey: null,
+      last: 0,
+      first: null,
+      copy: null,
+      lastMutation: null,
+      streamEnd: null,
+      done: null,
+      listen: null,
+    }
   }
   document.addEventListener(
     'input',
@@ -88,6 +110,9 @@ export function installInputTracker(s: Selectors): void {
       if (tr) {
         tr.firstKey ??= e.timeStamp
         tr.last = e.timeStamp
+        tr.lastMutation = null
+        tr.streamEnd = null
+        tr.done = null
       }
     },
     true,
@@ -96,22 +121,48 @@ export function installInputTracker(s: Selectors): void {
     const el = document.querySelector<HTMLButtonElement>(selector)
     return Boolean(el && !el.disabled)
   }
-  const check = () => {
+  new MutationObserver((records) => {
     const tr = w.__tr
     if (!tr || tr.last === 0) return
     const now = performance.now()
+    if (records.some((r) => !document.head.contains(r.target)))
+      tr.lastMutation = now
     const main = document.querySelector(s.main)?.textContent.trim() ?? ''
     if (tr.first === null && main !== '') tr.first = now
     if (tr.copy === null && enabled(s.copy)) tr.copy = now
-    if (tr.done === null && enabled(s.listen)) tr.done = now
-  }
-  new MutationObserver(check).observe(document, {
+    if (tr.listen === null && enabled(s.listen)) tr.listen = now
+  }).observe(document, {
     subtree: true,
     childList: true,
     characterData: true,
     attributes: true,
     attributeFilter: ['disabled'],
   })
+  new PerformanceObserver((list) => {
+    const tr = w.__tr
+    if (!tr || tr.last === 0) return
+    for (const e of list.getEntries() as PerformanceResourceTiming[])
+      if (
+        (e.initiatorType === 'fetch' || e.initiatorType === 'xmlhttprequest') &&
+        e.startTime >= tr.last
+      )
+        tr.streamEnd = Math.max(tr.streamEnd ?? 0, e.responseEnd)
+  }).observe({ type: 'resource' })
+}
+
+/** Marks the result done once Copy is enabled, main text is present and the
+ * DOM has not changed for `quietMs`; returns whether it is done. */
+export function checkDone(arg: { quietMs: number; main: string }): boolean {
+  const tr = (window as unknown as PageGlobals).__tr
+  if (!tr) return false
+  if (tr.done !== null) return true
+  if (tr.copy === null || tr.first === null || tr.streamEnd === null)
+    return false
+  if (!document.querySelector(arg.main)?.textContent.trim()) return false
+  const last = Math.max(tr.copy, tr.lastMutation ?? 0, tr.streamEnd)
+  if (performance.now() - last < arg.quietMs) return false
+  tr.done = last
+  return true
 }
 
 /** Replaces window.visualViewport with an EventTarget that mirrors the real
@@ -283,6 +334,8 @@ export function layoutSnapshot(arg: {
   return {
     mainTop: main ? main.top : null,
     sourceTop: rect ? rect.top : null,
+    caretTop: caret ? caret.top : null,
+    caretBottom: caret ? caret.top + caret.height : null,
     mainVisible: main
       ? lineInside(
           main.top,
