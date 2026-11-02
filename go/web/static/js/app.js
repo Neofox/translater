@@ -62,7 +62,7 @@ const app = {
   autoSwap() {
     if (!ta.value.trim() || app.prefs.source !== 'auto' || !app.routingDetected()) return
     const target = app.translationTarget()
-    if (target !== app.prefs.target) prefs.set('target', target)
+    if (target !== app.prefs.target) prefs.set('target', target, { quiet: true })
   },
 
   /** Stop the in-flight run; its late events are ignored from now on. */
@@ -180,7 +180,7 @@ document.querySelector('.swap-button')?.addEventListener('click', () => {
   const live = app.live
   const main = live?.done && !live.error && live.key === app.currentKey() ? live.main : null
   if (main) {
-    composer.replaceText(main)
+    composer.replaceText(main, false)
     prefs.set('source', 'auto')
     prefs.set('target', from)
   } else {

@@ -106,7 +106,7 @@ export function initComposer(app, ta) {
     changed()
   })
   ta.addEventListener('input', (event) => {
-    if (event.isComposing || composing) {
+    if (composing) {
       clearTimer()
       resize()
       app.inputChanged()
@@ -130,11 +130,11 @@ export function initComposer(app, ta) {
     app.run('blur')
   }
 
-  /** Replace the whole text, as Paste does, and run without debounce. */
-  function replaceText(text) {
+  /** Replace the whole text; Paste runs without debounce, Swap debounced. */
+  function replaceText(text, now = true) {
     ta.value = text
     ta.setSelectionRange(text.length, text.length)
-    immediate = true
+    immediate = now
     changed()
   }
 

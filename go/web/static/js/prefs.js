@@ -107,8 +107,10 @@ export function initPrefs(app, data) {
   }
   document.addEventListener('htmx:after:swap', syncControls)
 
-  /** Change one preference: cookie first (an immediate reload keeps it). */
-  function set(key, value) {
+  /** Change one preference: cookie first (an immediate reload keeps it).
+   * `quiet` skips the re-run when the caller already reschedules (the
+   * auto-target flip inside an input change keeps a paste immediate). */
+  function set(key, value, { quiet = false } = {}) {
     if (app.prefs[key] === value) return
     app.prefs[key] = value
     if (key === 'source' || key === 'target') {
@@ -119,7 +121,7 @@ export function initPrefs(app, data) {
     if (key === 'uiLang') applyStrings()
     syncControls()
     postPrefs()
-    app.settingsChanged()
+    if (!quiet) app.settingsChanged()
   }
 
   document.addEventListener('click', (event) => {
