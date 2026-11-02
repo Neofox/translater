@@ -5,6 +5,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"iter"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/ssestream"
 	"github.com/openai/openai-go/v3/responses"
 )
 
@@ -31,9 +33,32 @@ const (
 // ErrMissingAPIKey is yielded when OPENAI_API_KEY is empty at call time.
 var ErrMissingAPIKey = errors.New("llm: OPENAI_API_KEY is not set")
 
-// errStream marks a failure reported inside the stream. It carries no
-// provider text: raw provider errors are never logged or surfaced.
-var errStream = errors.New("llm: provider reported a stream failure")
+// ErrIncomplete: the provider ended the response early (token limit, content
+// filter), so the structured output cannot be parsed. Kind structured_output.
+var ErrIncomplete = &failure{kind: KindStructuredOutput, text: "response incomplete"}
+
+// ErrTruncated: the stream ended without response.completed. Kind provider.
+var ErrTruncated = &failure{kind: KindProvider, text: "stream ended before completion"}
+
+// failure is a content-free error: it carries a Kind and fixed text only.
+// Provider errors (openai.Error, ssestream.StreamError) embed the raw
+// provider body in Error(), so StreamText never yields them as-is.
+type failure struct {
+	kind Kind
+	text string
+}
+
+func (f *failure) Error() string { return "llm: " + f.text + " (" + string(f.kind) + ")" }
+
+func codeFailure(code string) error {
+	switch code {
+	case "insufficient_quota":
+		return &failure{KindBudget, "provider error"}
+	case "rate_limit_exceeded":
+		return &failure{KindRateLimit, "provider error"}
+	}
+	return &failure{KindProvider, "provider error"}
+}
 
 // Client sends Responses requests. The API key is read per request.
 type Client struct {
@@ -54,7 +79,10 @@ func New(getenv func(string) string) *Client {
 // StreamText posts body (a complete Responses request that already contains
 // "stream":true) and yields each response.output_text.delta. The SDK's
 // NewStreaming sets "stream" on the supplied body in place, so the bytes on
-// the wire equal body. A cancelled ctx stops the stream and yields ctx.Err().
+// the wire equal body. OPENAI_BASE_URL must include the version path (/v1).
+// A cancelled ctx stops the stream and yields context.Canceled (or the
+// deadline error): callers must check ctx.Err()/errors.Is before Classify.
+// Every yielded error is content-free (safe to log); use Classify for its Kind.
 func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		key := c.getenv("OPENAI_API_KEY")
@@ -66,6 +94,7 @@ func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, 
 			option.WithRequestBody("application/json", body),
 			option.WithAPIKey(key))
 		defer stream.Close()
+		completed := false
 		for stream.Next() {
 			ev := stream.Current()
 			switch ev.Type {
@@ -73,19 +102,57 @@ func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, 
 				if !yield(ev.Delta, nil) {
 					return
 				}
-			case "error", "response.failed", "response.incomplete":
-				yield("", errStream)
+			case "response.completed":
+				completed = true
+			case "error":
+				yield("", codeFailure(ev.Code))
+				return
+			case "response.failed":
+				yield("", codeFailure(string(ev.Response.Error.Code)))
+				return
+			case "response.incomplete":
+				yield("", ErrIncomplete)
 				return
 			}
 		}
 		if err := stream.Err(); err != nil {
-			yield("", err)
+			yield("", sanitize(err))
 			return
 		}
 		if err := ctx.Err(); err != nil {
 			yield("", err)
+			return
+		}
+		if !completed {
+			yield("", ErrTruncated)
 		}
 	}
+}
+
+// sanitize drops provider text from SDK errors. Context errors pass through.
+func sanitize(err error) error {
+	var se *ssestream.StreamError
+	if errors.As(err, &se) { // an `error` object event, intercepted by the SDK
+		return codeFailure(streamErrorCode(se.Event.Data))
+	}
+	var apiErr *openai.Error
+	if errors.As(err, &apiErr) {
+		return &failure{Classify(err), "provider error"}
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	return &failure{KindProvider, "transport error"}
+}
+
+func streamErrorCode(data []byte) string {
+	var e struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(data, &e)
+	return e.Error.Code
 }
 
 // Classify maps an error from StreamText to a Kind. Only status and error
@@ -93,6 +160,10 @@ func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, 
 func Classify(err error) Kind {
 	if errors.Is(err, ErrMissingAPIKey) {
 		return KindConfiguration
+	}
+	var f *failure
+	if errors.As(err, &f) {
+		return f.kind
 	}
 	var apiErr *openai.Error
 	if !errors.As(err, &apiErr) {

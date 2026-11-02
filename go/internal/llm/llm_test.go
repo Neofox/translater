@@ -254,3 +254,76 @@ func TestClassifyNonAPIErrorIsProvider(t *testing.T) {
 		t.Fatal(k)
 	}
 }
+
+func faultClient(t *testing.T, name string, fault string) *llm.Client {
+	t.Helper()
+	dir := t.TempDir()
+	fx := `{"match":"[fx:` + name + `]","delayMs":1,"chunk":10,"result":{"main":"hello there, this is long enough"},"fault":` + fault + `}`
+	if err := os.WriteFile(filepath.Join(dir, name+".json"), []byte(fx), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(fakeopenai.Handler(dir))
+	t.Cleanup(srv.Close)
+	env := map[string]string{"OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": srv.URL + "/v1"}
+	return llm.New(func(k string) string { return env[k] })
+}
+
+func TestStreamFaults(t *testing.T) {
+	cases := []struct {
+		name, fault string
+		want        llm.Kind
+		wantErr     error
+	}{
+		{"err-quota", `{"kind":"error","after":2,"code":"insufficient_quota"}`, llm.KindBudget, nil},
+		{"err-rate", `{"kind":"error","after":2,"code":"rate_limit_exceeded"}`, llm.KindRateLimit, nil},
+		{"err-other", `{"kind":"error","after":2,"code":"server_error"}`, llm.KindProvider, nil},
+		{"nest-quota", `{"kind":"error-nested","after":2,"code":"insufficient_quota"}`, llm.KindBudget, nil},
+		{"nest-rate", `{"kind":"error-nested","after":2,"code":"rate_limit_exceeded"}`, llm.KindRateLimit, nil},
+		{"failed-rate", `{"kind":"failed","after":2,"code":"rate_limit_exceeded"}`, llm.KindRateLimit, nil},
+		{"failed-other", `{"kind":"failed","after":2,"code":"server_error"}`, llm.KindProvider, nil},
+		{"incomplete", `{"kind":"incomplete","after":2,"reason":"max_output_tokens"}`, llm.KindStructuredOutput, llm.ErrIncomplete},
+		{"truncate", `{"kind":"truncate","after":2}`, llm.KindProvider, llm.ErrTruncated},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := faultClient(t, tc.name, tc.fault)
+			deltas := 0
+			var got error
+			for _, err := range c.StreamText(context.Background(), body(t, "[fx:"+tc.name+"]")) {
+				if err != nil {
+					got = err
+					break
+				}
+				deltas++
+			}
+			if got == nil {
+				t.Fatal("stream ended without error")
+			}
+			if deltas != 2 {
+				t.Errorf("deltas = %d, want 2", deltas)
+			}
+			if k := llm.Classify(got); k != tc.want {
+				t.Errorf("kind %s, want %s (%v)", k, tc.want, got)
+			}
+			if tc.wantErr != nil && !errors.Is(got, tc.wantErr) {
+				t.Errorf("err %v, want %v", got, tc.wantErr)
+			}
+			if strings.Contains(got.Error(), fakeopenai.FaultMessage) {
+				t.Errorf("error leaks provider text: %v", got)
+			}
+		})
+	}
+}
+
+func TestHTTPErrorsAreContentFree(t *testing.T) {
+	c, _ := setup(t)
+	for _, marker := range []string{"[fx:error-auth]", "[fx:error-budget]", "[fx:error-rate]", "[fx:error-model]", "[fx:error-provider]"} {
+		for _, err := range c.StreamText(context.Background(), body(t, marker)) {
+			for _, leak := range []string{"Incorrect API key", "exceeded your current quota", "Rate limit reached", "does not exist", "server had an error"} {
+				if strings.Contains(err.Error(), leak) {
+					t.Errorf("%s leaks %q: %v", marker, leak, err)
+				}
+			}
+		}
+	}
+}

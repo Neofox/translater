@@ -362,3 +362,27 @@ func TestFixturesMatchSharedSchemas(t *testing.T) {
 		}
 	}
 }
+
+func TestFaultTruncateEndsWithoutCompleted(t *testing.T) {
+	dir := t.TempDir()
+	fx := `{"match":"[fx:cut]","delayMs":1,"chunk":5,"result":{"a":"hello world"},"fault":{"kind":"truncate","after":2}}`
+	if err := os.WriteFile(filepath.Join(dir, "cut.json"), []byte(fx), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(fakeopenai.Handler(dir))
+	defer srv.Close()
+	res := post(t, context.Background(), srv.URL, "[fx:cut]")
+	defer res.Body.Close()
+	deltas := 0
+	for _, e := range readEvents(t, res.Body) {
+		switch e.Data["type"] {
+		case "response.output_text.delta":
+			deltas++
+		case "response.completed":
+			t.Fatal("truncated stream must not complete")
+		}
+	}
+	if deltas != 2 {
+		t.Fatalf("deltas = %d, want 2", deltas)
+	}
+}

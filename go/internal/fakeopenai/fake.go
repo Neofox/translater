@@ -46,7 +46,24 @@ type Fixture struct {
 	ASCII   bool           `json:"ascii"` // escape every non-ASCII rune as \uXXXX (surrogate pairs)
 	Result  jsontext.Value `json:"result"`
 	Error   *FixtureError  `json:"error"`
+	Fault   *Fault         `json:"fault"`
 }
+
+// Fault cuts a stream short after After deltas. Kind is one of: "error"
+// (top-level OpenAI `error` event with Code), "error-nested" (event with an
+// `error` object, the shape the SDK intercepts), "failed" (response.failed
+// with error.code), "incomplete" (response.incomplete with
+// incomplete_details.reason) or "truncate" (close without response.completed).
+// Messages carry FaultMessage so tests can assert it never leaks.
+type Fault struct {
+	Kind   string `json:"kind"`
+	After  int    `json:"after"`
+	Code   string `json:"code"`
+	Reason string `json:"reason"`
+}
+
+// FaultMessage is the provider text every fault event carries.
+const FaultMessage = "SECRET-PROVIDER-TEXT"
 
 // FixtureError is the HTTP status and JSON body returned instead of a stream.
 type FixtureError struct {
@@ -323,7 +340,7 @@ func (s *server) stream(ctx context.Context, w http.ResponseWriter, fx *Fixture,
 		s.countAbort()
 		return
 	}
-	for _, c := range chunks {
+	for i, c := range chunks {
 		select {
 		case <-ctx.Done():
 			s.countAbort()
@@ -332,6 +349,12 @@ func (s *server) stream(ctx context.Context, w http.ResponseWriter, fx *Fixture,
 		}
 		if send("response.output_text.delta", at(map[string]any{"delta": c, "logprobs": []any{}})) != nil {
 			s.countAbort()
+			return
+		}
+		if fx.Fault != nil && i+1 >= fx.Fault.After {
+			if send2 := fault(fx.Fault, send, response); send2 != nil {
+				s.countAbort()
+			}
 			return
 		}
 	}
@@ -349,4 +372,24 @@ func (s *server) stream(ctx context.Context, w http.ResponseWriter, fx *Fixture,
 		send("response.completed", map[string]any{"response": done}) != nil {
 		s.countAbort()
 	}
+}
+
+// fault emits the configured early ending; a nil result means it was sent
+// (or, for "truncate", deliberately nothing).
+func fault(f *Fault, send func(string, map[string]any) error, response func(string, []any, any) map[string]any) error {
+	switch f.Kind {
+	case "error":
+		return send("error", map[string]any{"code": f.Code, "message": FaultMessage, "param": nil})
+	case "error-nested":
+		return send("error", map[string]any{"error": map[string]any{"code": f.Code, "message": FaultMessage, "type": "server_error"}})
+	case "failed":
+		r := response("failed", []any{}, nil)
+		r["error"] = map[string]any{"code": f.Code, "message": FaultMessage}
+		return send("response.failed", map[string]any{"response": r})
+	case "incomplete":
+		r := response("incomplete", []any{}, nil)
+		r["incomplete_details"] = map[string]any{"reason": f.Reason}
+		return send("response.incomplete", map[string]any{"response": r})
+	}
+	return nil
 }
