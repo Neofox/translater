@@ -97,14 +97,18 @@ describe('throttle proxy', () => {
     const { proxyPort } = await proxy({ target: true })
     const a = await open(proxyPort)
     await roundTrip(a, 'warm', 4)
+    // b connects and writes FIRST, so its bytes are queued while its
+    // handshake RTT runs; only then does a send on its open connection.
+    // A scheduler that books b's handshake on the shared upload link (the
+    // round-1 bug) makes a wait for b's handshake: a then takes ~2 RTT. Run
+    // against that scheduler this test failed with timeA ~ 380 ms (see the
+    // Task 5 report, fix round 3).
     const b = await open(proxyPort)
-    // b's first bytes wait for b's handshake; a's request must not.
-    const [timeA, timeB] = await Promise.all([
-      roundTrip(a, 'from-a', 6),
-      roundTrip(b, 'from-b', 6),
-    ])
+    const timeB = roundTrip(b, 'from-b', 6)
+    await new Promise((done) => setTimeout(done, 20))
+    const timeA = await roundTrip(a, 'from-a', 6)
     expect(timeA).toBeLessThan(RTT + 80)
-    expect(timeB).toBeGreaterThanOrEqual(2 * RTT - 5)
+    expect(await timeB).toBeGreaterThanOrEqual(2 * RTT - 5)
   })
 
   it('answers CONNECT directly and throttles only the tunnelled bytes', async () => {

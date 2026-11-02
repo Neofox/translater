@@ -116,6 +116,10 @@ export type InteractRun = {
   /** Diagnostic: last key to the main Listen button enabling, if the app has
    * one (not used for "done"). */
   keyToListen: number | null
+  /** End of the last request started after the last keystroke minus the last
+   * DOM change: > 0 means the response stayed open after the page stopped
+   * changing (e.g. an SSE response not closed after its final event). */
+  streamEndMinusLastDom: number | null
   jsThroughDoneRaw: number
   jsThroughDoneGzip: number
   /** visualViewport shrink + offsetTop pan (overlays-content keyboards). */
@@ -484,8 +488,7 @@ const SECTIONS: Section[] = [
       'Typing during load (headline: input kept and acted on from; gate: wiped/ignored; secondary: first typeable incl. the retype model)',
     rows: rows(paired, [
       {
-        label:
-          '**Input kept and acted on from** (max(FCP, earliest kept keystroke))',
+        label: '**Input kept from** (max(FCP, earliest kept keystroke))',
         unit: 'ms',
         get: (r) => keptFrom(r.probe),
       },
@@ -524,6 +527,11 @@ const SECTIONS: Section[] = [
           label: 'Last key to done (stream ended + Copy + DOM quiet 500 ms)',
           unit: 'ms',
           get: (r) => r.keyToDone,
+        },
+        {
+          label: 'Request end minus last DOM change (> 0: response held open)',
+          unit: 'ms',
+          get: (r) => r.streamEndMinusLastDom,
         },
         {
           label: 'Diagnostic: last key to Listen enabled (if the app has it)',
@@ -651,9 +659,11 @@ export function comparability(
     }
     if (first!.meta.mode !== other.meta.mode)
       warnings.push(`mode ${first!.meta.mode} vs ${other.meta.mode} (${pair})`)
-    if (first!.meta.harness !== other.meta.harness)
+    const harness = (f: PerfFile) =>
+      (f.meta.harness as string | undefined)?.slice(0, 12) ?? 'not recorded'
+    if (harness(first!) !== harness(other) || !first!.meta.harness)
       warnings.push(
-        `harness ${first!.meta.harness.slice(0, 12)} vs ${other.meta.harness.slice(0, 12)} (${pair}): e2e/perf changed between the runs`,
+        `harness ${harness(first!)} vs ${harness(other)} (${pair}): e2e/perf changed between the runs or was not recorded`,
       )
     if (first!.meta.playwright !== other.meta.playwright)
       warnings.push(
@@ -755,7 +765,7 @@ export function markdownTables(
         : ''
       return (
         `- ${fileLabel(f)}: ${f.meta.date}, commit ${f.meta.commit.slice(0, 12)}` +
-        `${f.meta.dirty ? ' (dirty)' : ''}${build}, harness ${f.meta.harness.slice(0, 12)}, ${m.cpu}, ${m.cores} cores, ` +
+        `${f.meta.dirty ? ' (dirty)' : ''}${build}, harness ${(f.meta.harness as string | undefined)?.slice(0, 12) ?? 'not recorded'}, ${m.cpu}, ${m.cores} cores, ` +
         `${m.memoryGiB} GiB, ${m.platform} ${m.arch}, Playwright ${f.meta.playwright}, ` +
         f.profiles
           .map((p) => `${p.profile.browser} ${p.browserVersion}`)

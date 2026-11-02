@@ -21,15 +21,6 @@ export type Tracker = {
   /** performance.now() of the latest DOM change outside <head> (content,
    * text or a `disabled` flip) since the last keystroke. */
   lastMutation: number | null
-  /** responseEnd of the latest fetch/XHR that started after the last
-   * keystroke (Resource Timing adds the entry when the response has fully
-   * arrived): the translation stream has ended. */
-  streamEnd: number | null
-  /** Done: Copy enabled, main text present, a fetch/XHR started after the
-   * last keystroke has ended, and the DOM unchanged for the quiet period
-   * after both; the value is max(Copy, last DOM change, stream end). Set by
-   * `checkDone`. App-agnostic: no Listen button needed. */
-  done: number | null
   /** Diagnostic only: when a main Listen button enabled, if the app has one. */
   listen: number | null
 }
@@ -96,8 +87,6 @@ export function installInputTracker(s: Selectors): void {
       first: null,
       copy: null,
       lastMutation: null,
-      streamEnd: null,
-      done: null,
       listen: null,
     }
   }
@@ -111,8 +100,6 @@ export function installInputTracker(s: Selectors): void {
         tr.firstKey ??= e.timeStamp
         tr.last = e.timeStamp
         tr.lastMutation = null
-        tr.streamEnd = null
-        tr.done = null
       }
     },
     true,
@@ -138,31 +125,6 @@ export function installInputTracker(s: Selectors): void {
     attributes: true,
     attributeFilter: ['disabled'],
   })
-  new PerformanceObserver((list) => {
-    const tr = w.__tr
-    if (!tr || tr.last === 0) return
-    for (const e of list.getEntries() as PerformanceResourceTiming[])
-      if (
-        (e.initiatorType === 'fetch' || e.initiatorType === 'xmlhttprequest') &&
-        e.startTime >= tr.last
-      )
-        tr.streamEnd = Math.max(tr.streamEnd ?? 0, e.responseEnd)
-  }).observe({ type: 'resource' })
-}
-
-/** Marks the result done once Copy is enabled, main text is present and the
- * DOM has not changed for `quietMs`; returns whether it is done. */
-export function checkDone(arg: { quietMs: number; main: string }): boolean {
-  const tr = (window as unknown as PageGlobals).__tr
-  if (!tr) return false
-  if (tr.done !== null) return true
-  if (tr.copy === null || tr.first === null || tr.streamEnd === null)
-    return false
-  if (!document.querySelector(arg.main)?.textContent.trim()) return false
-  const last = Math.max(tr.copy, tr.lastMutation ?? 0, tr.streamEnd)
-  if (performance.now() - last < arg.quietMs) return false
-  tr.done = last
-  return true
 }
 
 /** Replaces window.visualViewport with an EventTarget that mirrors the real

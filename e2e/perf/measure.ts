@@ -41,11 +41,11 @@ import type {
   BrowserContext,
   LaunchOptions,
   Page,
+  Request,
   Response,
 } from 'playwright'
 import { Fake, fixture, nonce, userText } from '../tests/helpers'
 import {
-  checkDone,
   focusSource,
   installFakeVisualViewport,
   installInputTracker,
@@ -97,11 +97,12 @@ const CLEAR = '[data-testid="clear-input"]'
 /** Keys typed one by one at the end of the settled-page translation text. */
 const TYPED_TAIL = 6
 const TYPE_DELAY_MS = 60
-/** "Done" = Copy enabled, main text present, the translation request (a
- * fetch/XHR started after the last keystroke) has ended, and no DOM change
- * for this long afterwards (see page-scripts.ts checkDone); the done time is
- * the latest of those events. DOM quiet alone is not enough: the TS app
- * renders nothing for ~2.5 s while learner details stream after main. */
+/** "Done" = Copy enabled, main text present, every fetch/XHR/EventSource
+ * request started after the last keystroke has finished (none in flight, at
+ * least one finished; tracked by Playwright outside the page), and no DOM
+ * change for this long after the latest of those (see waitForDone). DOM quiet
+ * alone is not enough: the TS app renders nothing for ~2.5 s while learner
+ * details stream after main. */
 const DONE_QUIET_MS = 500
 /** Keyboard pan margin below the caret line (browser scroll-into-view). */
 const CARET_MARGIN_PX = 16
@@ -751,28 +752,94 @@ async function waitForFirst(page: Page, timeout: number): Promise<boolean> {
     )
 }
 
-/** App-agnostic completion (no Listen button needed): see checkDone. */
-async function waitForDone(page: Page, timeout: number): Promise<boolean> {
-  return page
-    .waitForFunction(
-      checkDone,
-      { quietMs: DONE_QUIET_MS, main: S.main },
-      { timeout, polling: 50 },
-    )
-    .then(
-      () => true,
-      () => false,
-    )
+type RequestLog = {
+  /** In-flight requests with their start (Node wall clock, epoch ms). */
+  inflight: Map<Request, number>
+  /** Finished requests: browser start and end (epoch ms). */
+  finished: Array<{ start: number; end: number }>
+}
+
+const requestLogs = new WeakMap<Page, RequestLog>()
+const TRACKED_TYPES = new Set(['fetch', 'xhr', 'eventsource'])
+
+/** Tracks the page's fetch/XHR/EventSource requests from outside the page
+ * (Playwright events), so requests still in flight are visible too. */
+function trackRequests(page: Page): void {
+  const log: RequestLog = { inflight: new Map(), finished: [] }
+  requestLogs.set(page, log)
+  page.on('request', (r) => {
+    if (TRACKED_TYPES.has(r.resourceType())) log.inflight.set(r, Date.now())
+  })
+  page.on('requestfinished', (r) => {
+    const startedAt = log.inflight.get(r)
+    if (startedAt === undefined) return
+    log.inflight.delete(r)
+    const t = r.timing()
+    const begin = t.startTime > 0 ? t.startTime : startedAt
+    const end = t.responseEnd >= 0 ? t.startTime + t.responseEnd : Date.now()
+    log.finished.push({ start: begin, end })
+  })
+  page.on('requestfailed', (r) => {
+    log.inflight.delete(r)
+  })
+}
+
+type Done = {
+  /** Page time (performance.now()) of done. */
+  done: number
+  /** Page time the last request started after the last keystroke ended. */
+  streamEnd: number
+  /** Page time of the last DOM change after the last keystroke. */
+  lastDom: number | null
+}
+
+/** App-agnostic completion (no Listen button needed): Copy enabled, main text
+ * present, no fetch/XHR/EventSource that started after the last keystroke
+ * still in flight and at least one finished, and the DOM unchanged for
+ * DONE_QUIET_MS after max(Copy, last DOM change, last request end). */
+async function waitForDone(page: Page, timeout: number): Promise<Done | null> {
+  const log = requestLogs.get(page)
+  if (!log) throw new Error('waitForDone needs trackRequests(page) first')
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    const s = await page.evaluate((main) => {
+      const tr = (window as unknown as PageGlobals).__tr
+      return {
+        now: performance.now(),
+        origin: performance.timeOrigin,
+        tr,
+        main: Boolean(document.querySelector(main)?.textContent.trim()),
+      }
+    }, S.main)
+    const tr = s.tr
+    if (tr && tr.last > 0 && tr.copy !== null && tr.first !== null && s.main) {
+      const keyEpoch = s.origin + tr.last
+      const inflight = [...log.inflight.values()].some((t) => t >= keyEpoch)
+      const ends = log.finished
+        .filter((f) => f.start >= keyEpoch)
+        .map((f) => f.end - s.origin)
+      if (!inflight && ends.length > 0) {
+        const streamEnd = Math.max(...ends)
+        const last = Math.max(tr.copy, tr.lastMutation ?? 0, streamEnd)
+        if (s.now - last >= DONE_QUIET_MS)
+          return { done: last, streamEnd, lastDom: tr.lastMutation }
+      }
+    }
+    await sleep(50)
+  }
+  return null
 }
 
 /** In --fake, the full fixture main text, not a partial one, is on screen. */
 async function waitForFullMain(page: Page, timeout: number): Promise<boolean> {
   if (mode !== 'fake') return true
-  const main = fixture(FIXTURE).result.main ?? ''
+  const main = (fixture(FIXTURE).result.main ?? '').replace(/\s+/g, ' ').trim()
   return page
     .waitForFunction(
       ([selector, expected]) =>
-        document.querySelector(selector)?.textContent.trim() === expected,
+        (document.querySelector(selector)?.textContent ?? '')
+          .replace(/\s+/g, ' ')
+          .trim() === expected,
       [S.main, main] as const,
       { timeout, polling: 50 },
     )
@@ -906,8 +973,8 @@ async function settledTranslation(page: Page, fake: Fake | null) {
     throw new Error(
       `source holds ${JSON.stringify(typed)}, expected the typed text`,
     )
-  if (!(await waitForDone(page, 60_000)))
-    throw new Error('the settled-page translation never completed')
+  const done = await waitForDone(page, 60_000)
+  if (!done) throw new Error('the settled-page translation never completed')
   if (!(await waitForFullMain(page, 1000)))
     throw new Error('the settled-page translation is not the full fixture text')
   const tr = (await tracker(page))!
@@ -925,7 +992,9 @@ async function settledTranslation(page: Page, fake: Fake | null) {
   return {
     keyToFirstChar: since(tr.first),
     keyToCopy: since(tr.copy),
-    keyToDone: since(tr.done),
+    keyToDone: since(done.done),
+    streamEndMinusLastDom:
+      done.lastDom === null ? null : done.streamEnd - done.lastDom,
     keyToListen: since(tr.listen),
     upstreamRequests,
   }
@@ -1093,6 +1162,7 @@ async function interactRun(
     await page.addInitScript(installInputTracker, S)
     if (profile.keyboard) await page.addInitScript(installFakeVisualViewport)
     const collect = collector(page)
+    trackRequests(page)
     const cold = await typeAtFirstFocus(page, url, fake)
     const translation = await settledTranslation(page, fake)
     const js = await jsThroughDone(collect.take().responses)
@@ -1274,14 +1344,18 @@ async function measureProfile(
   }
 }
 
-/** sha256 over the harness sources (e2e/perf/*.ts|mjs), so results measured
- * with different harness code are not compared silently. */
+/** sha256 over the harness sources (e2e/perf/*.ts|mjs and the shared
+ * e2e/tests/helpers.ts), so results measured with different harness code are
+ * not compared silently. */
 function harnessHash(): string {
   const dir = join(ROOT, 'e2e/perf')
+  const files = readdirSync(dir)
+    .filter((name) => /\.(?:ts|mjs)$/.test(name) && !name.endsWith('.test.ts'))
+    .map((name) => join(dir, name))
+  files.push(join(ROOT, 'e2e/tests/helpers.ts'))
   const hash = createHash('sha256')
-  for (const name of readdirSync(dir).sort())
-    if (/\.(?:ts|mjs)$/.test(name) && !name.endsWith('.test.ts'))
-      hash.update(name).update(readFileSync(join(dir, name)))
+  for (const path of files.sort())
+    hash.update(relative(ROOT, path)).update(readFileSync(path))
   return hash.digest('hex')
 }
 
@@ -1369,8 +1443,8 @@ async function measure(): Promise<void> {
           : 'In --live the proxy is the browser’s HTTP CONNECT proxy, so third-party requests are throttled too.'),
       notes: [
         'TTFB/FCP/LCP/DOMContentLoaded/load are ms from navigation start (Navigation and Paint Timing, PerformanceObserver).',
-        `Done = Copy enabled, main text present, the translation fetch/XHR (started after the last keystroke) ended per Resource Timing, and no DOM change outside <head> for ${DONE_QUIET_MS} ms after; the done time is the latest of these (no Listen button needed).`,
-        'Input kept and acted on from = max(FCP, earliest kept keystroke); the space probe gives the kept keystroke, the burst shows whether input is acted on.',
+        `Done = Copy enabled, main text present, no fetch/XHR/EventSource started after the last keystroke still in flight (Playwright request events) and at least one finished, and no DOM change outside <head> for ${DONE_QUIET_MS} ms after the latest of Copy, last DOM change and last request end; done = that latest time (no Listen button needed). streamEndMinusLastDom shows a response held open after the last visible change.`,
+        'Input kept from = max(FCP, earliest kept keystroke) from the space probe; whether input is acted on is the burst gate.',
         'First typeable = max(FCP, earliest kept keystroke, earliest acted-on keystroke) for one sentence typed as a burst at the first moment the textarea takes focus; a dropped burst is cleared and retyped after the page settles (network idle + 500 ms) and that penalty is included.',
         'TBT = sum over long tasks of the part after FCP beyond 50 ms, until 1 s after network idle (Chromium only: WebKit has no longtask entries).',
         'LCP and CLS need largest-contentful-paint / layout-shift entries; supportedEntryTypes per profile says which engine has them.',
