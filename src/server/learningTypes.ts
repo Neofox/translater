@@ -1,52 +1,57 @@
 import { z } from 'zod'
-import { MAX_CONTEXT_CHARS, MAX_INPUT_CHARS } from '../lib/limits'
+import { SENTENCE_RESULT_SCHEMA, fromSharedSchema } from './schemas'
+import {
+  MAX_CONTEXT_CHARS,
+  MAX_INPUT_CHARS,
+  MAX_LEARNING_TRANSLATION_CHARS,
+} from '../lib/limits'
+import type {
+  CharacterBreakdownData,
+  LearningPhraseData,
+} from './resultTypes.generated'
 
-export const MAX_LEARNING_TRANSLATION_CHARS = 16_000
-export const CharacterBreakdown = z.object({
-  word: z
-    .string()
-    .describe(
-      'The exact CJK word in the analysed language: Hangul, Japanese or Hanzi.',
-    ),
-  chars: z
-    .array(
-      z.object({
-        char: z.string().describe('One hanja, kanji or hanzi character.'),
-        meaning: z.string().describe('Short meaning in the metadata language.'),
-      }),
-    )
-    .max(10),
-})
-export type CharacterBreakdownData = z.infer<typeof CharacterBreakdown>
-export const LearningPhrase = z.object({
-  text: z.string().min(1).max(MAX_LEARNING_TRANSLATION_CHARS),
-  gloss: z.string().max(600),
-  sourceTexts: z.array(z.string().min(1).max(4000)).max(8),
-  baseForm: z.string().max(600),
-  literalMeaning: z.string().max(600),
-  naturalMeaning: z.string().max(600),
-  grammar: z.string().max(1000),
-  omissions: z.string().max(600),
-  usageNote: z
-    .string()
-    .max(1000)
-    .describe(
-      'Useful vocabulary, idiom, register or cultural nuance belonging to this phrase. Empty when redundant.',
-    ),
-  characters: z
-    .array(CharacterBreakdown)
-    .max(3)
-    .describe(
-      'Useful CJK character origins belonging to this exact phrase. Skip native words and loanwords; [] when inapplicable.',
-    ),
-  grammarHighlights: z
-    .array(z.string().min(1).max(4000))
-    .max(4)
-    .describe(
-      'Exact short quotations from this phrase worth underlining for grammar: an ending, particle, conjugation or meaningful grammatical construction. Usually zero or one; use [] for ordinary vocabulary. Never underline every word or quote a whole phrase just to mark it as clickable.',
-    ),
-})
-export const LearningPhrases = z.array(LearningPhrase).max(64)
+export { MAX_LEARNING_TRANSLATION_CHARS }
+export type { CharacterBreakdownData, LearningPhraseData }
+
+// Phrase and character parts of the shared sentence result schema
+// (shared/translation/schemas/sentence.json), validated by zod.
+const learningPhrasesSchema = SENTENCE_RESULT_SCHEMA.properties.learningPhrases
+const phraseSchema = learningPhrasesSchema.items
+const characterSchema = phraseSchema.properties.characters.items
+
+export const CharacterBreakdown =
+  fromSharedSchema<CharacterBreakdownData>(characterSchema)
+export const LearningPhrase = fromSharedSchema<LearningPhraseData>(phraseSchema)
+export const LearningPhrases = fromSharedSchema<LearningPhraseData[]>(
+  learningPhrasesSchema,
+)
+
+// Page-memory compatibility only: older gloss-only results may lack every
+// detail field, and (as with the earlier non-strict zod objects) unknown keys
+// do not reject the map. The generated schema still requires all fields.
+const LEGACY_PHRASE_REQUIRED = ['text', 'gloss', 'sourceTexts']
+function lenient(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(lenient)
+  if (!schema || typeof schema !== 'object') return schema
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([key]) => key !== 'additionalProperties')
+      .map(([key, value]) => [key, lenient(value)]),
+  )
+}
+export type LegacyLearningPhraseData = Pick<
+  LearningPhraseData,
+  'text' | 'gloss' | 'sourceTexts'
+> &
+  Partial<LearningPhraseData>
+export const LegacyLearningPhrases = fromSharedSchema<
+  LegacyLearningPhraseData[]
+>(
+  lenient({
+    ...learningPhrasesSchema,
+    items: { ...phraseSchema, required: LEGACY_PHRASE_REQUIRED },
+  }) as object,
+)
 export const LearningInput = z
   .object({
     text: z.string().min(1).max(MAX_INPUT_CHARS),

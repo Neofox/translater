@@ -6,5 +6,9 @@ yarn.lock
 # Pinned generated font-face declarations
 src/styles/pretendard.css
 
-# Generated golden request bodies: never reformat
-shared/translation/fixtures/
+# Shared translation contract (byte-exact data, golden request bodies) and
+# its generated views: never reformat
+shared/
+go/internal/contract/data/
+src/server/promptTemplates.generated.json
+src/server/resultTypes.generated.ts

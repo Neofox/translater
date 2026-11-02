@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sentencePrompt, wordPrompt } from './prompts'
-import { SentenceResult, WordResult } from './schemas'
+import { SentenceResult, WORD_RESULT_SCHEMA, WordResult } from './schemas'
 
 const MODES = ['friends', 'casual', 'professional'] as const
 const UI_LANGS = ['en', 'ko'] as const
@@ -295,5 +295,7 @@ describe('punctuation preference', () => {
 })
 
 it('keeps the model schema usage example consistent with the punctuation preference', () => {
-  expect(WordResult.shape.primaryUsageNote.description).not.toContain('—')
+  expect(
+    WORD_RESULT_SCHEMA.properties.primaryUsageNote.description,
+  ).not.toContain('—')
 })

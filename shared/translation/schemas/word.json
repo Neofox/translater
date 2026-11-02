@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "sourceLang": {
+      "type": "string",
+      "enum": [
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh",
+        "other"
+      ],
+      "description": "The actual language of the source text. When the instructions name a forced source language, echo its code. Otherwise report the language you detected. Use \"other\" only when the language is not in this list."
+    },
+    "targetLang": {
+      "type": "string",
+      "enum": [
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh",
+        "other"
+      ],
+      "description": "The language `primaryTranslation` and every alternative are actually written in."
+    },
+    "headword": {
+      "type": "string",
+      "description": "The source word, normalized (lemma form)."
+    },
+    "primaryTranslation": {
+      "type": "string",
+      "description": "The single most common equivalent in the target language, within the current mode register band."
+    },
+    "primaryUsageNote": {
+      "type": "string",
+      "description": "One short sentence in the metadata language (see prompt) on the register/context of primaryTranslation. When there is an important opposite-register equivalent, mention it briefly (e.g., \"Casual: for professional settings use 감사합니다.\"). Empty string when nothing worth noting."
+    },
+    "alternativeTranslations": {
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "register": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags (in the metadata language: see prompt) strictly within the current mode band (e.g., [\"casual polite\"], [\"very formal\"]). Never cross bands. Empty array when none apply."
+          },
+          "note": {
+            "type": "string",
+            "description": "Short note in the metadata language (see prompt) on when/why to pick this over the primary."
+          }
+        },
+        "required": [
+          "text",
+          "register",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "description": "0-4 alternative equivalents, ALL within the current mode band. Casual mode → casual variants only; Professional → polite/formal only. Never mix bands."
+    },
+    "posList": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pos": {
+            "type": "string",
+            "description": "Part of speech in the metadata language (see prompt), e.g. \"noun\", \"verb\", \"adjective\", \"interjection\"."
+          },
+          "senses": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "definition": {
+                  "type": "string",
+                  "description": "One-sentence definition in the metadata language (see prompt)."
+                },
+                "register": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Tags like \"informal\", \"formal\", \"technical\", \"slang\", \"archaic\": written in the metadata language (see prompt). Empty array when none apply."
+                },
+                "examples": {
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Up to 2 short example sentences demonstrating this sense. Write them in the HEADWORD's language so the user sees natural native usage. If the headword's language differs from the metadata language (see prompt), append a metadata-language gloss in parentheses, e.g. \"그는 진짜 빵돌이라서 매일 빵집에 가요. (He's a real bread-lover...)\" when metadata is English."
+                }
+              },
+              "required": [
+                "definition",
+                "register",
+                "examples"
+              ],
+              "additionalProperties": false
+            },
+            "description": "1-4 senses ordered by frequency within this POS."
+          }
+        },
+        "required": [
+          "pos",
+          "senses"
+        ],
+        "additionalProperties": false
+      },
+      "description": "1-3 parts of speech the headword can take, ordered by frequency of use."
+    },
+    "synonyms": {
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "3-6 source-language synonyms of the headword when common synonyms exist. Empty array for bare function words."
+    },
+    "etymology": {
+      "type": "string",
+      "description": "Brief etymology when genuinely illuminating, in the metadata language (see prompt). Empty string when not illuminating."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Vocabulary nuance, idioms, cultural context, usage notes, false friends and common collocations, in the metadata language (see prompt). Empty string when none worth noting."
+    },
+    "grammar": {
+      "type": "string",
+      "description": "Useful grammar, inflection or construction for the non-fluent language in this entry, in the metadata language. Empty if unhelpful. Do not duplicate notes."
+    },
+    "characters": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "word": {
+            "type": "string",
+            "description": "The exact CJK word in the analysed language: Hangul, Japanese or Hanzi."
+          },
+          "chars": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "char": {
+                  "type": "string",
+                  "description": "One hanja, kanji or hanzi character."
+                },
+                "meaning": {
+                  "type": "string",
+                  "description": "Short meaning in the metadata language."
+                }
+              },
+              "required": [
+                "char",
+                "meaning"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "word",
+          "chars"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Useful character origins from the non-fluent language in this entry. Skip native words and loanwords; [] when inapplicable."
+    }
+  },
+  "required": [
+    "sourceLang",
+    "targetLang",
+    "headword",
+    "primaryTranslation",
+    "primaryUsageNote",
+    "alternativeTranslations",
+    "posList",
+    "synonyms",
+    "etymology",
+    "notes",
+    "grammar",
+    "characters"
+  ],
+  "additionalProperties": false
+}

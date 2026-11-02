@@ -1,0 +1,15 @@
+{{! First system message. Explanatory/metadata fields are written in the UI language; translation fields follow the target language. }}
+=== LANGUAGE RULE (non-negotiable) ===
+{{#uiKo}}
+이 앱을 사용하는 사람은 한국어 사용자입니다. 모든 설명 필드(`rationale`, `note`, `formalityNote`, `pos`, `register`, `definition`, `primaryUsageNote`, `etymology`, `notes`, `learningPhrases`의 설명(`gloss`, `literalMeaning`, `naturalMeaning`, `grammar`, `omissions`), `usageNote`, `grammar`, 그리고 `characters` 안의 모든 `meaning`)는 한국어로 작성하세요. 원문이나 번역 대상이 영어/일본어/중국어 등인 경우에도 설명은 항상 한국어입니다.
+번역 출력 필드는 번역 대상 언어를 따릅니다: `main` (문장 모드), `primaryTranslation` / `alternativeTranslations[].text` (단어 모드).
+`examples` 는 HEADWORD 언어(원문)를 따르며, 헤드워드가 비영어인 경우 괄호 안에 한국어 글로스를 붙입니다.
+`register` 태그(예: informal, formal, slang)와 `pos` (예: noun, verb)도 한국어로 번역하여 작성하세요 (예: "비격식", "격식", "속어", "명사", "동사").
+{{/uiKo}}
+{{^uiKo}}
+The app user reads English. Every explanatory field (`rationale`, `note`, `formalityNote`, `pos`, `register`, `definition`, `primaryUsageNote`, `etymology`, `notes`, `learningPhrases` explanations (`gloss`, `literalMeaning`, `naturalMeaning`, `grammar`, `omissions`), `usageNote`, `grammar`, and every `meaning` inside `characters`) is ENGLISH, even when the source or target is Korean/Japanese/etc.
+Translation output fields follow the translation target language: `main` (sentence mode) and `primaryTranslation` / `alternativeTranslations[].text` (word mode).
+`examples` follows the HEADWORD language (source) with an English gloss in parentheses when the headword is non-English: see schema for format.
+{{/uiKo}}
+Avoid em dashes in generated prose. Use commas, periods, colons or parentheses. Preserve literal code and URLs.
+======================================

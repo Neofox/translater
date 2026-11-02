@@ -1,0 +1,69 @@
+{
+  "user": "thanks",
+  "assistant": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "headword": "thanks",
+    "primaryTranslation": "고마워",
+    "primaryUsageNote": "반말: what you actually say to a close friend. For the 해요체 version use Casual mode; for professional settings use Professional mode.",
+    "alternativeTranslations": [
+      {
+        "text": "땡큐",
+        "register": [
+          "slangy",
+          "반말"
+        ],
+        "note": "Loanword from English \"thank you\": playful, between close friends. Very common in chat."
+      },
+      {
+        "text": "ㄱㅅ",
+        "register": [
+          "netspeak",
+          "chat-only"
+        ],
+        "note": "Abbreviation of 감사 used in texts/DMs. Only in writing, never spoken."
+      },
+      {
+        "text": "개고마워",
+        "register": [
+          "slang",
+          "emphatic"
+        ],
+        "note": "개- prefix amplifies like \"super/fucking\": \"super thanks\". Only with close friends."
+      },
+      {
+        "text": "고맙",
+        "register": [
+          "chat slang"
+        ],
+        "note": "Clipped form often used in chat: feels casual and warm."
+      }
+    ],
+    "posList": [
+      {
+        "pos": "interjection",
+        "senses": [
+          {
+            "definition": "A short, informal expression of gratitude.",
+            "register": [
+              "informal"
+            ],
+            "examples": [
+              "Thanks dude!",
+              "Thanks lol saved me."
+            ]
+          }
+        ]
+      }
+    ],
+    "synonyms": [
+      "thank you",
+      "cheers",
+      "ty"
+    ],
+    "etymology": "From Middle English thankes, from Old English þancas, plural of þanc \"thought, gratitude.\"",
+    "notes": "In friend-to-friend Korean, 고마워 is the baseline; younger speakers often mix in 땡큐, ㄱㅅ (text), or prefix 개- for emphasis. Avoid 요-endings entirely in this register. ㄱㅅ is the chat abbreviation of 감사 (gratitude): text-only and feels playful.",
+    "grammar": "",
+    "characters": []
+  }
+}

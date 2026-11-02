@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { SentenceResult, WordResult } from './schemas'
+import {
+  SENTENCE_RESULT_SCHEMA,
+  SentenceResult,
+  WORD_RESULT_SCHEMA,
+} from './schemas'
+import { LegacyLearningPhrases } from './learningTypes'
 
 const characterEntry = (char: string) => ({
   word: char,
@@ -57,10 +62,10 @@ describe('SentenceResult', () => {
     ).toBe(false)
   })
   it('keeps all learner notes in phrase or dictionary details, with no global tips object', () => {
-    expect(SentenceResult.shape).not.toHaveProperty('learningTips')
-    expect(WordResult.shape).not.toHaveProperty('learningTips')
-    expect(WordResult.shape).toHaveProperty('grammar')
-    expect(WordResult.shape).toHaveProperty('characters')
+    expect(SENTENCE_RESULT_SCHEMA.properties).not.toHaveProperty('learningTips')
+    expect(WORD_RESULT_SCHEMA.properties).not.toHaveProperty('learningTips')
+    expect(WORD_RESULT_SCHEMA.properties).toHaveProperty('grammar')
+    expect(WORD_RESULT_SCHEMA.properties).toHaveProperty('characters')
   })
   it('accepts a fully populated strict payload', () => {
     const result = SentenceResult.parse(validResult)
@@ -94,5 +99,27 @@ describe('SentenceResult', () => {
     expect(() =>
       SentenceResult.parse({ ...validResult, sourceLang: 'auto' }),
     ).toThrow()
+  })
+
+  it('rejects keys the strict request schema does not allow', () => {
+    expect(() =>
+      SentenceResult.parse({ ...validResult, learningTips: [] }),
+    ).toThrow()
+  })
+})
+
+describe('LegacyLearningPhrases', () => {
+  it('reads gloss-only page-memory phrases, ignoring unknown keys', () => {
+    const parsed = LegacyLearningPhrases.safeParse([
+      { text: 'School life', gloss: 'life', sourceTexts: [], start: 0 },
+    ])
+    expect(parsed.success).toBe(true)
+  })
+
+  it('still rejects phrases without the original required fields', () => {
+    expect(
+      LegacyLearningPhrases.safeParse([{ text: 'School life', gloss: 'x' }])
+        .success,
+    ).toBe(false)
   })
 })

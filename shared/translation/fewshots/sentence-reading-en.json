@@ -1,0 +1,50 @@
+{
+  "user": "오늘 어떻게 지내요?",
+  "assistant": {
+    "sourceLang": "ko",
+    "targetLang": "en",
+    "main": "How are you doing today?",
+    "learningPhrases": [
+      {
+        "text": "오늘",
+        "gloss": "today",
+        "sourceTexts": [
+          "today"
+        ],
+        "baseForm": "",
+        "literalMeaning": "",
+        "naturalMeaning": "",
+        "grammar": "지내요 is the polite present form of 지내다. 어떻게 asks how someone is getting along.",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "오늘 means today.",
+        "characters": []
+      },
+      {
+        "text": "어떻게 지내요",
+        "gloss": "how are you doing",
+        "sourceTexts": [
+          "How are you doing"
+        ],
+        "baseForm": "지내다",
+        "literalMeaning": "how (you) get along",
+        "naturalMeaning": "how are you doing",
+        "grammar": "지내요 adds the polite present ending -어요 to 지내다.",
+        "omissions": "The subject you is understood.",
+        "grammarHighlights": [
+          "지내요"
+        ],
+        "usageNote": "",
+        "characters": []
+      }
+    ],
+    "rationale": "The Korean greeting asks how someone is getting along; this is its natural everyday English equivalent.",
+    "alternatives": [
+      {
+        "text": "How is it going today?",
+        "note": "A more informal English greeting with the same meaning."
+      }
+    ],
+    "formalityNote": ""
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "user": "thanks",
+  "assistant": {
+    "sourceLang": "en",
+    "targetLang": "en",
+    "headword": "thanks",
+    "primaryTranslation": "thank you",
+    "primaryUsageNote": "A slightly warmer and more polished alternative to \"thanks\" that still works in most casual contexts. For formal settings prefer \"I appreciate it\" or \"much obliged\".",
+    "alternativeTranslations": [
+      {
+        "text": "thanks so much",
+        "register": [
+          "warm casual"
+        ],
+        "note": "Sincere and warm; natural between friends or colleagues when you want to add weight."
+      },
+      {
+        "text": "appreciate it",
+        "register": [
+          "casual polite"
+        ],
+        "note": "Slightly more grown-up / professional feel; common in workplace chat and email."
+      },
+      {
+        "text": "cheers",
+        "register": [
+          "casual",
+          "British/Aus"
+        ],
+        "note": "Short and friendly: common in UK/Aus English, occasionally in US casual writing."
+      }
+    ],
+    "posList": [
+      {
+        "pos": "interjection",
+        "senses": [
+          {
+            "definition": "A short, informal expression of gratitude.",
+            "register": [
+              "informal"
+            ],
+            "examples": [
+              "Thanks for your help!",
+              "Thanks, that's exactly what I needed."
+            ]
+          }
+        ]
+      },
+      {
+        "pos": "noun",
+        "senses": [
+          {
+            "definition": "An expression or feeling of gratitude.",
+            "register": [],
+            "examples": [
+              "She sent her thanks in a handwritten card."
+            ]
+          }
+        ]
+      }
+    ],
+    "synonyms": [
+      "thank you",
+      "cheers",
+      "appreciate it",
+      "ta"
+    ],
+    "etymology": "From Middle English thankes, from Old English þancas, plural of þanc \"thought, gratitude.\"",
+    "notes": "English has a wide casual-thanks vocabulary. \"Ta\" and \"cheers\" are British/Australian; \"appreciate it\" lands slightly more formal; \"thanks so much\" is universal.",
+    "grammar": "",
+    "characters": []
+  }
+}

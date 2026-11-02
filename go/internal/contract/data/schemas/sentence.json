@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "sourceLang": {
+      "type": "string",
+      "enum": [
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh",
+        "other"
+      ],
+      "description": "The actual language of the source text. When the instructions name a forced source language, echo its code. Otherwise report the language you detected. Use \"other\" only when the language is not in this list."
+    },
+    "targetLang": {
+      "type": "string",
+      "enum": [
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh",
+        "other"
+      ],
+      "description": "The language `main` and every alternative are actually written in."
+    },
+    "main": {
+      "type": "string",
+      "description": "The primary translation of the source text."
+    },
+    "learningPhrases": {
+      "maxItems": 64,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "gloss": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "sourceTexts": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "baseForm": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "literalMeaning": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "naturalMeaning": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "grammar": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "omissions": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "usageNote": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Useful vocabulary, idiom, register or cultural nuance belonging to this phrase. Empty when redundant."
+          },
+          "characters": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "word": {
+                  "type": "string",
+                  "description": "The exact CJK word in the analysed language: Hangul, Japanese or Hanzi."
+                },
+                "chars": {
+                  "maxItems": 10,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "char": {
+                        "type": "string",
+                        "description": "One hanja, kanji or hanzi character."
+                      },
+                      "meaning": {
+                        "type": "string",
+                        "description": "Short meaning in the metadata language."
+                      }
+                    },
+                    "required": [
+                      "char",
+                      "meaning"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "word",
+                "chars"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Useful CJK character origins belonging to this exact phrase. Skip native words and loanwords; [] when inapplicable."
+          },
+          "grammarHighlights": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "description": "Exact short quotations from this phrase worth underlining for grammar: an ending, particle, conjugation or meaningful grammatical construction. Usually zero or one; use [] for ordinary vocabulary. Never underline every word or quote a whole phrase just to mark it as clickable."
+          }
+        },
+        "required": [
+          "text",
+          "gloss",
+          "sourceTexts",
+          "baseForm",
+          "literalMeaning",
+          "naturalMeaning",
+          "grammar",
+          "omissions",
+          "usageNote",
+          "characters",
+          "grammarHighlights"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Complete concise phrase details from this same translation request. If targetLang is the UI language and sourceLang differs, quote original source phrases in source order; sourceTexts quotes their counterparts from main. Otherwise quote main in target order and sourceTexts quotes the original source. Supply a short gloss, dictionary/base form where useful, literal and natural meaning, grammatical construction and implicit content; use empty strings for inapplicable facts. Explanations use the metadata language; baseForm keeps the analysed language. grammarHighlights contains only exact short grammar/conjugation quotations worth underlining, usually [] or one quotation, never every word. Cover meaningful text in natural units, never punctuation-only chunks. No offsets or rewriting. Generate main first so it can be copied while these details stream."
+    },
+    "rationale": {
+      "type": "string",
+      "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
+    },
+    "alternatives": {
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "description": "Insightful note in the metadata language (see prompt): explain wordplay, double meanings, slang origins, cultural connotations, or nuance that a literal translation would miss. Avoid generic register descriptions like \"casual\" or \"informal\" without further insight."
+          }
+        },
+        "required": [
+          "text",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "description": "0-6 alternative phrasings. Leave empty if the source is unambiguous."
+    },
+    "formalityNote": {
+      "type": "string",
+      "description": "Populate when the target language is Korean and the relationship between speakers materially affects the translation (honorific vs. plain). Brief, in the metadata language (see prompt). Empty string when not relevant."
+    }
+  },
+  "required": [
+    "sourceLang",
+    "targetLang",
+    "main",
+    "learningPhrases",
+    "rationale",
+    "alternatives",
+    "formalityNote"
+  ],
+  "additionalProperties": false
+}

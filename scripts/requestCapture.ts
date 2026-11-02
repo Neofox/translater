@@ -16,13 +16,13 @@ export async function captureRequestBody(
   const originalKey = process.env.OPENAI_API_KEY
   const bodies: unknown[] = []
   process.env.OPENAI_API_KEY = originalKey || 'capture-only-no-network'
-  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+  globalThis.fetch = async (_url: unknown, init?: RequestInit) => {
     bodies.push(JSON.parse(String(init?.body)))
     return new Response(
       JSON.stringify({ error: { message: 'capture only', type: 'capture' } }),
       { status: 400, headers: { 'content-type': 'application/json' } },
     )
-  })
+  }
   try {
     const result = streamText({
       ...translationRequest(data, config, sentenceSystem),
