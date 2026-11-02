@@ -1,7 +1,7 @@
 // Results format of e2e/perf/measure.ts and the markdown table writer used by
 // the baseline (Task 5) and the TS vs Go comparison (Task 13).
 //
-//   npx tsx e2e/perf/table.ts ts.json [go.json ...]
+//   npx tsx e2e/perf/table.ts ts.json [go.json ...] [--allow-mismatch]
 //
 // Statistics are inline (median + nearest-rank p90 over at most tens of
 // samples); no library needed for two order statistics.
@@ -10,9 +10,31 @@ import { isDeepStrictEqual } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import type { ProfileDescription } from './profiles'
 
-/** One page-load run: fresh browser context, no interaction. */
+export type Resource = {
+  url: string
+  /** Playwright resource type and response content-type. */
+  type: string
+  contentType: string
+  kind: 'js' | 'css' | 'html' | 'other'
+  status: number
+  encoding: string | null
+  raw: number
+  /** Headers + encoded body on the wire: same-origin Resource Timing
+   * transferSize (0 = HTTP cache hit), else Playwright's sizes. */
+  transferred: number | null
+  gzip: number | null
+  /** First 16 hex chars of the body's sha256 (build provenance). */
+  sha256: string | null
+}
+
+/** One page load (cold: fresh context; repeat: second navigation in the same
+ * context after the first settled). */
 export type LoadRun = {
   ttfb: number | null
+  /** Navigation responseEnd - responseStart, and what the simulated link
+   * needs for the document's transferred bytes (null when unthrottled). */
+  docTransferMs: number | null
+  docExpectedMs: number | null
   fcp: number | null
   lcp: number | null
   tbt: number | null
@@ -22,53 +44,112 @@ export type LoadRun = {
   jsRaw: number
   jsTransferred: number
   jsGzip: number
+  jsInlineRaw: number
+  jsInlineGzip: number
+  /** External + inline: the deciding JS size. */
+  jsTotalRaw: number
+  jsTotalGzip: number
+  /** Non-executable inline <script> (JSON, import maps). */
+  inlineDataRaw: number
   cssRaw: number
   cssTransferred: number
   cssGzip: number
+  cssInlineRaw: number
+  cssInlineGzip: number
   htmlRaw: number
   htmlTransferred: number
   totalTransferred: number
-  resources: Array<{
-    url: string
-    type: string
-    status: number
-    encoding: string | null
-    raw: number
-    transferred: number | null
-    gzip: number | null
-  }>
+  /** Requests that failed (blocked third-party hosts in --fake). */
+  failedRequests: string[]
+  resources: Resource[]
 }
 
-/** One interaction run: fresh context; first-typeable during load, then one
- * translation, then (mobile) the simulated keyboard. */
-export type InteractRun = {
-  /** Earliest keystroke whose character is still in the field afterwards. */
+/** Typing a real sentence at the first moment the textarea takes focus. */
+export type TypeableRun = {
+  fcp: number | null
+  /** First input event of the burst typed at first focus. */
+  burstFirstKey: number | null
+  /** The burst's text was still in the field after the page settled. */
+  burstKept: boolean
+  /** A translation of exactly that text arrived with no further input. */
+  burstActed: boolean
+  /** null when the burst was kept and acted on; otherwise how it was lost. */
+  dropped: 'wiped' | 'ignored' | null
+  /** First input event of the retype after settle (only when dropped). */
+  /** performance.now() when the harness considered the page settled
+   * (network idle + 500 ms) and judged the burst. */
+  settledAt: number | null
+  retypeFirstKey: number | null
+  /** max(FCP, earliest kept keystroke, earliest acted-on keystroke). */
   firstTypeable: number | null
-  /** Earliest keystroke the field showed at all (it may be lost later, e.g.
-   * when hydration resets a pre-hydration value). */
-  firstInput: number | null
-  /** The lost keystroke just before the first kept one (null when none was
-   * lost): firstTypeable - lastLostInput is the measurement resolution. */
-  lastLostInput: number | null
-  typeableAttempts: number
+  /** Navigation start to the first main character of the translation that
+   * counted (the burst's, or the retype's including the penalty). */
+  navToFirstChar: number | null
+  upstreamRequests: number | null
+}
+
+export type KeyboardRun = {
+  shiftSum: number | null
+  mainDy: number | null
+  sourceDy: number | null
+  mainVisible: boolean | null
+  textareaVisible: boolean | null
+  caretVisible: boolean | null
+  sourceFocused: boolean | null
+}
+
+/** One interaction run: fresh context; typing at first focus, a translation
+ * on the settled page, (mobile) the keyboard simulations, then a repeat visit
+ * with typing at first focus. */
+export type InteractRun = {
+  cold: TypeableRun
+  repeat: TypeableRun
   keyToFirstChar: number | null
   keyToCopy: number | null
   keyToDone: number | null
   upstreamRequests: number | null
-  /** Sum of every layout-shift value during the simulated keyboard shrink
-   * (the focus is programmatic, so no entry has hadRecentInput). Not the Web
-   * Vitals CLS session window; an app-vs-app layout-movement number. */
-  keyboardCls: number | null
-  keyboardMainDy: number | null
-  keyboardSourceDy: number | null
+  /** All JS the page loaded from navigation through the settled translation's
+   * "done" (external bodies + the document's inline scripts). */
+  jsThroughDoneRaw: number
+  jsThroughDoneGzip: number
+  /** visualViewport shrink + offsetTop pan (overlays-content keyboards). */
+  keyboardVisual: KeyboardRun | null
+  /** Layout viewport shrink via setViewportSize (resizes-content). */
+  keyboardResize: KeyboardRun | null
 }
+
+/** Diagnostic run: spaces typed whenever the textarea can take focus during
+ * load (the original first-typeable probe). */
+export type ProbeRun = {
+  /** Earliest keystroke still in the field after settle. */
+  kept: number | null
+  /** Earliest input event at all (it may be lost later). */
+  shown: number | null
+  /** The lost keystroke just before the first kept one. */
+  lastLost: number | null
+  attempts: number
+  /** Upstream requests caused by whitespace-only input (must be 0). */
+  whitespaceRequests: number | null
+}
+
+type Failed = { error: string }
 
 export type ProfileResult = {
   profile: ProfileDescription
   browserVersion: string
   supportedEntryTypes: string[]
-  load: Array<LoadRun | { error: string }>
-  interact: Array<InteractRun | { error: string }>
+  load: Array<LoadRun | Failed>
+  loadRepeat: Array<LoadRun | Failed>
+  interact: Array<InteractRun | Failed>
+  probe: Array<ProbeRun | Failed>
+}
+
+export type Machine = {
+  platform: string
+  arch: string
+  cpu: string
+  cores: number
+  memoryGiB: number
 }
 
 export type PerfFile = {
@@ -81,18 +162,18 @@ export type PerfFile = {
     dirty: boolean
     runs: number
     node: string
-    /** Absent in files written before it was recorded. */
-    machine?: {
-      platform: string
-      arch: string
-      cpu: string
-      cores: number
-      memoryGiB: number
-    }
+    machine: Machine
     playwright: string
+    build: {
+      skipped: boolean
+      /** sha256 over the served build (TS: .vercel/output; Go: binary). */
+      sha256: string
+      assets: string[]
+    } | null
     text: string
     debounce: string
     compression: string
+    network: string
     notes: string[]
   }
   server: {
@@ -103,7 +184,7 @@ export type PerfFile = {
   profiles: ProfileResult[]
 }
 
-// ----- statistics --------------------------------------------------------------
+// ----- statistics ----------------------------------------------------------------
 
 export function median(values: number[]): number | null {
   if (values.length === 0) return null
@@ -120,77 +201,6 @@ export function percentile(values: number[], p: number): number | null {
   return s[Math.max(0, Math.ceil((p / 100) * s.length) - 1)]!
 }
 
-// ----- metrics -------------------------------------------------------------------
-
-type Unit = 'ms' | 'bytes' | 'score' | 'px'
-
-type Metric<TRun> = {
-  key: keyof TRun & string
-  label: string
-  unit: Unit
-}
-
-export const LOAD_METRICS: Metric<LoadRun>[] = [
-  { key: 'ttfb', label: 'TTFB', unit: 'ms' },
-  { key: 'fcp', label: 'FCP', unit: 'ms' },
-  { key: 'lcp', label: 'LCP', unit: 'ms' },
-  { key: 'tbt', label: 'TBT (FCP to quiet)', unit: 'ms' },
-  { key: 'domContentLoaded', label: 'DOMContentLoaded', unit: 'ms' },
-  { key: 'load', label: 'load event', unit: 'ms' },
-  { key: 'loadCls', label: 'CLS during load', unit: 'score' },
-  { key: 'jsRaw', label: 'JS raw (decoded)', unit: 'bytes' },
-  { key: 'jsTransferred', label: 'JS transferred', unit: 'bytes' },
-  { key: 'jsGzip', label: 'JS gzip -9 (computed)', unit: 'bytes' },
-  { key: 'cssRaw', label: 'CSS raw (decoded)', unit: 'bytes' },
-  { key: 'cssTransferred', label: 'CSS transferred', unit: 'bytes' },
-  { key: 'cssGzip', label: 'CSS gzip -9 (computed)', unit: 'bytes' },
-  { key: 'htmlRaw', label: 'HTML raw (decoded)', unit: 'bytes' },
-  { key: 'totalTransferred', label: 'All transferred', unit: 'bytes' },
-]
-
-export const INTERACT_METRICS: Metric<InteractRun>[] = [
-  {
-    key: 'firstTypeable',
-    label: 'First typeable (keystroke kept)',
-    unit: 'ms',
-  },
-  {
-    key: 'firstInput',
-    label: 'First keystroke shown (may be lost)',
-    unit: 'ms',
-  },
-  {
-    key: 'keyToFirstChar',
-    label: 'Last key to first main char',
-    unit: 'ms',
-  },
-  { key: 'keyToCopy', label: 'Last key to Copy enabled', unit: 'ms' },
-  { key: 'keyToDone', label: 'Last key to done', unit: 'ms' },
-  {
-    key: 'keyboardCls',
-    label: 'Keyboard open: layout-shift sum',
-    unit: 'score',
-  },
-  { key: 'keyboardMainDy', label: 'Keyboard open: main text dy', unit: 'px' },
-  {
-    key: 'keyboardSourceDy',
-    label: 'Keyboard open: source textarea dy',
-    unit: 'px',
-  },
-]
-
-function ok<TRun extends object>(
-  runs: Array<TRun | { error: string }>,
-): TRun[] {
-  return runs.filter((r): r is TRun => !('error' in r))
-}
-
-function samples<TRun>(runs: TRun[], key: keyof TRun): number[] {
-  return runs
-    .map((r) => r[key])
-    .filter((v): v is TRun[keyof TRun] & number => typeof v === 'number')
-}
-
 export type Summary = { median: number | null; p90: number | null; n: number }
 
 export function summarize(values: number[]): Summary {
@@ -199,6 +209,318 @@ export function summarize(values: number[]): Summary {
     p90: percentile(values, 90),
     n: values.length,
   }
+}
+
+// ----- metrics -------------------------------------------------------------------
+
+type Unit = 'ms' | 'bytes' | 'score' | 'px' | 'flag'
+type Value = number | boolean | null
+
+type Metric<TRun> = {
+  label: string
+  unit: Unit
+  get: (run: TRun) => Value
+  /** Rows only for profiles that simulate the keyboard. */
+  keyboard?: boolean
+}
+
+type Section = {
+  title: string
+  rows: (r: ProfileResult) => Array<{
+    metric: Metric<never>
+    runs: Array<object>
+  }>
+}
+
+function rows<TRun extends object>(
+  runs: (r: ProfileResult) => Array<TRun | Failed>,
+  metrics: Metric<TRun>[],
+) {
+  return (r: ProfileResult) =>
+    metrics.map((metric) => ({
+      metric: metric,
+      runs: ok(runs(r)),
+    }))
+}
+
+const loadMetrics = (suffix: string): Metric<LoadRun>[] => [
+  { label: `TTFB${suffix}`, unit: 'ms', get: (r) => r.ttfb },
+  {
+    label: `Document transfer (responseEnd - responseStart)${suffix}`,
+    unit: 'ms',
+    get: (r) => r.docTransferMs,
+  },
+  {
+    label: `Document transfer expected on the link${suffix}`,
+    unit: 'ms',
+    get: (r) => r.docExpectedMs,
+  },
+  { label: `FCP${suffix}`, unit: 'ms', get: (r) => r.fcp },
+  { label: `LCP${suffix}`, unit: 'ms', get: (r) => r.lcp },
+  { label: `TBT (FCP to quiet)${suffix}`, unit: 'ms', get: (r) => r.tbt },
+  {
+    label: `DOMContentLoaded${suffix}`,
+    unit: 'ms',
+    get: (r) => r.domContentLoaded,
+  },
+  { label: `load event${suffix}`, unit: 'ms', get: (r) => r.load },
+  { label: `CLS during load${suffix}`, unit: 'score', get: (r) => r.loadCls },
+]
+
+const SIZE_METRICS: Metric<LoadRun>[] = [
+  {
+    label: '**JS total gzip (external + inline)**',
+    unit: 'bytes',
+    get: (r) => r.jsTotalGzip,
+  },
+  {
+    label: 'JS total raw (external + inline)',
+    unit: 'bytes',
+    get: (r) => r.jsTotalRaw,
+  },
+  { label: 'JS external raw', unit: 'bytes', get: (r) => r.jsRaw },
+  {
+    label: 'JS external transferred (incl. headers)',
+    unit: 'bytes',
+    get: (r) => r.jsTransferred,
+  },
+  { label: 'JS external gzip -9', unit: 'bytes', get: (r) => r.jsGzip },
+  { label: 'JS inline raw', unit: 'bytes', get: (r) => r.jsInlineRaw },
+  { label: 'JS inline gzip -9', unit: 'bytes', get: (r) => r.jsInlineGzip },
+  {
+    label: 'Inline data scripts raw (JSON)',
+    unit: 'bytes',
+    get: (r) => r.inlineDataRaw,
+  },
+  { label: 'CSS external raw', unit: 'bytes', get: (r) => r.cssRaw },
+  {
+    label: 'CSS external transferred (incl. headers)',
+    unit: 'bytes',
+    get: (r) => r.cssTransferred,
+  },
+  { label: 'CSS external gzip -9', unit: 'bytes', get: (r) => r.cssGzip },
+  { label: 'CSS inline raw', unit: 'bytes', get: (r) => r.cssInlineRaw },
+  { label: 'CSS inline gzip -9', unit: 'bytes', get: (r) => r.cssInlineGzip },
+  { label: 'HTML raw', unit: 'bytes', get: (r) => r.htmlRaw },
+  {
+    label: 'HTML transferred (incl. headers)',
+    unit: 'bytes',
+    get: (r) => r.htmlTransferred,
+  },
+  {
+    label: 'All transferred (incl. headers)',
+    unit: 'bytes',
+    get: (r) => r.totalTransferred,
+  },
+]
+
+const REPEAT_SIZE_METRICS: Metric<LoadRun>[] = [
+  {
+    label: 'JS external transferred (repeat; 0 = cache hit)',
+    unit: 'bytes',
+    get: (r) => r.jsTransferred,
+  },
+  {
+    label: 'All transferred (repeat)',
+    unit: 'bytes',
+    get: (r) => r.totalTransferred,
+  },
+]
+
+const typeableMetrics = (which: 'cold' | 'repeat'): Metric<InteractRun>[] => {
+  const s = which === 'cold' ? '' : ' (repeat visit)'
+  return [
+    {
+      label: `**First typeable**${s}`,
+      unit: 'ms',
+      get: (r) => r[which].firstTypeable,
+    },
+    {
+      label: `**Nav start to first main char, typing at first focus**${s}`,
+      unit: 'ms',
+      get: (r) => r[which].navToFirstChar,
+    },
+    {
+      label: `Typing at first focus wiped${s}`,
+      unit: 'flag',
+      get: (r) => r[which].dropped === 'wiped',
+    },
+    {
+      label: `Typing at first focus ignored${s}`,
+      unit: 'flag',
+      get: (r) => r[which].dropped === 'ignored',
+    },
+    {
+      label: `First focus (burst first keystroke)${s}`,
+      unit: 'ms',
+      get: (r) => r[which].burstFirstKey,
+    },
+    {
+      label: `Harness settle point (dropped runs)${s}`,
+      unit: 'ms',
+      get: (r) => (r[which].dropped ? r[which].settledAt : null),
+    },
+    {
+      label: `Clear + retype after settle (dropped runs)${s}`,
+      unit: 'ms',
+      get: (r) =>
+        r[which].retypeFirstKey === null || r[which].settledAt === null
+          ? null
+          : r[which].retypeFirstKey - r[which].settledAt,
+    },
+    {
+      label: `Wiped and the remainder translated (extra upstream request)${s}`,
+      unit: 'flag',
+      get: (r) =>
+        r[which].upstreamRequests === null
+          ? null
+          : r[which].dropped === 'wiped' && r[which].upstreamRequests > 1,
+    },
+  ]
+}
+
+const keyboardMetrics = (
+  which: 'keyboardVisual' | 'keyboardResize',
+  name: string,
+): Metric<InteractRun>[] => [
+  {
+    label: `${name}: layout-shift sum`,
+    unit: 'score',
+    get: (r) => r[which]?.shiftSum ?? null,
+    keyboard: true,
+  },
+  {
+    label: `${name}: main text dy`,
+    unit: 'px',
+    get: (r) => r[which]?.mainDy ?? null,
+    keyboard: true,
+  },
+  {
+    label: `${name}: source textarea dy`,
+    unit: 'px',
+    get: (r) => r[which]?.sourceDy ?? null,
+    keyboard: true,
+  },
+  {
+    label: `${name}: main text visible`,
+    unit: 'flag',
+    get: (r) => r[which]?.mainVisible ?? null,
+    keyboard: true,
+  },
+  {
+    label: `${name}: textarea visible`,
+    unit: 'flag',
+    get: (r) => r[which]?.textareaVisible ?? null,
+    keyboard: true,
+  },
+  {
+    label: `${name}: caret visible`,
+    unit: 'flag',
+    get: (r) => r[which]?.caretVisible ?? null,
+    keyboard: true,
+  },
+  {
+    label: `${name}: textarea keeps focus`,
+    unit: 'flag',
+    get: (r) => r[which]?.sourceFocused ?? null,
+    keyboard: true,
+  },
+]
+
+const SECTIONS: Section[] = [
+  {
+    title: 'Page load, cold cache',
+    rows: rows((r) => r.load, [...loadMetrics(''), ...SIZE_METRICS]),
+  },
+  {
+    title: 'Typing at first focus',
+    rows: rows(
+      (r) => r.interact,
+      [...typeableMetrics('cold'), ...typeableMetrics('repeat')],
+    ),
+  },
+  {
+    title: 'Page load, repeat visit (same context, warm cache)',
+    rows: rows(
+      (r) => r.loadRepeat,
+      [
+        ...loadMetrics(' (repeat)').filter(
+          (m) => !m.label.startsWith('Document'),
+        ),
+        ...REPEAT_SIZE_METRICS,
+      ],
+    ),
+  },
+  {
+    title: 'Translation on the settled page',
+    rows: rows(
+      (r) => r.interact,
+      [
+        {
+          label: 'Last key to first main char',
+          unit: 'ms',
+          get: (r) => r.keyToFirstChar,
+        },
+        {
+          label: 'Last key to Copy enabled',
+          unit: 'ms',
+          get: (r) => r.keyToCopy,
+        },
+        { label: 'Last key to done', unit: 'ms', get: (r) => r.keyToDone },
+        {
+          label: 'JS loaded through done, gzip -9',
+          unit: 'bytes',
+          get: (r) => r.jsThroughDoneGzip,
+        },
+        {
+          label: 'JS loaded through done, raw',
+          unit: 'bytes',
+          get: (r) => r.jsThroughDoneRaw,
+        },
+      ],
+    ),
+  },
+  {
+    title:
+      'Keyboard open (simulated; dy is not "lower is better", read it with visibility)',
+    rows: rows(
+      (r) => r.interact,
+      [
+        ...keyboardMetrics('keyboardVisual', 'visualViewport shrink + pan'),
+        ...keyboardMetrics('keyboardResize', 'Layout viewport resize'),
+      ],
+    ),
+  },
+  {
+    title: 'Diagnostics: space probe during load',
+    rows: rows(
+      (r) => r.probe,
+      [
+        { label: 'Earliest kept keystroke', unit: 'ms', get: (r) => r.kept },
+        {
+          label: 'Earliest keystroke shown (may be lost)',
+          unit: 'ms',
+          get: (r) => r.shown,
+        },
+        {
+          label: 'Probe resolution (kept - last lost)',
+          unit: 'ms',
+          get: (r) =>
+            r.kept === null || r.lastLost === null ? null : r.kept - r.lastLost,
+        },
+        {
+          label: 'Upstream requests from whitespace input',
+          unit: 'flag',
+          get: (r) =>
+            r.whitespaceRequests === null ? null : r.whitespaceRequests > 0,
+        },
+      ],
+    ),
+  },
+]
+
+function ok<TRun extends object>(runs: Array<TRun | Failed>): TRun[] {
+  return runs.filter((r): r is TRun => !('error' in r))
 }
 
 function format(value: number | null, unit: Unit): string {
@@ -210,6 +532,8 @@ function format(value: number | null, unit: Unit): string {
       return `${Math.round(value)} px`
     case 'score':
       return value.toFixed(3)
+    case 'flag':
+      return String(value)
     case 'bytes':
       return value >= 10_000
         ? `${(value / 1024).toFixed(1)} KiB`
@@ -217,38 +541,83 @@ function format(value: number | null, unit: Unit): string {
   }
 }
 
-function cell(s: Summary, unit: Unit, runs: number): string {
-  if (s.n === 0) return 'n/a'
-  const missing = s.n < runs ? ` (n=${s.n})` : ''
-  return `${format(s.median, unit)} / ${format(s.p90, unit)}${missing}`
+function cell(
+  metric: Metric<never>,
+  runs: Array<object>,
+  expected: number,
+): string {
+  const values = runs.map((r) => metric.get(r as never))
+  if (metric.unit === 'flag') {
+    const known = values.filter((v): v is boolean => typeof v === 'boolean')
+    if (known.length === 0) return 'n/a'
+    return `${known.filter(Boolean).length}/${known.length} yes`
+  }
+  const numbers = values.filter((v): v is number => typeof v === 'number')
+  if (numbers.length === 0) return 'n/a'
+  const s = summarize(numbers)
+  const missing = s.n < expected ? ` (n=${s.n})` : ''
+  return `${format(s.median, metric.unit)} / ${format(s.p90, metric.unit)}${missing}`
 }
 
 function fileLabel(file: PerfFile): string {
   return `${file.meta.app} (${file.meta.mode})`
 }
 
-/** Refuse to put files measured under different profile definitions side by
- * side. */
-function assertComparable(files: PerfFile[]): void {
+/** Files must share profile definitions; browser versions, Playwright and
+ * machine must match too unless `allowMismatch` (then the differences are
+ * printed as warnings above the tables). */
+export function comparability(
+  files: PerfFile[],
+  allowMismatch: boolean,
+): string[] {
   const [first, ...rest] = files
+  const warnings: string[] = []
   for (const other of rest) {
+    const pair = `${fileLabel(first!)} vs ${fileLabel(other)}`
     for (const p of other.profiles) {
       const match = first!.profiles.find((q) => q.profile.id === p.profile.id)
-      if (match && !isDeepStrictEqual(match.profile, p.profile))
+      if (!match) continue
+      if (!isDeepStrictEqual(match.profile, p.profile))
         throw new Error(
-          `profile ${p.profile.id} differs between ${fileLabel(first!)} and ` +
-            `${fileLabel(other)}; re-measure with the same profiles.ts`,
+          `profile ${p.profile.id} differs (${pair}); re-measure with the same profiles.ts`,
+        )
+      if (match.browserVersion !== p.browserVersion)
+        warnings.push(
+          `${p.profile.id}: browser ${match.browserVersion} vs ${p.browserVersion} (${pair})`,
         )
     }
+    if (first!.meta.playwright !== other.meta.playwright)
+      warnings.push(
+        `Playwright ${first!.meta.playwright} vs ${other.meta.playwright} (${pair})`,
+      )
+    if (!isDeepStrictEqual(first!.meta.machine, other.meta.machine))
+      warnings.push(
+        `machine ${JSON.stringify(first!.meta.machine)} vs ${JSON.stringify(other.meta.machine)} (${pair})`,
+      )
   }
+  if (warnings.length && !allowMismatch)
+    throw new Error(
+      `results are not comparable:\n- ${warnings.join('\n- ')}\n` +
+        'Re-measure on the same setup, or pass --allow-mismatch to print them with a warning.',
+    )
+  return warnings
 }
 
-/** Markdown: one table per profile, a column per file, each cell
- * "median / p90". Also the server cold/warm TTFB table. */
-export function markdownTables(files: PerfFile[]): string {
+/** Markdown: per profile, one table per section, a column per file, each cell
+ * "median / p90" (flags: "k/n yes"). Then server TTFB and provenance. */
+export function markdownTables(
+  files: PerfFile[],
+  { allowMismatch = false } = {},
+): string {
   if (files.length === 0) throw new Error('no results files')
-  assertComparable(files)
+  const warnings = comparability(files, allowMismatch)
   const out: string[] = []
+  if (warnings.length)
+    out.push(
+      '> **Warning: setups differ**',
+      ...warnings.map((w) => `> - ${w}`),
+      '',
+    )
   const header = `| Metric | ${files.map((f) => `${fileLabel(f)} median / p90`).join(' | ')} |`
   const rule = `|---|${files.map(() => '---|').join('')}`
   const ids = [
@@ -259,34 +628,29 @@ export function markdownTables(files: PerfFile[]): string {
       f.profiles.find((p) => p.profile.id === id),
     )
     const any = results.find(Boolean)!
-    out.push(`#### ${id}`, '', any.profile.label, '', header, rule)
-    for (const m of LOAD_METRICS) {
-      const cells = files.map((f, i) => {
-        const r = results[i]
-        return r
-          ? cell(summarize(samples(ok(r.load), m.key)), m.unit, f.meta.runs)
-          : '-'
+    out.push(`#### ${id}`, '', any.profile.label, '')
+    for (const section of SECTIONS) {
+      const perFile = results.map((r) => (r ? section.rows(r) : null))
+      const template = perFile.find(Boolean)!
+      const lines: string[] = []
+      template.forEach(({ metric }, row) => {
+        if (metric.keyboard && !any.profile.keyboard) return
+        const cells = files.map((f, i) => {
+          const entry = perFile[i]?.[row]
+          return entry ? cell(entry.metric, entry.runs, f.meta.runs) : '-'
+        })
+        lines.push(`| ${metric.label} | ${cells.join(' | ')} |`)
       })
-      out.push(`| ${m.label} | ${cells.join(' | ')} |`)
-    }
-    for (const m of INTERACT_METRICS) {
-      if (m.key.startsWith('keyboard') && !any.profile.keyboard) continue
-      const cells = files.map((f, i) => {
-        const r = results[i]
-        return r
-          ? cell(summarize(samples(ok(r.interact), m.key)), m.unit, f.meta.runs)
-          : '-'
-      })
-      out.push(`| ${m.label} | ${cells.join(' | ')} |`)
+      if (lines.length === 0) continue
+      out.push(`##### ${section.title}`, '', header, rule, ...lines, '')
     }
     const errors = results.flatMap((r, i) =>
       r
-        ? [...r.load, ...r.interact]
-            .filter((x): x is { error: string } => 'error' in x)
+        ? [...r.load, ...r.loadRepeat, ...r.interact, ...r.probe]
+            .filter((x): x is Failed => 'error' in x)
             .map((x) => `${fileLabel(files[i]!)}: ${x.error}`)
         : [],
     )
-    out.push('')
     if (errors.length)
       out.push(
         `Failed runs (${errors.length}):`,
@@ -302,7 +666,12 @@ export function markdownTables(files: PerfFile[]): string {
   ] as const) {
     out.push(
       `| ${label} | ${files
-        .map((f) => cell(summarize(f.server[key]), 'ms', f.server[key].length))
+        .map((f) => {
+          const s = summarize(f.server[key])
+          return s.n === 0
+            ? 'n/a'
+            : `${format(s.median, 'ms')} / ${format(s.p90, 'ms')}`
+        })
         .join(' | ')} |`,
     )
   }
@@ -312,10 +681,18 @@ export function markdownTables(files: PerfFile[]): string {
     '',
     ...files.map((f) => {
       const m = f.meta.machine
-      const machine = m
-        ? `${m.cpu}, ${m.cores} cores, ${m.memoryGiB} GiB, ${m.platform} ${m.arch}`
-        : 'machine not recorded'
-      return `- ${fileLabel(f)}: ${f.meta.date}, commit ${f.meta.commit.slice(0, 12)}${f.meta.dirty ? ' (dirty)' : ''}, ${machine}`
+      const build = f.meta.build
+        ? `, build ${f.meta.build.sha256.slice(0, 12)}${f.meta.build.skipped ? ' (--skip-build: not rebuilt for this run)' : ''}`
+        : ''
+      return (
+        `- ${fileLabel(f)}: ${f.meta.date}, commit ${f.meta.commit.slice(0, 12)}` +
+        `${f.meta.dirty ? ' (dirty)' : ''}${build}, ${m.cpu}, ${m.cores} cores, ` +
+        `${m.memoryGiB} GiB, ${m.platform} ${m.arch}, Playwright ${f.meta.playwright}, ` +
+        f.profiles
+          .map((p) => `${p.profile.browser} ${p.browserVersion}`)
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .join(', ')
+      )
     }),
     '',
   )
@@ -323,13 +700,17 @@ export function markdownTables(files: PerfFile[]): string {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const paths = process.argv.slice(2)
+  const argv = process.argv.slice(2)
+  const allowMismatch = argv.includes('--allow-mismatch')
+  const paths = argv.filter((a) => a !== '--allow-mismatch')
   if (paths.length === 0) {
-    console.error('usage: npx tsx e2e/perf/table.ts <results.json> [...]')
+    console.error(
+      'usage: npx tsx e2e/perf/table.ts <results.json> [...] [--allow-mismatch]',
+    )
     process.exit(2)
   }
   const files = paths.map(
     (p) => JSON.parse(readFileSync(p, 'utf8')) as PerfFile,
   )
-  console.log(markdownTables(files))
+  console.log(markdownTables(files, { allowMismatch }))
 }

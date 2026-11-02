@@ -9,44 +9,84 @@
 //
 // --fake builds the app's PRODUCTION build and serves it locally against the
 // fake OpenAI server (go/cmd/fakeopenai): TS via e2e/perf/serve-ts.mjs, Go as
-// a `go build` binary. Every translation must reach the fake exactly once.
-// --live measures a deployed URL; each interaction run makes one billed
-// OpenAI translation, so it refuses to start without the explicit flag.
+// a `go build` binary. Every translation must reach the fake.
+// --live measures a deployed URL; translations are billed, so it refuses to
+// start without the explicit flag.
 //
 // Hand-written orchestration: Playwright drives the browsers; Lighthouse
 // cannot type, translate or simulate the keyboard, and Lighthouse throttling
 // does not exist for WebKit either. See docs/superpowers/reports/*-baseline.md
 // for what each metric means.
+import { createHash } from 'node:crypto'
 import { execFileSync, spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { connect } from 'node:net'
 import { arch, cpus, platform, release, tmpdir, totalmem } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { constants as zlibConstants, gzipSync } from 'node:zlib'
+import { parse } from 'parse5'
 import { chromium, webkit } from 'playwright'
-import type { Browser, BrowserContext, Page, Response } from 'playwright'
-import { Fake, fixture, nonce } from '../tests/helpers'
-import { PROFILES, profileDescription } from './profiles'
+import type {
+  Browser,
+  BrowserContext,
+  LaunchOptions,
+  Page,
+  Response,
+} from 'playwright'
+import { Fake, fixture, nonce, userText } from '../tests/helpers'
+import {
+  focusSource,
+  installFakeVisualViewport,
+  installInputTracker,
+  installPerfObservers,
+  layoutSnapshot,
+  readPerf,
+  startShiftObserver,
+  stopShiftObserver,
+} from './page-scripts'
+import type { PageGlobals, Selectors } from './page-scripts'
+import { PROFILES, bytesPerSecond, profileDescription } from './profiles'
 import type { Profile } from './profiles'
 import { markdownTables } from './table'
-import type { InteractRun, LoadRun, PerfFile, ProfileResult } from './table'
+import type {
+  InteractRun,
+  KeyboardRun,
+  LoadRun,
+  PerfFile,
+  ProbeRun,
+  ProfileResult,
+  Resource,
+  TypeableRun,
+} from './table'
 
 const ROOT = resolve(import.meta.dirname, '../..')
 const GO_DIR = join(ROOT, 'go')
 const BIN_DIR = join(tmpdir(), 'neotranslate-perf')
 // Separate from the e2e suite's ports (fake 3901+, ts 3100+, go 3200+) so a
 // running parity suite is never measured or disturbed.
-const PORTS = { fake: 3951, ts: 3150, go: 3250 } as const
+const PORTS = { fake: 3951, ts: 3150, go: 3250, proxy: 3960 } as const
+/** Nothing listens here: in --fake every non-loopback request (CDN fonts,
+ * analytics) is sent to it and fails, identically for both apps. */
+const BLACKHOLE_PROXY = 'http://127.0.0.1:9'
 const FIXTURE = 'stream'
-const SOURCE = '[data-testid="input-textarea"]'
-const MAIN = '[data-testid="main-translation"]'
-const COPY = '[data-testid="output-toolbar"] [data-testid="copy-button"]'
-const LISTEN = '[data-testid="output-toolbar"] [data-testid="listen-button"]'
-/** Keys typed one by one at the end of the source text (the rest is filled). */
+const S: Selectors = {
+  source: '[data-testid="input-textarea"]',
+  main: '[data-testid="main-translation"]',
+  copy: '[data-testid="output-toolbar"] [data-testid="copy-button"]',
+  listen: '[data-testid="output-toolbar"] [data-testid="listen-button"]',
+}
+const CLEAR = '[data-testid="clear-input"]'
+/** Keys typed one by one at the end of the settled-page translation text. */
 const TYPED_TAIL = 6
 const TYPE_DELAY_MS = 60
 
@@ -103,11 +143,15 @@ if (mode === 'fake' && args.url)
   )
 if (mode === 'live') {
   if (!args.url) usage('--live needs --url <deployed base URL>')
-  const billed = runs * profiles.length
+  const interactions = runs * profiles.length
   console.log(
-    `--live plan: ${profiles.length} profile(s) x ${runs} run(s) = ${billed} ` +
-      `billed OpenAI translation(s) against ${args.url} ` +
-      '(one per interaction run; page loads, first-typeable and TTFB probes are free).',
+    `--live plan against ${args.url}: ${profiles.length} profile(s) x ${runs} ` +
+      `run(s) = ${interactions} interaction run(s). Each makes at least 3 billed ` +
+      'OpenAI translations (typing at first focus on a cold and on a repeat ' +
+      'visit, one on the settled page) and up to 7 when typing at first focus is ' +
+      'lost (a partial-text translation plus the retype, on each visit): ' +
+      `${interactions * 3} to ${interactions * 7} billed translations. Page ` +
+      'loads, the whitespace probe and TTFB requests are free.',
   )
   if (!args['i-understand-this-is-billed']) {
     console.error(
@@ -217,6 +261,17 @@ function assertTranslatorPage(body: string, url: string): void {
     )
 }
 
+function sha256(data: Buffer | string): string {
+  return createHash('sha256').update(data).digest('hex')
+}
+
+function filesUnder(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .map((name) => join(dir, name))
+    .filter((path) => statSync(path).isFile())
+    .sort()
+}
+
 // ----- fake mode servers -----------------------------------------------------------
 
 type AppServer = { url: string; start: () => ReturnType<typeof start> }
@@ -236,7 +291,11 @@ function appEnv(port: number): NodeJS.ProcessEnv {
   }
 }
 
-async function prepareFake(): Promise<{ fake: Fake; server: AppServer }> {
+async function prepareFake(): Promise<{
+  fake: Fake
+  server: AppServer
+  build: NonNullable<PerfFile['meta']['build']>
+}> {
   for (const port of [PORTS.fake, PORTS[app]])
     if (await portOpen(port))
       throw new Error(
@@ -249,13 +308,24 @@ async function prepareFake(): Promise<{ fake: Fake; server: AppServer }> {
     cwd: GO_DIR,
     stdio: 'inherit',
   })
+  const skipped = args['skip-build']
   let server: AppServer
+  let build: NonNullable<PerfFile['meta']['build']>
   const port = PORTS[app]
   const url = `http://127.0.0.1:${port}`
   if (app === 'ts') {
-    if (!args['skip-build']) {
+    if (!skipped) {
       console.log('building the TS app (npm run build)…')
       execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit' })
+    }
+    const output = join(ROOT, '.vercel/output')
+    const hash = createHash('sha256')
+    for (const path of filesUnder(output))
+      hash.update(relative(output, path)).update(readFileSync(path))
+    build = {
+      skipped,
+      sha256: hash.digest('hex'),
+      assets: readdirSync(join(output, 'static/assets')).sort(),
     }
     server = {
       url,
@@ -269,11 +339,14 @@ async function prepareFake(): Promise<{ fake: Fake; server: AppServer }> {
     }
   } else {
     const appBin = join(BIN_DIR, 'app-go')
-    console.log('building the Go app (go build)…')
-    execFileSync('go', ['build', '-o', appBin, '.'], {
-      cwd: GO_DIR,
-      stdio: 'inherit',
-    })
+    if (!skipped) {
+      console.log('building the Go app (go build)…')
+      execFileSync('go', ['build', '-o', appBin, '.'], {
+        cwd: GO_DIR,
+        stdio: 'inherit',
+      })
+    }
+    build = { skipped, sha256: sha256(readFileSync(appBin)), assets: [] }
     server = { url, start: () => start(appBin, [], appEnv(port), GO_DIR) }
   }
   const fakeProc = start(
@@ -290,7 +363,7 @@ async function prepareFake(): Promise<{ fake: Fake; server: AppServer }> {
   await waitForPort(PORTS.fake, fakeProc.child, 'fake OpenAI server')
   const fake = new Fake(`http://127.0.0.1:${PORTS.fake}`)
   await fake.reset()
-  return { fake, server }
+  return { fake, server, build }
 }
 
 /** Cold = first request to a freshly started process; warm = the next one.
@@ -345,6 +418,29 @@ async function serverTtfbLive(url: string, samples: number) {
   }
 }
 
+/** Throttle proxy for a profile: transparent to `target` in --fake, an HTTP
+ * CONNECT proxy in --live. */
+async function startProxy(profile: Profile, target: string | null) {
+  const network = profile.network!
+  if (await portOpen(PORTS.proxy))
+    throw new Error(`port ${PORTS.proxy} (throttle proxy) is already in use`)
+  const proc = start(
+    process.execPath,
+    [join(ROOT, 'e2e/perf/throttle-proxy.mjs')],
+    {
+      ...process.env,
+      PORT: String(PORTS.proxy),
+      RTT_MS: String(network.rttMs),
+      DOWN_BPS: String(bytesPerSecond(network.downloadKbps)),
+      UP_BPS: String(bytesPerSecond(network.uploadKbps)),
+      ...(target ? { TARGET: target } : {}),
+    },
+    ROOT,
+  )
+  await waitForPort(PORTS.proxy, proc.child, 'throttle proxy')
+  return proc
+}
+
 // ----- browser helpers -------------------------------------------------------------
 
 async function newPage(
@@ -354,351 +450,395 @@ async function newPage(
   const context = await browser.newContext({
     ...profile.context,
     locale: 'en-US',
+    serviceWorkers: 'block',
   })
   // tsx (esbuild keepNames) wraps named functions in `__name(...)`; the
   // functions this file serializes into the page need that helper there.
   await context.addInitScript({ content: 'globalThis.__name = (fn) => fn' })
   const page = await context.newPage()
-  if (profile.browser === 'chromium') {
+  if (profile.browser === 'chromium' && profile.cpuSlowdown > 1) {
     const cdp = await context.newCDPSession(page)
-    if (profile.cpuSlowdown > 1)
-      await cdp.send('Emulation.setCPUThrottlingRate', {
-        rate: profile.cpuSlowdown,
-      })
-    if (profile.network) {
-      await cdp.send('Network.enable')
-      await cdp.send('Network.emulateNetworkConditions', {
-        offline: false,
-        latency: profile.network.latencyMs,
-        downloadThroughput: (profile.network.downloadKbps * 1024) / 8,
-        uploadThroughput: (profile.network.uploadKbps * 1024) / 8,
-      })
-    }
+    await cdp.send('Emulation.setCPUThrottlingRate', {
+      rate: profile.cpuSlowdown,
+    })
   }
   return { context, page }
 }
 
-type PerfWindow = Window & {
-  __perf: {
-    fcp: number | null
-    lcp: number | null
-    cls: number
-    longtasks: Array<[number, number]>
-  }
-}
-
-/** Installed before any page script so buffered and non-buffered entries
- * (longtask has no reliable buffer) are all seen. */
-function installPerfObservers() {
-  const w = window as unknown as PerfWindow
-  const perf: PerfWindow['__perf'] = {
-    fcp: null,
-    lcp: null,
-    cls: 0,
-    longtasks: [],
-  }
-  w.__perf = perf
-  const types = PerformanceObserver.supportedEntryTypes
-  const observe = (
-    type: string,
-    onEntry: (entry: PerformanceEntry) => void,
-  ) => {
-    if (!types.includes(type)) return
-    new PerformanceObserver((list) =>
-      list.getEntries().forEach(onEntry),
-    ).observe({ type, buffered: true })
-  }
-  observe('paint', (e) => {
-    if (e.name === 'first-contentful-paint') perf.fcp = e.startTime
-  })
-  observe('largest-contentful-paint', (e) => {
-    perf.lcp = e.startTime
-  })
-  observe('longtask', (e) => {
-    perf.longtasks.push([e.startTime, e.duration])
-  })
-  observe('layout-shift', (e) => {
-    perf.cls += (e as PerformanceEntry & { value: number }).value
-  })
-}
-
-function gzipSize(body: Buffer): number {
+function gzipSize(body: Buffer | string): number {
+  if (body.length === 0) return 0
   return gzipSync(body, { level: zlibConstants.Z_BEST_COMPRESSION }).length
 }
 
+type ParseNode = {
+  nodeName: string
+  value?: string
+  attrs?: Array<{ name: string; value: string }>
+  childNodes?: ParseNode[]
+  content?: ParseNode
+}
+
+const EXECUTABLE_SCRIPT_TYPES = new Set([
+  '',
+  'module',
+  'text/javascript',
+  'application/javascript',
+  'text/ecmascript',
+  'application/ecmascript',
+])
+
+/** Inline <script> and <style> bodies of the served HTML (parsed with
+ * parse5, the HTML parser jsdom uses), split into executable JS, CSS and
+ * non-executable script data (JSON, import maps). */
+function inlineCode(html: string) {
+  const js: string[] = []
+  const css: string[] = []
+  const data: string[] = []
+  const text = (node: ParseNode) =>
+    (node.childNodes ?? []).map((c) => c.value ?? '').join('')
+  const walk = (node: ParseNode) => {
+    const attr = (name: string) =>
+      node.attrs?.find((a) => a.name === name)?.value
+    if (node.nodeName === 'script' && attr('src') === undefined) {
+      const type = (attr('type') ?? '').trim().toLowerCase()
+      ;(EXECUTABLE_SCRIPT_TYPES.has(type) ? js : data).push(text(node))
+    } else if (node.nodeName === 'style') {
+      css.push(text(node))
+    }
+    for (const child of node.childNodes ?? []) walk(child)
+    if (node.content) walk(node.content)
+  }
+  walk(parse(html))
+  const joined = (parts: string[]) => parts.join('\n')
+  return {
+    jsInlineRaw: Buffer.byteLength(joined(js)),
+    jsInlineGzip: gzipSize(joined(js)),
+    cssInlineRaw: Buffer.byteLength(joined(css)),
+    cssInlineGzip: gzipSize(joined(css)),
+    inlineDataRaw: Buffer.byteLength(joined(data)),
+  }
+}
+
+function kindOf(response: Response, contentType: string): Resource['kind'] {
+  const type = response.request().resourceType()
+  if (type === 'document') return 'html'
+  if (/javascript|ecmascript/.test(contentType) || type === 'script')
+    return 'js'
+  if (contentType.includes('text/css') || type === 'stylesheet') return 'css'
+  return 'other'
+}
+
+/** Same-origin Resource Timing `transferSize` per URL, in fetch order
+ * (headers + encoded body; 0 for an HTTP cache hit). Both engines report it;
+ * Playwright's `request.sizes()` does not: Chromium returns negative sizes and
+ * WebKit the full size for cache hits. */
+type TransferSizes = Map<string, number[]>
+
+async function transferSizes(page: Page): Promise<TransferSizes> {
+  const entries = await page.evaluate(() =>
+    (
+      [
+        ...performance.getEntriesByType('navigation'),
+        ...performance.getEntriesByType('resource'),
+      ] as PerformanceResourceTiming[]
+    )
+      .filter((e) => new URL(e.name).origin === location.origin)
+      .map((e) => [e.name, e.transferSize] as const),
+  )
+  const map: TransferSizes = new Map()
+  for (const [name, size] of entries)
+    map.set(name, [...(map.get(name) ?? []), size])
+  return map
+}
+
+async function describe(
+  response: Response,
+  rt: TransferSizes = new Map(),
+): Promise<{
+  resource: Resource
+  totalBytes: number
+  body: Buffer | null
+}> {
+  const sizes = await response
+    .request()
+    .sizes()
+    .catch(() => null)
+  // Cross-origin entries are opaque to Resource Timing without
+  // Timing-Allow-Origin: fall back to Playwright's sizes there.
+  const transferred =
+    rt.get(response.url())?.shift() ??
+    (sizes
+      ? Math.max(0, sizes.responseBodySize) +
+        Math.max(0, sizes.responseHeadersSize)
+      : null)
+  const contentType = (await response.headerValue('content-type')) ?? ''
+  const kind = kindOf(response, contentType)
+  const body = kind === 'other' ? null : await response.body().catch(() => null)
+  return {
+    resource: {
+      url: response.url(),
+      type: response.request().resourceType(),
+      contentType,
+      kind,
+      status: response.status(),
+      encoding: (await response.headerValue('content-encoding')) ?? null,
+      raw: body?.length ?? 0,
+      transferred,
+      gzip: body ? gzipSize(body) : null,
+      sha256: body ? sha256(body).slice(0, 16) : null,
+    },
+    totalBytes: transferred ?? 0,
+    body,
+  }
+}
+
+/** Collects every response (and failed request) of a page from now on. */
+function collector(page: Page) {
+  let responses: Response[] = []
+  let failed: string[] = []
+  page.on('response', (r) => responses.push(r))
+  page.on('requestfailed', (r) =>
+    failed.push(`${r.url()} ${r.failure()?.errorText ?? ''}`.trim()),
+  )
+  return {
+    take() {
+      const taken = { responses, failed }
+      responses = []
+      failed = []
+      return taken
+    },
+  }
+}
+
+async function settle(page: Page): Promise<void> {
+  await page.waitForLoadState('networkidle', { timeout: 120_000 })
+  await page.waitForTimeout(500)
+}
+
+async function measureLoad(
+  page: Page,
+  profile: Profile,
+  url: string,
+  responses: () => { responses: Response[]; failed: string[] },
+): Promise<LoadRun> {
+  await page.goto(url, { waitUntil: 'load', timeout: 120_000 })
+  await page.waitForLoadState('networkidle', { timeout: 60_000 })
+  // Quiet window for late long tasks and LCP candidates.
+  await page.waitForTimeout(1000)
+  const perf = await page.evaluate(readPerf)
+  const rt = await transferSizes(page)
+  const taken = responses()
+  const resources: Resource[] = []
+  let totalTransferred = 0
+  let html: string | null = null
+  for (const r of taken.responses) {
+    const d = await describe(r, rt)
+    totalTransferred += d.totalBytes
+    if (d.resource.kind === 'other') continue
+    resources.push(d.resource)
+    if (d.resource.kind === 'html' && r.frame() === page.mainFrame() && d.body)
+      html ??= d.body.toString('utf8')
+  }
+  const sum = (kind: Resource['kind'], key: 'raw' | 'transferred' | 'gzip') =>
+    resources
+      .filter((x) => x.kind === kind && x.status < 400)
+      .reduce((total, x) => total + (x[key] ?? 0), 0)
+  const inline = html
+    ? inlineCode(html)
+    : {
+        jsInlineRaw: 0,
+        jsInlineGzip: 0,
+        cssInlineRaw: 0,
+        cssInlineGzip: 0,
+        inlineDataRaw: 0,
+      }
+  const htmlTransferred = sum('html', 'transferred')
+  return {
+    ...perf,
+    docExpectedMs: profile.network
+      ? htmlTransferred / (bytesPerSecond(profile.network.downloadKbps) / 1000)
+      : null,
+    jsRaw: sum('js', 'raw'),
+    jsTransferred: sum('js', 'transferred'),
+    jsGzip: sum('js', 'gzip'),
+    ...inline,
+    jsTotalRaw: sum('js', 'raw') + inline.jsInlineRaw,
+    jsTotalGzip: sum('js', 'gzip') + inline.jsInlineGzip,
+    cssRaw: sum('css', 'raw'),
+    cssTransferred: sum('css', 'transferred'),
+    cssGzip: sum('css', 'gzip'),
+    htmlRaw: sum('html', 'raw'),
+    htmlTransferred,
+    totalTransferred,
+    failedRequests: taken.failed,
+    resources,
+  }
+}
+
+/** Cold load in a fresh context, then a repeat navigation in the same
+ * context after the first settled (warm HTTP cache, cookies kept). */
 async function loadRun(
   browser: Browser,
   profile: Profile,
   url: string,
-): Promise<LoadRun> {
+): Promise<{ cold: LoadRun; repeat: LoadRun }> {
   const { context, page } = await newPage(browser, profile)
   try {
-    const responses: Response[] = []
-    page.on('response', (r) => responses.push(r))
     await page.addInitScript(installPerfObservers)
-    await page.goto(url, { waitUntil: 'load', timeout: 120_000 })
-    await page.waitForLoadState('networkidle', { timeout: 60_000 })
-    // Quiet window for late long tasks and LCP candidates.
-    await page.waitForTimeout(1000)
-    const perf = await page.evaluate(() => {
-      const p = (window as unknown as PerfWindow).__perf
-      const nav = performance.getEntriesByType('navigation')[0] as
-        PerformanceNavigationTiming | undefined
-      // Lighthouse-style TBT: the part of each long task after FCP beyond 50 ms.
-      const tbt =
-        p.fcp === null ||
-        !PerformanceObserver.supportedEntryTypes.includes('longtask')
-          ? null
-          : p.longtasks.reduce((sum, [begin, duration]) => {
-              const from = Math.max(begin, p.fcp!)
-              return sum + Math.max(0, begin + duration - from - 50)
-            }, 0)
-      return {
-        ttfb: nav ? nav.responseStart : null,
-        domContentLoaded: nav ? nav.domContentLoadedEventEnd : null,
-        load: nav ? nav.loadEventEnd : null,
-        fcp: p.fcp,
-        lcp: p.lcp,
-        tbt,
-        loadCls: PerformanceObserver.supportedEntryTypes.includes(
-          'layout-shift',
-        )
-          ? p.cls
-          : null,
-      }
-    })
-    const resources: LoadRun['resources'] = []
-    let totalTransferred = 0
-    for (const r of responses) {
-      const sizes = await r
-        .request()
-        .sizes()
-        .catch(() => null)
-      const transferred = sizes
-        ? sizes.responseBodySize + sizes.responseHeadersSize
-        : null
-      totalTransferred += transferred ?? 0
-      const type = r.request().resourceType()
-      if (!['script', 'stylesheet', 'document'].includes(type)) continue
-      const body = await r.body().catch(() => null)
-      resources.push({
-        url: r.url(),
-        type,
-        status: r.status(),
-        encoding: (await r.headerValue('content-encoding')) ?? null,
-        raw: body?.length ?? 0,
-        transferred: sizes ? sizes.responseBodySize : null,
-        gzip: body ? gzipSize(body) : null,
-      })
-    }
-    const sum = (type: string, key: 'raw' | 'transferred' | 'gzip') =>
-      resources
-        .filter((x) => x.type === type && x.status < 400)
-        .reduce((total, x) => total + (x[key] ?? 0), 0)
-    return {
-      ...perf,
-      jsRaw: sum('script', 'raw'),
-      jsTransferred: sum('script', 'transferred'),
-      jsGzip: sum('script', 'gzip'),
-      cssRaw: sum('stylesheet', 'raw'),
-      cssTransferred: sum('stylesheet', 'transferred'),
-      cssGzip: sum('stylesheet', 'gzip'),
-      htmlRaw: sum('document', 'raw'),
-      htmlTransferred: sum('document', 'transferred'),
-      totalTransferred,
-      resources,
-    }
+    const collect = collector(page)
+    const cold = await measureLoad(page, profile, url, () => collect.take())
+    const repeat = await measureLoad(page, profile, url, () => collect.take())
+    return { cold, repeat }
   } finally {
     await context.close()
   }
 }
 
-type InteractWindow = Window & {
-  __typeable: number[]
-  __tr: {
-    last: number
-    first: number | null
-    copy: number | null
-    done: number | null
-    baseline: string
-  }
-  __keyboard?: {
-    set: (height: number | null, offsetTop: number | null) => void
+class IsolationError extends Error {}
+
+function translationText(): string {
+  return `${mode === 'fake' ? `${fixture(FIXTURE).match} ` : ''}${nonce()} How are you doing today, my friend?`
+}
+
+function tracker(page: Page) {
+  return page.evaluate(() => (window as unknown as PageGlobals).__tr)
+}
+
+async function waitForTracker(
+  page: Page,
+  field: 'first' | 'done',
+  timeout: number,
+): Promise<boolean> {
+  return page
+    .waitForFunction(
+      (f) => (window as unknown as PageGlobals).__tr?.[f] != null,
+      field,
+      { timeout, polling: 50 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+}
+
+/** In --fake: did the upstream receive a translation of exactly `text`? */
+async function upstreamSaw(fake: Fake | null, text: string): Promise<boolean> {
+  if (!fake) return true
+  const deadline = Date.now() + 5000
+  for (;;) {
+    if ((await fake.bodies()).some((b) => userText(b).includes(text)))
+      return true
+    if (Date.now() > deadline) return false
+    await sleep(50)
   }
 }
 
-/** Records the timestamp of every input event on the source textarea, from
- * document start (before any app script, so pre-hydration input counts). */
-function installTypeableRecorder(selector: string) {
-  const w = window as unknown as InteractWindow
-  w.__typeable = []
-  document.addEventListener(
-    'input',
-    (e) => {
-      if (e.target instanceof Element && e.target.matches(selector))
-        w.__typeable.push(e.timeStamp)
-    },
-    true,
+/** Clear (the app's own button: a user facing stale or mangled text does the
+ * same) and wait until no main text and no enabled Copy remain. */
+async function clearSource(page: Page): Promise<void> {
+  await page.locator(CLEAR).click()
+  await page.waitForFunction(
+    (main) => !document.querySelector(main)?.textContent.trim(),
+    S.main,
+    { timeout: 10_000 },
   )
-}
-
-/** Replaces window.visualViewport with an EventTarget that mirrors the real
- * one until the harness overrides height/offsetTop, the technique of
- * tests/browser/mobile.browser.tsx (stubbed visualViewport, shrunk step by
- * step with resize events) applied to a real page. */
-function installFakeVisualViewport() {
-  const real = window.visualViewport
-  if (!real) return
-  const fake = new EventTarget()
-  let height: number | null = null
-  let offsetTop: number | null = null
-  for (const key of [
-    'width',
-    'offsetLeft',
-    'pageLeft',
-    'pageTop',
-    'scale',
-  ] as const)
-    Object.defineProperty(fake, key, { get: () => real[key] })
-  Object.defineProperty(fake, 'height', { get: () => height ?? real.height })
-  Object.defineProperty(fake, 'offsetTop', {
-    get: () => offsetTop ?? real.offsetTop,
-  })
-  real.addEventListener('resize', () => fake.dispatchEvent(new Event('resize')))
-  real.addEventListener('scroll', () => fake.dispatchEvent(new Event('scroll')))
-  Object.defineProperty(window, 'visualViewport', {
-    configurable: true,
-    get: () => fake,
-  })
-  ;(window as unknown as InteractWindow).__keyboard = {
-    set(h, top) {
-      height = h
-      offsetTop = top
-      fake.dispatchEvent(new Event('resize'))
-      fake.dispatchEvent(new Event('scroll'))
-    },
-  }
-}
-
-function focusSource(selector: string): boolean {
-  const el = document.querySelector<HTMLTextAreaElement>(selector)
-  if (!el) return false
-  if (document.activeElement !== el) el.focus({ preventScroll: true })
-  return document.activeElement === el
-}
-
-/** First typeable: during the load, type a space whenever the textarea can
- * take focus (spaces never start a translation: whitespace-only input is
- * ignored). A keystroke counts only if its character is still there once the
- * page has settled; hydration that resets the field discards the earlier
- * ones. The result is the in-page timestamp of the earliest surviving
- * keystroke's input event. */
-async function measureFirstTypeable(page: Page, url: string) {
-  await page.goto(url, { waitUntil: 'commit', timeout: 120_000 })
-  const state = { idle: false }
-  const idlePromise = page
-    .waitForLoadState('networkidle', { timeout: 120_000 })
-    .then(() => (state.idle = true))
-  let afterIdle = 0
-  const deadline = Date.now() + 120_000
-  while (Date.now() < deadline) {
-    const focused = await page.evaluate(focusSource, SOURCE).catch(() => false)
-    if (focused) await page.keyboard.type(' ')
-    if (state.idle && ++afterIdle >= 5) break
-    await page.waitForTimeout(state.idle ? 100 : focused ? 25 : 10)
-  }
-  await idlePromise
-  await page.waitForTimeout(500)
-  const { events, value } = await page.evaluate((selector) => {
-    const w = window as unknown as InteractWindow
-    return {
-      events: w.__typeable,
-      value: document.querySelector<HTMLTextAreaElement>(selector)?.value ?? '',
-    }
-  }, SOURCE)
-  const survivors = value.length
-  const firstInput = events[0] ?? null
-  if (value.trim() !== '' || survivors === 0 || survivors > events.length)
-    return {
-      firstTypeable: null,
-      firstInput,
-      lastLost: null,
-      attempts: events.length,
-    }
-  return {
-    firstTypeable: events[events.length - survivors]!,
-    firstInput,
-    // The keystroke just before the first kept one, which was lost: brackets
-    // the moment the field started keeping input (measurement resolution).
-    lastLost: events[events.length - survivors - 1] ?? null,
-    attempts: events.length,
-  }
-}
-
-function installTranslationObserver(s: {
-  main: string
-  copy: string
-  listen: string
-  source: string
-}) {
-  const w = window as unknown as InteractWindow
-  const text = () => document.querySelector(s.main)?.textContent.trim() ?? ''
-  const tr: InteractWindow['__tr'] = {
-    last: 0,
-    first: null,
-    copy: null,
-    done: null,
-    baseline: text(),
-  }
-  w.__tr = tr
-  document.addEventListener(
-    'input',
-    (e) => {
-      if (e.target instanceof Element && e.target.matches(s.source))
-        tr.last = e.timeStamp
-    },
-    true,
-  )
-  const enabled = (selector: string) => {
-    const el = document.querySelector<HTMLButtonElement>(selector)
-    return Boolean(el && !el.disabled)
-  }
-  const check = () => {
-    if (tr.last === 0) return
-    const now = performance.now()
-    const main = text()
-    if (tr.first === null && main !== '' && main !== tr.baseline) tr.first = now
-    if (tr.copy === null && enabled(s.copy)) tr.copy = now
-    if (tr.done === null && enabled(s.listen)) tr.done = now
-  }
-  new MutationObserver(check).observe(document.body, {
-    subtree: true,
-    childList: true,
-    characterData: true,
-    attributes: true,
-    attributeFilter: ['disabled'],
-  })
-}
-
-async function measureTranslation(page: Page, text: string, fake: Fake | null) {
   if (
     await page.evaluate(
-      (s) =>
-        Boolean(
-          document.querySelector<HTMLButtonElement>(s)?.disabled === false,
-        ),
-      COPY,
+      (s) => document.querySelector<HTMLButtonElement>(s)?.disabled === false,
+      S.copy,
     )
   )
-    throw new Error('Copy is enabled before the translation run')
-  await page.evaluate(installTranslationObserver, {
-    main: MAIN,
-    copy: COPY,
-    listen: LISTEN,
-    source: SOURCE,
-  })
+    throw new Error('Copy is enabled after Clear')
+}
+
+const ACT_WAIT_MS = mode === 'fake' ? 3000 : 10_000
+
+/** Typing at first focus: navigate, type one real sentence (ending "?") as
+ * one burst the moment the textarea takes focus, then nothing. It counts if
+ * the text survives the page settling AND a translation of exactly that text
+ * arrives with no further input. Otherwise the input was dropped (wiped:
+ * the field no longer holds it; ignored: it does, but nothing was
+ * translated) and, after settle, the user clears the field (the app's Clear
+ * button) and retypes a fresh sentence; that penalty is included. */
+async function typeAtFirstFocus(
+  page: Page,
+  url: string,
+  fake: Fake | null,
+): Promise<TypeableRun> {
   const before = fake ? await fake.requests() : null
-  const source = page.locator(SOURCE)
+  await page.goto(url, { waitUntil: 'commit', timeout: 120_000 })
+  const deadline = Date.now() + 120_000
+  while (!(await page.evaluate(focusSource, S.source).catch(() => false))) {
+    if (Date.now() > deadline)
+      throw new Error('the source textarea never took focus')
+    await page.waitForTimeout(10)
+  }
+  const text = translationText()
+  await page.evaluate(() => (window as unknown as PageGlobals).__trStart())
+  await page.keyboard.type(text)
+  await settle(page)
+  const settledAt = await page.evaluate(() => performance.now())
+  const value = await page.locator(S.source).inputValue()
+  const burst = await tracker(page)
+  const kept = value === text
+  const acted =
+    kept &&
+    (await waitForTracker(page, 'first', ACT_WAIT_MS)) &&
+    (await upstreamSaw(fake, text))
+  const fcp = await page.evaluate(
+    () => (window as unknown as PageGlobals).__perf.fcp,
+  )
+  const result: TypeableRun = {
+    fcp,
+    burstFirstKey: burst?.firstKey ?? null,
+    burstKept: kept,
+    burstActed: acted,
+    dropped: acted ? null : kept ? 'ignored' : 'wiped',
+    settledAt,
+    retypeFirstKey: null,
+    firstTypeable: null,
+    navToFirstChar: null,
+    upstreamRequests: null,
+  }
+  let counted = burst
+  if (!acted) {
+    const retype = translationText()
+    await clearSource(page)
+    await page.evaluate(() => (window as unknown as PageGlobals).__trStart())
+    await page.evaluate((selector) => {
+      document
+        .querySelector<HTMLTextAreaElement>(selector)!
+        .focus({ preventScroll: true })
+    }, S.source)
+    await page.keyboard.type(retype)
+    if ((await page.locator(S.source).inputValue()) !== retype)
+      throw new Error('the retyped text did not stay in the field')
+    if (!(await waitForTracker(page, 'first', 60_000)))
+      throw new Error('no translation after retyping on the settled page')
+    if (!(await upstreamSaw(fake, retype)))
+      throw new IsolationError('the fake upstream never saw the retyped text')
+    counted = await tracker(page)
+    result.retypeFirstKey = counted?.firstKey ?? null
+  }
+  if (!(await waitForTracker(page, 'done', 60_000)))
+    throw new Error('the counted translation never completed')
+  counted = await tracker(page)
+  const keystroke = counted?.firstKey ?? null
+  result.firstTypeable =
+    keystroke === null ? null : Math.max(fcp ?? 0, keystroke)
+  result.navToFirstChar = counted?.first ?? null
+  result.upstreamRequests = fake ? (await fake.requests()) - before! : null
+  return result
+}
+
+/** A translation on the settled page: Clear, fill all but the last characters
+ * and type those 60 ms apart; times from the last keystroke. */
+async function settledTranslation(page: Page, fake: Fake | null) {
+  await clearSource(page)
+  const text = translationText()
+  const before = fake ? await fake.requests() : null
+  await page.evaluate(() => (window as unknown as PageGlobals).__trStart())
+  const source = page.locator(S.source)
   await source.fill(text.slice(0, -TYPED_TAIL))
   await page.keyboard.type(text.slice(-TYPED_TAIL), { delay: TYPE_DELAY_MS })
   const typed = await source.inputValue()
@@ -706,27 +846,14 @@ async function measureTranslation(page: Page, text: string, fake: Fake | null) {
     throw new Error(
       `source holds ${JSON.stringify(typed)}, expected the typed text`,
     )
-  await page.waitForFunction(
-    () => (window as unknown as InteractWindow).__tr.done !== null,
-    null,
-    {
-      timeout: 60_000,
-      polling: 50,
-    },
-  )
-  const tr = await page.evaluate(
-    () => (window as unknown as InteractWindow).__tr,
-  )
+  if (!(await waitForTracker(page, 'done', 60_000)))
+    throw new Error('the settled-page translation never completed')
+  const tr = (await tracker(page))!
   let upstreamRequests: number | null = null
   if (fake) {
     upstreamRequests = (await fake.requests()) - before!
-    if (upstreamRequests === 0)
-      throw new IsolationError(
-        'the translation completed without reaching the fake upstream',
-      )
-    const bodies = await fake.bodies()
-    if (!bodies.some((b) => JSON.stringify(b).includes(text.split(' ')[1]!)))
-      throw new IsolationError('the fake upstream never saw this run’s nonce')
+    if (!(await upstreamSaw(fake, text)))
+      throw new IsolationError('the fake upstream never saw this run’s text')
     if (upstreamRequests !== 1)
       throw new Error(
         `expected exactly one upstream request, saw ${upstreamRequests}`,
@@ -741,61 +868,129 @@ async function measureTranslation(page: Page, text: string, fake: Fake | null) {
   }
 }
 
-/** Blur (keyboard closed), then focus the source and shrink the visual
- * viewport to 60% in 50 px steps, 50 ms apart (roughly a software keyboard's
- * slide-in), with resize + scroll events like a real one. */
-async function measureKeyboard(page: Page) {
-  return page.evaluate(
-    async ({ main, source }) => {
-      const w = window as unknown as InteractWindow
-      const frame = () =>
-        new Promise((done) =>
-          requestAnimationFrame(() => requestAnimationFrame(done)),
-        )
-      const wait = (ms: number) => new Promise((done) => setTimeout(done, ms))
-      const top = (selector: string) =>
-        document.querySelector(selector)?.getBoundingClientRect().top ?? null
-      const input = document.querySelector<HTMLTextAreaElement>(source)!
-      if (!w.__keyboard) throw new Error('fake visualViewport missing')
-      input.blur()
-      await wait(400)
-      const mainBefore = top(main)
-      const sourceBefore = top(source)
-      const clsSupported =
-        PerformanceObserver.supportedEntryTypes.includes('layout-shift')
-      let cls = 0
-      const observer = new PerformanceObserver((list) => {
-        for (const e of list.getEntries())
-          cls += (e as PerformanceEntry & { value: number }).value
-      })
-      if (clsSupported) observer.observe({ type: 'layout-shift' })
-      input.focus({ preventScroll: true })
-      const full = window.innerHeight
-      const visible = Math.round(full * 0.6)
-      for (let h = full - 50; h > visible; h -= 50) {
-        w.__keyboard.set(h, 0)
-        await frame()
-        await wait(50)
-      }
-      w.__keyboard.set(visible, 0)
-      await wait(600)
-      await frame()
-      observer.disconnect()
-      const mainAfter = top(main)
-      const sourceAfter = top(source)
-      const dy = (a: number | null, b: number | null) =>
-        a === null || b === null ? null : Math.abs(b - a)
-      return {
-        keyboardCls: clsSupported ? cls : null,
-        keyboardMainDy: dy(mainBefore, mainAfter),
-        keyboardSourceDy: dy(sourceBefore, sourceAfter),
-      }
-    },
-    { main: MAIN, source: SOURCE },
-  )
+async function jsThroughDone(responses: Response[]) {
+  let raw = 0
+  let gzip = 0
+  for (const r of responses) {
+    const d = await describe(r)
+    if (d.resource.status >= 400) continue
+    if (d.resource.kind === 'js') {
+      raw += d.resource.raw
+      gzip += d.resource.gzip ?? 0
+    } else if (d.resource.kind === 'html' && d.body) {
+      const inline = inlineCode(d.body.toString('utf8'))
+      raw += inline.jsInlineRaw
+      gzip += inline.jsInlineGzip
+    }
+  }
+  return { jsThroughDoneRaw: raw, jsThroughDoneGzip: gzip }
 }
 
-class IsolationError extends Error {}
+function keyboardResult(
+  before: { mainTop: number | null; sourceTop: number | null },
+  after: ReturnType<typeof layoutSnapshot>,
+  shiftSum: number | null,
+): KeyboardRun {
+  const dy = (a: number | null, b: number | null) =>
+    a === null || b === null ? null : Math.abs(b - a)
+  return {
+    shiftSum,
+    mainDy: dy(before.mainTop, after.mainTop),
+    sourceDy: dy(before.sourceTop, after.sourceTop),
+    mainVisible: after.mainVisible,
+    textareaVisible: after.textareaVisible,
+    caretVisible: after.caretVisible,
+    sourceFocused: after.sourceFocused,
+  }
+}
+
+async function blurAndRest(page: Page): Promise<void> {
+  await page.evaluate((selector) => {
+    document.querySelector<HTMLElement>(selector)?.blur()
+  }, S.source)
+  await page.waitForTimeout(400)
+}
+
+async function focusEnd(page: Page): Promise<void> {
+  await page.evaluate((selector) => {
+    const el = document.querySelector<HTMLTextAreaElement>(selector)!
+    el.focus({ preventScroll: true })
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, S.source)
+}
+
+/** Overlays-content keyboard (iOS Safari, Android default): the layout
+ * viewport keeps its size; the visual viewport shrinks in 50 px steps, 50 ms
+ * apart, to half the window, then pans down (offsetTop), as in
+ * tests/browser/mobile.browser.tsx. resize + scroll fire on every step. */
+async function keyboardVisual(page: Page): Promise<KeyboardRun> {
+  await blurAndRest(page)
+  const before = await page.evaluate(layoutSnapshot, {
+    main: S.main,
+    source: S.source,
+    band: null,
+  })
+  await page.evaluate(startShiftObserver)
+  await focusEnd(page)
+  const full = await page.evaluate(() => window.innerHeight)
+  const visible = Math.round(full * 0.5)
+  const offset = Math.round(full * 0.125)
+  const set = (height: number | null, top: number | null) =>
+    page.evaluate(
+      ([h, t]) => (window as unknown as PageGlobals).__keyboard!.set(h, t),
+      [height, top] as const,
+    )
+  for (let h = full - 50; h > visible; h -= 50) {
+    await set(h, 0)
+    await page.waitForTimeout(50)
+  }
+  await set(visible, offset)
+  await page.waitForTimeout(600)
+  const shiftSum = await page.evaluate(stopShiftObserver)
+  const after = await page.evaluate(layoutSnapshot, {
+    main: S.main,
+    source: S.source,
+    band: { top: offset, height: visible },
+  })
+  await blurAndRest(page)
+  await set(null, null)
+  await page.waitForTimeout(600)
+  return keyboardResult(before, after, shiftSum)
+}
+
+/** Resizes-content keyboard: the layout viewport itself shrinks
+ * (page.setViewportSize) in 50 px steps, 50 ms apart, to half its height. */
+async function keyboardResize(
+  page: Page,
+  profile: Profile,
+): Promise<KeyboardRun> {
+  const size = profile.context.viewport!
+  await blurAndRest(page)
+  const before = await page.evaluate(layoutSnapshot, {
+    main: S.main,
+    source: S.source,
+    band: null,
+  })
+  await page.evaluate(startShiftObserver)
+  await focusEnd(page)
+  const visible = Math.round(size.height * 0.5)
+  for (let h = size.height - 50; h > visible; h -= 50) {
+    await page.setViewportSize({ width: size.width, height: h })
+    await page.waitForTimeout(50)
+  }
+  await page.setViewportSize({ width: size.width, height: visible })
+  await page.waitForTimeout(600)
+  const shiftSum = await page.evaluate(stopShiftObserver)
+  const after = await page.evaluate(layoutSnapshot, {
+    main: S.main,
+    source: S.source,
+    band: { top: 0, height: visible },
+  })
+  await blurAndRest(page)
+  await page.setViewportSize(size)
+  await page.waitForTimeout(600)
+  return keyboardResult(before, after, shiftSum)
+}
 
 async function interactRun(
   browser: Browser,
@@ -805,21 +1000,84 @@ async function interactRun(
 ): Promise<InteractRun> {
   const { context, page } = await newPage(browser, profile)
   try {
-    await page.addInitScript(installTypeableRecorder, SOURCE)
+    await page.addInitScript(installPerfObservers)
+    await page.addInitScript(installInputTracker, S)
     if (profile.keyboard) await page.addInitScript(installFakeVisualViewport)
-    const typeable = await measureFirstTypeable(page, url)
-    const text = `${fake ? `${fixture(FIXTURE).match} ` : ''}${nonce()} How are you doing today, my friend?`
-    const translation = await measureTranslation(page, text, fake)
-    const keyboard = profile.keyboard
-      ? await measureKeyboard(page)
-      : { keyboardCls: null, keyboardMainDy: null, keyboardSourceDy: null }
+    const collect = collector(page)
+    const cold = await typeAtFirstFocus(page, url, fake)
+    const translation = await settledTranslation(page, fake)
+    const js = await jsThroughDone(collect.take().responses)
+    const keyboardV = profile.keyboard ? await keyboardVisual(page) : null
+    const keyboardR = profile.keyboard
+      ? await keyboardResize(page, profile)
+      : null
+    const repeat = await typeAtFirstFocus(page, url, fake)
     return {
-      firstTypeable: typeable.firstTypeable,
-      firstInput: typeable.firstInput,
-      lastLostInput: typeable.lastLost,
-      typeableAttempts: typeable.attempts,
+      cold,
+      repeat,
       ...translation,
-      ...keyboard,
+      ...js,
+      keyboardVisual: keyboardV,
+      keyboardResize: keyboardR,
+    }
+  } finally {
+    await context.close()
+  }
+}
+
+/** Diagnostic: from `commit` on, type a space whenever the textarea takes
+ * focus, until network idle + 5 more tries. A keystroke counts as kept if
+ * its character is still there after settle. Whitespace-only input must
+ * never reach the upstream (checked in --fake). */
+async function probeRun(
+  browser: Browser,
+  profile: Profile,
+  url: string,
+  fake: Fake | null,
+): Promise<ProbeRun> {
+  const { context, page } = await newPage(browser, profile)
+  try {
+    await page.addInitScript(installInputTracker, S)
+    const before = fake ? await fake.requests() : null
+    await page.goto(url, { waitUntil: 'commit', timeout: 120_000 })
+    const state = { idle: false }
+    const idle = page
+      .waitForLoadState('networkidle', { timeout: 120_000 })
+      .then(() => (state.idle = true))
+    let afterIdle = 0
+    const deadline = Date.now() + 120_000
+    while (Date.now() < deadline) {
+      const focused = await page
+        .evaluate(focusSource, S.source)
+        .catch(() => false)
+      if (focused) await page.keyboard.type(' ')
+      if (state.idle && ++afterIdle >= 5) break
+      await page.waitForTimeout(state.idle ? 100 : focused ? 25 : 10)
+    }
+    await idle
+    // Longer than the 800 ms debounce for text without final punctuation.
+    await page.waitForTimeout(1500)
+    const events = await page.evaluate(
+      () => (window as unknown as PageGlobals).__inputs,
+    )
+    const value = await page.locator(S.source).inputValue()
+    const whitespaceRequests = fake ? (await fake.requests()) - before! : null
+    const survivors = value.length
+    const shown = events[0] ?? null
+    if (value.trim() !== '' || survivors === 0 || survivors > events.length)
+      return {
+        kept: null,
+        shown,
+        lastLost: null,
+        attempts: events.length,
+        whitespaceRequests,
+      }
+    return {
+      kept: events[events.length - survivors]!,
+      shown,
+      lastLost: events[events.length - survivors - 1] ?? null,
+      attempts: events.length,
+      whitespaceRequests,
     }
   } finally {
     await context.close()
@@ -843,13 +1101,30 @@ async function attempt<T>(
 
 async function measureProfile(
   profile: Profile,
-  url: string,
+  appUrl: string,
   fake: Fake | null,
   warmUp: boolean,
 ): Promise<ProfileResult> {
+  let url = appUrl
+  let proxy: ReturnType<typeof start> | null = null
+  const launch: LaunchOptions = {}
+  if (profile.network) {
+    if (mode === 'fake') {
+      proxy = await startProxy(profile, new URL(appUrl).host)
+      url = `http://127.0.0.1:${PORTS.proxy}`
+    } else {
+      proxy = await startProxy(profile, null)
+      launch.proxy = { server: `http://127.0.0.1:${PORTS.proxy}` }
+    }
+  }
+  if (mode === 'fake')
+    launch.proxy = {
+      server: BLACKHOLE_PROXY,
+      bypass: '127.0.0.1,localhost',
+    }
   const browser = await (
     profile.browser === 'webkit' ? webkit : chromium
-  ).launch()
+  ).launch(launch)
   try {
     const supportedEntryTypes = await (async () => {
       const page = await browser.newPage()
@@ -861,7 +1136,7 @@ async function measureProfile(
     })()
     if (warmUp) {
       // Discarded: lets the freshly started server load its lazy chunks so
-      // page-load runs measure a warm instance (cold TTFB is measured apart).
+      // measured runs see a warm instance (cold TTFB is measured apart).
       await loadRun(browser, profile, url)
       if (fake) await interactRun(browser, profile, url, fake)
     }
@@ -870,15 +1145,28 @@ async function measureProfile(
       browserVersion: browser.version(),
       supportedEntryTypes,
       load: [],
+      loadRepeat: [],
       interact: [],
+      probe: [],
     }
     for (let i = 0; i < runs; i++) {
-      result.load.push(
-        await attempt(`load ${i + 1}`, () => loadRun(browser, profile, url)),
+      const load = await attempt(`load ${i + 1}`, () =>
+        loadRun(browser, profile, url),
+      )
+      result.load.push('error' in load ? load : load.cold)
+      result.loadRepeat.push(
+        'error' in load
+          ? { error: '(same failure as the cold load)' }
+          : load.repeat,
       )
       result.interact.push(
         await attempt(`interact ${i + 1}`, () =>
           interactRun(browser, profile, url, fake),
+        ),
+      )
+      result.probe.push(
+        await attempt(`probe ${i + 1}`, () =>
+          probeRun(browser, profile, url, fake),
         ),
       )
       process.stdout.write(`  ${profile.id}: run ${i + 1}/${runs}\n`)
@@ -886,6 +1174,7 @@ async function measureProfile(
     return result
   } finally {
     await browser.close()
+    if (proxy) await stop(proxy.child)
   }
 }
 
@@ -897,10 +1186,12 @@ async function measure(): Promise<void> {
   let url: string
   let fake: Fake | null = null
   let server: PerfFile['server']
+  let build: PerfFile['meta']['build'] = null
   let appProc: ReturnType<typeof start> | null = null
   if (mode === 'fake') {
     const prepared = await prepareFake()
     fake = prepared.fake
+    build = prepared.build
     url = prepared.server.url
     console.log(`server TTFB: ${runs} cold restarts…`)
     server = await serverTtfbFake(prepared.server, runs)
@@ -919,6 +1210,10 @@ async function measure(): Promise<void> {
     )
   }
 
+  const network = profiles
+    .filter((p) => p.network)
+    .map((p) => p.id)
+    .join(', ')
   const file: PerfFile = {
     meta: {
       app,
@@ -944,23 +1239,29 @@ async function measure(): Promise<void> {
           ),
         ) as { version: string }
       ).version,
+      build,
       text: `${mode === 'fake' ? `${fixture(FIXTURE).match} ` : ''}<nonce> How are you doing today, my friend?`,
       debounce:
-        'Included in every "last key" timing: the text ends in "?", so both apps use the 400 ms sentence-final debounce.',
+        'The text ends in "?", so both apps use the 400 ms sentence-final debounce; it is inside every translation timing.',
       compression:
         mode === 'fake'
           ? 'Local servers send everything uncompressed (one policy for every app); compare the computed gzip sizes.'
           : 'As served by the deployment (see each resource’s encoding).',
+      network:
+        `Throttled profiles (${network || 'none'}) go through e2e/perf/throttle-proxy.mjs: one shared link, ` +
+        'RTT per request, +1 RTT per new connection, shared down/up bandwidth, for both engines. ' +
+        (mode === 'fake'
+          ? 'Every non-loopback request (CDN fonts, analytics) is sent to a closed proxy port and fails, for every app.'
+          : 'In --live the proxy is the browser’s HTTP CONNECT proxy, so third-party requests are throttled too.'),
       notes: [
         'TTFB/FCP/LCP/DOMContentLoaded/load are ms from navigation start (Navigation and Paint Timing, PerformanceObserver).',
-        'Chromium applies CDP network throttling after the Navigation Timing responseStart point, so throttled-profile TTFB excludes the emulated 562.5 ms latency (it is server + loopback time); FCP, LCP and later metrics include the throttled delivery.',
-        'First typeable = earliest keystroke still in the field once the page settled (spaces typed during load); first keystroke shown = earliest input event at all.',
-        'Pages load the production font CSS/subsets from their CDN over the real network, as in production.',
+        'First typeable = max(FCP, earliest kept keystroke, earliest acted-on keystroke) for one sentence typed as a burst at the first moment the textarea takes focus; a dropped burst is cleared and retyped after the page settles (network idle + 500 ms) and that penalty is included.',
         'TBT = sum over long tasks of the part after FCP beyond 50 ms, until 1 s after network idle (Chromium only: WebKit has no longtask entries).',
         'LCP and CLS need largest-contentful-paint / layout-shift entries; supportedEntryTypes per profile says which engine has them.',
         '"First main char" is the DOM mutation that first shows main text (MutationObserver, performance.now()), not a paint.',
-        'Transferred = response body bytes on the wire (+ headers in "All transferred"); raw = decoded; gzip = gzip -9 of the decoded body.',
-        'Every run uses a fresh browser context (empty cache, no cookies).',
+        'JS total = external script bodies + executable inline <script> of the document; gzip = gzip -9 of decoded bodies.',
+        'Keyboard dy is not "lower is better": read it together with the visibility flags.',
+        'Every load starts in a fresh browser context (empty cache, no cookies, service workers blocked); repeat = second navigation in the same context.',
       ],
     },
     server,

@@ -5,16 +5,18 @@ import type { BrowserContextOptions } from 'playwright'
 // Task 5 brief). Shared by measure.ts and the table writer, which refuses to
 // compare files whose profile definitions differ.
 //
-// Deviation from the brief's "iPhone WebKit 3G-fast throttled": Playwright's
-// WebKit has no CDP, so neither network nor CPU can be throttled there. The
-// iPhone profile is measured UNTHROTTLED and named so; the throttled-network
-// mobile case is carried by the Pixel profile (Lighthouse mobile throttling).
+// Network throttling goes through e2e/perf/throttle-proxy.mjs for BOTH
+// engines (one shared link: latency per request, +1 RTT per new connection,
+// shared bandwidth), so the iPhone/WebKit profile gets the same network as
+// the Pixel/Chromium one. CPU throttling exists only in Chromium (CDP
+// Emulation.setCPUThrottlingRate); WebKit's CPU is unthrottled and the
+// profile says so.
 
-/** Lighthouse's "mobile slow 4G" DevTools throttling (the old "fast 3G"
- * numbers): 150 ms RTT and 1.6 Mbps down / 750 Kbps up, with Lighthouse's
- * request-level multipliers (RTT x 3.75, throughput x 0.9). */
+/** Lighthouse's mobile "slow 4G" throttling values: 150 ms RTT and
+ * 1.6 Mbps down / 750 Kbps up, with its request-level multipliers (RTT x 3.75,
+ * throughput x 0.9). */
 export const LIGHTHOUSE_MOBILE_NETWORK = {
-  latencyMs: 150 * 3.75,
+  rttMs: 150 * 3.75,
   downloadKbps: 1.6 * 1024 * 0.9,
   uploadKbps: 750 * 0.9,
 } as const
@@ -28,9 +30,9 @@ export type Profile = {
   context: BrowserContextOptions
   /** Chromium CDP `Emulation.setCPUThrottlingRate`; 1 = none. */
   cpuSlowdown: number
-  /** Chromium CDP `Network.emulateNetworkConditions`; null = none. */
+  /** Throttle proxy link; null = direct connection. */
   network: NetworkThrottle | null
-  /** Run the simulated software-keyboard (visualViewport shrink) phase. */
+  /** Run the simulated software-keyboard phases. */
   keyboard: boolean
 }
 
@@ -41,17 +43,19 @@ function deviceContext(name: string): BrowserContextOptions {
 
 export const PROFILES: Profile[] = [
   {
-    id: 'iphone-webkit-unthrottled',
-    label: 'iPhone 15, WebKit, unthrottled (WebKit cannot be throttled)',
+    id: 'iphone-webkit-slow4g',
+    label:
+      'iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrottled (WebKit cannot be CPU-throttled)',
     browser: 'webkit',
     context: deviceContext('iPhone 15'),
     cpuSlowdown: 1,
-    network: null,
+    network: LIGHTHOUSE_MOBILE_NETWORK,
     keyboard: true,
   },
   {
     id: 'pixel-chromium-4xcpu-slow4g',
-    label: 'Pixel 7, Chromium, 4x CPU + Lighthouse mobile network',
+    label:
+      'Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle proxy',
     browser: 'chromium',
     context: deviceContext('Pixel 7'),
     cpuSlowdown: 4,
@@ -60,7 +64,8 @@ export const PROFILES: Profile[] = [
   },
   {
     id: 'macbook-chromium',
-    label: 'MacBook 14" (1512x982 @2x), Chromium, unthrottled',
+    label:
+      'MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection',
     browser: 'chromium',
     context: {
       viewport: { width: 1512, height: 982 },
@@ -91,3 +96,8 @@ export function profileDescription(profile: Profile) {
 }
 
 export type ProfileDescription = ReturnType<typeof profileDescription>
+
+/** Bytes per second of a throttle direction. */
+export function bytesPerSecond(kbps: number): number {
+  return (kbps * 1024) / 8
+}
