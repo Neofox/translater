@@ -1,0 +1,9 @@
+/* Tailwind v4 entry for the Go app (`make css` → app.css). base.css and
+   pretendard.css are generated from the TS app's stylesheet (syncstyles);
+   go.css holds the few Go-only rules. */
+@import './pretendard.css';
+@import 'tailwindcss' source(none);
+@source '../../../internal/web';
+@source '../js';
+@import './base.css';
+@import './go.css';

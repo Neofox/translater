@@ -1,0 +1,16 @@
+/* Go-only rules. Each names the TS behaviour it reproduces. */
+
+/* SentenceView/WordView unmount the alternatives section until a row
+   exists; the Go skeleton keeps it mounted for the streamed rows. */
+.detail-alternatives:not(:has(.alternative-item)) {
+  display: none;
+}
+
+/* Floating UI positions the TS popovers with fixed coordinates; prefs.js
+   does the same for the native popovers, so drop the UA centring. */
+.settings-popover[popover],
+[role='listbox'][popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+}
