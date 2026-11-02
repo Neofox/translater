@@ -41,6 +41,7 @@ export default function CopyButton({
       onClick={handleCopy}
       aria-label={label_}
       title={label_}
+      data-testid="copy-button"
       disabled={disabled}
       className={`copy-button ${compact ? 'icon-action' : ''} disabled:cursor-not-allowed disabled:opacity-45`}
     >

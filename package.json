@@ -19,6 +19,9 @@
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:browser:ui": "vitest --config vitest.browser.config.ts --ui",
     "test:browser:report": "vite preview --config vitest.browser.config.ts --outDir test-results/browser --port 4175",
+    "e2e": "playwright test -c e2e",
+    "e2e:ts": "APP=ts playwright test -c e2e",
+    "e2e:go": "APP=go playwright test -c e2e",
     "eval:quality": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c evals/promptfooconfig.yaml --env-file .env.local",
     "eval:quality:fresh": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c evals/promptfooconfig.yaml --env-file .env.local --no-cache",
     "eval:quality:repeat": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c evals/promptfooconfig.yaml --env-file .env.local --repeat 3",
@@ -56,6 +59,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tanstack/devtools-vite": "0.8.5",
     "@tanstack/eslint-config": "0.4.0",
     "@testing-library/dom": "10.4.2",
