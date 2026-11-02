@@ -304,9 +304,22 @@ Therefore **stage 0 is a deployment spike** with pass criteria:
 3. warm-instance reuse is observable (in-memory LRU survives between requests),
 4. cold start TTFB is acceptable (< 500ms target).
 
-If 1 or 2 fails, Vercel cannot host the Go app with parity. The fallback is an
-always-on Go server (e.g. Fly.io or Railway) — **that choice goes back to the
-user at that point**, it is not pre-decided here.
+**Result (2026-11-02):** check 1 passed on Vercel (GET and POST stream
+incrementally); check 2 failed — the Go handler's context is never cancelled
+when the browser disconnects (matches the docs). Requests reused one warm
+instance throughout.
+
+**User decision:** stay on Vercel with a best-effort, in-memory cancel signal
+(a shared store such as Upstash was judged overkill). Each run has a client
+UUID; the server keeps `run → cancel func` for its in-flight OpenAI streams.
+When the client supersedes or abandons a run it aborts the fetch **and** sends
+`POST /cancel` (`run` id, `keepalive: true`/`sendBeacon`). If that request
+lands on the instance running the stream, the OpenAI request is cancelled at
+once; if it lands elsewhere, the old run finishes and is billed (same as no
+cancellation). The `/cancel` handler reports hit/miss via a content-free
+counter (exposed in a debug stats endpoint and logs without text) so miss
+rates can be checked after deployment. The handler also stops writing once a
+write fails, as a second, weaker signal.
 
 ## Testing
 
