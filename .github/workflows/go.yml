@@ -1,0 +1,115 @@
+name: Go app
+
+# No secrets and no billed requests: e2e runs against the fake OpenAI upstream
+# (go/cmd/fakeopenai) with OPENAI_API_KEY=test.
+#
+# Toolchain: jdx/mise-action reads go/mise.toml, which pins both Go and
+# tailwindcss (used by `make css`); actions/setup-go would not provide the
+# latter. The templ generator comes from the go.mod tool directive.
+on:
+  pull_request:
+    paths:
+      - go/**
+      - e2e/**
+      - shared/**
+      - scripts/capture-request-fixtures.ts
+      - src/server/**
+      - src/lib/**
+      - .github/workflows/go.yml
+  workflow_dispatch:
+
+concurrency:
+  group: go-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit, generated files, shared contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        with:
+          working_directory: go
+          cache: true
+
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: Go tests
+        working-directory: go
+        run: go test ./...
+
+      # Regenerates the shared contract copy, templ output and CSS, then fails
+      # when any committed copy differs.
+      - name: Generated files are fresh
+        working-directory: go
+        run: make check
+
+      # A directory argument fails on newer Node; use the glob form.
+      - name: JS unit tests
+        working-directory: go
+        run: node --test 'web/static/js/*.test.js'
+
+      - name: JS size budget
+        working-directory: go
+        run: make size
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Shared prompt and generated contract tests
+        run: npx vitest run src/server/sharedPrompts.test.ts src/server/sharedGenerated.test.ts
+
+  e2e:
+    name: E2E core (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [go, ts]
+    env:
+      APP: ${{ matrix.app }}
+      OPENAI_API_KEY: test
+      E2E_WORKERS: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Both apps need Go: the fake upstream is built from go/.
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        with:
+          working_directory: go
+          cache: true
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium webkit
+
+      # mise-action puts go on PATH; Playwright spawns `go run` from go/.
+      - name: Core e2e
+        run: npx playwright test -c e2e --grep @core
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.app }}
+          path: |
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
