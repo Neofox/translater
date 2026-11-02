@@ -104,6 +104,7 @@ test('stale result disables copy @core', async ({ page, fake }) => {
   await expect(copyButton(page)).toBeDisabled()
   await expect(copyButton(page)).toBeEnabled({ timeout: 15_000 })
   expect(await mainText(page)).toBe(second)
+  await waitForDone(page)
   expect(await fake.requests()).toBe(2)
   // Copy never re-enabled on the old main while the new run was pending.
   const log = await resultLog(page)
@@ -123,6 +124,7 @@ test('paste runs immediately @core', async ({ page, fake }) => {
   expect(Date.now() - start).toBeLessThan(IMMEDIATE_MS)
   await expect(source(page)).toHaveValue(text)
   await waitForMain(page, fixture('plain').result.main!)
+  await waitForDone(page)
 })
 
 test('blur flushes @core', async ({ page, fake }) => {
@@ -137,7 +139,7 @@ test('blur flushes @core', async ({ page, fake }) => {
   // Flushed before the debounce would have fired.
   expect(Date.now() - typedAt).toBeLessThan(800)
   await waitForMain(page, fixture('plain').result.main!)
-  await page.waitForTimeout(1_000)
+  await waitForDone(page)
   expect(await fake.requests()).toBe(1)
 })
 
@@ -152,6 +154,7 @@ test('cmd+enter forces @core', async ({ page, fake }) => {
   expect(Date.now() - start).toBeLessThan(IMMEDIATE_MS)
   await expect(source(page)).toHaveValue(text)
   await waitForMain(page, fixture('plain').result.main!)
+  await waitForDone(page)
 })
 
 test('cmd+enter replaces the pending debounce @core', async ({
@@ -275,6 +278,7 @@ test('error kinds are localized @core', async ({ page, fake }) => {
 
 test('textarea survives streaming and UI language switch @core', async ({
   page,
+  fake,
 }) => {
   await page.evaluate(() => {
     ;(window as unknown as { __ta: Element | null }).__ta =
@@ -292,7 +296,12 @@ test('textarea survives streaming and UI language switch @core', async ({
     ta.setSelectionRange(5, 9)
   })
 
+  // The UI language is part of the request: switching re-runs it. Wait for
+  // that run to reach the fake and finish.
+  const before = await fake.requests()
   await setUiLang(page, 'ko')
+  await waitForStats(fake, (s) => s.requests > before)
+  await waitForMain(page, fixture('plain').result.main!)
   await waitForDone(page)
   const state = await page.evaluate(() => {
     const ta = document.querySelector<HTMLTextAreaElement>(

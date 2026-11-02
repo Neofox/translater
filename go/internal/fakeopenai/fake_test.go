@@ -1,8 +1,8 @@
 package fakeopenai_test
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
@@ -233,6 +233,61 @@ func stats(t *testing.T, url string) fakeopenai.Stats {
 		t.Fatal(err)
 	}
 	return st
+}
+
+// Active counts in-flight requests, survives /_reset, and drops only after
+// the abort of a canceled stream has been counted.
+func TestActiveTracksInFlightRequests(t *testing.T) {
+	srv := httptest.NewServer(fakeopenai.Handler(fixturesDir))
+	defer srv.Close()
+	fx := loadFixture(t, "slow.json")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	res := post(t, ctx, srv.URL, fx.Match)
+	br := bufio.NewReader(res.Body)
+	for {
+		line, err := br.ReadString('\n')
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(line, "output_text.delta") {
+			break
+		}
+	}
+	if st := stats(t, srv.URL); st.Active != 1 {
+		t.Fatalf("active = %d during stream, want 1", st.Active)
+	}
+	r, _ := http.Post(srv.URL+"/_reset", "", nil)
+	r.Body.Close()
+	if st := stats(t, srv.URL); st.Active != 1 || st.Requests != 0 {
+		t.Fatalf("after reset %+v, want active 1 and requests 0", st)
+	}
+
+	cancel()
+	res.Body.Close()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if st := stats(t, srv.URL); st.Active == 0 {
+			if st.Aborted != 1 {
+				t.Fatalf("active reached 0 before the abort was counted: %+v", st)
+			}
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if st := stats(t, srv.URL); st.Active != 0 {
+		t.Fatalf("active = %d after cancel, want 0", st.Active)
+	}
+
+	// Completed and error responses leave Active too.
+	for _, m := range []string{"no marker here", loadFixture(t, "error-rate.json").Match} {
+		r := post(t, context.Background(), srv.URL, m)
+		io.Copy(io.Discard, r.Body)
+		r.Body.Close()
+	}
+	if st := stats(t, srv.URL); st.Active != 0 {
+		t.Fatalf("active = %d after finished requests, want 0", st.Active)
+	}
 }
 
 func TestAbortCounted(t *testing.T) {

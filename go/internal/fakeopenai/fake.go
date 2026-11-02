@@ -54,10 +54,14 @@ type FixtureError struct {
 	Body   jsontext.Value `json:"body"`
 }
 
-// Stats is the body of GET /_stats.
+// Stats is the body of GET /_stats. Active counts requests still being
+// served; it is live state, so /_reset keeps it. A request leaves Active only
+// after any abort it caused has been counted, so a caller that waits for
+// Active == 0 before /_reset cannot have a late abort leak past the reset.
 type Stats struct {
 	Requests   int      `json:"requests"`
 	Aborted    int      `json:"aborted"`
+	Active     int      `json:"active"`
 	LastBodies []string `json:"lastBodies"`
 }
 
@@ -88,7 +92,7 @@ func (s *server) stats(w http.ResponseWriter, _ *http.Request) {
 
 func (s *server) reset(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
-	s.st = Stats{LastBodies: []string{}}
+	s.st = Stats{Active: s.st.Active, LastBodies: []string{}}
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -159,6 +163,15 @@ func (s *server) loadFixtures() (matched []Fixture, def *Fixture, err error) {
 }
 
 func (s *server) responses(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	s.st.Active++
+	s.mu.Unlock()
+	// Deferred first, so it runs last: after the stream counted any abort.
+	defer func() {
+		s.mu.Lock()
+		s.st.Active--
+		s.mu.Unlock()
+	}()
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)

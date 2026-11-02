@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { test as base, expect } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, TestInfo } from '@playwright/test'
 import strings from '../../shared/translation/i18n/strings.json' with { type: 'json' }
-import { appUrl, fakeUrl } from '../ports'
+import { WORKERS, appUrl, fakeUrl } from '../ports'
 
 export { expect }
 
@@ -10,7 +10,13 @@ export type UiLang = 'en' | 'ko'
 export type StringKey = keyof (typeof strings)['en']
 export const STRINGS: Record<UiLang, Record<StringKey, string>> = strings
 
-export type Stats = { requests: number; aborted: number; lastBodies: string[] }
+export type Stats = {
+  requests: number
+  aborted: number
+  /** Requests the fake is still serving; /_reset keeps it. */
+  active: number
+  lastBodies: string[]
+}
 
 /** Client for this worker's fake OpenAI server. */
 export class Fake {
@@ -41,15 +47,41 @@ export class Fake {
   }
 }
 
+/** This worker's fake + app pair (see ports.ts). */
+function pairIndex(testInfo: TestInfo): number {
+  const index = testInfo.parallelIndex
+  if (index >= WORKERS)
+    throw new Error(
+      `Playwright worker ${index} has no fake/app pair: only ${WORKERS} were ` +
+        'started. Set E2E_WORKERS instead of --workers.',
+    )
+  return index
+}
+
+const SETTLE_MS = 5_000
+
 // Playwright fixtures must destructure their dependencies, even when empty.
 /* eslint-disable no-empty-pattern */
 export const test = base.extend<{ fake: Fake }>({
-  // Each worker owns one fake + app pair (see ports.ts).
   baseURL: async ({}, use, testInfo) => {
-    await use(appUrl(testInfo.parallelIndex))
+    await use(appUrl(pairIndex(testInfo)))
   },
   fake: async ({}, use, testInfo) => {
-    const fake = new Fake(fakeUrl(testInfo.parallelIndex))
+    const fake = new Fake(fakeUrl(pairIndex(testInfo)))
+    // A previous test's page may have closed mid-stream. Wait until the
+    // fake has finished (and counted the abort of) every request, so nothing
+    // lands after the reset.
+    const start = Date.now()
+    let stats = await fake.stats()
+    while (stats.active > 0) {
+      if (Date.now() - start > SETTLE_MS)
+        throw new Error(
+          `fake upstream still serves ${stats.active} request(s) ${SETTLE_MS}ms ` +
+            'after the previous test: the app did not cancel or finish them.',
+        )
+      await new Promise((resolve) => setTimeout(resolve, 25))
+      stats = await fake.stats()
+    }
     await fake.reset()
     await use(fake)
   },
