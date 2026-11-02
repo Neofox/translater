@@ -14,6 +14,7 @@
     "format": "prettier --check .",
     "check": "prettier --write . && eslint --fix",
     "typecheck": "tsc --noEmit",
+    "fixtures:capture": "tsx scripts/capture-request-fixtures.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:browser:ui": "vitest --config vitest.browser.config.ts --ui",
     "test:browser:report": "vite preview --config vitest.browser.config.ts --outDir test-results/browser --port 4175",

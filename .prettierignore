@@ -5,3 +5,6 @@ yarn.lock
 
 # Pinned generated font-face declarations
 src/styles/pretendard.css
+
+# Generated golden request bodies: never reformat
+shared/translation/fixtures/
