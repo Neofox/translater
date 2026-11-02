@@ -1,0 +1,59 @@
+{
+  "match": "[fx:emoji]",
+  "intent": "sentence",
+  "chunk": 5,
+  "delayMs": 20,
+  "ascii": true,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "안녕하세요 😀 반가워요 👨‍👩‍👧 \"quoted\" back\\slash\nnewline",
+    "learningPhrases": [
+      {
+        "text": "오늘",
+        "gloss": "today",
+        "sourceTexts": [
+          "today"
+        ],
+        "baseForm": "",
+        "literalMeaning": "",
+        "naturalMeaning": "",
+        "grammar": "어떻게 means how, and 지내요 is the polite present form of 지내다 (to get along). Korean uses this form for an everyday greeting.",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "어떻게 지내요",
+        "gloss": "how are you doing",
+        "sourceTexts": [
+          "How are you doing"
+        ],
+        "baseForm": "지내다",
+        "literalMeaning": "how (you) get along",
+        "naturalMeaning": "how are you doing",
+        "grammar": "지내요 adds the polite present ending -어요 to 지내다.",
+        "omissions": "The subject you is understood.",
+        "grammarHighlights": [
+          "지내요"
+        ],
+        "usageNote": "",
+        "characters": []
+      }
+    ],
+    "rationale": "이모지 😀 와 따옴표 \"…\" 가 섞인 설명입니다.",
+    "alternatives": [
+      {
+        "text": "오늘 잘 지내?",
+        "note": "반말 drops the 요 politeness marker entirely. Using 반말 signals you consider the listener a close equal: saying this to someone older or higher-status would come across as rude."
+      },
+      {
+        "text": "오늘 잘 지내세요?",
+        "note": "The 시 honorific infix in 지내시다 elevates the listener: common when speaking to someone slightly above you in age or rank, like a senior coworker or a friend's parent."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

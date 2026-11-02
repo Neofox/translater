@@ -1,0 +1,16 @@
+{
+  "match": "[fx:error-rate]",
+  "intent": "sentence",
+  "result": null,
+  "error": {
+    "status": 429,
+    "body": {
+      "error": {
+        "message": "Rate limit reached for requests.",
+        "type": "requests",
+        "param": null,
+        "code": "rate_limit_exceeded"
+      }
+    }
+  }
+}
