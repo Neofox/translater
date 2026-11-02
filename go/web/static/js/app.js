@@ -1,0 +1,198 @@
+// Translator page entry: state, routing and runs. Runs are htmx requests of
+// #translate-form (hx-trigger="nt-run", hx-sync="this:replace"); the form
+// holds only hidden inputs, so the textarea is never part of any swap.
+
+import { detectIntent, detectLanguage, fallbackTargetFor, initComposer, resolveTarget } from './composer.js'
+import { initCopy, requestKey } from './copy.js'
+import { initPrefs } from './prefs.js'
+import { initStream } from './stream.js'
+
+const data = JSON.parse(document.getElementById('nt-data').textContent)
+const form = document.getElementById('translate-form')
+const ta = document.querySelector('[data-testid="input-textarea"]')
+const VALID_DETECTED = ['en', 'ko', 'ja', 'fr', 'es', 'zh']
+const REGISTER = { friends: '반말', casual: '해요체', professional: '존댓말' }
+
+let composer, stream, copy, prefs
+// The model's report for an exact input, kept while that input stays.
+let modelDetected = null
+// Input for which the done-time safety net already flipped the target.
+let flipGuard = null
+
+const app = {
+  prefs: data.prefs,
+  /** The current run: { run, key, text, intent, source, target, raw, main,
+   * mainReady, done, error, aborted, sourceLang, rationale, formality }. */
+  live: null,
+  pending: false,
+  t: (key) => data.strings[app.prefs.uiLang]?.[key] ?? data.strings.en[key] ?? key,
+  streaming: () => Boolean(app.pending && app.live && !app.live.done && !app.live.aborted),
+  context: () => '',
+  refinements: () => [],
+
+  detected() {
+    if (app.prefs.source !== 'auto') return null
+    const trimmed = ta.value.trim()
+    if (!trimmed) return null
+    const live = app.live
+    if (live && live.text === trimmed && live.source === 'auto' && VALID_DETECTED.includes(live.sourceLang))
+      return live.sourceLang
+    if (modelDetected?.text === trimmed) return modelDetected.lang
+    return detectLanguage(trimmed)
+  },
+  routingDetected() {
+    if (app.prefs.source !== 'auto') return null
+    const trimmed = ta.value.trim()
+    return modelDetected?.text === trimmed ? modelDetected.lang : detectLanguage(trimmed)
+  },
+  translationTarget() {
+    const { source, target } = app.prefs
+    const detected = flipGuard === ta.value.trim() ? null : app.routingDetected()
+    return resolveTarget({ source, target, detected })
+  },
+  currentKey() {
+    const { source, mode, uiLang } = app.prefs
+    return requestKey({
+      text: ta.value, source, target: app.translationTarget(), mode,
+      context: app.context(), refinements: app.refinements(), uiLang,
+    })
+  },
+
+  /** Auto source: keep the target away from the detected language. */
+  autoSwap() {
+    if (!ta.value.trim() || app.prefs.source !== 'auto' || !app.routingDetected()) return
+    const target = app.translationTarget()
+    if (target !== app.prefs.target) prefs.set('target', target)
+  },
+
+  /** Stop the in-flight run; its late events are ignored from now on. */
+  abort() {
+    if (!app.pending) return
+    app.pending = false
+    if (app.live) app.live.aborted = true
+    htmx.trigger(form, 'htmx:abort')
+    stream.stop()
+  },
+
+  inputChanged() {
+    app.abort()
+    const trimmed = ta.value.trim()
+    if (flipGuard !== trimmed) flipGuard = null
+    if (!trimmed) {
+      app.live = null
+      stream.clear()
+    }
+    app.autoSwap()
+    prefs.syncDetected()
+    updateCount()
+    copy.updateActions()
+  },
+
+  /** Tone, languages or UI language changed: abort and re-run debounced. */
+  settingsChanged() {
+    app.abort()
+    app.autoSwap()
+    updateCount()
+    copy.updateActions()
+    composer.schedule()
+  },
+
+  run() {
+    const text = ta.value
+    const trimmed = text.trim()
+    if (!trimmed) return
+    app.abort()
+    composer.clearTimer()
+    const { source, mode, uiLang } = app.prefs
+    const target = app.translationTarget()
+    const intent = detectIntent(text)
+    const live = {
+      run: crypto.randomUUID(), key: app.currentKey(), text: trimmed, intent, source, target,
+      raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
+      sourceLang: null, rationale: '', formality: '',
+      register: intent === 'sentence' && target === 'ko' ? REGISTER[mode] : '',
+    }
+    app.live = live
+    if (trimmed.length > data.limits.maxInputChars) {
+      stream.start(live)
+      stream.showError(
+        app.t('inputTooLong'),
+        app.t('inputTooLongHint').replace('{max}', data.limits.maxInputChars).replace('{count}', trimmed.length),
+      )
+      return
+    }
+    const values = {
+      run: live.run, text: trimmed, source, target, mode, intent, uiLang,
+      context: app.context(), previousMain: '', refinements: '',
+    }
+    for (const [name, value] of Object.entries(values))
+      if (form.elements[name]) form.elements[name].value = value
+    app.pending = true
+    stream.start(live)
+    htmx.trigger(form, 'nt-run')
+  },
+
+  /** The model named the source language of the current run. */
+  sourceReported(live) {
+    if (live.source !== 'auto' || !VALID_DETECTED.includes(live.sourceLang)) return
+    const same = modelDetected?.text === live.text && modelDetected.lang === live.sourceLang
+    if (!same) modelDetected = { text: live.text, lang: live.sourceLang }
+    prefs.syncDetected()
+  },
+
+  /** Safety net: the model says the source IS the target; flip once. */
+  sourceDone(live) {
+    if (live.source !== 'auto' || app.prefs.source !== 'auto' || live.text !== ta.value.trim()) return
+    const reported = live.sourceLang
+    if (!VALID_DETECTED.includes(reported) || reported !== app.prefs.target || flipGuard === live.text) return
+    flipGuard = live.text
+    prefs.set('target', fallbackTargetFor(reported))
+  },
+
+  updateActions: () => copy.updateActions(),
+  copyMain: () => copy.copyMain(),
+  warm: () => fetch('/warm', { method: 'POST' }).catch(() => {}),
+  setSwapBusy(busy) {
+    const button = document.querySelector('.swap-button')
+    if (!button) return
+    button.querySelector('[data-icon="swap"]').hidden = busy
+    button.querySelector('[data-icon="busy"]').hidden = !busy
+  },
+}
+
+function updateCount() {
+  const length = ta.value.length
+  const max = data.limits.maxInputChars
+  const show = length >= max * data.limits.inputWarnFraction
+  const el = document.querySelector('.input-count')
+  el.textContent = app.t(show ? 'charCount' : 'inputCount').replace('{count}', length).replace('{max}', max)
+  el.classList.toggle('input-count-visible', show)
+  el.classList.toggle('text-red-400', length > max)
+  el.classList.toggle('text-ink-dim', length <= max)
+  if (show) el.setAttribute('aria-live', 'polite')
+  else el.removeAttribute('aria-live')
+}
+
+// Swap languages (OutputPanel.tsx): a finished result becomes the new input.
+document.querySelector('.swap-button')?.addEventListener('click', () => {
+  const { source, target } = app.prefs
+  const from = source === 'auto' ? (app.detected() ?? 'en') : source
+  const live = app.live
+  const main = live?.done && !live.error && live.key === app.currentKey() ? live.main : null
+  if (main) {
+    composer.replaceText(main)
+    prefs.set('source', 'auto')
+    prefs.set('target', from)
+  } else {
+    prefs.set('source', target)
+    prefs.set('target', from)
+  }
+})
+
+stream = initStream(app, form)
+copy = initCopy(app)
+prefs = initPrefs(app, data)
+composer = initComposer(app, ta)
+updateCount()
+copy.updateActions()
+if (matchMedia('(pointer: fine)').matches) ta.focus()
