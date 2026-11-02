@@ -1,0 +1,2463 @@
+{
+  "meta": {
+    "app": "ts",
+    "mode": "fake",
+    "url": "http://127.0.0.1:3150",
+    "date": "2026-11-02T07:03:47.203Z",
+    "commit": "bb8647151413f1ff7be175563c598f2f1e76aa88",
+    "dirty": false,
+    "runs": 10,
+    "node": "v26.5.0",
+    "playwright": "1.64.1",
+    "text": "[fx:stream] <nonce> How are you doing today, my friend?",
+    "debounce": "Included in every \"last key\" timing: the text ends in \"?\", so both apps use the 400 ms sentence-final debounce.",
+    "compression": "Local servers send everything uncompressed (one policy for every app); compare the computed gzip sizes.",
+    "notes": [
+      "TTFB/FCP/LCP/DOMContentLoaded/load are ms from navigation start (Navigation and Paint Timing, PerformanceObserver).",
+      "Chromium applies CDP network throttling after the Navigation Timing responseStart point, so throttled-profile TTFB excludes the emulated 562.5 ms latency (it is server + loopback time); FCP, LCP and later metrics include the throttled delivery.",
+      "First typeable = earliest keystroke still in the field once the page settled (spaces typed during load); first keystroke shown = earliest input event at all.",
+      "Pages load the production font CSS/subsets from their CDN over the real network, as in production.",
+      "TBT = sum over long tasks of the part after FCP beyond 50 ms, until 1 s after network idle (Chromium only: WebKit has no longtask entries).",
+      "LCP and CLS need largest-contentful-paint / layout-shift entries; supportedEntryTypes per profile says which engine has them.",
+      "\"First main char\" is the DOM mutation that first shows main text (MutationObserver, performance.now()), not a paint.",
+      "Transferred = response body bytes on the wire (+ headers in \"All transferred\"); raw = decoded; gzip = gzip -9 of the decoded body.",
+      "Every run uses a fresh browser context (empty cache, no cookies)."
+    ]
+  },
+  "server": {
+    "note": "Local process restarted per sample; cold = first GET / after TCP readiness, warm = the second GET. Node client, new connection each.",
+    "coldTtfb": [
+      97.22795900000028, 97.68562500000007, 96.93733399999928, 97.1904169999998,
+      93.66691699999865, 103.36970800000017, 96.8823339999999,
+      96.10579099999995, 95.92508300000009, 96.73420799999985
+    ],
+    "warmTtfb": [
+      7.41641699999991, 4.316917000000103, 4.691416000000572, 4.299957999999606,
+      4.597084000000905, 4.694375000000946, 4.910625000000437,
+      5.602000000000771, 4.583458999999493, 4.511749999999665
+    ]
+  },
+  "profiles": [
+    {
+      "profile": {
+        "id": "iphone-webkit-unthrottled",
+        "label": "iPhone 15, WebKit, unthrottled (WebKit cannot be throttled)",
+        "browser": "webkit",
+        "viewport": {
+          "width": 393,
+          "height": 659
+        },
+        "deviceScaleFactor": 3,
+        "isMobile": true,
+        "cpuSlowdown": 1,
+        "network": null,
+        "keyboard": true
+      },
+      "browserVersion": "27.2",
+      "supportedEntryTypes": [
+        "event",
+        "first-input",
+        "largest-contentful-paint",
+        "mark",
+        "measure",
+        "navigation",
+        "paint",
+        "resource"
+      ],
+      "load": [
+        {
+          "ttfb": 6,
+          "domContentLoaded": 32,
+          "load": 149,
+          "fcp": 79,
+          "lcp": 79,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251607,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 5,
+          "domContentLoaded": 29,
+          "load": 193,
+          "fcp": 75,
+          "lcp": 75,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251601,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 27,
+          "load": 242,
+          "fcp": 69,
+          "lcp": 69,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251601,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 5,
+          "domContentLoaded": 28,
+          "load": 993,
+          "fcp": 72,
+          "lcp": 72,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251636,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 26,
+          "load": 230,
+          "fcp": 66,
+          "lcp": 66,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251605,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 26,
+          "load": 159,
+          "fcp": 67,
+          "lcp": 67,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251610,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 26,
+          "load": 157,
+          "fcp": 66,
+          "lcp": 66,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251602,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 26,
+          "load": 238,
+          "fcp": 67,
+          "lcp": 67,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251629,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 29,
+          "load": 165,
+          "fcp": 72,
+          "lcp": 72,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251603,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 4,
+          "domContentLoaded": 26,
+          "load": 156,
+          "fcp": 68,
+          "lcp": 68,
+          "tbt": null,
+          "loadCls": null,
+          "jsRaw": 925452,
+          "jsTransferred": 925452,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146878,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16962,
+          "totalTransferred": 1251638,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16962,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146878,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361123,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564329,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        }
+      ],
+      "interact": [
+        {
+          "firstTypeable": 157,
+          "firstInput": 74,
+          "typeableAttempts": 24,
+          "keyToFirstChar": 675,
+          "keyToCopy": 979,
+          "keyToDone": 4744,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 171,
+          "firstInput": 75,
+          "typeableAttempts": 24,
+          "keyToFirstChar": 680,
+          "keyToCopy": 987,
+          "keyToDone": 4745,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 155,
+          "firstInput": 72,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 681,
+          "keyToCopy": 985,
+          "keyToDone": 4717,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 149,
+          "firstInput": 76,
+          "typeableAttempts": 25,
+          "keyToFirstChar": 681,
+          "keyToCopy": 979,
+          "keyToDone": 4735,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 149,
+          "firstInput": 68,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 677,
+          "keyToCopy": 982,
+          "keyToDone": 4721,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 156,
+          "firstInput": 70,
+          "typeableAttempts": 22,
+          "keyToFirstChar": 674,
+          "keyToCopy": 979,
+          "keyToDone": 4728,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 143,
+          "firstInput": 64,
+          "typeableAttempts": 24,
+          "keyToFirstChar": 680,
+          "keyToCopy": 976,
+          "keyToDone": 4733,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 153,
+          "firstInput": 72,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 673,
+          "keyToCopy": 975,
+          "keyToDone": 4710,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 184,
+          "firstInput": 77,
+          "typeableAttempts": 22,
+          "keyToFirstChar": 688,
+          "keyToCopy": 985,
+          "keyToDone": 4769,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        },
+        {
+          "firstTypeable": 150,
+          "firstInput": 69,
+          "typeableAttempts": 24,
+          "keyToFirstChar": 671,
+          "keyToCopy": 975,
+          "keyToDone": 4754,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": 58,
+          "keyboardSourceDy": 258
+        }
+      ]
+    },
+    {
+      "profile": {
+        "id": "pixel-chromium-4xcpu-slow4g",
+        "label": "Pixel 7, Chromium, 4x CPU + Lighthouse mobile network",
+        "browser": "chromium",
+        "viewport": {
+          "width": 412,
+          "height": 839
+        },
+        "deviceScaleFactor": 2.625,
+        "isMobile": true,
+        "cpuSlowdown": 4,
+        "network": {
+          "latencyMs": 562.5,
+          "downloadKbps": 1474.5600000000002,
+          "uploadKbps": 675
+        },
+        "keyboard": true
+      },
+      "browserVersion": "156.0.8078.4",
+      "supportedEntryTypes": [
+        "element",
+        "event",
+        "first-input",
+        "interaction-contentful-paint",
+        "largest-contentful-paint",
+        "layout-shift",
+        "long-animation-frame",
+        "longtask",
+        "mark",
+        "measure",
+        "navigation",
+        "paint",
+        "resource",
+        "soft-navigation",
+        "visibility-state"
+      ],
+      "load": [
+        {
+          "ttfb": 5.600000001490116,
+          "domContentLoaded": 2890.89999999851,
+          "load": 5394.39999999851,
+          "fcp": 2896,
+          "lcp": 2896,
+          "tbt": 30,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251583,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3,
+          "domContentLoaded": 2822.300000000745,
+          "load": 5368.5,
+          "fcp": 2828,
+          "lcp": 2828,
+          "tbt": 27,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251612,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.899999998509884,
+          "domContentLoaded": 2828.300000000745,
+          "load": 5355.39999999851,
+          "fcp": 2836,
+          "lcp": 2836,
+          "tbt": 21,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251573,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3,
+          "domContentLoaded": 2827.300000000745,
+          "load": 5363,
+          "fcp": 2832,
+          "lcp": 2832,
+          "tbt": 15,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251234,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3.099999997764826,
+          "domContentLoaded": 2823,
+          "load": 5370.099999997765,
+          "fcp": 2828,
+          "lcp": 2828,
+          "tbt": 16,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251589,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4304
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3.2000000029802322,
+          "domContentLoaded": 2823.400000002235,
+          "load": 5371.800000000745,
+          "fcp": 2828,
+          "lcp": 2828,
+          "tbt": 13,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251578,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3,
+          "domContentLoaded": 2824.60000000149,
+          "load": 5371.199999999255,
+          "fcp": 2832,
+          "lcp": 2832,
+          "tbt": 15,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251216,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3.099999997764826,
+          "domContentLoaded": 2828.39999999851,
+          "load": 5366.5,
+          "fcp": 2832,
+          "lcp": 2832,
+          "tbt": 21,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251602,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.800000000745058,
+          "domContentLoaded": 2820.7000000029802,
+          "load": 5360.800000000745,
+          "fcp": 2828,
+          "lcp": 2828,
+          "tbt": 37,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251591,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3.199999999254942,
+          "domContentLoaded": 2828.599999997765,
+          "load": 5361.300000000745,
+          "fcp": 2836,
+          "lcp": 2836,
+          "tbt": 18,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251564,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        }
+      ],
+      "interact": [
+        {
+          "firstTypeable": 7904.60000000149,
+          "firstInput": 2843.60000000149,
+          "typeableAttempts": 194,
+          "keyToFirstChar": 1013.8000000007451,
+          "keyToCopy": 1013.8000000007451,
+          "keyToDone": 4725.900000002235,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7926.900000002235,
+          "firstInput": 2825.60000000149,
+          "typeableAttempts": 194,
+          "keyToFirstChar": 1029.6000000014901,
+          "keyToCopy": 1029.6000000014901,
+          "keyToDone": 4743.199999999255,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7910.300000000745,
+          "firstInput": 2833.10000000149,
+          "typeableAttempts": 193,
+          "keyToFirstChar": 1010.0999999977648,
+          "keyToCopy": 1010.0999999977648,
+          "keyToDone": 4714.300000000745,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7912.10000000149,
+          "firstInput": 2828.60000000149,
+          "typeableAttempts": 194,
+          "keyToFirstChar": 1003.6999999992549,
+          "keyToCopy": 1003.6999999992549,
+          "keyToDone": 4716.5,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7906.89999999851,
+          "firstInput": 2822.099999997765,
+          "typeableAttempts": 195,
+          "keyToFirstChar": 1015.3000000007451,
+          "keyToCopy": 1015.3000000007451,
+          "keyToDone": 4724,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7896.699999999255,
+          "firstInput": 2828,
+          "typeableAttempts": 194,
+          "keyToFirstChar": 1015.9000000022352,
+          "keyToCopy": 1015.9000000022352,
+          "keyToDone": 4723,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7008.5,
+          "firstInput": 2830.89999999851,
+          "typeableAttempts": 365,
+          "keyToFirstChar": 1015.3999999985099,
+          "keyToCopy": 1015.3999999985099,
+          "keyToDone": 4718.300000000745,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7906,
+          "firstInput": 2840.400000002235,
+          "typeableAttempts": 195,
+          "keyToFirstChar": 1006.1999999992549,
+          "keyToCopy": 1006.1999999992549,
+          "keyToDone": 4707.300000000745,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7907.199999999255,
+          "firstInput": 2827.900000002235,
+          "typeableAttempts": 194,
+          "keyToFirstChar": 1005.4000000022352,
+          "keyToCopy": 1005.4000000022352,
+          "keyToDone": 4704.800000000745,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        },
+        {
+          "firstTypeable": 7900.199999999255,
+          "firstInput": 2838.300000000745,
+          "typeableAttempts": 194,
+          "keyToFirstChar": 1013.6999999992549,
+          "keyToCopy": 1013.6999999992549,
+          "keyToDone": 4725.199999999255,
+          "upstreamRequests": 1,
+          "keyboardCls": 0.2280574631244131,
+          "keyboardMainDy": 56,
+          "keyboardSourceDy": 330
+        }
+      ]
+    },
+    {
+      "profile": {
+        "id": "macbook-chromium",
+        "label": "MacBook 14\" (1512x982 @2x), Chromium, unthrottled",
+        "browser": "chromium",
+        "viewport": {
+          "width": 1512,
+          "height": 982
+        },
+        "deviceScaleFactor": 2,
+        "isMobile": false,
+        "cpuSlowdown": 1,
+        "network": null,
+        "keyboard": false
+      },
+      "browserVersion": "156.0.8078.4",
+      "supportedEntryTypes": [
+        "element",
+        "event",
+        "first-input",
+        "interaction-contentful-paint",
+        "largest-contentful-paint",
+        "layout-shift",
+        "long-animation-frame",
+        "longtask",
+        "mark",
+        "measure",
+        "navigation",
+        "paint",
+        "resource",
+        "soft-navigation",
+        "visibility-state"
+      ],
+      "load": [
+        {
+          "ttfb": 3.600000001490116,
+          "domContentLoaded": 36.399999998509884,
+          "load": 231.5,
+          "fcp": 48,
+          "lcp": 48,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251863,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4304
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.699999999254942,
+          "domContentLoaded": 33.399999998509884,
+          "load": 120.19999999925494,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251850,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.699999999254942,
+          "domContentLoaded": 33.80000000074506,
+          "load": 132.89999999850988,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251727,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4304
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.800000000745058,
+          "domContentLoaded": 34.30000000074506,
+          "load": 179.39999999850988,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251851,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.699999999254942,
+          "domContentLoaded": 35.69999999925494,
+          "load": 127.10000000149012,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251862,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3.300000000745058,
+          "domContentLoaded": 35.099999997764826,
+          "load": 89.30000000074506,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251478,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 3,
+          "domContentLoaded": 33.69999999925494,
+          "load": 88.30000000074506,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251485,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.699999999254942,
+          "domContentLoaded": 33.5,
+          "load": 89.60000000149012,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251849,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.600000001490116,
+          "domContentLoaded": 34.900000002235174,
+          "load": 93.30000000074506,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251841,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        },
+        {
+          "ttfb": 2.800000000745058,
+          "domContentLoaded": 34.600000001490116,
+          "load": 91.60000000149012,
+          "fcp": 44,
+          "lcp": 44,
+          "tbt": 0,
+          "loadCls": 0,
+          "jsRaw": 925452,
+          "jsTransferred": 925454,
+          "jsGzip": 290493,
+          "cssRaw": 146878,
+          "cssTransferred": 146879,
+          "cssGzip": 29435,
+          "htmlRaw": 16907,
+          "htmlTransferred": 16963,
+          "totalTransferred": 1251828,
+          "resources": [
+            {
+              "url": "http://127.0.0.1:3150/",
+              "type": "document",
+              "status": 200,
+              "encoding": null,
+              "raw": 16907,
+              "transferred": 16963,
+              "gzip": 4301
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/styles-D1JLLsT_.css",
+              "type": "stylesheet",
+              "status": 200,
+              "encoding": null,
+              "raw": 146878,
+              "transferred": 146879,
+              "gzip": 29435
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/index-t8WD9cQE.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 361123,
+              "transferred": 361124,
+              "gzip": 116613
+            },
+            {
+              "url": "http://127.0.0.1:3150/assets/routes-BWvrTRcm.js",
+              "type": "script",
+              "status": 200,
+              "encoding": null,
+              "raw": 564329,
+              "transferred": 564330,
+              "gzip": 173880
+            },
+            {
+              "url": "http://127.0.0.1:3150/_vercel/insights/script.js",
+              "type": "script",
+              "status": 404,
+              "encoding": null,
+              "raw": 0,
+              "transferred": 0,
+              "gzip": 20
+            }
+          ]
+        }
+      ],
+      "interact": [
+        {
+          "firstTypeable": 94.39999999850988,
+          "firstInput": 55.19999999925494,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 673.9000000022352,
+          "keyToCopy": 978.6000000014901,
+          "keyToDone": 4713.70000000298,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 90.60000000149012,
+          "firstInput": 36.30000000074506,
+          "typeableAttempts": 26,
+          "keyToFirstChar": 688.8999999985099,
+          "keyToCopy": 983.1999999992549,
+          "keyToDone": 4739.599999997765,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 87.69999999925494,
+          "firstInput": 36.30000000074506,
+          "typeableAttempts": 24,
+          "keyToFirstChar": 690.3000000007451,
+          "keyToCopy": 992,
+          "keyToDone": 4725.60000000149,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 91.60000000149012,
+          "firstInput": 52.399999998509884,
+          "typeableAttempts": 25,
+          "keyToFirstChar": 682.8000000007451,
+          "keyToCopy": 976.5,
+          "keyToDone": 4718.199999999255,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 89.5,
+          "firstInput": 36,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 674.3999999985099,
+          "keyToCopy": 977.3000000007451,
+          "keyToDone": 4713.60000000149,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 94,
+          "firstInput": 55.099999997764826,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 705.3000000007451,
+          "keyToCopy": 1004.3000000007451,
+          "keyToDone": 4761.800000000745,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 86.89999999850988,
+          "firstInput": 37.099999997764826,
+          "typeableAttempts": 25,
+          "keyToFirstChar": 678.9000000022352,
+          "keyToCopy": 981.2000000029802,
+          "keyToDone": 4730.400000002235,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 84.80000000074506,
+          "firstInput": 35.30000000074506,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 669.1999999992549,
+          "keyToCopy": 983.1999999992549,
+          "keyToDone": 4741.60000000149,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 94.29999999701977,
+          "firstInput": 50.399999998509884,
+          "typeableAttempts": 22,
+          "keyToFirstChar": 682.6000000014901,
+          "keyToCopy": 983.1999999992549,
+          "keyToDone": 4705.10000000149,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        },
+        {
+          "firstTypeable": 87.19999999925494,
+          "firstInput": 35.5,
+          "typeableAttempts": 23,
+          "keyToFirstChar": 676.8999999985099,
+          "keyToCopy": 981,
+          "keyToDone": 4733,
+          "upstreamRequests": 1,
+          "keyboardCls": null,
+          "keyboardMainDy": null,
+          "keyboardSourceDy": null
+        }
+      ]
+    }
+  ]
+}
