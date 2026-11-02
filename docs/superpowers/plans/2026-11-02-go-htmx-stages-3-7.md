@@ -807,7 +807,3 @@ Why `float.js` is hand-written: the spec forbids Floating UI (binding over "pref
   - (d) The Go-only CSS rules in `go.css`.
   - (e) The JS budget from `make size`.
 - [ ] **Step 4:** Push the branch and confirm CI passes. **Commit** (`docs: parity sign-off for the Go app`).
-
----
-
-### Critical Files for Implementation
