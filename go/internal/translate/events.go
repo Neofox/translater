@@ -2,6 +2,7 @@ package translate
 
 import (
 	"encoding/json/v2"
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
@@ -100,7 +101,9 @@ func (s *sseWriter) write(frame string) bool {
 		s.err = err
 		return false
 	}
-	if err := s.flush(); err != nil {
+	// A writer without flush support buffers (a host problem), but the
+	// client is still there: only a real flush failure ends the stream.
+	if err := s.flush(); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		s.err = err
 		return false
 	}

@@ -381,6 +381,18 @@ func TestPartialSplitsEveryLineBreak(t *testing.T) {
 	}
 }
 
+func TestFlushNotSupportedKeepsStreaming(t *testing.T) {
+	var b strings.Builder
+	out := &sseWriter{w: &b, flush: func() error { return fmt.Errorf("wrapped: %w", http.ErrNotSupported) }}
+	if !out.event(evDone, runPayload{Run: "r"}) || !out.partial("x") {
+		t.Fatal("a writer without flush support was treated as a disconnect")
+	}
+	out = &sseWriter{w: &b, flush: func() error { return io.ErrClosedPipe }}
+	if out.event(evDone, runPayload{Run: "r"}) {
+		t.Fatal("a failed flush was ignored")
+	}
+}
+
 func TestResponseClosedAfterDone(t *testing.T) {
 	e := newEnv(t, fixturesDir, nil)
 	raw := e.run(t, form("How are you doing today?"))
