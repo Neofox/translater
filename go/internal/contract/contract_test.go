@@ -168,3 +168,15 @@ func TestUnknownTemplate(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestForbiddenTagsRejected(t *testing.T) {
+	for _, tag := range []string{"{{{x}}}", "{{& x}}", "{{=<% %>=}}"} {
+		_, err := parseTemplates(map[string]string{"bad-one": "a " + tag + "\n"})
+		if err == nil || !strings.Contains(err.Error(), `"bad-one"`) {
+			t.Errorf("%s: err = %v, want error naming the template", tag, err)
+		}
+	}
+	if _, err := parseTemplates(map[string]string{"ok": "{{x}}\n"}); err != nil {
+		t.Errorf("plain variable rejected: %v", err)
+	}
+}

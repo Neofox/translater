@@ -17,6 +17,8 @@ import (
 var dataFS embed.FS
 
 func init() {
+	// Invariant: this package is the only mustache user in the binary, so
+	// flipping this process-wide cbroglie global here cannot affect others.
 	// Process-wide cbroglie switch: a variable missing from the view is a
 	// render error instead of an empty string. Sections stay lenient in the
 	// library (a missing section name is falsy), so templates only use
@@ -239,28 +241,52 @@ func (c *Contract) loadTemplates() error {
 			return err
 		}
 		name := strings.TrimSuffix(strings.TrimPrefix(p, "data/prompts/"), ".mustache")
-		raw[name] = rawify(string(b))
+		raw[name] = string(b)
 		return nil
 	})
 	if err != nil {
 		return err
 	}
+	t, err := parseTemplates(raw)
+	if err != nil {
+		return err
+	}
+	c.Templates = t
+	return nil
+}
+
+// forbiddenTags are mustache constructs the contract never uses (shared
+// README rule 5). Triple/ampersand tags would collide with rawify, and
+// delimiter changes would defeat its regex.
+var forbiddenTags = []string{"{{{", "{{&", "{{="}
+
+// parseTemplates validates and parses template sources keyed by name.
+func parseTemplates(sources map[string]string) (map[string]*mustache.Template, error) {
+	raw := make(map[string]string, len(sources))
+	for name, src := range sources {
+		for _, tag := range forbiddenTags {
+			if strings.Contains(src, tag) {
+				return nil, fmt.Errorf("contract: template %q uses forbidden tag %q (only variables, sections, comments and partials are allowed)", name, tag)
+			}
+		}
+		raw[name] = rawify(src)
+	}
 	for name, src := range raw {
 		for _, m := range partialTag.FindAllStringSubmatch(src, -1) {
 			if _, ok := raw[m[1]]; !ok {
-				return fmt.Errorf("contract: template %q references missing partial %q", name, m[1])
+				return nil, fmt.Errorf("contract: template %q references missing partial %q", name, m[1])
 			}
 		}
 	}
-	c.Templates = make(map[string]*mustache.Template, len(raw))
+	out := make(map[string]*mustache.Template, len(raw))
 	for name, src := range raw {
 		t, err := mustache.ParseStringPartials(src, partials(raw))
 		if err != nil {
-			return fmt.Errorf("contract: parse template %q: %w", name, err)
+			return nil, fmt.Errorf("contract: parse template %q: %w", name, err)
 		}
-		c.Templates[name] = t
+		out[name] = t
 	}
-	return nil
+	return out, nil
 }
 
 func (c *Contract) loadFewshots() error {
