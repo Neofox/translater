@@ -151,10 +151,11 @@ export function initStream(app, form) {
       tag.textContent = live.register
       parts.push(tag)
     }
-    for (const text of [rationale, formality]) {
+    for (const [id, text] of [['explanation-rationale', rationale], ['explanation-formality', formality]]) {
       if (!text) continue
       if (parts.length > (live.register ? 1 : 0)) parts.push(' ')
       const span = document.createElement('span')
+      span.id = id
       span.textContent = text
       parts.push(span)
     }

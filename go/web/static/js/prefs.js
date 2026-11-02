@@ -26,6 +26,9 @@ export const FIXED = { source: ['auto', 'en', 'ko'], target: ['en', 'ko'] }
 // Pill tones (src/components/ui/Pill.tsx) of a selected and an idle chip.
 const ACTIVE = ['border-accent/70', 'bg-accent-soft', '[&>svg]:text-accent']
 const NEUTRAL = ['border-border', 'bg-panel', 'hover:border-accent/60']
+// UiLangToggle.tsx button states.
+const UI_ACTIVE = ['bg-accent', 'text-bg', 'shadow-sm']
+const UI_IDLE = ['text-ink-soft', 'hover:text-ink']
 
 /** Place a top-layer popup below `anchor`, flipping above when needed. */
 export function place(popup, anchor, { align = 'start', offset = 6, maxHeight = Infinity } = {}) {
@@ -69,8 +72,12 @@ export function initPrefs(app, data) {
       b.setAttribute('aria-pressed', String(b.dataset.value === p.mode))
     const select = document.querySelector('.mode-select')
     if (select) select.value = p.mode
-    for (const b of document.querySelectorAll('[data-ui-lang]'))
-      b.setAttribute('aria-pressed', String(b.dataset.uiLang === p.uiLang))
+    for (const b of document.querySelectorAll('[data-ui-lang]')) {
+      const pressed = b.dataset.uiLang === p.uiLang
+      b.setAttribute('aria-pressed', String(pressed))
+      for (const c of UI_ACTIVE) b.classList.toggle(c, pressed)
+      for (const c of UI_IDLE) b.classList.toggle(c, !pressed)
+    }
     for (const bar of ['source', 'target'])
       for (const chip of document.querySelectorAll(`#${bar}-bar [data-testid="lang-chip"]`)) {
         const pressed = chip.dataset.value === p[bar]
