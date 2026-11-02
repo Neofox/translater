@@ -9,8 +9,7 @@ templ LanguageBar(v View, kind string) {
 		<div class="language-chip-scroll flex min-w-0 items-center gap-1.5 overflow-x-auto">
 			for _, c := range v.chips(kind) {
 				<button type="button" aria-pressed={ boolString(c.Pressed) } data-testid="lang-chip" data-value={ c.Code } aria-label={ c.Label } class={ pill(chipTone(c.Pressed), "md", "language-chip") }>
-					<span class="sr-only">{ c.Label }</span>
-					<span aria-hidden="true">{ c.Short }</span>
+					<span class="sr-only">{ c.Label }</span><span aria-hidden="true">{ c.Short }</span>
 				</button>
 			}
 		</div>

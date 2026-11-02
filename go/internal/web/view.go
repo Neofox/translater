@@ -115,10 +115,8 @@ func chipTone(pressed bool) string {
 	return "neutral"
 }
 
-func uiLangClass(pressed bool) string {
-	c := "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition "
-	if pressed {
-		return c + "bg-accent text-bg shadow-sm"
-	}
-	return c + "text-ink-soft hover:text-ink"
+// uiLangClass is UiLangToggle.tsx's idle button; go.css styles the pressed
+// one from [aria-pressed], so a client-side switch needs no class changes.
+func uiLangClass() string {
+	return "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition text-ink-soft hover:text-ink"
 }

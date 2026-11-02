@@ -10,6 +10,7 @@ require (
 	github.com/openai/openai-go/v3 v3.91.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tdewolff/minify/v2 v2.24.24
+	golang.org/x/net v0.60.0
 )
 
 require (
@@ -29,7 +30,6 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

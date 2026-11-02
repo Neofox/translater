@@ -75,6 +75,11 @@ export function createInterpolator(write, {
       }
       id = frame(tick)
     },
+    /** Stop animating and keep the text shown so far. */
+    halt() {
+      stop()
+      full = shown
+    },
     /** Show everything now (main ready, done, focus, selection). */
     flush(text = full) {
       full = text
@@ -191,9 +196,9 @@ export function initStream(app, form) {
     renderState()
   }
 
-  /** Stop animating an aborted run, keeping what arrived (useTranslate). */
+  /** Freeze an aborted run's main where it is: nothing more appears. */
   function stop() {
-    interp.flush()
+    interp.halt()
     renderState()
   }
 

@@ -64,6 +64,18 @@ test('interpolator continues from the shown prefix and flushes', () => {
   assert.equal(shown.at(-1), '')
 })
 
+test('halt freezes the shown text, even for a later flush', () => {
+  const { interp, shown, step, frames } = harness()
+  interp.set('안녕하세요 반가워요')
+  step(10)
+  const frozen = shown.at(-1)
+  assert.ok(frozen.length < '안녕하세요 반가워요'.length)
+  interp.halt()
+  assert.equal(frames.length, 0)
+  interp.flush()
+  assert.equal(interp.text, frozen)
+})
+
 test('immediate mode writes directly', () => {
   const shown = []
   const interp = createInterpolator((t) => shown.push(t), { immediate: () => true, frame: () => assert.fail('no frames') })

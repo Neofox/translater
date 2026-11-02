@@ -35,7 +35,7 @@ templ settingsPopover(v View) {
 		<h2 data-t="settings">{ v.T("settings") }</h2>
 		<div class="inline-flex rounded-md border border-border bg-panel p-0.5 text-xs" role="group" aria-label="UI language">
 			for _, l := range []struct{ Code, Label string }{{"en", "EN"}, {"ko", "한"}} {
-				<button type="button" data-ui-lang={ l.Code } aria-pressed={ boolString(v.Prefs.UILang == l.Code) } class={ uiLangClass(v.Prefs.UILang == l.Code) }>{ l.Label }</button>
+				<button type="button" data-ui-lang={ l.Code } aria-pressed={ boolString(v.Prefs.UILang == l.Code) } class={ uiLangClass() }>{ l.Label }</button>
 			}
 		</div>
 	</div>

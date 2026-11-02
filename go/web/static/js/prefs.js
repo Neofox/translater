@@ -23,12 +23,6 @@ export function writePrefsCookie(prefs, rules) {
 
 export const FIXED = { source: ['auto', 'en', 'ko'], target: ['en', 'ko'] }
 
-// Pill tones (src/components/ui/Pill.tsx) of a selected and an idle chip.
-const ACTIVE = ['border-accent/70', 'bg-accent-soft', '[&>svg]:text-accent']
-const NEUTRAL = ['border-border', 'bg-panel', 'hover:border-accent/60']
-// UiLangToggle.tsx button states.
-const UI_ACTIVE = ['bg-accent', 'text-bg', 'shadow-sm']
-const UI_IDLE = ['text-ink-soft', 'hover:text-ink']
 
 /** Place a top-layer popup below `anchor`, flipping above when needed. */
 export function place(popup, anchor, { align = 'start', offset = 6, maxHeight = Infinity } = {}) {
@@ -72,18 +66,12 @@ export function initPrefs(app, data) {
       b.setAttribute('aria-pressed', String(b.dataset.value === p.mode))
     const select = document.querySelector('.mode-select')
     if (select) select.value = p.mode
-    for (const b of document.querySelectorAll('[data-ui-lang]')) {
-      const pressed = b.dataset.uiLang === p.uiLang
-      b.setAttribute('aria-pressed', String(pressed))
-      for (const c of UI_ACTIVE) b.classList.toggle(c, pressed)
-      for (const c of UI_IDLE) b.classList.toggle(c, !pressed)
-    }
+    // Pressed looks come from CSS on [aria-pressed] (base.css, go.css).
+    for (const b of document.querySelectorAll('[data-ui-lang]'))
+      b.setAttribute('aria-pressed', String(b.dataset.uiLang === p.uiLang))
     for (const bar of ['source', 'target'])
       for (const chip of document.querySelectorAll(`#${bar}-bar [data-testid="lang-chip"]`)) {
-        const pressed = chip.dataset.value === p[bar]
-        chip.setAttribute('aria-pressed', String(pressed))
-        for (const c of ACTIVE) chip.classList.toggle(c, pressed)
-        for (const c of NEUTRAL) chip.classList.toggle(c, !pressed)
+        chip.setAttribute('aria-pressed', String(chip.dataset.value === p[bar]))
       }
     syncDetected()
   }
@@ -105,7 +93,17 @@ export function initPrefs(app, data) {
     for (const key of data.rules.fields) prefsForm.elements[key].value = app.prefs[key] ?? ''
     htmx.trigger(prefsForm, 'nt-prefs')
   }
-  document.addEventListener('htmx:after:swap', syncControls)
+  // A /prefs morph re-renders the bars, including an open More listbox's
+  // (always empty) markup: refill it so an open menu keeps its options.
+  document.addEventListener('htmx:after:swap', () => {
+    syncControls()
+    for (const menu of document.querySelectorAll('[role="listbox"][popover]'))
+      if (isOpen(menu) && !menu.firstElementChild) {
+        document.querySelector(`[popovertarget="${menu.id}"]`)?.setAttribute('aria-expanded', 'true')
+        fillMenu(menu)
+        focusOption(menu)
+      }
+  })
 
   /** Change one preference: cookie first (an immediate reload keeps it).
    * `quiet` skips the re-run when the caller already reschedules (the
@@ -141,16 +139,19 @@ export function initPrefs(app, data) {
   })
   document.querySelector('.mode-select')?.addEventListener('change', (event) => set('mode', event.target.value))
 
-  // More… listbox: options exist only while open (one listbox in the DOM).
-  document.addEventListener('beforetoggle', (event) => {
-    const menu = event.target
-    if (!(menu instanceof HTMLElement) || menu.getAttribute('role') !== 'listbox') return
-    const trigger = document.querySelector(`[popovertarget="${menu.id}"]`)
-    if (event.newState !== 'open') {
-      trigger?.setAttribute('aria-expanded', 'false')
-      menu.replaceChildren()
-      return
+  const isOpen = (el) => {
+    try {
+      return el.matches(':popover-open')
+    } catch {
+      return false
     }
+  }
+  const focusOption = (menu) =>
+    (menu.querySelector('[aria-selected="true"]') ?? menu.querySelector('button'))?.focus()
+
+  /** The options a bar's More listbox offers: every language not shown as a
+   * visible chip (Select.tsx options). */
+  function fillMenu(menu) {
     const kind = menu.dataset.kind
     const bar = document.getElementById(`${kind}-bar`)
     const value = app.prefs[kind]
@@ -158,6 +159,7 @@ export function initPrefs(app, data) {
       .filter((chip) => chip.offsetParent !== null)
       .map((chip) => chip.dataset.value)
     const template = document.getElementById('lang-option')
+    const items = []
     for (const lang of data.languages) {
       if ((kind === 'target' && lang.code === 'auto') || visible.includes(lang.code)) continue
       const item = template.content.firstElementChild.cloneNode(true)
@@ -169,9 +171,20 @@ export function initPrefs(app, data) {
       button.classList.toggle('text-ink', !selected)
       button.querySelector('span').textContent = lang.label
       button.querySelector('svg').toggleAttribute('hidden', !selected)
-      menu.append(item)
+      items.push(item)
     }
-    trigger?.setAttribute('aria-expanded', 'true')
+    menu.replaceChildren(...items)
+  }
+
+  // More… listbox: options exist only while open (one listbox in the DOM).
+  document.addEventListener('beforetoggle', (event) => {
+    const menu = event.target
+    if (!(menu instanceof HTMLElement) || menu.getAttribute('role') !== 'listbox') return
+    const trigger = document.querySelector(`[popovertarget="${menu.id}"]`)
+    const open = event.newState === 'open'
+    trigger?.setAttribute('aria-expanded', String(open))
+    if (open) fillMenu(menu)
+    else menu.replaceChildren()
   }, true)
   document.addEventListener('toggle', (event) => {
     const popup = event.target
@@ -180,7 +193,7 @@ export function initPrefs(app, data) {
     if (!trigger) return
     const listbox = popup.getAttribute('role') === 'listbox'
     place(popup, trigger, listbox ? { maxHeight: 320 } : { align: 'end', offset: 8 })
-    if (listbox) (popup.querySelector('[aria-selected="true"]') ?? popup.querySelector('button'))?.focus()
+    if (listbox) focusOption(popup)
   }, true)
   // Arrow keys move between options.
   document.addEventListener('keydown', (event) => {

@@ -330,7 +330,7 @@ func settingsPopover(v View) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var19 = []any{uiLangClass(v.Prefs.UILang == l.Code)}
+				var templ_7745c5c3_Var19 = []any{uiLangClass()}
 				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var19...)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -365,7 +365,7 @@ func settingsPopover(v View) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(l.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/header.templ`, Line: 38, Col: 161}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/header.templ`, Line: 38, Col: 137}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
