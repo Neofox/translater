@@ -109,7 +109,7 @@ replacement decision. Go toolchain is managed by mise (user's global setup).
 
 ### Toolchain versions (user decision)
 
-Use the newest features of **Go 1.27** and **htmx 4.0**; check details with
+Use the newest features of **Go 1.27** and **htmx 4.0.1** (the most recent htmx release; npm tag `next`); check details with
 context7 (`/golang/go/go1.27.3`, `/golang/website`, `/bigskysoftware/htmx/v4.0.0`)
 rather than memory. Relevant to this design:
 
