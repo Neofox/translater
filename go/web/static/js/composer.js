@@ -170,6 +170,15 @@ export function initComposer(app, ta) {
     changed()
   }
 
+  // Escape closes an open popover first; it clears the text only otherwise.
+  const popoverOpen = () => {
+    try {
+      return Boolean(document.querySelector(':popover-open'))
+    } catch {
+      return false
+    }
+  }
+
   window.addEventListener('keydown', (event) => {
     const meta = event.metaKey || event.ctrlKey
     if (meta && event.key === 'Enter') {
@@ -184,7 +193,7 @@ export function initComposer(app, ta) {
       event.preventDefault()
       ta.focus()
       ta.select()
-    } else if (event.key === 'Escape' && ta.value && !document.querySelector(':popover-open')) {
+    } else if (event.key === 'Escape' && ta.value && !popoverOpen()) {
       event.preventDefault()
       clearInput()
       ta.focus()
