@@ -53,3 +53,15 @@ go run ./cmd/spikecheck -url https://<preview-url> -only cold   # check 4, targe
 If the preview is behind Vercel deployment protection, use a protection-bypass header/cookie or disable protection for the spike. If check 1 or 2 fails on the preview, stop and bring the fallback-host decision to the user (spec "Deployment").
 
 Note: `main.go` serves static files from `web/static` relative to the working directory; verify on Vercel that those files are bundled (otherwise `htmx.mjs` fails to load htmx and the page-based checks fail even though streaming works). Add `includeFiles` in `vercel.json` if needed.
+
+## Fix round 1 (review findings)
+
+Changes:
+1. Single-clock cancel measurement. `/spike/stats` now returns the server's `now`. Server-side `serverAgo = now - lastCancelAt` is pure server time; the client measures its own elapsed time since close. Estimated latency = clientElapsed - serverAgo; upper bound = client elapsed at first observation (includes poll interval and RTT). Pass criterion uses the upper bound (<=1500 ms spikecheck, <=1000 ms htmx.mjs). Server and client clocks are never subtracted.
+2. `X-Instance` header on `/spike/stream` and `/spike/htmx`. Stats polls (up to 20, 100 ms apart) must come from that instance, else the check reports `INCONCLUSIVE` (never matched) rather than a false PASS/FAIL; matched-but-no-cancel is a real FAIL.
+3. Negative control: `/spike/page?noext=1` loads htmx core only. Result: with no hx-sse extension, 0 named events fired and `#a`/`#b` stayed `A0`/`B0`, so the hx-sse extension IS required (it is what parses `text/event-stream`).
+4. Minor: `x-vercel-protection-bypass` header from `VERCEL_AUTOMATION_BYPASS_SECRET` in both tools; guarded `delta && ready`; `browser.close()` in try/finally; check 4 also reports time-to-headers.
+
+Commands (local, binary on :3000): `go run ./cmd/spikecheck -url http://localhost:3000` and `node cmd/spikecheck/htmx.mjs http://localhost:3000`.
+
+Output (local): check 1 PASS 49/50 spaced; check 2 PASS estimated latency 1 ms, upper bound 105 ms; checks 3 and 5 PASS; htmx.mjs: (a) PASS gap 295 ms; (b) PASS events on `f`, detail `{data,id}`; (c1) PASS est 7 ms / upper 120 ms; (c2) PASS est 44 ms / upper 136 ms; (e) negative control PASS (extension required); (d) PASS 16,001 B gz total; no page errors. I did not run against the preview; rerun after the controller redeploys.

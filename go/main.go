@@ -41,6 +41,7 @@ func sseHeaders(w http.ResponseWriter) http.Flusher {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache, no-transform")
 	h.Set("X-Accel-Buffering", "no")
+	h.Set("X-Instance", instance)
 	f, _ := w.(http.Flusher)
 	w.WriteHeader(http.StatusOK)
 	if f != nil {
@@ -76,6 +77,7 @@ func stats(w http.ResponseWriter, _ *http.Request) {
 		"instance":     instance,
 		"served":       served.Load(),
 		"lastCancelAt": lastCancelAt.Load(),
+		"now":          time.Now().UnixMilli(),
 		"bootAt":       bootAt,
 	})
 }
@@ -83,8 +85,7 @@ func stats(w http.ResponseWriter, _ *http.Request) {
 const page = `<!doctype html>
 <html><head><meta charset="utf-8"><title>spike</title>
 <script src="/static/vendor/htmx.min.js"></script>
-<script src="/static/vendor/hx-sse.min.js"></script>
-</head><body>
+%s</head><body>
 <form id="f" hx-post="/spike/htmx" hx-trigger="submit" hx-sync="this:replace" hx-swap="none">
   <textarea name="q">hi</textarea><button id="go" type="submit">go</button>
 </form>
@@ -100,10 +101,16 @@ new MutationObserver(() => window.spikeSwaps.push({t: Date.now(), a: document.ge
 </script>
 </body></html>`
 
-func spikePage(w http.ResponseWriter, _ *http.Request) {
+// spikePage serves the page; ?noext=1 omits the hx-sse extension (negative
+// control: proves the extension is what parses text/event-stream).
+func spikePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
-	fmt.Fprint(w, page)
+	ext := `<script src="/static/vendor/hx-sse.min.js"></script>` + "\n"
+	if r.URL.Query().Get("noext") == "1" {
+		ext = ""
+	}
+	fmt.Fprintf(w, page, ext)
 }
 
 // htmxStream: two unnamed <hx-partial> messages 300ms apart, then two named
