@@ -108,9 +108,9 @@ func utf16Len(s string) int {
 	return n
 }
 
-// jsTrim is JS String.prototype.trim: Unicode White_Space plus the BOM.
+// JSTrim is JS String.prototype.trim: Unicode White_Space plus the BOM.
 // unicode.IsSpace differs only by including U+0085, which JS keeps.
-func jsTrim(s string) string {
+func JSTrim(s string) string {
 	return strings.TrimFunc(s, func(r rune) bool {
 		return r == '\uFEFF' || (r != '\u0085' && unicode.IsSpace(r))
 	})
@@ -146,7 +146,7 @@ func LiveText(s string) string { return blockTag.ReplaceAllString(s, "‹${1}›
 // (prompts.ts userBlocks + sourceBlock). Word intent passes only context.
 func LiveInput(in TranslateInput) string {
 	var b strings.Builder
-	if ctx := jsTrim(in.Context); ctx != "" {
+	if ctx := JSTrim(in.Context); ctx != "" {
 		b.WriteString("<context>\n" + LiveText(ctx) + "\n</context>\n\n")
 	}
 	if in.Intent == "sentence" && len(in.Refinements) > 0 {

@@ -116,8 +116,8 @@ func TestJSTrim(t *testing.T) {
 		"   ":                        "",
 	}
 	for in, want := range cases {
-		if got := jsTrim(in); got != want {
-			t.Errorf("jsTrim(%q) = %q, want %q", in, got, want)
+		if got := JSTrim(in); got != want {
+			t.Errorf("JSTrim(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

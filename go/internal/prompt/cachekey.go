@@ -18,7 +18,7 @@ func CacheKey(in TranslateInput, cacheVersion, configLabel string) string {
 	previousMain := ""
 	if !isWord {
 		for _, r := range in.Refinements {
-			refinements = append(refinements, jsTrim(r))
+			refinements = append(refinements, JSTrim(r))
 		}
 		if len(in.Refinements) > 0 {
 			previousMain = in.PreviousMain
@@ -26,7 +26,7 @@ func CacheKey(in TranslateInput, cacheVersion, configLabel string) string {
 	}
 	b, err := json.Marshal([]any{
 		cacheVersion, configLabel, in.Intent, in.Mode, in.Source, in.Target, in.UILang,
-		jsTrim(in.Text), jsTrim(in.Context), refinements, previousMain,
+		JSTrim(in.Text), JSTrim(in.Context), refinements, previousMain,
 	}, jsontext.AllowInvalidUTF8(true))
 	if err != nil { // strings always marshal once invalid UTF-8 is allowed
 		panic(err)
