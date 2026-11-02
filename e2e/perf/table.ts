@@ -485,7 +485,7 @@ const SECTIONS: Section[] = [
   },
   {
     title:
-      'Typing during load (headline: input kept and acted on from; gate: wiped/ignored; secondary: first typeable incl. the retype model)',
+      'Typing during load (headline: input kept from; gate: wiped/ignored, i.e. not acted on; secondary: first typeable incl. the retype model)',
     rows: rows(paired, [
       {
         label: '**Input kept from** (max(FCP, earliest kept keystroke))',
