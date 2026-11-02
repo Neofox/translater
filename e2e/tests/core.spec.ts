@@ -397,6 +397,89 @@ test('markup renders as text @core', async ({ page }) => {
   expect(dialogs).toEqual([])
 })
 
+test('IME composition is not interrupted @core', async ({
+  page,
+  fake,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'CDP IME emulation is Chromium-only')
+  test.fail(
+    APP === 'ts',
+    'TS app bug: every composition update changes the controlled value, so ' +
+      'the debounce fires a paid run on partial jamo while the user is ' +
+      'still composing.',
+  )
+  const first = sentence('slow')
+  await fillSource(page, first)
+  await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
+  expect(await fake.requests()).toBe(1)
+
+  // Compose 한글 at the end while the slow stream is still running, holding
+  // the last uncommitted step well past the 800ms debounce.
+  await page.evaluate(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>(
+      '[data-testid="input-textarea"]',
+    )!
+    ta.focus()
+    ta.setSelectionRange(ta.value.length, ta.value.length)
+  })
+  const cdp = await page.context().newCDPSession(page)
+  const compose = (text: string) =>
+    cdp.send('Input.imeSetComposition', {
+      text,
+      selectionStart: text.length,
+      selectionEnd: text.length,
+    })
+  for (const step of ['ㅎ', '하', '한', '한ㄱ', '한그', '한글']) {
+    await compose(step)
+    await page.waitForTimeout(150)
+  }
+  await page.waitForTimeout(1_200)
+  // Composition edits stop the stale stream but never start a run.
+  expect(await fake.stats()).toMatchObject({ requests: 1, aborted: 1 })
+  await cdp.send('Input.insertText', { text: '한글' })
+
+  const expected = `${first}한글`
+  await expect(source(page)).toHaveValue(expected)
+  await waitForStats(fake, (s) => s.requests >= 2, 5_000)
+  await waitForMain(page, fixture('slow').result.main!)
+  const caret = await page.evaluate(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>(
+      '[data-testid="input-textarea"]',
+    )!
+    return [ta.value, ta.selectionStart, ta.selectionEnd]
+  })
+  expect(caret).toEqual([expected, expected.length, expected.length])
+  expect(userText((await fake.bodies()).at(-1)!)).toContain(expected)
+  await stopStream(page, fake, (await fake.stats()).aborted)
+})
+
+test('late events from a superseded run are ignored @core', async ({
+  page,
+  fake,
+}) => {
+  await recordResult(page)
+  await fillSource(page, sentence('slow'))
+  await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
+  const edit = (await resultLog(page)).length
+  const second = fixture('second').result.main!
+  await fillSource(page, sentence('second'))
+  await expect(copyButton(page)).toBeDisabled()
+  await waitForMain(page, second)
+  await waitForDone(page)
+
+  const log = (await resultLog(page)).slice(edit)
+  // The new run starts with an empty main; from then on only the new
+  // result may appear, and Copy only for its complete main.
+  const start = log.findIndex((entry) => entry.text === '')
+  expect(start).toBeGreaterThanOrEqual(0)
+  for (const entry of log.slice(start)) {
+    expect(second.startsWith(entry.text ?? '')).toBe(true)
+    if (entry.copy) expect(entry.text).toBe(second)
+  }
+  expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
+})
+
 test('word input uses word intent @core', async ({ page, fake }) => {
   const fx = fixture('word')
   // `thanks` plus the fixture marker (the fake needs it to answer with a word

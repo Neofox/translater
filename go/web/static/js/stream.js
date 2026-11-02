@@ -89,6 +89,12 @@ export function createInterpolator(write, {
   }
 }
 
+/** Only the current, still-running run may change the result: events of a
+ * superseded run that were already in flight are dropped. */
+export function accepts(live, data) {
+  return Boolean(live && data && live.run === data.run && !live.aborted && !live.error)
+}
+
 const reduced = () =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -245,8 +251,7 @@ export function initStream(app, form) {
         return
       }
       const live = app.live
-      if (!live || live.run !== data.run || live.aborted || live.error) return
-      handle(live, data)
+      if (accepts(live, data)) handle(live, data)
     })
   }
 

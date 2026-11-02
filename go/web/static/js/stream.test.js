@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createInterpolator, graphemeEnds } from './stream.js'
+import { accepts, createInterpolator, graphemeEnds } from './stream.js'
+
+test('only events of the current running run are accepted', () => {
+  const live = { run: 'b', aborted: false, error: null }
+  assert.equal(accepts(live, { run: 'b' }), true)
+  assert.equal(accepts(live, { run: 'a' }), false, 'superseded run')
+  assert.equal(accepts(null, { run: 'b' }), false, 'cleared input')
+  assert.equal(accepts({ ...live, aborted: true }, { run: 'b' }), false, 'edited mid-stream')
+  assert.equal(accepts({ ...live, error: { message: 'x' } }, { run: 'b' }), false, 'after nt-error')
+})
 
 const graphemes = (s) => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map((p) => p.segment)
 
