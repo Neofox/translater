@@ -1,6 +1,6 @@
-// Spike server: proves incremental SSE (GET and POST), request cancellation
-// propagation and instance reuse on Vercel's Go runtime, plus the htmx 4
-// streaming protocol. Throwaway: later tasks replace this entry point.
+// Stage-0 spike routes (NT_SPIKE=1 only): incremental SSE (GET and POST),
+// request cancellation propagation and instance reuse on Vercel's Go
+// runtime, plus the htmx 4 streaming protocol. go/cmd/spikecheck drives them.
 package main
 
 import (
@@ -8,15 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
 )
 
 var (
+	spikeAsset   func(string) string
 	instance     = randomID()
 	bootAt       = time.Now().UnixMilli()
 	served       atomic.Int64
@@ -84,7 +83,7 @@ func stats(w http.ResponseWriter, _ *http.Request) {
 
 const page = `<!doctype html>
 <html><head><meta charset="utf-8"><title>spike</title>
-<script src="/static/vendor/htmx.min.js"></script>
+<script src="%s"></script>
 %s</head><body>
 <form id="f" hx-post="/spike/htmx" hx-trigger="submit" hx-sync="this:replace" hx-swap="none">
   <textarea name="q">hi</textarea><button id="go" type="submit">go</button>
@@ -106,11 +105,11 @@ new MutationObserver(() => window.spikeSwaps.push({t: Date.now(), a: document.ge
 func spikePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
-	ext := `<script src="/static/vendor/hx-sse.min.js"></script>` + "\n"
+	ext := `<script src="` + spikeAsset("vendor/hx-sse.min.js") + `"></script>` + "\n"
 	if r.URL.Query().Get("noext") == "1" {
 		ext = ""
 	}
-	fmt.Fprintf(w, page, ext)
+	fmt.Fprintf(w, page, spikeAsset("vendor/htmx.min.js"), ext)
 }
 
 // htmxStream: two unnamed <hx-partial> messages 300ms apart, then two named
@@ -139,18 +138,13 @@ func htmxStream(w http.ResponseWriter, r *http.Request) {
 		send("event: nt-main-ready\ndata: {\"main\":\"안녕하세요\"}\n\n", time.Duration(intParam(r, "hold", 5000))*time.Millisecond)
 }
 
-func main() {
-	mux := http.NewServeMux()
+// registerSpike adds the spike routes. The page loads the hashed htmx and
+// hx-sse assets.
+func registerSpike(mux *http.ServeMux, asset func(string) string) {
+	spikeAsset = asset
 	mux.HandleFunc("GET /spike/stream", stream)
 	mux.HandleFunc("POST /spike/stream", stream)
 	mux.HandleFunc("GET /spike/stats", stats)
 	mux.HandleFunc("GET /spike/page", spikePage)
 	mux.HandleFunc("POST /spike/htmx", htmxStream)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000"
-	}
-	log.Printf("spike instance %s on :%s", instance, port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
 }

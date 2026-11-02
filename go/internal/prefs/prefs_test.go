@@ -134,3 +134,26 @@ func TestNoCookieAndDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestFromValues(t *testing.T) {
+	r := rules(t)
+	form := url.Values{"source": {"ko"}, "target": {"fr"}, "mode": {"professional"}, "uiLang": {"ko"}, "recentSource": {"zh"}, "recentTarget": {"fr"}}
+	got, ok := FromValues(form.Get, r)
+	if !ok || got.Source != "ko" || got.Target != "fr" || *got.RecentSource != "zh" || *got.RecentTarget != "fr" {
+		t.Fatalf("FromValues = %+v, %v", got, ok)
+	}
+	form.Set("recentSource", "")
+	if got, ok := FromValues(form.Get, r); !ok || got.RecentSource != nil {
+		t.Fatalf("empty recent should be null: %+v, %v", got, ok)
+	}
+	for _, bad := range []struct{ key, value string }{{"source", ""}, {"target", "auto"}, {"mode", "rude"}, {"uiLang", "fr"}, {"recentTarget", "xx"}} {
+		f := url.Values{}
+		for k, v := range form {
+			f[k] = v
+		}
+		f.Set(bad.key, bad.value)
+		if _, ok := FromValues(f.Get, r); ok {
+			t.Errorf("%s=%q accepted", bad.key, bad.value)
+		}
+	}
+}

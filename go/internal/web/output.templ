@@ -1,0 +1,59 @@
+package web
+
+// outputPanel is OutputPanel.tsx. stream.js fills the result regions from
+// the nt-* events; #result-details receives the server's partials
+// (ResultSkeleton, AlternativeRow). Copy/Listen are disabled until the
+// current run allows them (copy.js). Listen has no speech yet (stage 5).
+templ outputPanel(v View) {
+	<section class="output-panel" aria-label={ v.T("translation") } data-t-attr="aria-label:translation" aria-busy="false">
+		<div class="target-toolbar" data-testid="target-toolbar">
+			<button type="button" class="swap-button" aria-label={ v.T("swapLanguages") } data-t-attr="aria-label:swapLanguages">
+				<span data-icon="swap" class="contents">
+					@iconSwap(18)
+				</span>
+				<span data-icon="busy" class="contents" hidden>
+					@iconLoader(18, " animate-spin")
+				</span>
+			</button>
+			@LanguageBar(v, "target")
+			<span id="result-status" class="sr-only" role="status" data-t="streaming" hidden>{ v.T("streaming") }</span>
+		</div>
+		<div class="result-actions" data-testid="output-toolbar">
+			<div class="primary-result-actions">
+				<button type="button" aria-label={ v.T("copy") } title={ v.T("copy") } data-t-attr="aria-label:copy title:copy" data-testid="copy-button" disabled class={ pill("primary", "md", "copy-button disabled:cursor-not-allowed disabled:opacity-45") }>
+					@iconCopy(14)
+					<span data-t="copy">{ v.T("copy") }</span>
+				</button>
+				<span class="relative inline-flex shrink-0">
+					<button type="button" disabled aria-label={ v.T("listen") } title={ v.T("listen") } data-t-attr="aria-label:listen title:listen" aria-pressed="false" aria-busy="false" data-testid="listen-button" class={ pill("neutral", "md", "listen-button disabled:cursor-not-allowed disabled:opacity-50") }>
+						@iconVolume(14)
+						<span data-t="listen">{ v.T("listen") }</span>
+					</button>
+				</span>
+			</div>
+		</div>
+		<div id="translation-result" class="result-scroll scrollbar-thin" data-testid="translation-result" tabindex="0" aria-label={ v.T("translation") } data-t-attr="aria-label:translation">
+			<div id="result-error" class="result-error" role="alert" hidden>
+				@iconAlert(28, " state-icon")
+				<p class="state-title"></p>
+				<p class="state-body"></p>
+				<p class="state-hint mt-2 text-ink-dim" hidden></p>
+			</div>
+			<div id="result-content" class="result-content" hidden>
+				<p id="main-translation" class="result-main" lang={ v.Prefs.Target } data-testid="main-translation" tabindex="-1"></p>
+				<section id="main-explanation" class="main-explanation detail-why" hidden>
+					<h3 class="sr-only"></h3>
+					<div class="main-explanation-skeleton" aria-hidden="true">
+						<span class="skeleton-line"></span>
+						<span class="skeleton-line"></span>
+					</div>
+					<p class="detail-enter" hidden></p>
+				</section>
+				<div id="result-details" class="result-details"></div>
+			</div>
+			<div id="result-empty" class="result-empty">
+				<p data-t="emptyMain">{ v.T("emptyMain") }</p>
+			</div>
+		</div>
+	</section>
+}

@@ -1,0 +1,49 @@
+package web
+
+// Header (TranslatorWorkspace.tsx app-header): brand, Tone (ModeToggle.tsx)
+// and the Settings trigger (SettingsMenu.tsx). Labels carry data-t keys so
+// prefs.js relabels them on a UI-language switch without a swap.
+templ header(v View) {
+	<header class="app-header">
+		<div class="app-brand">
+			<span class="brand-glyph" aria-hidden="true">가</span>
+			<h1>Translater</h1>
+		</div>
+		<div class="app-settings">
+			<div class="mode-segment" role="group" aria-label={ v.T("tone") } data-t-attr="aria-label:tone">
+				for _, m := range modes {
+					<button type="button" data-value={ m.Value } aria-pressed={ boolString(v.Prefs.Mode == m.Value) } data-t={ m.Key }>{ v.T(m.Key) }</button>
+				}
+			</div>
+			<select class="mode-select" aria-label={ v.T("tone") } data-t-attr="aria-label:tone">
+				for _, m := range modes {
+					<option value={ m.Value } selected?={ v.Prefs.Mode == m.Value } data-t={ m.Key }>{ v.T(m.Key) }</option>
+				}
+			</select>
+			<button type="button" aria-label={ v.T("settings") } data-t-attr="aria-label:settings" data-testid="settings-button" aria-haspopup="dialog" popovertarget="settings-popover" class={ pill("neutral", "md", "settings-trigger") }>
+				@iconSettings(18)
+			</button>
+		</div>
+	</header>
+}
+
+// settingsPopover is SettingsMenu's floating panel; it lives at the end of
+// <body> (FloatingPortal) and opens with the native popover API. The
+// "UI language" label stays English in both UI languages (UiLangToggle.tsx).
+templ settingsPopover(v View) {
+	<div id="settings-popover" popover class="settings-popover" role="dialog" aria-label={ v.T("settings") } data-t-attr="aria-label:settings">
+		<h2 data-t="settings">{ v.T("settings") }</h2>
+		<div class="inline-flex rounded-md border border-border bg-panel p-0.5 text-xs" role="group" aria-label="UI language">
+			for _, l := range []struct{ Code, Label string }{{"en", "EN"}, {"ko", "한"}} {
+				<button type="button" data-ui-lang={ l.Code } aria-pressed={ boolString(v.Prefs.UILang == l.Code) } class={ uiLangClass(v.Prefs.UILang == l.Code) }>{ l.Label }</button>
+			}
+		</div>
+	</div>
+}
+
+func boolString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}

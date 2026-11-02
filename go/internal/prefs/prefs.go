@@ -88,6 +88,32 @@ func Parse(r *http.Request, rules contract.PrefRules) Snapshot {
 	}}
 }
 
+// FromValues validates preferences posted as form fields named after the
+// cookie fields (POST /prefs). An empty value is null; it is accepted only
+// where the rules allow null (the recent chips).
+func FromValues(get func(string) string, rules contract.PrefRules) (Preferences, bool) {
+	vals := map[string]*string{}
+	for _, f := range rules.Fields {
+		var s *string
+		if v := get(f.Key); v != "" {
+			s = &v
+		}
+		if !slices.ContainsFunc(f.Values, func(a *string) bool { return equal(a, s) }) {
+			return Preferences{}, false
+		}
+		vals[f.Key] = s
+	}
+	for _, key := range []string{"source", "target", "mode", "uiLang"} {
+		if vals[key] == nil {
+			return Preferences{}, false
+		}
+	}
+	return Preferences{
+		Source: *vals["source"], Target: *vals["target"], Mode: *vals["mode"], UILang: *vals["uiLang"],
+		RecentSource: vals["recentSource"], RecentTarget: vals["recentTarget"],
+	}, true
+}
+
 func equal(a, b *string) bool {
 	if a == nil || b == nil {
 		return a == b
