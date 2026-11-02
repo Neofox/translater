@@ -14,8 +14,8 @@
 // This scanner does only the streaming part; number grammar is checked with
 // jsontext, and full-document validation stays with libraries (Task 10).
 //
-// Validity matches jsontext's defaults (RFC 7493) except that duplicate object
-// names are not detected: invalid UTF-8, unpaired surrogate escapes, raw
+// Validity matches jsontext's defaults (RFC 7493, nesting depth 10000) except
+// that duplicate object names are not detected: invalid UTF-8, unpaired surrogate escapes, raw
 // control characters, malformed numbers/literals and trailing data are errors.
 //
 // Event order: a string value yields zero or more StringChunk events (at most
@@ -110,6 +110,9 @@ const (
 	rootValue        // document start
 	rootDone         // after the root value: whitespace only
 )
+
+// maxDepth mirrors jsontext's container nesting limit.
+const maxDepth = 10000
 
 // Token modes.
 const (
@@ -260,6 +263,9 @@ func (s *Scanner) step(c byte, off int, evs *[]Event) error {
 
 func (s *Scanner) beginValue(c byte, off int) error {
 	s.start = off
+	if (c == '{' || c == '[') && len(s.frames) > maxDepth {
+		return errors.New("nesting too deep")
+	}
 	switch {
 	case c == '{':
 		s.frames = append(s.frames, frame{state: objFirst, start: off})
@@ -321,8 +327,8 @@ func (s *Scanner) stringByte(c byte, off int, evs *[]Event) error {
 		if !utf8.FullRune(s.tail) {
 			return nil
 		}
-		r, n := utf8.DecodeRune(s.tail)
-		if r == utf8.RuneError || n != len(s.tail) {
+		// (RuneError, 1) is invalid; a raw U+FFFD decodes as (RuneError, 3).
+		if r, n := utf8.DecodeRune(s.tail); r == utf8.RuneError && n == 1 || n != len(s.tail) {
 			return errors.New("invalid UTF-8")
 		}
 		s.text = append(s.text, s.tail...)

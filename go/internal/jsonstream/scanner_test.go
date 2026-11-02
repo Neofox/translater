@@ -260,6 +260,32 @@ func TestScalarsAndWhitespace(t *testing.T) {
 	}
 }
 
+func TestRawReplacementCharacter(t *testing.T) {
+	doc := "{\"main\":\"a\xef\xbf\xbdb\"}"
+	if !jsontext.Value(doc).IsValid() {
+		t.Fatal("test document should be valid JSON")
+	}
+	for _, parts := range [][]string{{doc}, bytewise(doc)} {
+		evs, err := feedAll(parts...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, end, _ := stringText(t, evs, "main"); end != "a�b" {
+			t.Fatalf("end = %q", end)
+		}
+	}
+}
+
+func TestNestingDepthMatchesJSONText(t *testing.T) {
+	for _, n := range []int{maxDepth - 1, maxDepth, maxDepth + 1} {
+		doc := strings.Repeat("[", n) + strings.Repeat("]", n)
+		_, err := feedAll(doc)
+		if valid := jsontext.Value(doc).IsValid(); valid != (err == nil) {
+			t.Errorf("depth %d: jsontext valid=%v, scanner err=%v", n, valid, err)
+		}
+	}
+}
+
 func TestInvalidDocuments(t *testing.T) {
 	for _, doc := range []string{
 		``, ` `, `{`, `}`, `{"a":01}`, `{"a" 1}`, `{"a":tru}`, `{"a":truex}`, `{"a":1.}`,
@@ -338,6 +364,7 @@ func FuzzFeedSplits(f *testing.F) {
 		` [ "\\", "\/", "\n\t\r\b\f", 0, 10 ] `,
 		`{"a":"😀한\u0000"}`,
 		`{"a":01}`,
+		"{\"a\":[\"\xef\xbf\xbd\",\"\\uFFFD\"]}",
 		`"lone"`,
 	} {
 		f.Add(seed, uint64(1))
