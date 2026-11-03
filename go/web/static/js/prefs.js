@@ -3,8 +3,10 @@
 //
 // Hand-written: the cookie format is shared with the TS app (src/lib/
 // preferences.ts) and the controls are a few native buttons. Popups use the
-// native `popover` attribute; placement is a few lines of fixed positioning
-// (floating-ui would cost more than the whole module).
+// native `popover` attribute, placed by float.js.
+
+import { autoUpdate, panelBoundary, position } from './float.js'
+import { initSettings } from './settings.js'
 
 /** Cookie string for `prefs`, byte-compatible with encodePreferencesCookie. */
 export function encodePrefsCookie(prefs, rules, secure) {
@@ -21,29 +23,13 @@ export function writePrefsCookie(prefs, rules) {
   }
 }
 
+const UI_LANGS = ['en', 'ko']
+/** UiLangToggle's idle and pressed class tokens. */
+const UI_LANG_TOKENS = [['text-ink-soft', 'hover:text-ink'], ['bg-accent', 'text-bg', 'shadow-sm']]
+const uiLangButtons = () => [...document.querySelectorAll('[aria-label="UI language"] button')]
+
 export const FIXED = { source: ['auto', 'en', 'ko'], target: ['en', 'ko'] }
 
-
-/** Place a top-layer popup below `anchor`, flipping above when needed. */
-export function place(popup, anchor, { align = 'start', offset = 6, maxHeight = Infinity } = {}) {
-  const r = anchor.getBoundingClientRect()
-  const vw = document.documentElement.clientWidth
-  const vh = window.visualViewport?.height ?? window.innerHeight
-  const pad = 8
-  popup.style.position = 'fixed'
-  popup.style.margin = '0'
-  popup.style.inset = 'auto'
-  popup.style.minWidth = `${r.width}px`
-  const below = vh - r.bottom - offset - pad
-  const above = r.top - offset - pad
-  const up = below < Math.min(popup.scrollHeight, 200) && above > below
-  const room = Math.max(0, Math.min(up ? above : below, maxHeight))
-  popup.style.maxHeight = Number.isFinite(room) ? `${room}px` : ''
-  const w = popup.offsetWidth
-  const left = align === 'end' ? r.right - w : r.left
-  popup.style.left = `${Math.max(pad, Math.min(left, vw - w - pad))}px`
-  popup.style.top = up ? `${Math.max(pad, r.top - offset - popup.offsetHeight)}px` : `${r.bottom + offset}px`
-}
 
 export function initPrefs(app, data) {
   const prefsForm = document.getElementById('prefs-form')
@@ -72,9 +58,13 @@ export function initPrefs(app, data) {
       b.setAttribute('aria-pressed', String(modeOf(b) === p.mode))
     const select = document.querySelector('.mode-select')
     if (select) select.value = p.mode
-    // Pressed looks come from CSS on [aria-pressed] (base.css, go.css).
-    for (const b of document.querySelectorAll('[data-ui-lang]'))
-      b.setAttribute('aria-pressed', String(b.dataset.uiLang === p.uiLang))
+    // UiLangToggle's state tokens end its class string (settings.templ).
+    for (const [i, b] of uiLangButtons().entries()) {
+      const on = UI_LANGS[i] === p.uiLang
+      b.setAttribute('aria-pressed', String(on))
+      b.classList.remove(...UI_LANG_TOKENS[+!on])
+      b.classList.add(...UI_LANG_TOKENS[+on])
+    }
     for (const bar of ['source', 'target'])
       for (const chip of document.querySelectorAll(`#${bar}-bar [data-testid="lang-chip"]`)) {
         chip.setAttribute('aria-pressed', String(chip.dataset.value === p[bar]))
@@ -132,8 +122,8 @@ export function initPrefs(app, data) {
     const el = event.target instanceof Element ? event.target : null
     const mode = el?.closest('.mode-segment button')
     if (mode) return set('mode', modeOf(mode))
-    const ui = el?.closest('[data-ui-lang]')
-    if (ui) return set('uiLang', ui.dataset.uiLang)
+    const ui = el?.closest('[aria-label="UI language"] button')
+    if (ui) return set('uiLang', UI_LANGS[uiLangButtons().indexOf(ui)])
     const chip = el?.closest('[data-testid="lang-chip"]')
     if (chip) return set(chip.closest('[data-kind]').dataset.kind, chip.dataset.value)
     const option = el?.closest('[data-testid="select-option"]')
@@ -192,28 +182,54 @@ export function initPrefs(app, data) {
     const open = event.newState === 'open'
     trigger?.setAttribute('aria-expanded', String(open))
     if (menu.getAttribute('role') !== 'listbox') return
-    if (open) fillMenu(menu)
-    else menu.replaceChildren()
+    if (open) {
+      // Hidden until placed (Floating UI's isPositioned); toggle shows it.
+      menu.style.visibility = 'hidden'
+      fillMenu(menu)
+    } else menu.replaceChildren()
   }, true)
+  // Select.tsx's placement: bottom-start, offset 6, flip and shift inside
+  // panelBoundary, at most 320 px high and at least as wide as the trigger.
+  let unfollow = null
   document.addEventListener('toggle', (event) => {
     const popup = event.target
-    if (!(popup instanceof HTMLElement) || event.newState !== 'open') return
+    if (!(popup instanceof HTMLElement) || popup.getAttribute('role') !== 'listbox') return
+    unfollow?.()
+    unfollow = null
     const trigger = document.querySelector(`[popovertarget="${popup.id}"]`)
-    if (!trigger) return
-    const listbox = popup.getAttribute('role') === 'listbox'
-    place(popup, trigger, listbox ? { maxHeight: 320 } : { align: 'end', offset: 8 })
-    if (listbox) focusOption(popup)
+    if (event.newState !== 'open' || !trigger) return
+    popup.style.minWidth = `${trigger.offsetWidth}px`
+    unfollow = autoUpdate(trigger, popup, () =>
+      position(trigger, popup, { placement: 'bottom-start', offset: 6, flip: true, maxHeight: 320, ...panelBoundary(trigger) }))
+    popup.style.visibility = ''
+    focusOption(popup)
   }, true)
-  // Arrow keys move between options.
+  // Arrow keys move between options; typing focuses the next option whose
+  // label starts with the typed text (useTypeahead, reset after 750 ms).
+  let typed = ''
+  let typedAt = 0
   document.addEventListener('keydown', (event) => {
     const option = event.target instanceof Element && event.target.closest('[data-testid="select-option"]')
-    if (!option || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
-    event.preventDefault()
+    if (!option) return
     const options = [...option.closest('[role="listbox"]').querySelectorAll('button')]
-    const i = options.indexOf(option) + (event.key === 'ArrowDown' ? 1 : -1)
-    options[(i + options.length) % options.length]?.focus()
+    const n = options.length
+    let i = options.indexOf(option)
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') i += event.key === 'ArrowDown' ? 1 : -1
+    else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      typed = (event.timeStamp - typedAt > 750 ? '' : typed) + event.key.toLowerCase()
+      typedAt = event.timeStamp
+      // A new search starts after the focused option; a longer one may stay.
+      const from = typed.length > 1 ? i : i + 1
+      const k = options.findIndex((_, k) =>
+        options[(from + k) % n].textContent.trim().toLowerCase().startsWith(typed))
+      if (k < 0) return
+      i = from + k
+    } else return
+    event.preventDefault()
+    options[(i + n) % n].focus()
   })
 
+  initSettings()
   syncControls()
   return { set, syncDetected, applyStrings }
 }

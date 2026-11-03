@@ -117,7 +117,7 @@ func attrCovered(n *html.Node, key string) bool {
 	switch {
 	case n.Data == "html" && key == "lang": // applyStrings sets it
 		return true
-	case attrVal(n, "data-ui-lang") != "" && (key == "aria-pressed" || key == "class"): // syncControls
+	case n.Parent != nil && attrVal(n.Parent, "aria-label") == "UI language" && (key == "aria-pressed" || key == "class"): // syncControls
 		return true
 	}
 	return false

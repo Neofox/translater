@@ -11,6 +11,11 @@
 // - A textarea's text: React mirrors the value into its text content, Go
 //   sets only the value. The ARIA snapshots compare the value.
 // - The attributes in IGNORED, each a difference by design (reasons there).
+// - Floating UI's helpers around an open popup: its portal wrapper (the
+//   children are compared in its place), focus-guard and marker spans, and
+//   the empty span[aria-owns] that places the portalled popup after its
+//   trigger in the accessibility tree (Go's settings.js renders the same
+//   span; the ARIA snapshots compare its effect).
 // ID references (aria-controls, aria-labelledby, …) keep only their presence:
 // React generates its ids.
 import type { Page } from '@playwright/test'
@@ -42,6 +47,11 @@ export async function domSnapshot(page: Page): Promise<string> {
       // Native popover wiring (TS positions with Floating UI portals).
       /^popover$/,
       /^popovertarget$/,
+      // Floating UI's bookkeeping: data-floating-ui-inert on everything
+      // outside an open popup, data-floating-ui-focusable and data-tabindex
+      // on the popup.
+      /^data-floating-ui-/,
+      /^data-tabindex$/,
     ]
     const IDREFS = new Set([
       'aria-controls',
@@ -58,6 +68,16 @@ export async function domSnapshot(page: Page): Promise<string> {
     const walk = (el: Element, depth: number) => {
       if (SKIP.has(el.tagName) || el.hasAttribute('hidden') || el.hasAttribute('inert')) return
       if (el.hasAttribute('popover') && !el.matches(':popover-open')) return
+      if (el.hasAttribute('data-floating-ui-portal')) {
+        for (const child of el.children) walk(child, depth)
+        return
+      }
+      const helper =
+        el.tagName === 'SPAN' &&
+        !el.hasChildNodes() &&
+        !el.hasAttribute('class') &&
+        el.getAttributeNames().some((n) => n === 'aria-owns' || n.startsWith('data-floating-ui-'))
+      if (helper) return
       const parts = [el.tagName.toLowerCase()]
       for (const name of el.getAttributeNames().sort()) {
         if (IGNORED.some((re) => re.test(name))) continue

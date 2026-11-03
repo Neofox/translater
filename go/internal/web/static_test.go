@@ -52,7 +52,7 @@ func TestStaticModulesMinifiedAndMapped(t *testing.T) {
 	if err := json.Unmarshal([]byte(s.ImportMap()), &m); err != nil {
 		t.Fatal(err)
 	}
-	names := []string{"app", "composer", "context", "copy", "dictionary", "layout", "learning", "prefs", "stream", "transition"}
+	names := []string{"app", "composer", "context", "copy", "dictionary", "float", "layout", "learning", "prefs", "settings", "stream", "transition"}
 	if len(m.Imports) != len(names) {
 		t.Fatalf("import map = %v", m.Imports)
 	}

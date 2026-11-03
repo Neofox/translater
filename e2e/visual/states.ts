@@ -76,6 +76,25 @@ export const STATES: VisualState[] = [
     },
   },
   {
+    // Settings popover open (bottom-end below its trigger) with focus on the
+    // dialog itself, as Floating UI leaves it. No request.
+    name: 'settings-open',
+    async setup(page, fake) {
+      await openApp(page)
+      await page.getByTestId('settings-button').click()
+      const dialog = page.getByRole('dialog', { name: 'Settings' })
+      await expect(
+        dialog.getByRole('group', { name: 'UI language' }),
+      ).toBeVisible()
+      await expect(dialog).toBeFocused()
+      await expect(page.getByTestId('settings-button')).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      expect(await fake.requests()).toBe(0)
+    },
+  },
+  {
     // Mid-stream (skeleton.json hangs inside alternatives[1].text): main and
     // its explanation, the first alternative settled and the second still a
     // skeleton, the busy swap icon. Pulses are masked.

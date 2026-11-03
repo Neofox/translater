@@ -40,13 +40,14 @@ templ Page(v View) {
 					</div>
 				</div>
 			</main>
-			@settingsPopover(v)
 			@contextField(v)
 			@referencePanel(v)
 			@translateForm()
 			@prefsForm(v)
 			@langOption()
 			@jsonScript(`type="application/json" id="nt-data"`, v.Data)
+			// Last, like the TS FloatingPortal.
+			@settingsPopover(v)
 		</body>
 	</html>
 }

@@ -6,22 +6,11 @@
   display: none;
 }
 
-/* Floating UI positions the TS popovers with fixed coordinates; prefs.js
+/* Floating UI positions the TS popovers with fixed coordinates; float.js
    does the same for the native popovers, so drop the UA centring. */
 .settings-popover[popover],
 [role='listbox'][popover] {
   position: fixed;
   inset: auto;
   margin: 0;
-}
-
-/* UiLangToggle.tsx swaps classes for the pressed button (bg-accent
-   text-bg shadow-sm; base.css's `button { color: inherit }` overrides
-   text-bg); here [aria-pressed] carries that look, so prefs.js only flips
-   the attribute. */
-.settings-popover [data-ui-lang][aria-pressed='true'] {
-  background-color: var(--color-accent);
-  box-shadow:
-    0 1px 3px 0 rgb(0 0 0 / 0.1),
-    0 1px 2px -1px rgb(0 0 0 / 0.1);
 }

@@ -1,6 +1,8 @@
 // Reply context (@context): ContextField.tsx's toggle and field, kept in
-// sessionStorage for the tab and sent with every run.
-import type { Page } from '@playwright/test'
+// sessionStorage for the tab and sent with every run. Also the header's
+// Settings popover and the More… language menus (SettingsMenu.tsx,
+// Select.tsx and their floatingPanelBoundary placement).
+import type { Locator, Page } from '@playwright/test'
 import {
   expect,
   fillSource,
@@ -128,4 +130,178 @@ test('Clear input preserves the context and focuses the source @context', async 
   await expect(source(page)).toBeFocused()
   await expect(field(page)).toBeVisible()
   await expect(field(page)).toHaveValue('Thanks for yesterday.')
+})
+
+// ----- Settings popover and language menus ---------------------------------
+
+type Box = { left: number; top: number; right: number; bottom: number }
+
+async function box(locator: Locator): Promise<Box> {
+  return locator.evaluate((e) => {
+    const r = e.getBoundingClientRect()
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+  })
+}
+
+/** `inner` lies inside `outer` shrunk by `pad` (half a pixel of rounding). */
+function expectInside(inner: Box, outer: Box, pad: number, what: string) {
+  expect(inner.left, `${what} left`).toBeGreaterThanOrEqual(outer.left + pad - 0.5)
+  expect(inner.top, `${what} top`).toBeGreaterThanOrEqual(outer.top + pad - 0.5)
+  expect(inner.right, `${what} right`).toBeLessThanOrEqual(outer.right - pad + 0.5)
+  expect(inner.bottom, `${what} bottom`).toBeLessThanOrEqual(outer.bottom - pad + 0.5)
+}
+
+const viewportBox = (page: Page): Promise<Box> =>
+  page.evaluate(() => ({
+    left: 0,
+    top: 0,
+    right: document.documentElement.clientWidth,
+    bottom: window.innerHeight,
+  }))
+
+test('makes UI language available in settings and persists an explicit choice @context', async ({
+  page,
+  context,
+}) => {
+  const trigger = page.getByTestId('settings-button')
+  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const group = page.getByRole('group', { name: 'UI language' })
+  const button = (name: string) => group.getByRole('button', { name, exact: true })
+  await expect(group).toBeHidden()
+  await expect(trigger).not.toHaveAttribute('aria-controls')
+
+  await trigger.click()
+  await expect(group).toBeVisible()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  // While open, the trigger controls the dialog (useRole).
+  const controls = await trigger.getAttribute('aria-controls')
+  expect(controls).toBeTruthy()
+  await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute('role', 'dialog')
+  // Non-modal: focus moves to the dialog, Tab reaches the toggle, and
+  // Escape returns focus to the trigger.
+  await expect(dialog).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(button('EN')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(group).toBeHidden()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await expect(trigger).not.toHaveAttribute('aria-controls')
+  await expect(trigger).toBeFocused()
+  // An outside press closes it as well.
+  await trigger.click()
+  await expect(group).toBeVisible()
+  await page.locator('.app-brand').click()
+  await expect(group).toBeHidden()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+  await trigger.click()
+  await button('한').click()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko')
+  await expect(button('한')).toHaveAttribute('aria-pressed', 'true')
+  await expect(button('EN')).toHaveAttribute('aria-pressed', 'false')
+  await page.reload({ waitUntil: 'networkidle' })
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko')
+  const cookie = (await context.cookies()).find((c) => c.name === 'nt.preferences')
+  expect(JSON.parse(decodeURIComponent(cookie!.value)).uiLang).toBe('ko')
+  await trigger.click()
+  await expect(button('한')).toHaveAttribute('aria-pressed', 'true')
+})
+
+/** Open Settings and both More… listboxes and check where they land.
+ * Settings sits in the header, outside every pane, so it stays inside the
+ * viewport and its trigger's screen segment; each listbox stays inside its
+ * own pane (floatingPanelBoundary: padding 8, no safe areas here). */
+async function checkPopups(page: Page): Promise<void> {
+  const viewport = await viewportBox(page)
+  const segments: Box[] = await page.evaluate(() =>
+    (
+      (window as unknown as { viewport?: { segments?: DOMRect[] } }).viewport
+        ?.segments ?? []
+    ).map((r) => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom })),
+  )
+  const trigger = page.getByTestId('settings-button')
+  await trigger.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  const popup = await box(dialog)
+  const anchor = await box(trigger)
+  expectInside(popup, viewport, 8, 'settings')
+  // bottom-end, offset 8.
+  expect(Math.abs(popup.right - anchor.right)).toBeLessThanOrEqual(1)
+  expect(Math.abs(popup.top - anchor.bottom - 8)).toBeLessThanOrEqual(1)
+  const x = (anchor.left + anchor.right) / 2
+  const segment = segments.find((s) => s.left <= x && x <= s.right)
+  if (segments.length > 1 && segment)
+    expectInside(popup, segment, 0, 'settings segment')
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  for (const name of ['Source language', 'Target language']) {
+    const more = page
+      .getByRole('group', { name, exact: true })
+      .getByTestId('lang-more-trigger')
+    await more.click()
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+    const pane = await box(more.locator('xpath=ancestor::section[1]'))
+    expectInside(await box(listbox), pane, 8, `${name} menu`)
+    await page.keyboard.press('Escape')
+    await expect(more).toHaveAttribute('aria-expanded', 'false')
+  }
+}
+
+test('settings popover stays inside its pane in split and book layouts @context', async ({
+  page,
+  browserName,
+}) => {
+  const panels = page.locator('.translator-panels')
+  // An unfolded phone held sideways: split.
+  await page.setViewportSize({ width: 736, height: 594 })
+  await expect(panels).toHaveAttribute('data-layout', 'split')
+  await checkPopups(page)
+
+  // The same screen folded like a book. Chromium emulates the posture and
+  // a vertical fold over CDP; WebKit cannot.
+  if (browserName !== 'chromium') return
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setDevicePostureOverride', {
+    posture: { type: 'folded' },
+  })
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: 736,
+    height: 594,
+    deviceScaleFactor: 1,
+    mobile: false,
+    displayFeature: { orientation: 'vertical', offset: 368, maskLength: 0 },
+  })
+  await expect(panels).toHaveAttribute('data-layout', 'book')
+  await checkPopups(page)
+})
+
+test('language menus stay within the viewport and support keyboard selection @context', async ({
+  page,
+}) => {
+  for (const name of ['Source language', 'Target language']) {
+    const group = page.getByRole('group', { name, exact: true })
+    const trigger = group.getByTestId('lang-more-trigger')
+    if (!(await trigger.isVisible())) continue
+    await trigger.click()
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+    expectInside(await box(listbox), await viewportBox(page), 0, `${name} menu`)
+    await page.keyboard.press('Escape')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await trigger.click()
+    await expect(listbox).toBeVisible()
+    // Focus moves into the open list; typing jumps to the matching option.
+    await expect
+      .poll(() => listbox.evaluate((l) => l.contains(document.activeElement)))
+      .toBe(true)
+    await page.keyboard.type('f')
+    await expect(page.getByRole('option', { name: 'Français' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(
+      group.getByRole('button', { name: 'Français' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  }
 })

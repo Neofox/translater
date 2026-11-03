@@ -40,7 +40,7 @@ func TestPageRendersFromCookie(t *testing.T) {
 		`<option value="professional" selected`,
 		`aria-pressed="true" data-testid="lang-chip" data-value="fr"`,
 		`aria-label="UI language"`,
-		`data-ui-lang="ko" aria-pressed="true"`,
+		`aria-pressed="true" class="cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition bg-accent text-bg shadow-sm">한<`,
 		`data-testid="input-textarea"`,
 		`placeholder="입력하거나 붙여넣으세요"`,
 		`"prefs":{"mode":"professional","recentSource":null,"recentTarget":"fr","source":"auto","target":"fr","uiLang":"ko"}`,
