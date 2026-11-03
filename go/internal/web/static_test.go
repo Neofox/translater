@@ -52,7 +52,7 @@ func TestStaticModulesMinifiedAndMapped(t *testing.T) {
 	if err := json.Unmarshal([]byte(s.ImportMap()), &m); err != nil {
 		t.Fatal(err)
 	}
-	names := []string{"app", "composer", "copy", "prefs", "stream"}
+	names := []string{"app", "composer", "copy", "layout", "prefs", "stream"}
 	if len(m.Imports) != len(names) {
 		t.Fatalf("import map = %v", m.Imports)
 	}
@@ -66,7 +66,7 @@ func TestStaticModulesMinifiedAndMapped(t *testing.T) {
 	if strings.Contains(string(app), "// ") || !strings.Contains(string(app), "./composer.js") {
 		t.Errorf("app.js not minified or lost its imports: %.200s", app)
 	}
-	if got := len(s.Scripts()); got != 7 {
-		t.Errorf("Scripts() = %d files, want htmx, hx-sse and 5 modules", got)
+	if got := len(s.Scripts()); got != 2+len(names) {
+		t.Errorf("Scripts() = %d files, want htmx, hx-sse and %d modules", got, len(names))
 	}
 }

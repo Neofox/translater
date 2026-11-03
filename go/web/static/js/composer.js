@@ -255,5 +255,5 @@ export function initComposer(app, ta) {
   }
   resize()
 
-  return { flush, clearTimer, schedule, replaceText, clearInput, focus }
+  return { flush, clearTimer, schedule, replaceText, clearInput, focus, resize }
 }

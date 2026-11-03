@@ -11,6 +11,7 @@ import {
   routingDetected,
 } from './composer.js'
 import { initCopy, requestKey } from './copy.js'
+import { initLayout } from './layout.js'
 import { initPrefs } from './prefs.js'
 import { initStream } from './stream.js'
 
@@ -195,10 +196,15 @@ document.querySelector('.swap-button')?.addEventListener('click', () => {
   }
 })
 
+// Measure first: the panels leave their pending first paint before the
+// composer sizes the textarea.
+app.layout = initLayout(document.querySelector('.translator-panels'))
 stream = initStream(app, form)
 copy = initCopy(app)
 prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
+// InputPanel re-sizes the editor whenever the layout changes.
+document.addEventListener('nt-layout', () => composer.resize())
 updateCount()
 copy.updateActions()
 if (matchMedia('(pointer: fine)').matches) ta.focus()
