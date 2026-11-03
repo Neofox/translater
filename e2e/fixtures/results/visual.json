@@ -1,0 +1,25 @@
+{
+  "match": "[fx:visual]",
+  "intent": "sentence",
+  "chunk": 24,
+  "delayMs": 0,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "오늘 어떻게 지내요, 친구?",
+    "learningPhrases": [],
+    "rationale": "해요체 지내요 keeps the greeting warm but polite, and 친구 (friend) carries the friendly tone of my friend.",
+    "alternatives": [
+      {
+        "text": "오늘 잘 지내고 있어요, 친구?",
+        "note": "지내고 있어요 stresses how the day is going right now."
+      },
+      {
+        "text": "친구야, 오늘 어떻게 지내?",
+        "note": "반말 with 친구야 sounds closer and more casual: for a friend you know well."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

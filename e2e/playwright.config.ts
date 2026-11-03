@@ -1,6 +1,14 @@
 import { defineConfig } from '@playwright/test'
 import type { PlaywrightTestConfig } from '@playwright/test'
-import { APP, WORKERS, appPort, fakePort, fakeUrl } from './ports'
+import {
+  APP,
+  TS_BUILD,
+  WORKERS,
+  appPort,
+  appUrl,
+  fakePort,
+  fakeUrl,
+} from './ports'
 
 // Black-box parity suite: the same tests drive the TypeScript app (APP=ts,
 // default) and the Go app (APP=go) through URLs, data-testid/ARIA selectors
@@ -53,35 +61,58 @@ for (let i = 0; i < WORKERS; i++) {
     timeout: 120_000,
   })
   servers.push(
-    APP === 'ts'
+    APP === 'ts' && TS_BUILD === 'prod'
       ? {
-          name: `app-ts-${i}`,
-          command: `npm run dev -- --port ${appPort(i)} --strictPort`,
+          // Web servers start one after another, so only the first builds;
+          // the others serve the finished .vercel/output.
+          name: `app-ts-prod-${i}`,
+          command:
+            i === 0
+              ? 'npm run build && node e2e/perf/serve-ts.mjs'
+              : 'node e2e/perf/serve-ts.mjs',
           cwd: '..',
-          url: `http://localhost:${appPort(i)}/`,
-          env: appEnv(i),
-          stderr: appStderr,
-          reuseExistingServer: false,
-          timeout: 180_000,
-        }
-      : {
-          name: `app-go-${i}`,
-          command: 'go run .',
-          cwd: '../go',
-          // Port readiness only: global setup reports a clear error when the
-          // Go app does not serve the translator page yet.
-          port: appPort(i),
+          url: `${appUrl(i)}/`,
           env: { ...appEnv(i), PORT: String(appPort(i)) },
           stderr: appStderr,
           reuseExistingServer: false,
-          timeout: 180_000,
-        },
+          timeout: i === 0 ? 600_000 : 60_000,
+        }
+      : APP === 'ts'
+        ? {
+            name: `app-ts-${i}`,
+            command: `npm run dev -- --port ${appPort(i)} --strictPort`,
+            cwd: '..',
+            url: `http://localhost:${appPort(i)}/`,
+            env: appEnv(i),
+            stderr: appStderr,
+            reuseExistingServer: false,
+            timeout: 180_000,
+          }
+        : {
+            name: `app-go-${i}`,
+            command: 'go run .',
+            cwd: '../go',
+            // Port readiness only: global setup reports a clear error when the
+            // Go app does not serve the translator page yet.
+            port: appPort(i),
+            env: { ...appEnv(i), PORT: String(appPort(i)) },
+            stderr: appStderr,
+            reuseExistingServer: false,
+            timeout: 180_000,
+          },
   )
 }
 
 export default defineConfig({
   testDir: './tests',
   outputDir: '../test-results/e2e',
+  // Visual parity baselines (tests/visual.spec.ts): one folder per project,
+  // shared by both apps. The TS run writes them (e2e:visual passes
+  // --update-snapshots=all); the Go run only compares, so a missing baseline
+  // fails instead of being written.
+  snapshotPathTemplate:
+    '../test-results/visual-baseline/{projectName}/{arg}{ext}',
+  updateSnapshots: APP === 'go' ? 'none' : 'missing',
   globalSetup: './global-setup.ts',
   fullyParallel: true,
   workers: WORKERS,

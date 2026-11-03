@@ -22,6 +22,7 @@
     "e2e": "playwright test -c e2e",
     "e2e:ts": "APP=ts playwright test -c e2e",
     "e2e:go": "APP=go playwright test -c e2e",
+    "e2e:visual": "E2E_TS_BUILD=prod APP=ts playwright test -c e2e --grep @visual --update-snapshots=all && APP=go playwright test -c e2e --grep @visual",
     "eval:quality": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c evals/promptfooconfig.yaml --env-file .env.local",
     "eval:quality:fresh": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c evals/promptfooconfig.yaml --env-file .env.local --no-cache",
     "eval:quality:repeat": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c evals/promptfooconfig.yaml --env-file .env.local --repeat 3",
