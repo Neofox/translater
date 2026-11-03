@@ -69,8 +69,9 @@ const SELECTOR = '[data-testid="listen-button"]'
 /**
  * Feed `player` the audio for `key`: replayed from `cache`, or POSTed to
  * /speech (`body`) and cached once the whole body has been read. Resolves
- * true once the audio has ended, or false once `isCurrent()` turns false (a
- * stopped or superseded voice: its late bytes are dropped). Throws on any
+ * true once the input has ended and playback has finished or been stopped,
+ * or false once `isCurrent()` turns false while loading (a stopped or
+ * superseded voice: its late bytes are dropped). Throws on any
  * failure, a body cut short included, so nothing partial is cached.
  * `owner.reader` is set for cancellation; `playing()` runs at the first
  * audible chunk.

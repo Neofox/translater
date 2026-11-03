@@ -58,25 +58,31 @@ test('parseRate reads the L16 rate parameter', () => {
   assert.equal(parseRate(null), null)
 })
 
-/** A /speech response whose body yields `chunks`, then fails when `cut`. */
+/** A /speech response whose body yields `chunks` one read at a time, then
+ * ends, or fails on the next read when `cut` (a connection cut short). */
 function speechResponse(chunks, { cut = false, status = 200 } = {}) {
-  const body = new ReadableStream({
-    start(controller) {
-      for (const chunk of chunks) controller.enqueue(new Uint8Array(chunk))
-      if (cut) controller.error(new TypeError('network error'))
-      else controller.close()
+  const queue = chunks.map((chunk) => new Uint8Array(chunk))
+  const body = new ReadableStream(
+    {
+      pull(controller) {
+        if (queue.length) controller.enqueue(queue.shift())
+        else if (cut) controller.error(new TypeError('network error'))
+        else controller.close()
+      },
     },
-  })
+    { highWaterMark: 0 },
+  )
   return new Response(body, { status, headers: { 'Content-Type': 'audio/L16;rate=24000;channels=1' } })
 }
 
-function fakePlayer() {
+function fakePlayer(onAppend = () => {}) {
   const appended = []
   return {
     appended,
     ended: false,
     append(bytes, rate) {
       appended.push([bytes.length, rate])
+      onAppend()
       return bytes.length > 1
     },
     endInput() {
@@ -114,8 +120,22 @@ test('loadAudio caches only a completely read body and replays it without a requ
 })
 
 test('loadAudio rejects a body cut short and caches nothing', async () => {
-  const { run, cache, player } = load(speechResponse([[0, 0, 1, 1]], { cut: true }))
+  const { run, cache, player } = load(speechResponse([[0, 0, 1, 1], [2, 2]], { cut: true }))
   await assert.rejects(run)
+  // Both chunks played before the cut; none of it is kept for replay.
+  assert.deepEqual(player.appended, [[4, 24000], [2, 24000]])
+  assert.equal(cache.size, 0)
+  assert.equal(player.ended, false)
+})
+
+test('loadAudio stopped mid-read drops the remaining bytes and caches nothing', async () => {
+  let current = true
+  const player = fakePlayer(() => {
+    current = false // Stop tapped while the first chunk plays.
+  })
+  const { run, cache } = load(speechResponse([[0, 0], [1, 1], [2, 2]]), { current: () => current, player })
+  assert.equal(await run, false)
+  assert.deepEqual(player.appended, [[2, 24000]])
   assert.equal(cache.size, 0)
   assert.equal(player.ended, false)
 })
