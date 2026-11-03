@@ -8,7 +8,9 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | Module        | Role                                                                                   |
 | ------------- | -------------------------------------------------------------------------------------- |
 | `app.js`      | State, routing (auto target), runs of `#translate-form`                                 |
-| `composer.js` | Debounce/IME/paste/blur/shortcut scheduling, `detectIntent`, `detectLanguage`, `resolveTarget`, warm-up |
+| `composer.js` | Debounce/IME/paste/blur/shortcut scheduling, `detectIntent`, `detectLanguage`, `resolveTarget`, warm-up, editor auto-grow (`resize`) |
+| `layout.js`   | `decideLayout` (port of `useWorkspaceLayout`), `data-layout`/flags, `--app-height`/`--app-top`/`--workspace-height`, `.output-panel` order, `nt-layout` |
+| `context.js`  | Reply context toggle and field (`template#context-field`), `nt.context` sessionStorage, run `context` |
 | `stream.js`   | `nt-*` event handling (current run only), grapheme interpolator, error view             |
 | `copy.js`     | `requestKey`, Copy/Listen enabling, Copy actions                                         |
 | `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox, Settings popover    |
