@@ -8,16 +8,27 @@ import { expect, test } from './helpers'
 import { STATES } from '../visual/states'
 import { APP } from '../ports'
 
-// Known Go-vs-TS differences per state, each owned by a later task. A state
-// with gaps in a project is expected to fail on Go there (test.fail, declared
-// only once setup has settled, so a broken setup still fails): Playwright
-// reports an unexpected pass once every listed gap is closed, so the owning
-// task must remove its entry. Never list a difference without its owner.
-type Gap = { reason: string; projects?: RegExp }
+// Known Go-vs-TS differences, each owned by a later task and scoped to the
+// TS-only elements: the TS baseline run removes `tsHide` before capturing,
+// so the pixels, ARIA and DOM baselines lack exactly those elements and
+// everything else is compared strictly. They are removed, not hidden,
+// because base.css selects on presence (e.g. .app-settings:has(.adjust-menu)).
+// The Go run checks that nothing visible matches `tsHide`: once the owning
+// task renders the element, the gap entry must go. Never list a difference
+// without its owner.
+type Gap = { reason: string; tsHide: string; projects?: RegExp }
+const ADJUST: Gap = {
+  reason: 'Task 26: Adjust disclosure in the header',
+  tsHide: '.adjust-menu',
+}
 const GO_GAPS: Record<string, Gap[]> = {
-  'sentence-done': [{ reason: 'Task 26: Adjust disclosure in the header' }],
+  'sentence-done': [ADJUST],
   'error-provider': [
-    { reason: 'Task 16: errorEnvHint line and Retry button for server errors' },
+    ADJUST,
+    {
+      reason: 'Task 16: errorEnvHint line and Retry button for server errors',
+      tsHide: '.result-error > p.mt-2, .result-error > .state-actions',
+    },
   ],
 }
 
@@ -60,15 +71,25 @@ for (const state of STATES) {
     await page.route(WEB_FONTS, (route) => route.abort())
     await state.setup(page, fake)
     await settle(page)
-    // E2E_VISUAL_STRICT=1 runs the known gaps as ordinary tests, so their
-    // diff images and ARIA diffs are written (expected failures keep none).
     const gaps = (GO_GAPS[state.name] ?? []).filter(
       (gap) => !gap.projects || gap.projects.test(testInfo.project.name),
     )
-    test.fail(
-      APP === 'go' && gaps.length > 0 && !process.env.E2E_VISUAL_STRICT,
-      gaps.map((gap) => gap.reason).join('; '),
-    )
+    for (const gap of gaps) {
+      if (APP === 'ts') {
+        const removed = await page.evaluate(
+          (selector) =>
+            [...document.querySelectorAll(selector)].map((e) => e.remove()).length,
+          gap.tsHide,
+        )
+        expect(removed, `TS renders ${gap.tsHide} (${gap.reason})`).toBeGreaterThan(0)
+      } else {
+        await expect(
+          page.locator(gap.tsHide).filter({ visible: true }),
+          `Go renders ${gap.tsHide} now: remove its GO_GAPS entry (${gap.reason})`,
+        ).toHaveCount(0)
+      }
+    }
+    if (APP === 'ts' && gaps.length > 0) await settle(page)
     // Soft, so one run reports the pixel, ARIA template and ARIA tree diffs.
     await expect.soft(page).toHaveScreenshot(`${state.name}.png`, {
       animations: 'disabled',
