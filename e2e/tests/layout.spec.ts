@@ -1,7 +1,7 @@
 // Workspace layout (@layout): the measured layout, its server-rendered first
 // paint and the panel order. Ports of tests/browser/mobile.browser.tsx and
 // useWorkspaceLayout.test.tsx cases that need a real browser.
-import type { Page, Route } from '@playwright/test'
+import type { BrowserContextOptions, Page, Route } from '@playwright/test'
 import {
   expect,
   fillSource,
@@ -117,41 +117,59 @@ async function boxes(page: Page): Promise<{ elements: Box[]; chips: Box[][] }> {
 for (const inset of [0, 12, 64]) {
   test(`server-rendered first paint matches the measured layout with ${inset} px side insets @layout`, async ({
     page,
+    browser,
     baseURL,
-  }) => {
+  }, testInfo) => {
     const { width, height } = page.viewportSize()!
-    await page.route(WEB_FONTS, (route) => route.abort())
     // Side insets as browsers report them (env()): the page's own :root
     // value, so the style goes after the stylesheet.
-    await page.route(
-      (url) => url.origin === new URL(baseURL!).origin && url.pathname === '/',
-      async (route: Route) => {
-        const response = await route.fetch()
-        const body = (await response.text()).replace(
-          '</head>',
-          `<style>:root{--safe-area-left:${inset}px;--safe-area-right:${inset}px}</style></head>`,
-        )
-        await route.fulfill({ response, body })
-      },
-    )
-    const blockScripts = (route: Route) =>
-      route.request().resourceType() === 'script'
-        ? route.abort()
-        : route.fallback()
-    await page.route('**/*', blockScripts)
-    await page.goto('/')
-    await expect(source(page)).toBeVisible()
-    expect(
-      await page.evaluate(() =>
-        getComputedStyle(document.documentElement)
-          .getPropertyValue('--safe-area-left')
-          .trim(),
-      ),
-    ).toBe(`${inset}px`)
-    await expect(panels(page)).toHaveAttribute('data-layout-pending', /.*/)
+    const prepare = async (target: Page) => {
+      await target.route(WEB_FONTS, (route) => route.abort())
+      await target.route(
+        (url) => url.origin === new URL(baseURL!).origin && url.pathname === '/',
+        async (route: Route) => {
+          const response = await route.fetch()
+          const body = (await response.text()).replace(
+            '</head>',
+            `<style>:root{--safe-area-left:${inset}px;--safe-area-right:${inset}px}</style></head>`,
+          )
+          await route.fulfill({ response, body })
+        },
+      )
+    }
+
+    // The script-free (server-rendered) paint gets its own context. WebKit
+    // keeps a failed <link rel=modulepreload> response in its memory cache
+    // for the page's next documents, so a scripted load after an aborted
+    // one in the same page never fetches the modules. Both apps show it
+    // through a plain proxy too (no interception); there it clears after
+    // two reloads for TS and three for Go.
+    const { viewport, hasTouch, locale, reducedMotion } = testInfo.project.use
+    const options: BrowserContextOptions = { viewport, hasTouch, locale, reducedMotion, baseURL }
+    const ssrContext = await browser.newContext(options)
+    let before: Awaited<ReturnType<typeof boxes>>
+    try {
+      const ssr = await ssrContext.newPage()
+      await prepare(ssr)
+      await ssr.route('**/*', (route) =>
+        route.request().resourceType() === 'script' ? route.abort() : route.fallback(),
+      )
+      await ssr.goto('/')
+      await expect(source(ssr)).toBeVisible()
+      expect(
+        await ssr.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue('--safe-area-left')
+            .trim(),
+        ),
+      ).toBe(`${inset}px`)
+      await expect(panels(ssr)).toHaveAttribute('data-layout-pending', /.*/)
+      before = await boxes(ssr)
+    } finally {
+      await ssrContext.close()
+    }
     const usable = width - 2 * inset
     const twoColumns = usable >= 1100 || (usable >= 560 && usable > height)
-    const before = await boxes(page)
     const [input, output] = before.elements.slice(1, 3) as [Box, Box]
     if (twoColumns) {
       expect(Math.abs(input.y - output.y)).toBeLessThanOrEqual(1)
@@ -160,7 +178,7 @@ for (const inset of [0, 12, 64]) {
       expect(output.y + output.height).toBeLessThanOrEqual(input.y + 1)
     }
 
-    await page.unroute('**/*', blockScripts)
+    await prepare(page)
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(panels(page)).not.toHaveAttribute('data-layout-pending')
     await expect(panels(page)).toHaveAttribute(
