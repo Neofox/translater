@@ -1,5 +1,10 @@
 package web
 
+import (
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
 // inputPanel is InputPanel.tsx. The textarea belongs to no form and sits
 // outside every swap target: runs copy its trimmed text into
 // #translate-form, so streaming and preference swaps never touch it.
@@ -14,14 +19,21 @@ templ inputPanel(v View) {
 					<textarea rows="1" placeholder={ v.T("placeholder") } aria-label={ v.T("inputText") } data-t-attr="placeholder:placeholder aria-label:inputText" data-testid="input-textarea" class="translation-input scrollbar-thin" spellcheck="true" autocomplete="off" autocorrect="on"></textarea>
 				</div>
 				<div class="composer-actions">
-					<button type="button" aria-label={ v.T("pasteClipboard") } data-t-attr="aria-label:pasteClipboard" data-testid="paste-input" data-input-action="true" class={ pill("primary", "md", "paste-button") }>
-						@iconClipboard(16)
+					@ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "paste-button", Attrs: templ.Attributes{
+						"aria-label": v.T("pasteClipboard"), "data-t-attr": "aria-label:pasteClipboard",
+						"data-testid": "paste-input", "data-input-action": "true",
+					}}) {
+						@icons.Icon("clipboard", 16, nil)
 						<span data-t="paste">{ v.T("paste") }</span>
-					</button>
-					<button type="button" title={ v.T("clearInputTitle") } aria-label={ v.T("clearInput") } data-t-attr="title:clearInputTitle aria-label:clearInput" data-testid="clear-input" data-input-action="true" class={ pill("neutral", "md", "clear-button") }>
-						@iconX(16)
+					}
+					@ui.Pill(ui.PillProps{Size: "md", Class: "clear-button", Attrs: templ.Attributes{
+						"title": v.T("clearInputTitle"), "aria-label": v.T("clearInput"),
+						"data-t-attr": "title:clearInputTitle aria-label:clearInput",
+						"data-testid": "clear-input", "data-input-action": "true",
+					}}) {
+						@icons.Icon("x", 16, nil)
 						<span data-t="clear">{ v.T("clear") }</span>
-					</button>
+					}
 				</div>
 				<div class="composer-meta">
 					<span class="input-count text-ink-dim">{ v.inputCount() }</span>

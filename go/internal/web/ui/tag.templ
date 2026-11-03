@@ -1,0 +1,23 @@
+package ui
+
+// Tag.tsx's tone map.
+var tagTone = map[string]string{
+	"neutral": "bg-bg text-ink-dim",
+	"accent":  "bg-accent-soft text-ink",
+	"warm":    "bg-warm-soft text-ink",
+}
+
+// TagClass is Tag.tsx's className template literal (no className given).
+func TagClass(tone string) string {
+	if tone == "" {
+		tone = "neutral"
+	}
+	return "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide " + tagTone[tone] + " "
+}
+
+// Tag is the small uppercase chip (Tag.tsx).
+templ Tag(tone string) {
+	<span { templ.Attributes{"class": TagClass(tone)}... }>
+		{ children... }
+	</span>
+}

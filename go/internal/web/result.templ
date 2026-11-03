@@ -1,6 +1,11 @@
 package web
 
-import "strconv"
+import (
+	"strconv"
+
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
 
 // Result fragments streamed by /translate as <hx-partial> swaps. Markup,
 // class strings and data-testids follow the TS components (SentenceView /
@@ -28,16 +33,20 @@ templ AlternativeRow(index int, word bool, text, note string, registers []string
 	<li data-testid="alternative-item" class="alternative-item detail-enter group flow-root rounded-lg border border-border bg-panel px-3 py-2" style={ templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms") }>
 		if text != "" {
 			<div class="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
-				<button type="button" aria-label={ copyLabel } title={ copyLabel } data-testid="copy-button" disabled class="ui-pill inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition text-ink border-border bg-panel hover:border-accent/60 gap-1.5 px-2 py-1 text-xs min-h-11 min-w-11 copy-button icon-action disabled:cursor-not-allowed disabled:opacity-45">
-					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
-				</button>
+				@ui.Pill(ui.PillProps{Class: "copy-button icon-action disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+					"aria-label": copyLabel, "title": copyLabel, "data-testid": "copy-button", "disabled": true,
+				}}) {
+					@icons.Icon("copy", 14, nil)
+				}
 			</div>
 		}
 		if word {
 			<div class="flex flex-wrap items-baseline gap-2">
 				<p class="alternative-text min-w-0 break-words text-ink">{ text }</p>
 				for _, r := range registers {
-					<span class="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-bg text-ink-dim ">{ r }</span>
+					@ui.Tag("neutral") {
+						{ r }
+					}
 				}
 			</div>
 		} else {

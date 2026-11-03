@@ -1,5 +1,10 @@
 package web
 
+import (
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
 // outputPanel is OutputPanel.tsx. stream.js fills the result regions from
 // the nt-* events; #result-details receives the server's partials
 // (ResultSkeleton, AlternativeRow). Copy/Listen are disabled until the
@@ -9,10 +14,10 @@ templ outputPanel(v View) {
 		<div class="target-toolbar" data-testid="target-toolbar">
 			<button type="button" class="swap-button" aria-label={ v.T("swapLanguages") } data-t-attr="aria-label:swapLanguages">
 				<span data-icon="swap" class="contents">
-					@iconSwap(18)
+					@icons.Icon("arrow-right-left", 18, nil)
 				</span>
 				<span data-icon="busy" class="contents" hidden>
-					@iconLoader(18, " animate-spin")
+					@icons.Icon("loader-circle", 18, templ.Attributes{"class": "animate-spin"})
 				</span>
 			</button>
 			@LanguageBar(v, "target")
@@ -20,21 +25,27 @@ templ outputPanel(v View) {
 		</div>
 		<div class="result-actions" data-testid="output-toolbar">
 			<div class="primary-result-actions">
-				<button type="button" aria-label={ v.T("copy") } title={ v.T("copy") } data-t-attr="aria-label:copy title:copy" data-testid="copy-button" disabled class={ pill("primary", "md", "copy-button disabled:cursor-not-allowed disabled:opacity-45") }>
-					@iconCopy(14)
+				@ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+					"aria-label": v.T("copy"), "title": v.T("copy"), "data-t-attr": "aria-label:copy title:copy",
+					"data-testid": "copy-button", "disabled": true,
+				}}) {
+					@icons.Icon("copy", 14, nil)
 					<span data-t="copy">{ v.T("copy") }</span>
-				</button>
+				}
 				<span class="relative inline-flex shrink-0">
-					<button type="button" disabled aria-label={ v.T("listen") } title={ v.T("listen") } data-t-attr="aria-label:listen title:listen" aria-pressed="false" aria-busy="false" data-testid="listen-button" class={ pill("neutral", "md", "listen-button disabled:cursor-not-allowed disabled:opacity-50") }>
-						@iconVolume(14)
+					@ui.Pill(ui.PillProps{Size: "md", Class: "listen-button disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
+						"disabled": true, "aria-label": v.T("listen"), "title": v.T("listen"), "data-t-attr": "aria-label:listen title:listen",
+						"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
+					}}) {
+						@icons.Icon("volume-2", 14, nil)
 						<span data-t="listen">{ v.T("listen") }</span>
-					</button>
+					}
 				</span>
 			</div>
 		</div>
 		<div id="translation-result" class="result-scroll scrollbar-thin" data-testid="translation-result" tabindex="0" aria-label={ v.T("translation") } data-t-attr="aria-label:translation">
 			<div id="result-error" class="result-error" role="alert" hidden>
-				@iconAlert(28, " state-icon")
+				@icons.Icon("triangle-alert", 28, templ.Attributes{"class": "state-icon"})
 				<p class="state-title"></p>
 				<p class="state-body"></p>
 				<p class="state-hint mt-2 text-ink-dim" hidden></p>

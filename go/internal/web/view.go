@@ -83,40 +83,9 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// Pill class strings (src/components/ui/Pill.tsx).
-var (
-	pillTone = map[string]string{
-		"primary": "border-transparent bg-accent text-bg hover:brightness-110",
-		"neutral": "border-border bg-panel hover:border-accent/60",
-		"active":  "border-accent/70 bg-accent-soft [&>svg]:text-accent",
-	}
-	pillSize = map[string]string{
-		"sm": "gap-1.5 px-2 py-1 text-xs min-h-11 min-w-11",
-		"md": "gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11",
-	}
-)
-
-func pill(tone, size, extra string) string {
-	c := "ui-pill inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition"
-	if tone != "primary" {
-		c += " text-ink"
-	}
-	c += " " + pillTone[tone] + " " + pillSize[size]
-	if extra != "" {
-		c += " " + extra
-	}
-	return c
-}
-
 func chipTone(pressed bool) string {
 	if pressed {
 		return "active"
 	}
 	return "neutral"
-}
-
-// uiLangClass is UiLangToggle.tsx's idle button; go.css styles the pressed
-// one from [aria-pressed], so a client-side switch needs no class changes.
-func uiLangClass() string {
-	return "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition text-ink-soft hover:text-ink"
 }

@@ -85,6 +85,9 @@ func (s *Static) URL(name string) string {
 	return f.URL
 }
 
+// File is the served file for name ("css/app.css"), or nil.
+func (s *Static) File(name string) *File { return s.byName[name] }
+
 // Modules lists the application ES modules (js/*.js), sorted by name.
 func (s *Static) Modules() []*File {
 	var out []*File
