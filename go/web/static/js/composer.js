@@ -159,6 +159,13 @@ export function initComposer(app, ta) {
     changed()
   }
 
+  /** A lookup (synonym): the same textarea gets `text` and a debounced
+   * run, like typing it (TS lookupWord). */
+  function setText(text, { focus: andFocus = false } = {}) {
+    if (ta.value !== text) replaceText(text, false)
+    if (andFocus) focus()
+  }
+
   function focus() {
     const active = document.activeElement
     if (active instanceof HTMLElement && active !== ta) active.blur()
@@ -255,5 +262,5 @@ export function initComposer(app, ta) {
   }
   resize()
 
-  return { flush, clearTimer, schedule, replaceText, clearInput, focus, resize }
+  return { flush, clearTimer, schedule, replaceText, setText, clearInput, focus, resize }
 }

@@ -50,22 +50,97 @@ type processor struct {
 	scan   *jsonstream.Scanner
 	doc    strings.Builder
 	closed map[string]bool // top-level strings already closed (first one wins)
+	meta   *web.WordMetaView // word intent: the dictionary fields completed so far
+	seen   map[string]bool   // dictionary fields already taken (first one wins)
 }
 
 func newProcessor(out *sseWriter, c *contract.Contract, run, intent, uiLang string) *processor {
-	return &processor{
+	p := &processor{
 		out: out, c: c, run: run, uiLang: uiLang, word: intent == "word",
 		f: intentFields[intent], scan: jsonstream.New(), closed: map[string]bool{},
 	}
+	if p.word {
+		p.meta = &web.WordMetaView{T: func(key string) string { return c.T(uiLang, key) }, Streaming: true}
+		p.seen = map[string]bool{}
+	}
+	return p
 }
 
-// start resets #result-details to the empty skeleton.
+// start resets #result-details to the empty skeleton and, for a word, the
+// dictionary to its streaming start.
 func (p *processor) start() bool {
 	html, ok := p.render(web.ResultSkeleton(p.c.T(p.uiLang, p.f.skeletonKey)))
+	if !ok || !p.out.partial(`<hx-partial hx-target="#result-details" hx-swap="innerHTML">`+html+`</hx-partial>`) {
+		return false
+	}
+	return p.wordMeta()
+}
+
+// end renders the complete dictionary without skeletons; it precedes
+// nt-done.
+func (p *processor) end() bool {
+	if p.meta == nil {
+		return true
+	}
+	p.meta.Streaming = false
+	return p.wordMeta()
+}
+
+// wordMeta re-renders the dictionary into #word-meta. A morph keeps the
+// blocks already shown (their entry animation does not restart).
+func (p *processor) wordMeta() bool {
+	if p.meta == nil {
+		return true
+	}
+	html, ok := p.render(web.WordMeta(*p.meta))
 	if !ok {
 		return false
 	}
-	return p.out.partial(`<hx-partial hx-target="#result-details" hx-swap="innerHTML">` + html + `</hx-partial>`)
+	return p.out.partial(`<hx-partial hx-target="#word-meta" hx-swap="innerMorph">` + html + `</hx-partial>`)
+}
+
+// dictionary takes one completed dictionary value of a word result:
+// posList[i] or a top-level field. Values of the wrong shape are skipped
+// here; final validation reports them.
+func (p *processor) dictionary(ev jsonstream.Event) bool {
+	if p.meta == nil || ev.Kind != jsonstream.ValueEnd || len(ev.Path) == 0 || ev.Path[0].IsIndex {
+		return true
+	}
+	m, key := p.meta, ev.Path[0].Key
+	if len(ev.Path) == 2 && key == "posList" && ev.Path[1].IsIndex {
+		var pos web.POSView
+		if p.seen[key] || ev.Path[1].Index != len(m.POS) || json.Unmarshal(ev.Raw, &pos) != nil {
+			return true
+		}
+		m.POS = append(m.POS, pos)
+		return p.wordMeta()
+	}
+	if len(ev.Path) != 1 || p.seen[key] {
+		return true
+	}
+	var err error
+	switch key {
+	case "posList":
+		p.seen[key] = true // later duplicates of the key are ignored
+		return true
+	case "synonyms":
+		err = json.Unmarshal(ev.Raw, &m.Synonyms)
+	case "etymology":
+		err = json.Unmarshal(ev.Raw, &m.Etymology)
+	case "notes":
+		err = json.Unmarshal(ev.Raw, &m.Notes)
+	case "grammar":
+		err = json.Unmarshal(ev.Raw, &m.Grammar)
+	case "characters":
+		err = json.Unmarshal(ev.Raw, &m.Characters)
+	default:
+		return true
+	}
+	p.seen[key] = true
+	if err != nil {
+		return true
+	}
+	return p.wordMeta()
 }
 
 // feed scans one delta and emits its events. It returns errMalformed when the
@@ -94,6 +169,9 @@ func topLevel(path jsonstream.Path) (string, bool) {
 }
 
 func (p *processor) handle(ev jsonstream.Event) bool {
+	if !p.dictionary(ev) {
+		return false
+	}
 	if key, ok := topLevel(ev.Path); ok {
 		if p.closed[key] {
 			return true // duplicate key: the first value already counted

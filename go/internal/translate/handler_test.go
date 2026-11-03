@@ -597,7 +597,7 @@ func TestWordEvents(t *testing.T) {
 	if got := joined(t, evs, evTextDelta, "primaryUsageNote"); got != want["primaryUsageNote"] {
 		t.Errorf("usage deltas = %q", got)
 	}
-	ps := partials(evs)
+	ps := slices.DeleteFunc(partials(evs), isWordMeta)
 	if !strings.Contains(ps[0], e.c.T("en", "alternativeTranslations")) {
 		t.Errorf("skeleton title: %q", ps[0])
 	}
@@ -607,6 +607,94 @@ func TestWordEvents(t *testing.T) {
 	}
 	if evs[len(evs)-1].Name != evDone {
 		t.Errorf("last = %q", evs[len(evs)-1].Name)
+	}
+}
+
+func isWordMeta(html string) bool {
+	return strings.HasPrefix(html, `<hx-partial hx-target="#word-meta"`)
+}
+
+func wordMetaPartials(evs []sseEvent) []string {
+	var out []string
+	for _, p := range partials(evs) {
+		if isWordMeta(p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// inOrder reports whether every needle occurs in s, in order.
+func inOrder(s string, needles ...string) bool {
+	for _, n := range needles {
+		i := strings.Index(s, n)
+		if i < 0 {
+			return false
+		}
+		s = s[i+len(n):]
+	}
+	return true
+}
+
+func TestWordMetaStreamsSections(t *testing.T) {
+	e := newEnv(t, fixturesDir, nil)
+	for _, attempt := range []string{"live", "cached"} {
+		evs := parseSSE(t, e.run(t, form("[fx:word] thanks", "intent", "word")))
+		metas := wordMetaPartials(evs)
+		// start, 3 posList items, synonyms, etymology, notes, grammar,
+		// characters, and the final non-streaming render.
+		if len(metas) != 10 {
+			t.Fatalf("%s: %d #word-meta partials", attempt, len(metas))
+		}
+		if !strings.Contains(metas[0], `hx-swap="innerMorph"`) {
+			t.Errorf("%s: swap = %q", attempt, metas[0])
+		}
+		last := metas[len(metas)-1]
+		T := func(k string) string { return e.c.T("en", k) }
+		if !inOrder(last, T("pos"), "interjection", T("primaryMeaning"), T("otherMeanings"),
+			"An expression or feeling of gratitude.", T("etymology"), T("grammar"), T("notes"), T("synonyms")) {
+			t.Errorf("%s: last partial order: %s", attempt, last)
+		}
+		if strings.Contains(last, "animate-pulse") {
+			t.Errorf("%s: the final render still has a skeleton", attempt)
+		}
+		// The final render precedes nt-done.
+		lastMeta := slices.IndexFunc(evs, func(ev sseEvent) bool { return ev.Name == "" && ev.Data == last })
+		if lastMeta < 0 || lastMeta > index(evs, evDone) {
+			t.Errorf("%s: final #word-meta after nt-done", attempt)
+		}
+	}
+}
+
+func TestWordSkeletonForNextPendingSection(t *testing.T) {
+	e := newEnv(t, fixturesDir, nil)
+	evs := parseSSE(t, e.run(t, form("[fx:word] thanks", "intent", "word")))
+	metas := wordMetaPartials(evs)
+	T := func(k string) string { return e.c.T("en", k) }
+	// The partial after synonyms closes: etymology is the next one pending.
+	var before string
+	for _, m := range metas {
+		if strings.Contains(m, T("synonyms")+"</p>") && !strings.Contains(m, T("etymology")+"</p><p class=\"text-ink\">") {
+			before = m
+		}
+	}
+	if before == "" {
+		t.Fatal("no partial between synonyms and etymology")
+	}
+	if n := strings.Count(before, "animate-pulse"); n != 1 {
+		t.Fatalf("skeletons = %d, want 1: %s", n, before)
+	}
+	i := strings.Index(before, "animate-pulse")
+	label := before[strings.LastIndex(before[:i], "<p"):i]
+	if !strings.Contains(label, ">"+T("etymology")+"</p>") {
+		t.Fatalf("skeleton label = %q", label)
+	}
+}
+
+func TestSentenceHasNoWordMeta(t *testing.T) {
+	e := newEnv(t, fixturesDir, nil)
+	if metas := wordMetaPartials(parseSSE(t, e.run(t, form("[fx:visual] hi")))); len(metas) != 0 {
+		t.Fatalf("sentence emitted %d #word-meta partials", len(metas))
 	}
 }
 

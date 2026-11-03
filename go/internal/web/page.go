@@ -26,6 +26,8 @@ var clientStrings = []string{
 	"streaming", "emptyMain", "inputCount", "charCount", "whyWording", "usage",
 	"translationFailedTitle", "translationFailed", "inputTooLong", "inputTooLongHint",
 	"contextToggle", "contextShort", "contextPlaceholder", "contextClear",
+	"notes", "learn", "wordDetails", "pos", "primaryMeaning", "otherMeanings", "etymology",
+	"grammar", "synonyms", "hanja", "kanji", "hanzi", "characters",
 }
 
 // Pages renders the document and the preference partials.

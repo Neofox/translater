@@ -131,7 +131,7 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hit {
-		if p.feed(cached) == nil {
+		if p.feed(cached) == nil && p.end() {
 			out.event(evDone, runPayload{Run: run})
 		}
 		return
@@ -171,7 +171,9 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cache.Add(key, doc)
-	out.event(evDone, runPayload{Run: run})
+	if p.end() {
+		out.event(evDone, runPayload{Run: run})
+	}
 }
 
 // failStream answers a valid request with the skeleton and one nt-error.

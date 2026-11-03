@@ -6,5 +6,6 @@
 @import 'tailwindcss' source(none);
 @source '../../../internal/web/**/*.templ';
 @source '../js/**/*.js';
+@source not '../js/**/*.test.js';
 @import './base.css';
 @import './go.css';

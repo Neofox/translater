@@ -194,6 +194,18 @@ export function initStream(app, form) {
     main.lang = live.target
     // The TSX template literal, spaces included (classList would drop them).
     main.className = `result-main ${live.intent === 'word' ? 'result-word' : ''}`
+    // A word's main text is the word-details trigger's text
+    // (InspectableTranslation's actionLabel branch); dictionary.js keeps
+    // its state.
+    if (live.intent === 'word') {
+      const trigger = document.createElement('button')
+      trigger.type = 'button'
+      trigger.className = 'word-details-trigger'
+      trigger.dataset.testid = 'word-details-trigger'
+      trigger.disabled = true
+      trigger.append(mainText)
+      main.replaceChildren(trigger)
+    } else main.replaceChildren(mainText)
     details.replaceChildren()
     renderState()
   }

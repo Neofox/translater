@@ -75,4 +75,23 @@ export const STATES: VisualState[] = [
       expect(await fake.requests()).toBe(0)
     },
   },
+  {
+    // A word result (word.json): the word-details trigger as main text,
+    // alternatives with register tags and, in workspace/split/book layouts,
+    // the complete dictionary in the reference pane.
+    name: 'word-done',
+    async setup(page) {
+      await openApp(page)
+      await fillSource(page, '[fx:word] thanks')
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(3)
+      const layout = await page
+        .locator('.translator-panels')
+        .getAttribute('data-layout')
+      if (['workspace', 'split', 'book'].includes(layout ?? ''))
+        await expect(
+          page.locator('.reference-panel .word-source-meta'),
+        ).toContainText('cheers')
+    },
+  },
 ]

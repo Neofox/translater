@@ -12,6 +12,7 @@ import {
 } from './composer.js'
 import { initContext } from './context.js'
 import { initCopy, requestKey } from './copy.js'
+import { initDictionary } from './dictionary.js'
 import { initLayout } from './layout.js'
 import { initPrefs } from './prefs.js'
 import { initStream } from './stream.js'
@@ -22,7 +23,7 @@ const ta = document.querySelector('[data-testid="input-textarea"]')
 const VALID_DETECTED = ['en', 'ko', 'ja', 'fr', 'es', 'zh']
 const REGISTER = { friends: '반말', casual: '해요체', professional: '존댓말' }
 
-let composer, stream, copy, prefs
+let composer, stream, copy, prefs, dictionary
 // The model's report for an exact input, kept while that input stays.
 let modelDetected = null
 // Input for which the done-time safety net already flipped the target.
@@ -93,7 +94,7 @@ const app = {
     app.autoSwap()
     prefs.syncDetected()
     updateCount()
-    copy.updateActions()
+    app.updateActions()
   },
 
   /** Tone, languages or UI language changed: abort and re-run debounced. */
@@ -101,7 +102,7 @@ const app = {
     app.abort()
     app.autoSwap()
     updateCount()
-    copy.updateActions()
+    app.updateActions()
     composer.schedule()
   },
 
@@ -158,7 +159,10 @@ const app = {
     prefs.set('target', fallbackTargetFor(reported))
   },
 
-  updateActions: () => copy.updateActions(),
+  updateActions() {
+    copy.updateActions()
+    dictionary?.sync()
+  },
   copyMain: () => copy.copyMain(),
   warm: () => fetch('/warm', { method: 'POST' }).catch(() => {}),
   setSwapBusy(busy) {
@@ -205,8 +209,12 @@ stream = initStream(app, form)
 copy = initCopy(app)
 prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
+dictionary = initDictionary(app, composer)
 // InputPanel re-sizes the editor whenever the layout changes.
-document.addEventListener('nt-layout', () => composer.resize())
+document.addEventListener('nt-layout', () => {
+  composer.resize()
+  dictionary.sync()
+})
 initContext(app, () => composer.resize(), (root) => prefs.applyStrings(root))
 updateCount()
 copy.updateActions()

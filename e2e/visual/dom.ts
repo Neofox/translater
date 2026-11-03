@@ -33,6 +33,9 @@ export async function domSnapshot(page: Page): Promise<string> {
       /^id$/,
       // Go's swap-button icon hooks (OutputPanel renders one icon instead).
       /^data-icon$/,
+      // Go's per-POS dictionary block variants (WordSourceMeta re-renders
+      // for the active tab; dictionary.js shows the active variant).
+      /^data-pos$/,
       // React's <ViewTransition> markers (vt-update, vt-name, …); Go's
       // transition uses base.css's view-transition-class instead.
       /^vt-/,

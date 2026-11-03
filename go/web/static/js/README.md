@@ -13,6 +13,7 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | `context.js`  | Reply context toggle and field (`template#context-field`), `nt.context` sessionStorage, run `context` |
 | `stream.js`   | `nt-*` event handling (current run only), grapheme interpolator, error view             |
 | `copy.js`     | `requestKey`, Copy/Listen enabling, Copy actions                                         |
+| `dictionary.js` | Word dictionary POS tabs (active variant across `#word-meta` swaps), synonym lookup, reference pane placement, word-details trigger state |
 | `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox, Settings popover    |
 
 ## Language detection
