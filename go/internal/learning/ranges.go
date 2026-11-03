@@ -6,12 +6,6 @@ import (
 	"strings"
 )
 
-// Prepare is a port of prepareLearningResult in src/lib/learningRanges.ts.
-// Hand-written because no library resolves model quotations into
-// grapheme-safe, order-disambiguated ranges; graphemes come from
-// rivo/uniseg. The model never counts offsets: every range is found from an
-// exact quotation, and ambiguous or invalid quotations stay unmarked.
-
 // Range is a half-open span in UTF-16 code units.
 type Range struct{ Start, End int }
 
@@ -58,6 +52,12 @@ type Prepared struct {
 // Prepare resolves phrases quoted from primary (the analysed text) and their
 // counterpart quotations (sourceTexts) in counterpart. It reports false when
 // no phrase resolves.
+//
+// It is a port of prepareLearningResult in src/lib/learningRanges.ts,
+// hand-written because no library resolves model quotations into
+// grapheme-safe, order-disambiguated ranges; graphemes come from
+// rivo/uniseg. The model never counts offsets: every range is found from an
+// exact quotation, and ambiguous or invalid quotations stay unmarked.
 func Prepare(counterpart, primary string, phrases []Phrase) (Prepared, bool) {
 	var kept []Phrase
 	for _, p := range phrases {

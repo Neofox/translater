@@ -51,7 +51,10 @@ func lastIndexOf(h, needle []uint16, from int) int {
 
 // boundaries is the set of UTF-16 offsets at extended grapheme cluster
 // boundaries of s, including 0 and its length (Intl.Segmenter granularity
-// "grapheme" in the TS app).
+// "grapheme" in the TS app). Known divergence: uniseg v0.4.7 implements
+// Unicode 15.0, without the Indic conjunct rule (GB9c) that current browsers
+// apply, so Indic conjuncts such as क्ष split here but not in the browser.
+// Outside the app's language set; the TS parity corpus has no Indic text.
 func boundaries(s string) map[int]bool {
 	points := map[int]bool{0: true}
 	offset := 0
