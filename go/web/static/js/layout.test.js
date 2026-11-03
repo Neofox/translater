@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { COMPACT_LAYOUT, decideLayout, initLayout, initialLayoutState } from './layout.js'
 
 // Minimal DOM for initLayout: the panels' height follows the shell's
-// --app-height (minus a 64 px header), as the CSS grid does.
+// --app-height (minus a 64 px header), as base.css lays it out. (Tailwind
+// scans these files: avoid utility names such as the display keywords.)
 class FakeElement {
   constructor() {
     this.props = new Map()
