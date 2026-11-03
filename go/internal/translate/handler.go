@@ -126,7 +126,7 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	out := newSSEWriter(w)
-	p := newProcessor(out, s.c, run, in.Intent, in.UILang)
+	p := newProcessor(out, s.c, run, in.Intent, in.UILang, in.Text)
 	if !p.start() {
 		return
 	}
@@ -184,7 +184,7 @@ func (s *Server) failStream(w http.ResponseWriter, run string, in prompt.Transla
 	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	out := newSSEWriter(w)
-	if newProcessor(out, s.c, run, in.Intent, in.UILang).start() {
+	if newProcessor(out, s.c, run, in.Intent, in.UILang, in.Text).start() {
 		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
 	}
 }

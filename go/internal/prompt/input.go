@@ -123,7 +123,7 @@ func JSTrim(s string) string {
 // non-ASCII letters (U+017F ſ never matches s), so letters are ASCII
 // classes rather than (?i). \b is an ASCII word boundary in both.
 var blockTag = func() *regexp.Regexp {
-	const ws = `[\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}]`
+	const ws = `[` + jsSpace + `]`
 	ci := func(word string) string {
 		var b strings.Builder
 		for _, c := range word {

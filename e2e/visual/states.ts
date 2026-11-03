@@ -76,6 +76,37 @@ export const STATES: VisualState[] = [
     },
   },
   {
+    // Mid-stream (skeleton.json hangs inside alternatives[1].text): main and
+    // its explanation, the first alternative settled and the second still a
+    // skeleton, the busy swap icon. Pulses are masked.
+    name: 'streaming-skeleton',
+    async setup(page, fake) {
+      await openApp(page)
+      await fillSource(page, visualText('skeleton'))
+      await expect(page.locator('.alternative-skeleton')).toHaveCount(1, {
+        timeout: 20_000,
+      })
+      await expect(page.getByTestId('alternative-item')).toHaveCount(1)
+      await expect(page.locator('.main-explanation .section-tag')).toBeVisible()
+      await expect(page.locator('.output-panel')).toHaveAttribute(
+        'aria-busy',
+        'true',
+      )
+      expect(await fake.requests()).toBe(1)
+    },
+  },
+  {
+    // Input over the 4,000-character limit: a local error with its hint and
+    // no Retry; no request.
+    name: 'error-input',
+    async setup(page, fake) {
+      await openApp(page)
+      await fillSource(page, 'How are you doing today? '.repeat(161).trim())
+      await expect(page.getByRole('alert')).toBeVisible({ timeout: 5_000 })
+      expect(await fake.requests()).toBe(0)
+    },
+  },
+  {
     // A word result (word.json): the word-details trigger as main text,
     // alternatives with register tags and, in workspace/split/book layouts,
     // the complete dictionary in the reference pane.

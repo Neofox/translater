@@ -53,7 +53,9 @@ type Fixture struct {
 // (top-level OpenAI `error` event with Code), "error-nested" (event with an
 // `error` object, the shape the SDK intercepts), "failed" (response.failed
 // with error.code), "incomplete" (response.incomplete with
-// incomplete_details.reason) or "truncate" (close without response.completed).
+// incomplete_details.reason), "truncate" (close without response.completed)
+// or "hang" (send nothing more until the client leaves, which counts as an
+// abort: a stable mid-stream state for screenshots).
 // Messages carry FaultMessage so tests can assert it never leaks.
 type Fault struct {
 	Kind   string `json:"kind"`
@@ -352,6 +354,11 @@ func (s *server) stream(ctx context.Context, w http.ResponseWriter, fx *Fixture,
 			return
 		}
 		if fx.Fault != nil && i+1 >= fx.Fault.After {
+			if fx.Fault.Kind == "hang" {
+				<-ctx.Done()
+				s.countAbort()
+				return
+			}
 			if send2 := fault(fx.Fault, send, response); send2 != nil {
 				s.countAbort()
 			}

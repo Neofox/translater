@@ -202,6 +202,13 @@ document.querySelector('.swap-button')?.addEventListener('click', () => {
   }
 })
 
+// Retry a failed run with the current input (TS run(undefined, 'force')).
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element && event.target.closest('.retry-button'))) return
+  composer.clearTimer()
+  app.run('force')
+})
+
 // Measure first: the panels leave their pending first paint before the
 // composer sizes the textarea.
 app.layout = initLayout(document.querySelector('.translator-panels'))

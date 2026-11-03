@@ -52,12 +52,26 @@ type processor struct {
 	closed map[string]bool // top-level strings already closed (first one wins)
 	meta   *web.WordMetaView // word intent: the dictionary fields completed so far
 	seen   map[string]bool   // dictionary fields already taken (first one wins)
+	// Alternatives (none for a long-form sentence). SentenceView/WordView
+	// settle all but the newest one while the run streams: the newest,
+	// alternatives[altIndex], shows as #alternative-skeleton (altOpen) and
+	// its completed row waits in altRow until the next one starts or the
+	// run ends.
+	hideAlts  bool
+	altIndex  int
+	altOpen   bool
+	altRow    string
+	altLabels [2]string // Copy, Listen
 }
 
-func newProcessor(out *sseWriter, c *contract.Contract, run, intent, uiLang string) *processor {
+// newProcessor builds the processor of one run; text is the request's
+// source text.
+func newProcessor(out *sseWriter, c *contract.Contract, run, intent, uiLang, text string) *processor {
 	p := &processor{
 		out: out, c: c, run: run, uiLang: uiLang, word: intent == "word",
 		f: intentFields[intent], scan: jsonstream.New(), closed: map[string]bool{},
+		hideAlts: intent == "sentence" && prompt.IsLongForm(text), altIndex: -1,
+		altLabels: [2]string{c.T(uiLang, "copy"), c.T(uiLang, "listen")},
 	}
 	if p.word {
 		p.meta = &web.WordMetaView{T: func(key string) string { return c.T(uiLang, key) }, Streaming: true}
@@ -76,9 +90,12 @@ func (p *processor) start() bool {
 	return p.wordMeta()
 }
 
-// end renders the complete dictionary without skeletons; it precedes
-// nt-done.
+// end settles the last alternative and renders the complete dictionary
+// without skeletons; it precedes nt-done.
 func (p *processor) end() bool {
+	if !p.settleAlternative() {
+		return false
+	}
 	if p.meta == nil {
 		return true
 	}
@@ -195,9 +212,8 @@ func (p *processor) handle(ev jsonstream.Event) bool {
 		}
 		return true
 	}
-	if ev.Kind == jsonstream.ValueEnd && len(ev.Path) == 2 &&
-		!ev.Path[0].IsIndex && ev.Path[0].Key == p.f.alternatives && ev.Path[1].IsIndex {
-		return p.alternative(ev.Path[1].Index, ev.Raw)
+	if len(ev.Path) >= 2 && !ev.Path[0].IsIndex && ev.Path[0].Key == p.f.alternatives && ev.Path[1].IsIndex {
+		return p.alternative(ev)
 	}
 	return true
 }
@@ -211,22 +227,49 @@ func (p *processor) isText(key string) bool {
 	return false
 }
 
-// alternative emits one completed alternatives[i] row. An element of the
-// wrong shape is skipped here; final validation reports it.
-func (p *processor) alternative(index int, raw []byte) bool {
+// alternative handles an event under alternatives[i]. The first event of a
+// new item settles the previous one and appends the skeleton; the item's
+// completion renders its row, held until settled. An element of the wrong
+// shape gets no row (its skeleton just goes); final validation reports it.
+func (p *processor) alternative(ev jsonstream.Event) bool {
+	if p.hideAlts {
+		return true
+	}
+	i := ev.Path[1].Index
+	if i > p.altIndex {
+		if !p.settleAlternative() {
+			return false
+		}
+		html, ok := p.render(web.AlternativeSkeleton(p.altLabels[0], p.altLabels[1]))
+		if !ok || !p.out.partial(`<hx-partial hx-target="#alternatives" hx-swap="beforeend">`+html+`</hx-partial>`) {
+			return false
+		}
+		p.altIndex, p.altOpen = i, true
+	}
+	if ev.Kind != jsonstream.ValueEnd || len(ev.Path) != 2 || i != p.altIndex {
+		return true
+	}
 	var alt struct {
 		Text     string   `json:"text"`
 		Note     string   `json:"note"`
 		Register []string `json:"register"`
 	}
-	if json.Unmarshal(raw, &alt) != nil {
+	if json.Unmarshal(ev.Raw, &alt) != nil {
 		return true
 	}
-	html, ok := p.render(web.AlternativeRow(index, p.word, alt.Text, alt.Note, alt.Register, p.c.T(p.uiLang, "copy"), p.c.T(p.uiLang, "listen")))
-	if !ok {
-		return false
+	html, ok := p.render(web.AlternativeRow(i, p.word, alt.Text, alt.Note, alt.Register, p.altLabels[0], p.altLabels[1]))
+	p.altRow = html
+	return ok
+}
+
+// settleAlternative replaces the open skeleton with its completed row.
+func (p *processor) settleAlternative() bool {
+	if !p.altOpen {
+		return true
 	}
-	return p.out.partial(`<hx-partial hx-target="#alternatives" hx-swap="beforeend">` + html + `</hx-partial>`)
+	html := p.altRow
+	p.altOpen, p.altRow = false, ""
+	return p.out.partial(`<hx-partial hx-target="#alternative-skeleton" hx-swap="outerHTML">` + html + `</hx-partial>`)
 }
 
 func (p *processor) render(c templ.Component) (string, bool) {

@@ -115,6 +115,31 @@ test('swap button shows the busy spinner while streaming @core', async ({
   await expect(icon('busy')).toBeHidden()
 })
 
+test('streaming status names polishing for same-language input @core', async ({
+  page,
+  fake,
+}) => {
+  await pickLanguage(page, 'target', 'ko')
+  await fillSource(page, sentence('slow'))
+  await expect(page.getByRole('status')).toHaveText(STRINGS.en.streaming, {
+    timeout: 15_000,
+  })
+  await stopStream(page, fake, 0)
+  await expect(page.getByRole('status')).toHaveCount(0)
+  // Source English to target English polishes the text.
+  await pickLanguage(page, 'target', 'en')
+  test.skip(
+    !(await languageChip(page, 'source', 'auto').isVisible()),
+    'this layout hides the source language bar',
+  )
+  await pickLanguage(page, 'source', 'en')
+  await fillSource(page, sentence('slow'))
+  await expect(page.getByRole('status')).toHaveText(STRINGS.en.polishing, {
+    timeout: 15_000,
+  })
+  await stopStream(page, fake, 1)
+})
+
 test('stale result disables copy @core', async ({ page, fake }) => {
   await fillSource(page, sentence('plain'))
   await waitForMain(page, fixture('plain').result.main!)
@@ -615,4 +640,137 @@ test('word input uses word intent @core', async ({ page, fake }) => {
   const format = (bodies[0]!.text as { format: { name: string } }).format
   expect(format.name).toBe('word_translation')
   expect(userText(bodies[0]!)).toContain(text)
+})
+
+test('long-form input hides alternatives @core', async ({ page, fake }) => {
+  const fx = fixture('longform')
+  await fillSource(
+    page,
+    `Hi there.\nHow are you doing today my friend ${fx.match} ${nonce()}`,
+  )
+  await waitForMain(page, fx.result.main!)
+  await waitForDone(page)
+  await expect(page.locator('.alternative-item')).toHaveCount(0)
+  await expect(page.locator('.detail-alternatives')).toBeHidden()
+  expect(await fake.requests()).toBe(1)
+})
+
+test('retry re-runs a failed translation @core', async ({ page, fake }) => {
+  await fillSource(page, sentence('error-provider'))
+  const alert = page.getByRole('alert')
+  await expect(alert).toBeVisible({ timeout: 20_000 })
+  await expect(alert).toContainText(STRINGS.en.translationFailed)
+  await expect(alert).toContainText(STRINGS.en.errorEnvHint)
+  const retry = alert.getByRole('button', { name: STRINGS.en.retry })
+  await expect(retry).toHaveClass(/retry-button/)
+  expect(await fake.requests()).toBe(1)
+  await retry.click()
+  await waitForStats(fake, (s) => s.requests === 2)
+  await expect(alert.getByRole('button', { name: STRINGS.en.retry })).toBeVisible()
+  expect(await fake.requests()).toBe(2)
+})
+
+test('swap uses the translated text when the result is current @core', async ({
+  page,
+  fake,
+}) => {
+  const main = fixture('plain').result.main!
+  await pickLanguage(page, 'target', 'ko')
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, main)
+  await waitForDone(page)
+  await page.locator('.swap-button').click()
+  // The translation becomes the input; the model detected English, so it is
+  // the new target, and the source goes back to auto.
+  await expect(source(page)).toHaveValue(main)
+  await expectLanguage(page, 'target', 'en')
+  if ((await languageChip(page, 'source', 'auto').count()) > 0)
+    await expectLanguage(page, 'source', 'auto')
+  // The swapped input runs (debounced). The server LRU may answer it when
+  // another project on this worker swapped the same text first.
+  await expect(listenButton(page)).toBeDisabled()
+  await waitForDone(page)
+  const bodies = await fake.bodies()
+  if (bodies.length > 1) expect(userText(bodies[1]!)).toContain(main)
+})
+
+test('register label names the Korean speech level @core', async ({
+  page,
+}) => {
+  await pickLanguage(page, 'target', 'ko')
+  await setTone(page, 'casual')
+  await fillSource(page, sentence('plain'))
+  await waitForDone(page)
+  const tag = page.locator('.main-explanation .section-tag')
+  await expect(tag).toHaveText('해요체')
+  await expect(tag).toHaveAttribute('lang', 'ko')
+  await expect(page.locator('.main-explanation')).toHaveAttribute(
+    'aria-label',
+    STRINGS.en.whyWording,
+  )
+  await setTone(page, 'friends')
+  await expect(tag).toHaveText('반말', { timeout: 20_000 })
+})
+
+test('streaming deltas stay urgent and only completion starts a result transition @core', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __transitions: number }
+    w.__transitions = 0
+    const proto = Document.prototype as unknown as {
+      startViewTransition?: (...args: unknown[]) => unknown
+    }
+    const original = proto.startViewTransition
+    if (!original) return
+    proto.startViewTransition = function (...args: unknown[]) {
+      w.__transitions++
+      return original.apply(this, args)
+    }
+  })
+  await openApp(page)
+  // React's hydration may start one transition of its own; count from here.
+  await page.evaluate(() => {
+    ;(window as unknown as { __transitions: number }).__transitions = 0
+  })
+  const transitions = () =>
+    page.evaluate(
+      () => (window as unknown as { __transitions: number }).__transitions,
+    )
+  const supported = await page.evaluate(
+    () => 'startViewTransition' in Document.prototype,
+  )
+  await fillSource(page, sentence('stream'))
+  // Main is complete while details still stream: no transition yet.
+  await expect(copyButton(page)).toBeEnabled({ timeout: 15_000 })
+  expect(await transitions()).toBe(0)
+  await waitForDone(page)
+  await expect.poll(transitions).toBe(supported ? 1 : 0)
+
+  // Reduced motion: Go starts no transition. React still starts one and
+  // base.css cancels its animation; neither animates.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, fixture('plain').result.main!)
+  await waitForDone(page)
+  expect(await transitions()).toBe(supported ? (APP === 'ts' ? 2 : 1) : 0)
+})
+
+test('input over the limit shows a local error without a request @core', async ({
+  page,
+  fake,
+}) => {
+  const text = 'How are you doing today? '.repeat(161).trim()
+  expect(text.length).toBeGreaterThan(4000)
+  await fillSource(page, text)
+  const alert = page.getByRole('alert')
+  await expect(alert).toBeVisible({ timeout: 5_000 })
+  await expect(alert).toContainText(STRINGS.en.inputTooLong)
+  await expect(alert).toContainText(
+    STRINGS.en.inputTooLongHint
+      .replace('{max}', '4000')
+      .replace('{count}', String(text.length)),
+  )
+  await expect(alert.getByRole('button')).toHaveCount(0)
+  expect(await fake.requests()).toBe(0)
 })

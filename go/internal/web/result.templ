@@ -25,6 +25,31 @@ templ ResultSkeleton(title string) {
 	</section>
 }
 
+// AlternativeSkeleton is AlternativeItemSkeleton.tsx: the newest
+// alternative while the run streams, with real, disabled Copy and Listen.
+// The id (Go only) lets the settled AlternativeRow replace it.
+templ AlternativeSkeleton(copyLabel, listenLabel string) {
+	<li id="alternative-skeleton" class="alternative-item alternative-skeleton" aria-hidden="true">
+		<div class="alternative-actions inline-flex items-center">
+			@ui.Pill(ui.PillProps{Class: "copy-button icon-action disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+				"aria-label": copyLabel, "title": copyLabel, "data-testid": "copy-button", "disabled": true,
+			}}) {
+				@icons.Icon("copy", 14, nil)
+			}
+			<span class="relative inline-flex shrink-0">
+				@ui.Pill(ui.PillProps{Class: "listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
+					"disabled": true, "aria-label": listenLabel, "title": listenLabel,
+					"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
+				}}) {
+					@icons.Icon("volume-2", 14, nil)
+				}
+			</span>
+		</div>
+		<p class="alternative-text"><span class="animate-pulse"></span></p>
+		<p class="alternative-note"><span class="animate-pulse"></span></p>
+	</li>
+}
+
 // AlternativeRow is one completed alternative (AlternativeItem.tsx). Word
 // rows always use the wrapper with register tags: WordView passes children
 // (an array, truthy even when empty). Copy and Listen (ListenButton.tsx,

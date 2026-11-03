@@ -256,16 +256,18 @@ func TestEventOrder(t *testing.T) {
 			t.Errorf("%s without run id: %s", ev.Name, ev.Data)
 		}
 	}
-	rows := 0
+	n := 0
 	for _, p := range partials(evs)[1:] {
-		if !strings.HasPrefix(p, `<hx-partial hx-target="#alternatives" hx-swap="beforeend">`) ||
-			!strings.Contains(p, `data-testid="alternative-item"`) {
+		switch {
+		case strings.HasPrefix(p, skeletonPartial) && strings.Contains(p, `alternative-skeleton`):
+		case strings.HasPrefix(p, rowPartial) && strings.Contains(p, `data-testid="alternative-item"`):
+			n++
+		default:
 			t.Errorf("unexpected partial %q", p)
 		}
-		rows++
 	}
-	if rows != len(want["alternatives"].([]any)) {
-		t.Errorf("%d alternative rows", rows)
+	if n != len(want["alternatives"].([]any)) {
+		t.Errorf("%d alternative rows", n)
 	}
 	if last := evs[len(evs)-1]; last.Name != evDone {
 		t.Errorf("last event %q, want nt-done", last.Name)
@@ -325,7 +327,7 @@ func newTestProcessor(t *testing.T, w io.Writer, intent string) *processor {
 		t.Fatal(err)
 	}
 	out := &sseWriter{w: w, flush: func() error { return nil }}
-	return newProcessor(out, c, "run-1", intent, "en")
+	return newProcessor(out, c, "run-1", intent, "en", "")
 }
 
 func TestDuplicateMainKey(t *testing.T) {
@@ -577,10 +579,10 @@ func TestMarkupEscapedInRowsAndRationalePartial(t *testing.T) {
 	})
 	e := newEnv(t, dir, nil)
 	evs := parseSSE(t, e.run(t, form("[fx:row] hi")))
-	rows := partials(evs)[1:]
-	if len(rows) != 1 || !strings.Contains(rows[0], "&lt;img src=x onerror=alert(1)&gt;") ||
-		!strings.Contains(rows[0], "&lt;/textarea&gt;") || strings.Contains(rows[0], "<img") {
-		t.Fatalf("row not escaped: %q", rows)
+	rs := rows(evs)
+	if len(rs) != 1 || !strings.Contains(rs[0], "&lt;img src=x onerror=alert(1)&gt;") ||
+		!strings.Contains(rs[0], "&lt;/textarea&gt;") || strings.Contains(rs[0], "<img") {
+		t.Fatalf("row not escaped: %q", rs)
 	}
 }
 
@@ -597,13 +599,12 @@ func TestWordEvents(t *testing.T) {
 	if got := joined(t, evs, evTextDelta, "primaryUsageNote"); got != want["primaryUsageNote"] {
 		t.Errorf("usage deltas = %q", got)
 	}
-	ps := slices.DeleteFunc(partials(evs), isWordMeta)
-	if !strings.Contains(ps[0], e.c.T("en", "alternativeTranslations")) {
+	if ps := partials(evs); !strings.Contains(ps[0], e.c.T("en", "alternativeTranslations")) {
 		t.Errorf("skeleton title: %q", ps[0])
 	}
-	if len(ps) != 4 || !strings.Contains(ps[1], ">casual polite</span>") ||
-		!strings.Contains(ps[1], `class="flex flex-wrap items-baseline gap-2"`) {
-		t.Errorf("word rows: %q", ps[1:])
+	if rs := rows(evs); len(rs) != 3 || !strings.Contains(rs[0], ">casual polite</span>") ||
+		!strings.Contains(rs[0], `class="flex flex-wrap items-baseline gap-2"`) {
+		t.Errorf("word rows: %q", rs)
 	}
 	if evs[len(evs)-1].Name != evDone {
 		t.Errorf("last = %q", evs[len(evs)-1].Name)
@@ -839,5 +840,123 @@ func TestWriteFailureCancelsUpstream(t *testing.T) {
 			t.Fatalf("upstream not cancelled: %+v", st)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+const (
+	skeletonPartial = `<hx-partial hx-target="#alternatives" hx-swap="beforeend">`
+	rowPartial      = `<hx-partial hx-target="#alternative-skeleton" hx-swap="outerHTML">`
+)
+
+// rows returns the partials that settle an alternative row.
+func rows(evs []sseEvent) []string {
+	var out []string
+	for _, p := range partials(evs) {
+		if strings.HasPrefix(p, rowPartial) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// altSteps lists the alternatives partials in order, as "skeleton" or
+// "row:<text>", with formalityNote deltas and nt-done as event names.
+func altSteps(t *testing.T, raw string) []string {
+	t.Helper()
+	var out []string
+	for _, ev := range parseSSE(t, raw) {
+		switch {
+		case ev.Name == evDone || ev.Name == evTextDelta && strings.Contains(ev.Data, `"formalityNote"`):
+			if len(out) == 0 || out[len(out)-1] != ev.Name {
+				out = append(out, ev.Name)
+			}
+		case ev.Name != "":
+		case strings.HasPrefix(ev.Data, skeletonPartial):
+			out = append(out, "skeleton")
+		case strings.HasPrefix(ev.Data, rowPartial):
+			i := strings.Index(ev.Data, `<p class="alternative-text`)
+			j := strings.Index(ev.Data[i:], ">")
+			k := strings.Index(ev.Data[i:], "</p>")
+			out = append(out, "row:"+ev.Data[i+j+1:i+k])
+		}
+	}
+	return out
+}
+
+// TestAlternativeSkeletonThenRow: as SentenceView renders it, the newest
+// alternative stays a skeleton while the run streams; it settles into its
+// row when the next one starts, or before nt-done.
+func TestAlternativeSkeletonThenRow(t *testing.T) {
+	doc := `{"sourceLang":"en","targetLang":"ko","main":"m","learningPhrases":[],"rationale":"r",` +
+		`"alternatives":[{"text":"one","note":"a"},{"text":"two","note":"b"}],"formalityNote":"fn"}`
+	var b strings.Builder
+	p := newTestProcessor(t, &b, "sentence")
+	if !p.start() {
+		t.Fatal("start")
+	}
+	var probe []string
+	for i := 0; i < len(doc); i += 7 {
+		end := min(i+7, len(doc))
+		if err := p.feed(doc[i:end]); err != nil {
+			t.Fatal(err)
+		}
+		if probe == nil && strings.Contains(doc[:end], `"note":"a"}`) {
+			// Item 0 has completed and item 1 has not started.
+			probe = altSteps(t, b.String())
+		}
+	}
+	if !p.end() {
+		t.Fatal("end")
+	}
+	b.WriteString("event: " + evDone + "\ndata: {}\n\n")
+	if want := []string{"skeleton"}; !slices.Equal(probe, want) {
+		t.Errorf("after item 0 completed: %q, want %q", probe, want)
+	}
+	want := []string{"skeleton", "row:one", "skeleton", evTextDelta, "row:two", evDone}
+	if got := altSteps(t, b.String()); !slices.Equal(got, want) {
+		t.Fatalf("steps %q, want %q", got, want)
+	}
+	skeleton := ""
+	for _, ev := range parseSSE(t, b.String()) {
+		if strings.HasPrefix(ev.Data, skeletonPartial) {
+			skeleton = ev.Data
+			break
+		}
+	}
+	for _, s := range []string{
+		`<li id="alternative-skeleton" class="alternative-item alternative-skeleton" aria-hidden="true">`,
+		`<div class="alternative-actions inline-flex items-center">`,
+		`data-testid="copy-button" disabled`, `data-testid="listen-button"`,
+		`<p class="alternative-text"><span class="animate-pulse"></span></p>`,
+		`<p class="alternative-note"><span class="animate-pulse"></span></p>`,
+	} {
+		if !strings.Contains(skeleton, s) {
+			t.Errorf("skeleton lacks %q:\n%s", s, skeleton)
+		}
+	}
+	if strings.Contains(skeleton, `data-testid="alternative-item"`) {
+		t.Error("the skeleton is not an alternative item")
+	}
+}
+
+// TestLongFormNoAlternatives: long-form input (src/lib/longForm.ts) hides
+// the alternatives, live and on a cache replay; word results keep theirs.
+func TestLongFormNoAlternatives(t *testing.T) {
+	e := newEnv(t, fixturesDir, nil)
+	for _, attempt := range []string{"live", "cached"} {
+		evs := parseSSE(t, e.run(t, form("Hi there.\nHow are you doing today?")))
+		if ps := partials(evs); len(ps) != 1 {
+			t.Errorf("%s: %d partials after the result skeleton", attempt, len(ps)-1)
+		}
+		if evs[len(evs)-1].Name != evDone {
+			t.Errorf("%s: last = %q", attempt, evs[len(evs)-1].Name)
+		}
+	}
+	if n := e.stats(t).Requests; n != 1 {
+		t.Errorf("requests = %d, want 1 (the second run is a cache hit)", n)
+	}
+	word := parseSSE(t, e.run(t, form("[fx:word] thanks.\nok", "intent", "word")))
+	if n := len(rows(word)); n != 3 {
+		t.Errorf("word rows = %d, want 3", n)
 	}
 }

@@ -46,7 +46,15 @@ templ outputPanel(v View) {
 				@icons.Icon("triangle-alert", 28, templ.Attributes{"class": "state-icon"})
 				<p class="state-title"></p>
 				<p class="state-body"></p>
-				<p class="state-hint mt-2 text-ink-dim" hidden></p>
+				// The hint (input errors) or errorEnvHint (server errors).
+				<p id="result-error-hint" class="mt-2 text-ink-dim" hidden></p>
+				// Server errors only. stream.js adds the label as a bare text
+				// node (as in TS) when it shows the error.
+				<div class="state-actions" hidden>
+					@ui.Pill(ui.PillProps{Tone: "accent", Size: "md", Class: "retry-button"}) {
+						@icons.Icon("rotate-ccw", 18, nil)
+					}
+				</div>
 			</div>
 			<div id="result-content" class="result-content" hidden>
 				<p id="main-translation" class="result-main " lang={ v.Prefs.Target } data-testid="main-translation" tabindex="-1"></p>

@@ -24,13 +24,8 @@ const ADJUST: Gap = {
 }
 const GO_GAPS: Record<string, Gap[]> = {
   'sentence-done': [ADJUST],
-  'error-provider': [
-    ADJUST,
-    {
-      reason: 'Task 16: errorEnvHint line and Retry button for server errors',
-      tsHide: '.result-error > p.mt-2, .result-error > .state-actions',
-    },
-  ],
+  'error-provider': [ADJUST],
+  'streaming-skeleton': [ADJUST],
 }
 
 // Pixels that may differ per screenshot. Both apps render on the same

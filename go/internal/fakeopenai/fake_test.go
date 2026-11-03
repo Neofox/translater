@@ -386,3 +386,53 @@ func TestFaultTruncateEndsWithoutCompleted(t *testing.T) {
 		t.Fatalf("deltas = %d, want 2", deltas)
 	}
 }
+
+// A "hang" fault stops after its deltas and holds the response open until
+// the client leaves, which counts as an abort.
+func TestFaultHangHoldsUntilAbort(t *testing.T) {
+	dir := t.TempDir()
+	fx := `{"match":"[fx:hang]","delayMs":1,"chunk":5,"result":{"a":"hello world"},"fault":{"kind":"hang","after":2}}`
+	if err := os.WriteFile(filepath.Join(dir, "hang.json"), []byte(fx), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(fakeopenai.Handler(dir))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	res := post(t, ctx, srv.URL, "[fx:hang]")
+	br := bufio.NewReader(res.Body)
+	deltas := 0
+	for deltas < 2 {
+		line, err := br.ReadString('\n')
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.HasPrefix(line, "data: ") && strings.Contains(line, "output_text.delta") {
+			deltas++
+		}
+	}
+	if line, err := br.ReadString('\n'); err != nil || line != "\n" {
+		t.Fatalf("event end = %q, %v", line, err)
+	}
+	more := make(chan string, 1)
+	go func() {
+		line, _ := br.ReadString('\n')
+		more <- line
+	}()
+	select {
+	case line := <-more:
+		t.Fatalf("a hung stream sent %q", line)
+	case <-time.After(300 * time.Millisecond):
+	}
+	if st := stats(t, srv.URL); st.Active != 1 || st.Aborted != 0 {
+		t.Fatalf("while hung: %+v", st)
+	}
+	cancel()
+	res.Body.Close()
+	deadline := time.Now().Add(3 * time.Second)
+	for st := stats(t, srv.URL); st.Aborted != 1 || st.Active != 0; st = stats(t, srv.URL) {
+		if time.Now().After(deadline) {
+			t.Fatalf("after the client left: %+v", st)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}

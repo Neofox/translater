@@ -5,6 +5,8 @@
 // dispatches each named event on the form; partials (alternative rows) are
 // swapped by htmx itself. Model text is always written with textContent.
 
+import { transition } from './transition.js'
+
 const segmenter =
   typeof Intl !== 'undefined' && Intl.Segmenter
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
@@ -134,9 +136,23 @@ export function initStream(app, form) {
     mainText.data = text
   }, { immediate: reduced })
 
-  const setCursor = (on) => {
-    if (on) main.append(cursor)
+  // OutputPanel's placeholder for a run with no main text to show.
+  const dots = document.createElement('span')
+  dots.className = 'text-ink-dim'
+  dots.textContent = '…'
+  const scroll = $('translation-result')
+  const hint = $('result-error-hint')
+  const actions = errorBox.querySelector('.state-actions')
+  const retryLabel = document.createTextNode('')
+  actions.querySelector('.retry-button').append(retryLabel)
+
+  /** The streaming cursor until main is ready; `…` when nothing shows. */
+  function setMarks(live, streaming) {
+    const waiting = Boolean(live && streaming && !live.mainReady)
+    if (waiting) main.append(cursor)
     else cursor.remove()
+    if (live && !waiting && !interp.text) main.append(dots)
+    else dots.remove()
   }
 
   function renderExplanation() {
@@ -178,12 +194,15 @@ export function initStream(app, form) {
     const live = app.live
     const streaming = app.streaming()
     panel?.setAttribute('aria-busy', String(streaming))
-    if (status) status.hidden = !streaming
+    const { source, target } = app.prefs
+    status.dataset.t = source !== 'auto' && source === target ? 'polishing' : 'streaming'
+    status.textContent = app.t(status.dataset.t)
+    status.hidden = !streaming
     app.setSwapBusy(streaming)
     errorBox.hidden = !live?.error
     content.hidden = !live || Boolean(live.error)
     empty.hidden = Boolean(live) || app.pending
-    setCursor(Boolean(live && streaming && !live.mainReady))
+    setMarks(live, streaming)
     renderExplanation()
     app.updateActions()
   }
@@ -222,17 +241,27 @@ export function initStream(app, form) {
     renderState()
   }
 
-  function showError(message, hint) {
+  /** Show the current run's error. An input error brings its own hint; a
+   * server error (no hint) shows errorEnvHint and Retry, inside the result
+   * transition. */
+  function showError(message, inputHint) {
     const live = app.live
-    if (live) live.error = { message }
-    interp.reset()
-    details.replaceChildren()
-    errorBox.querySelector('.state-title').textContent = app.t('translationFailedTitle')
-    errorBox.querySelector('.state-body').textContent = message
-    const hintEl = errorBox.querySelector('.state-hint')
-    hintEl.textContent = hint ?? ''
-    hintEl.hidden = !hint
-    renderState()
+    live.error = { message }
+    const server = inputHint === undefined
+    const show = () => {
+      if (app.live !== live) return
+      interp.reset()
+      details.replaceChildren()
+      errorBox.querySelector('.state-title').textContent = app.t('translationFailedTitle')
+      errorBox.querySelector('.state-body').textContent = message
+      hint.textContent = server ? app.t('errorEnvHint') : inputHint
+      hint.hidden = false
+      actions.hidden = !server
+      retryLabel.data = app.t('retry')
+      renderState()
+    }
+    if (server) transition(scroll, show)
+    else show()
   }
 
   const handlers = {
@@ -259,8 +288,12 @@ export function initStream(app, form) {
       live.done = true
       app.pending = false
       live.main ??= live.raw.trim()
-      interp.flush(live.main)
-      renderState()
+      // Only the settled result transitions; deltas never wait for one.
+      transition(scroll, () => {
+        if (app.live !== live) return
+        interp.flush(live.main)
+        renderState()
+      })
       app.sourceDone(live)
     },
     'nt-error'(live, d) {
