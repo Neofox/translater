@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -74,6 +75,8 @@ type Server struct {
 	cfgErr error
 	// tracer is nil (no-op) unless Langfuse is configured.
 	tracer *telemetry.Tracer
+	// onPrepare is a test hook: a run's learning.Prepare is starting.
+	onPrepare func()
 }
 
 // Option configures a Server.
@@ -118,13 +121,13 @@ func (s *Server) HandleWarm(w http.ResponseWriter, _ *http.Request) {
 // partial per completed alternative, ending with exactly one nt-done or
 // nt-error, after which the response closes.
 func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
-	run, in, analytics, err := s.parse(w, r)
+	run, in, raw, analytics, err := s.parse(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if s.cfgErr != nil {
-		s.failStream(w, run, in, llm.KindConfiguration)
+		s.failStream(w, run, in, raw, llm.KindConfiguration)
 		return
 	}
 	key := prompt.CacheKey(in, s.c.CacheVersion, s.cfg.Label())
@@ -143,7 +146,8 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	out := newSSEWriter(w)
-	p := newProcessor(out, s.c, run, in.Intent, in.UILang, in.Text)
+	p := newProcessor(out, s.c, run, in, raw)
+	p.onPrepare = s.onPrepare
 	if !p.start() {
 		return
 	}
@@ -208,14 +212,14 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 }
 
 // failStream answers a valid request with the skeleton and one nt-error.
-func (s *Server) failStream(w http.ResponseWriter, run string, in prompt.TranslateInput, kind llm.Kind) {
+func (s *Server) failStream(w http.ResponseWriter, run string, in prompt.TranslateInput, raw string, kind llm.Kind) {
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache, no-transform")
 	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	out := newSSEWriter(w)
-	if newProcessor(out, s.c, run, in.Intent, in.UILang, in.Text).start() {
+	if newProcessor(out, s.c, run, in, raw).start() {
 		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
 	}
 }
@@ -226,7 +230,12 @@ var errBadForm = errors.New("invalid translation input: malformed form")
 // parse reads the form (urlencoded or multipart), rejects invalid UTF-8 and
 // a malformed run id, defaults uiLang to "en" and validates the limits.
 // Errors name fields only, never user text.
-func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.TranslateInput, telemetry.Analytics, error) {
+//
+// `text` is the exact textarea value (raw), which learning ranges refer to.
+// Form encoding may turn its LF into CRLF (textarea.value never has a CR),
+// so CRLF becomes LF. The prompt text is raw trimmed with JS semantics, as
+// the TS client trims before it sends.
+func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.TranslateInput, string, telemetry.Analytics, error) {
 	var none telemetry.Analytics
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	var err error
@@ -236,19 +245,19 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 		err = r.ParseForm()
 	}
 	if err != nil {
-		return "", prompt.TranslateInput{}, none, errBadForm
+		return "", prompt.TranslateInput{}, "", none, errBadForm
 	}
 	form := r.PostForm
 	for name, values := range form {
 		for _, v := range values {
 			if !utf8.ValidString(name) || !utf8.ValidString(v) {
-				return "", prompt.TranslateInput{}, none, &prompt.FieldError{Field: "form", Reason: "is not valid UTF-8"}
+				return "", prompt.TranslateInput{}, "", none, &prompt.FieldError{Field: "form", Reason: "is not valid UTF-8"}
 			}
 		}
 	}
 	run := form.Get("run")
 	if !runID.MatchString(run) {
-		return "", prompt.TranslateInput{}, none, &prompt.FieldError{Field: "run", Reason: "is not a valid run id"}
+		return "", prompt.TranslateInput{}, "", none, &prompt.FieldError{Field: "run", Reason: "is not a valid run id"}
 	}
 	// The page keeps one hidden refinements input, empty when there are none.
 	var refinements []string
@@ -257,8 +266,9 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 			refinements = append(refinements, v)
 		}
 	}
+	raw := strings.ReplaceAll(form.Get("text"), "\r\n", "\n")
 	in := prompt.TranslateInput{
-		Text:         form.Get("text"),
+		Text:         prompt.JSTrim(raw),
 		Source:       form.Get("source"),
 		Target:       form.Get("target"),
 		Mode:         form.Get("mode"),
@@ -272,13 +282,13 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 		in.UILang = "en"
 	}
 	if err := in.Validate(s.c.Limits); err != nil {
-		return "", prompt.TranslateInput{}, none, err
+		return "", prompt.TranslateInput{}, "", none, err
 	}
 	analytics, err := parseAnalytics(form, run)
 	if err != nil {
-		return "", prompt.TranslateInput{}, none, err
+		return "", prompt.TranslateInput{}, "", none, err
 	}
-	return run, in, analytics, nil
+	return run, in, raw, analytics, nil
 }
 
 // parseAnalytics validates the optional analytics fields (useTranslate.ts).

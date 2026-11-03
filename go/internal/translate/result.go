@@ -14,6 +14,7 @@ import (
 
 	"neotranslate/internal/contract"
 	"neotranslate/internal/jsonstream"
+	"neotranslate/internal/learning"
 	"neotranslate/internal/prompt"
 	"neotranslate/internal/web"
 )
@@ -62,16 +63,41 @@ type processor struct {
 	altOpen   bool
 	altRow    string
 	altLabels [2]string // Copy, Listen
+	// Learning (sentence intent). Ranges need every phrase (ordered passes,
+	// overlap rejection), so they are one whole-array computation: Prepare
+	// starts in a goroutine once main and learningPhrases have both closed,
+	// which in schema order is before rationale, alternatives and
+	// formalityNote, and runs while they stream. Its rows and ranges are
+	// sent just before nt-done because the page opens learning only once
+	// the result is done (LearningContext's canOpen). A cache hit
+	// recomputes them: ranges depend on the raw text, not the cache key.
+	in        prompt.TranslateInput
+	raw       string            // the exact textarea value (LF line ends)
+	langs     map[string]string // model-reported sourceLang/targetLang
+	main      string            // the closed main text, as the page shows it
+	mainDone  bool
+	phrases   []learning.Phrase
+	hasPhrase bool
+	learn     chan learnResult // set once Prepare has started
+	onPrepare func()           // test hook: Prepare is starting
 }
 
-// newProcessor builds the processor of one run; text is the request's
-// source text.
-func newProcessor(out *sseWriter, c *contract.Contract, run, intent, uiLang, text string) *processor {
+type learnResult struct {
+	prepared       learning.Prepared
+	ok             bool
+	side, language string
+}
+
+// newProcessor builds the processor of one run; raw is the exact textarea
+// value the learning ranges of an original source refer to.
+func newProcessor(out *sseWriter, c *contract.Contract, run string, in prompt.TranslateInput, raw string) *processor {
+	intent, uiLang := in.Intent, in.UILang
 	p := &processor{
 		out: out, c: c, run: run, uiLang: uiLang, word: intent == "word",
 		f: intentFields[intent], scan: jsonstream.New(), closed: map[string]bool{},
-		hideAlts: intent == "sentence" && prompt.IsLongForm(text), altIndex: -1,
+		hideAlts: intent == "sentence" && prompt.IsLongForm(in.Text), altIndex: -1,
 		altLabels: [2]string{c.T(uiLang, "copy"), c.T(uiLang, "listen")},
+		in:        in, raw: raw, langs: map[string]string{},
 	}
 	if p.word {
 		p.meta = &web.WordMetaView{T: func(key string) string { return c.T(uiLang, key) }, Streaming: true}
@@ -90,10 +116,10 @@ func (p *processor) start() bool {
 	return p.wordMeta()
 }
 
-// end settles the last alternative and renders the complete dictionary
-// without skeletons; it precedes nt-done.
+// end settles the last alternative, sends the learning rows and ranges and
+// renders the complete dictionary without skeletons; it precedes nt-done.
 func (p *processor) end() bool {
-	if !p.settleAlternative() {
+	if !p.settleAlternative() || !p.learning() {
 		return false
 	}
 	if p.meta == nil {
@@ -203,6 +229,9 @@ func (p *processor) handle(ev jsonstream.Event) bool {
 			}
 		case jsonstream.StringEnd:
 			p.closed[key] = true
+			if key == "sourceLang" || key == "targetLang" {
+				p.langs[key] = ev.Text
+			}
 			switch key {
 			case "sourceLang":
 				return p.out.event(evSourceLang, langPayload{Run: p.run, Lang: ev.Text})
@@ -213,7 +242,17 @@ func (p *processor) handle(ev jsonstream.Event) bool {
 					return p.out.event(evHeadword, textPayload{Run: p.run, Text: ev.Text})
 				}
 			case p.f.main:
-				return p.out.event(evMainReady, readyPayload{Run: p.run, Main: prompt.JSTrim(ev.Text)})
+				p.main, p.mainDone = prompt.JSTrim(ev.Text), true
+				ok := p.out.event(evMainReady, readyPayload{Run: p.run, Main: p.main})
+				p.prepare()
+				return ok
+			}
+		case jsonstream.ValueEnd:
+			if key == "learningPhrases" && !p.word {
+				p.closed[key] = true
+				// A malformed value gets no learning; final validation reports it.
+				p.hasPhrase = json.Unmarshal(ev.Raw, &p.phrases) == nil
+				p.prepare()
 			}
 		}
 		return true
@@ -222,6 +261,77 @@ func (p *processor) handle(ev jsonstream.Event) bool {
 		return p.alternative(ev)
 	}
 	return true
+}
+
+// prepare starts learning.Prepare once main and learningPhrases have both
+// closed. The side follows the model-reported languages, falling back to
+// the request's (learningSide). Target ranges are computed on the main text
+// as the page displays it (trimmed, the nt-main-ready value): TS shows and
+// measures the untrimmed main, Go shows the trimmed one.
+func (p *processor) prepare() {
+	if p.learn != nil || !p.mainDone || !p.hasPhrase {
+		return
+	}
+	source, target := p.in.Source, p.in.Target
+	if v, ok := p.langs["sourceLang"]; ok {
+		source = v
+	}
+	if v, ok := p.langs["targetLang"]; ok {
+		target = v
+	}
+	side := learning.Side(source, target, p.uiLang)
+	primary, counterpart, language := p.main, p.raw, target
+	if side == "source" {
+		primary, counterpart, language = p.raw, p.main, source
+	}
+	ch := make(chan learnResult, 1) // never blocks: an abandoned run leaks nothing
+	p.learn = ch
+	if p.onPrepare != nil {
+		p.onPrepare()
+	}
+	phrases := p.phrases
+	go func() {
+		prepared, ok := learning.Prepare(counterpart, primary, phrases)
+		ch <- learnResult{prepared, ok, side, language}
+	}()
+}
+
+// learning waits for Prepare and sends the rows partial, then the ranges.
+// Nothing is sent when no phrase resolves (the page then has no learning).
+func (p *processor) learning() bool {
+	if p.learn == nil {
+		return true
+	}
+	r := <-p.learn
+	p.learn = nil
+	if !r.ok {
+		return true
+	}
+	html, ok := p.render(web.LearningRows(web.LearningRowsView{
+		Run: p.run, Language: r.language, Chunks: r.prepared.Chunks, Partial: r.prepared.Partial,
+		T: func(key string) string { return p.c.T(p.uiLang, key) },
+	}))
+	if !ok || !p.out.partial(`<hx-partial hx-target="#learning-sentence" hx-swap="innerHTML">`+html+`</hx-partial>`) {
+		return false
+	}
+	pairs := func(rs []learning.Range) [][2]int {
+		out := make([][2]int, len(rs))
+		for i, r := range rs {
+			out[i] = [2]int{r.Start, r.End}
+		}
+		return out
+	}
+	chunks := make([]learningChunk, len(r.prepared.Chunks))
+	for i, c := range r.prepared.Chunks {
+		src := make([]learning.Range, len(c.SourceSpans))
+		for j, s := range c.SourceSpans {
+			src[j] = s.Range
+		}
+		chunks[i] = learningChunk{S: c.Start, E: c.End, Src: pairs(src), G: pairs(c.GrammarHighlights)}
+	}
+	return p.out.event(evLearning, learningPayload{
+		Run: p.run, Side: r.side, Language: r.language, Chunks: chunks, Partial: r.prepared.Partial,
+	})
 }
 
 func (p *processor) isText(key string) bool {

@@ -289,6 +289,10 @@ export function initStream(app, form) {
       interp.flush(d.main)
       renderState()
     },
+    // The sentence's learning ranges (learning.js shows them once done).
+    'nt-learning'(live, d) {
+      live.learning = d
+    },
     'nt-text-delta'(live, d) {
       const key = d.field === 'formalityNote' ? 'formality' : 'rationale'
       live[key] += d.text

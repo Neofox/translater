@@ -81,16 +81,17 @@ export function initDictionary(app, composer) {
       const box = meta.querySelector('.word-source-meta')
       if (box && !box.children.length) box.remove()
     }
-    // TS mounts the pane only then (and not under an open learning
-    // surface); base.css selects on its presence, so it waits in a hidden
-    // dock otherwise. learning.js writes its heading.
-    const home = word && separate && !app.learning.panelOpen() ? inputPanel : dock
+    // TS mounts the pane only for a word or a sentence with learning, and
+    // not under an open learning surface; base.css selects on its presence,
+    // so it waits in a hidden dock otherwise. learning.js writes its heading.
+    const home = (word || app.learning.ready()) && separate && !app.learning.panelOpen() ? inputPanel : dock
     if (panel.parentElement !== home) home.append(panel)
 
+    // A sentence's main text is learning.js's.
     const trigger = main.querySelector('.word-details-trigger')
-    const canOpen = Boolean(trigger && app.learning.canOpen())
-    set(main, 'data-inspectable', canOpen ? 'true' : null)
     if (!trigger) return
+    const canOpen = app.learning.canOpen()
+    set(main, 'data-inspectable', canOpen ? 'true' : null)
     trigger.disabled = !canOpen
     set(trigger, 'aria-label', `${app.t('wordDetails')}: ${live?.raw ?? ''}`)
   }

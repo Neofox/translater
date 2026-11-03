@@ -227,6 +227,47 @@ export const STATES: VisualState[] = [
       expect((await fake.stats()).speechRequests).toBe(1)
     },
   },
+  {
+    // Desktop workspace breakdown with one phrase expanded: its facts
+    // inline, the phrase marked in the main text and its counterpart
+    // quotation marked under the source.
+    name: 'learning-reference',
+    projects: /-(macbook-14|macbook-16|desktop-short)$/,
+    async setup(page) {
+      await openApp(page)
+      // No marker: the default fixture, with learning phrases.
+      await fillSource(page, 'How are you doing today, my friend?')
+      await waitForDone(page)
+      const row = page.getByTestId('learning-chunk').nth(1)
+      await row.click()
+      await expect(row).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.getByTestId('selected-phrase')).toHaveText(
+        '어떻게 지내요',
+      )
+      await expect(
+        page.getByTestId('source-highlight').locator('mark'),
+      ).toHaveText('How are you doing')
+    },
+  },
+  {
+    // Learning the original Korean source: grammar underlines in the source
+    // mirror before any selection; the breakdown beside it where the layout
+    // has a reference pane.
+    name: 'learning-source-underlines',
+    async setup(page) {
+      await openApp(page)
+      // Enough Hangul for auto source to route it to English.
+      await fillSource(
+        page,
+        '[fx:learn-reading] 오늘 도와줘서 고마워요. 다시 한 번 진심으로 감사드립니다 여러분',
+      )
+      await waitForDone(page)
+      await expect(page.getByTestId('source-grammar')).toHaveText([
+        '줘서',
+        '고마워요',
+      ])
+    },
+  },
 ]
 
 /** The visual fixture's result, then a tap on its main Listen. */

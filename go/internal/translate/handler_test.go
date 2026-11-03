@@ -22,6 +22,7 @@ import (
 	"neotranslate/internal/fakeopenai"
 	"neotranslate/internal/jsonstream"
 	"neotranslate/internal/llm"
+	"neotranslate/internal/prompt"
 	"neotranslate/internal/telemetry"
 )
 
@@ -254,7 +255,7 @@ func TestEventOrder(t *testing.T) {
 		t.Errorf("rationale deltas = %q", got)
 	}
 	for _, ev := range evs {
-		if ev.Name != "" && ev.json(t)["run"] != "run-1" {
+		if ev.Name != "" && ev.Name != evLearning && ev.json(t)["run"] != "run-1" { // learning: TestLearningEmittedBeforeDone
 			t.Errorf("%s without run id: %s", ev.Name, ev.Data)
 		}
 	}
@@ -264,6 +265,7 @@ func TestEventOrder(t *testing.T) {
 		case strings.HasPrefix(p, skeletonPartial) && strings.Contains(p, `alternative-skeleton`):
 		case strings.HasPrefix(p, rowPartial) && strings.Contains(p, `data-testid="alternative-item"`):
 			n++
+		case strings.HasPrefix(p, learningPartial):
 		default:
 			t.Errorf("unexpected partial %q", p)
 		}
@@ -329,7 +331,7 @@ func newTestProcessor(t *testing.T, w io.Writer, intent string) *processor {
 		t.Fatal(err)
 	}
 	out := &sseWriter{w: w, flush: func() error { return nil }}
-	return newProcessor(out, c, "run-1", intent, "en", "")
+	return newProcessor(out, c, "run-1", prompt.TranslateInput{Intent: intent, UILang: "en", Source: "en", Target: "ko"}, "")
 }
 
 func TestDuplicateMainKey(t *testing.T) {
@@ -429,8 +431,8 @@ func TestCacheHitNoUpstream(t *testing.T) {
 			if n == evTextDelta {
 				n += ":" + ev.json(t)["field"]
 			}
-			if n == "" {
-				n = ev.Data
+			if n == "" { // the learning rows name their run in element ids
+				n = strings.ReplaceAll(ev.Data, `-run-2-`, `-run-1-`)
 			}
 			if len(out) > 0 && out[len(out)-1] == n && (ev.Name == evMainDelta || ev.Name == evTextDelta) {
 				continue
@@ -948,7 +950,8 @@ func TestLongFormNoAlternatives(t *testing.T) {
 	e := newEnv(t, fixturesDir, nil)
 	for _, attempt := range []string{"live", "cached"} {
 		evs := parseSSE(t, e.run(t, form("Hi there.\nHow are you doing today?")))
-		if ps := partials(evs); len(ps) != 1 {
+		ps := slices.DeleteFunc(partials(evs), func(p string) bool { return strings.HasPrefix(p, learningPartial) })
+		if len(ps) != 1 {
 			t.Errorf("%s: %d partials after the result skeleton", attempt, len(ps)-1)
 		}
 		if evs[len(evs)-1].Name != evDone {

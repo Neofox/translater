@@ -41,8 +41,9 @@ let supersededRun = null
 const app = {
   prefs: data.prefs,
   /** The current run: { run, key, detected (its routing language), text,
-   * intent, source, target, raw, main, mainReady, done, error, aborted,
-   * sourceLang, headword, rationale, formality, register }. */
+   * input (the exact textarea value sent), intent, source, target, raw,
+   * main, mainReady, done, error, aborted, sourceLang, headword, rationale,
+   * formality, register, learning }. */
   live: null,
   pending: false,
   t: (key) => data.strings[app.prefs.uiLang]?.[key] ?? data.strings.en[key] ?? key,
@@ -137,7 +138,7 @@ const app = {
     const intent = detectIntent(text)
     const live = {
       run: crypto.randomUUID(), key: app.currentKey(), detected: app.routingDetected(),
-      text: trimmed, intent, source, target,
+      text: trimmed, input: text, intent, source, target,
       raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
       sourceLang: null, headword: '', rationale: '', formality: '',
       // Set from the model's targetLang (nt-target-lang), as TS does.
@@ -152,8 +153,9 @@ const app = {
       )
       return
     }
+    // The server trims the prompt text; learning ranges use the raw value.
     const values = {
-      run: live.run, text: trimmed, source, target, mode, intent, uiLang,
+      run: live.run, text, source, target, mode, intent, uiLang,
       context: app.context(), previousMain: '', refinements: '',
       analyticsSessionId, supersedesRunId: supersededRun ?? '', inputRevision, trigger,
     }

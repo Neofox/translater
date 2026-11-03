@@ -6,7 +6,7 @@ import (
 )
 
 // inputPanel is InputPanel.tsx. The textarea belongs to no form and sits
-// outside every swap target: runs copy its trimmed text into
+// outside every swap target: runs copy its exact value into
 // #translate-form, so streaming and preference swaps never touch it.
 templ inputPanel(v View) {
 	<section class="input-panel" aria-label={ v.T("sourceText") } data-t-attr="aria-label:sourceText">

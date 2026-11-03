@@ -20,6 +20,7 @@ const (
 	evMainDelta  = "nt-main-delta"
 	evMainReady  = "nt-main-ready"
 	evTextDelta  = "nt-text-delta"
+	evLearning   = "nt-learning" // sentence intent: phrase ranges, just before nt-done
 	evDone       = "nt-done"
 	evError      = "nt-error"
 )
@@ -45,6 +46,24 @@ type (
 		Run   string `json:"run"`
 		Field string `json:"field"`
 		Text  string `json:"text"`
+	}
+	// learningPayload carries ranges only (UTF-16 code units), never text:
+	// the rows partial before it holds the phrase text. Side "source" ranges
+	// are in the textarea value, side "target" ones in the main text.
+	learningPayload struct {
+		Run      string          `json:"run"`
+		Side     string          `json:"side"`
+		Language string          `json:"language"`
+		Chunks   []learningChunk `json:"chunks"`
+		Partial  bool            `json:"partial"`
+	}
+	// learningChunk is a phrase range with its counterpart quotations (src,
+	// in the other text) and grammar annotations (g, in the primary text).
+	learningChunk struct {
+		S   int      `json:"s"`
+		E   int      `json:"e"`
+		Src [][2]int `json:"src"`
+		G   [][2]int `json:"g"`
 	}
 	errorPayload struct {
 		Run     string `json:"run"`

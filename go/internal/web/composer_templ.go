@@ -15,7 +15,7 @@ import (
 )
 
 // inputPanel is InputPanel.tsx. The textarea belongs to no form and sits
-// outside every swap target: runs copy its trimmed text into
+// outside every swap target: runs copy its exact value into
 // #translate-form, so streaming and preference swaps never touch it.
 func inputPanel(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
