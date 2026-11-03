@@ -16,7 +16,12 @@ for (let i = 0; i < args.length; i++) {
   const arg = args[i]
   if (arg === '--grep' || arg === '-g') greps.push(args[++i])
   else if (arg.startsWith('--grep=')) greps.push(arg.slice('--grep='.length))
-  else rest.push(arg)
+  else if (arg === '-u' || arg.startsWith('--update-snapshots')) {
+    // Only the TS run writes baselines; letting the Go run write them would
+    // make it compare against itself.
+    console.error(`e2e:visual: ${arg} is not allowed (the TS run writes the baselines).`)
+    process.exit(2)
+  } else rest.push(arg)
 }
 const grep = greps.length
   ? `^(?=.*@visual)(?=.*(?:${greps.join('|')}))`
