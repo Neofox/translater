@@ -122,9 +122,10 @@ export function initAdjust(app, ta, relabel) {
     )
     // Focus stays visible: chips focused while they stop fitting open the
     // panel; a focused trigger that disappears hands focus to the chips.
-    if (!result.fits && controls.contains(document.activeElement)) open = true
+    const opens = !result.fits && !open && controls.contains(document.activeElement)
+    if (opens) open = true
     const toChips = result.fits && !beside && document.activeElement === trigger
-    const changed = result.fits !== beside || result.iconOnly !== iconOnly
+    const changed = opens || result.fits !== beside || result.iconOnly !== iconOnly
     beside = result.fits
     iconOnly = result.iconOnly
     if (changed || toChips) render()

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CHIPS, MAX_UNDO, add, customLabel, remove, summary } from './refine.js'
+import { CHIPS, MAX_UNDO, add, canSubmit, customLabel, remove, summary } from './refine.js'
 
 const empty = { refinements: [], previousMain: '', stack: [] }
 const [softer, direct, shorter, playful] = Object.values(CHIPS)
@@ -57,4 +57,12 @@ test('summary names chips by their label and shortens custom text', () => {
   assert.equal(summary([], t), '')
   assert.equal(summary([softer, shorter], t), 'Softer · Shorter')
   assert.equal(summary([softer, 'make it a bit less formal'], t), 'Softer · make it a bit less f…')
+})
+
+test('canSubmit rejects a blank draft, the cap and a second custom entry', () => {
+  assert.equal(canSubmit([], '  '), false)
+  assert.equal(canSubmit([], ' warmer '), true)
+  assert.equal(canSubmit([softer, direct], 'warmer'), true)
+  assert.equal(canSubmit([softer, direct, shorter], 'warmer'), false)
+  assert.equal(canSubmit(['gentler'], 'warmer'), false)
 })

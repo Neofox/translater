@@ -45,6 +45,11 @@ export function add(state, instruction, main, snap) {
   return { refinements: [...r, text], previousMain: main, stack: push(state.stack, snap) }
 }
 
+/** RefineRow's submitFreeform guard: a non-blank draft, below the cap,
+ * with no custom adjustment active yet. */
+export const canSubmit = (refinements, draft) =>
+  Boolean(draft.trim()) && refinements.length < MAX_REFINEMENTS && !refinements.some(isCustom)
+
 /** State after removing refinement `index`; previousMain is reset once
  * nothing is left to anchor (it would only fragment the cache). */
 export function remove(state, index, main, snap) {
@@ -170,6 +175,8 @@ export function initRefine(app, form, restore, relabel) {
   }
 
   function submit() {
+    // Before change(): a rejected draft must not stop speech.
+    if (!canSubmit(state.refinements, input.value)) return
     if (change(add, input.value)) input.value = ''
   }
 
