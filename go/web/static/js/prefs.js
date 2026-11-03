@@ -5,7 +5,7 @@
 // preferences.ts) and the controls are a few native buttons. Popups use the
 // native `popover` attribute, placed by float.js.
 
-import { autoUpdate, closeOnFocusOut, panelBoundary, position } from './float.js'
+import { autoUpdate, closeOnFocusOut, leftFocus, panelBoundary, position } from './float.js'
 import { initListbox } from './listbox.js'
 import { initSettings } from './settings.js'
 
@@ -190,7 +190,15 @@ export function initPrefs(app, data) {
       // Hidden until placed (Floating UI's isPositioned); toggle shows it.
       menu.style.visibility = 'hidden'
       fillMenu(menu)
-    } else menu.replaceChildren()
+      return
+    }
+    // Emptying the list drops a focused option before the browser could
+    // restore focus: return it to the trigger as Floating UI's returnFocus
+    // does, unless focus already left on its own (closeOnFocusOut).
+    const inside = menu.contains(document.activeElement)
+    menu.replaceChildren()
+    const left = leftFocus.delete(menu)
+    if (!left && (inside || document.activeElement === document.body)) trigger?.focus({ preventScroll: true })
   }, true)
   // Select.tsx's placement: bottom-start, offset 6, flip and shift inside
   // panelBoundary, at most 320 px high and at least as wide as the trigger.

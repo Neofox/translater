@@ -460,9 +460,12 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
   const options = listbox.getByRole('option')
   /** The options' tabindex values: only the active one is 0. */
   const tabStops = () => options.evaluateAll((all) => all.map((o) => o.getAttribute('tabindex')).join(','))
+  /** Escape closes the list and focus returns to the trigger, also from a
+   * focused option (Floating UI's returnFocus). */
   const close = async () => {
     await page.keyboard.press('Escape')
     await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(trigger).toBeFocused()
   }
 
   // A pointer opens with focus on the list and no active option.
@@ -470,6 +473,9 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
   await expect(listbox).toBeFocused()
   await expect.poll(tabStops).toBe('-1,-1,-1,-1,-1')
   await close()
+  /** The active option shows Select's highlight. */
+  const highlighted = () =>
+    options.evaluateAll((all) => all.map((o) => (o.classList.contains('bg-panel-2') ? 1 : 0)).join(','))
   // Enter, Space and ArrowDown on the trigger make the first option active
   // (focus stays on the list), ArrowUp the last; ArrowDown from the list
   // then activates the first option. (TS leaves focus on the list when the
@@ -480,16 +486,19 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
     ['ArrowDown', '0,-1,-1,-1,-1'],
     ['ArrowUp', '-1,-1,-1,-1,0'],
   ] as const) {
-    await trigger.focus()
+    // Focus is on the trigger: from the click above, then from each close.
+    await expect(trigger).toBeFocused()
     await page.keyboard.press(key)
     await expect(listbox).toBeFocused()
     await expect.poll(tabStops, key).toBe(stops)
+    await expect.poll(highlighted, key).toBe(stops.replaceAll('-1', 'x').replaceAll('0', '1').replaceAll('x', '0'))
+    // Escape from a focused option (Go focuses it here; TS may keep the
+    // list focused when the first option is already active).
     await page.keyboard.press('ArrowDown')
     await expect.poll(tabStops, key).toBe('0,-1,-1,-1,-1')
     await close()
   }
   // Home and End jump to the ends; arrows loop.
-  await trigger.focus()
   await page.keyboard.press('ArrowDown')
   await expect(listbox).toBeFocused()
   await page.keyboard.press('End')
@@ -531,4 +540,20 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
   await page.mouse.move(third.x + third.width / 2, third.y + 400, { steps: 3 })
   await expect(listbox).toBeFocused()
   await expect.poll(tabStops).toBe('-1,-1,-1,-1,-1')
+  // Escape while a hovered option holds focus.
+  await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2, { steps: 3 })
+  await expect(options.nth(2)).toBeFocused()
+  await close()
+  await page.mouse.move(0, 0)
+  // Enter on an option selects it, closes the list and returns focus.
+  await page.keyboard.press('ArrowDown')
+  await expect(listbox).toBeFocused()
+  await page.keyboard.press('End')
+  const last = (await options.last().textContent())!.trim()
+  await page.keyboard.press('Enter')
+  await expect(listbox).toBeHidden()
+  await expect(trigger).toBeFocused()
+  await expect(
+    page.getByRole('group', { name: 'Target language', exact: true }).getByRole('button', { name: last }),
+  ).toHaveAttribute('aria-pressed', 'true')
 })

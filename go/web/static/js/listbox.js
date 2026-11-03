@@ -58,9 +58,13 @@ export function initListbox(searchLabel) {
   const selectedIndex = (list) => items(list).findIndex((o) => o.getAttribute('aria-selected') === 'true')
 
   /** The active option (-1: none, the list itself holds focus) gets the
-   * only tabindex 0; typeahead starts after it while nobody types. */
+   * only tabindex 0 and Select's active background (bg-panel-2); typeahead
+   * starts after it while nobody types. */
   function activate(list, index, now) {
-    for (const [i, o] of items(list).entries()) o.tabIndex = i === index ? 0 : -1
+    for (const [i, o] of items(list).entries()) {
+      o.tabIndex = i === index ? 0 : -1
+      o.classList.toggle('bg-panel-2', i === index)
+    }
     if (!ta.typed || now - ta.at > RESET_MS) {
       const selected = selectedIndex(list)
       ta = { ...ta, typed: '', prev: selected >= 0 ? selected : index }
@@ -89,7 +93,7 @@ export function initListbox(searchLabel) {
     if (trigger) {
       const list = document.getElementById(trigger.getAttribute('popovertarget'))
       pointer = false
-      if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) openKey = event.key
+      if (list && !isOpen(list) && ['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) openKey = event.key
       if (!list || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return
       event.preventDefault()
       if (!isOpen(list)) return list.showPopover({ source: trigger })
