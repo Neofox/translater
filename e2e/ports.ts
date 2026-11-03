@@ -15,8 +15,12 @@ export const TS_BUILD: 'dev' | 'prod' =
 
 export const WORKERS = Math.max(1, Number(process.env.E2E_WORKERS ?? 3) || 1)
 
-const FAKE_BASE_PORT = 3901
-const APP_BASE_PORT: Record<AppKind, number> = { ts: 3100, go: 3200 }
+// E2E_PORT_OFFSET shifts every port, so two suites can run at once (e.g.
+// two worktrees, or two agents in one): 50 keeps them apart for up to 50
+// workers.
+const OFFSET = Number(process.env.E2E_PORT_OFFSET ?? 0) || 0
+const FAKE_BASE_PORT = 3901 + OFFSET
+const APP_BASE_PORT: Record<AppKind, number> = { ts: 3100 + OFFSET, go: 3200 + OFFSET }
 
 export function fakePort(index: number): number {
   return FAKE_BASE_PORT + index
