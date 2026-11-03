@@ -29,9 +29,34 @@ const pick = <T>(xs: readonly T[]) => xs[int(xs.length)]!
 // Tokens mixing ASCII, Hangul, CJK, combining marks, emoji with modifiers,
 // ZWJ sequences, flags, punctuation and whitespace.
 const tokens = [
-  'yes', 'a', 'ab', 'b', ' ', ' ', '.', ',', '\n', '오늘', '가', '요', '학교',
-  '點心', '懐かしい', 'é', 'é', '👍', '👍🏽', '👨‍👩‍👧', '🇰🇷', '́',
-  'x', '—', '7', '€', '!', '줘서',
+  'yes',
+  'a',
+  'ab',
+  'b',
+  ' ',
+  ' ',
+  '.',
+  ',',
+  '\n',
+  '오늘',
+  '가',
+  '요',
+  '학교',
+  '點心',
+  '懐かしい',
+  'é',
+  'é',
+  '👍',
+  '👍🏽',
+  '👨‍👩‍👧',
+  '🇰🇷',
+  '́',
+  'x',
+  '—',
+  '7',
+  '€',
+  '!',
+  '줘서',
 ] as const
 
 function text(max: number) {
@@ -55,11 +80,29 @@ function quote(s: string) {
 }
 
 const notes = [
-  { word: '학교', chars: [{ char: '學', meaning: 'm' }, { char: '校', meaning: 'm' }] },
+  {
+    word: '학교',
+    chars: [
+      { char: '學', meaning: 'm' },
+      { char: '校', meaning: 'm' },
+    ],
+  },
   { word: '학교', chars: [{ char: '學', meaning: 'm' }] },
-  { word: '點心', chars: [{ char: '點', meaning: 'm' }, { char: '心', meaning: 'm' }] },
+  {
+    word: '點心',
+    chars: [
+      { char: '點', meaning: 'm' },
+      { char: '心', meaning: 'm' },
+    ],
+  },
   { word: '懐かしい', chars: [{ char: '懐', meaning: 'm' }] },
-  { word: '오늘', chars: [{ char: '오', meaning: 'm' }, { char: '늘', meaning: 'm' }] },
+  {
+    word: '오늘',
+    chars: [
+      { char: '오', meaning: 'm' },
+      { char: '늘', meaning: 'm' },
+    ],
+  },
   { word: 'yes', chars: [] },
 ]
 
@@ -101,7 +144,7 @@ for (let i = 0; i < 600; i++) {
         text: c.text,
         grammarHighlights: c.grammarHighlights,
         sourceSpans: c.sourceSpans,
-        characters: c.characters.map((n) => n.word),
+        characters: (c.characters ?? []).map((n) => n.word),
       })),
     },
   })
@@ -109,4 +152,6 @@ for (let i = 0; i < 600; i++) {
 
 mkdirSync(dirname(out), { recursive: true })
 writeFileSync(out, JSON.stringify(cases) + '\n')
-console.log(`${cases.length} cases, ${cases.filter((c) => c.want).length} with a result → ${out}`)
+console.log(
+  `${cases.length} cases, ${cases.filter((c) => c.want).length} with a result → ${out}`,
+)

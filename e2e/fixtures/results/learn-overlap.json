@@ -11,9 +11,7 @@
       {
         "text": "평면도 작성 기능을",
         "gloss": "the floor plan feature",
-        "sourceTexts": [
-          "the floor plan feature"
-        ],
+        "sourceTexts": ["the floor plan feature"],
         "baseForm": "평면도",
         "literalMeaning": "floor plan drawing feature",
         "naturalMeaning": "the floor plan feature",
@@ -44,34 +42,26 @@
       {
         "text": "작성 기능을 확인해 보실 수 있는",
         "gloss": "where you can check out",
-        "sourceTexts": [
-          "where you can check out"
-        ],
+        "sourceTexts": ["where you can check out"],
         "baseForm": "확인하다",
         "literalMeaning": "(you) can try checking",
         "naturalMeaning": "where you can check out",
         "grammar": "-아/어 보다 means trying something; -(으)ㄹ 수 있다 means can.",
         "omissions": "You is implicit.",
-        "grammarHighlights": [
-          "보실 수 있는"
-        ],
+        "grammarHighlights": ["보실 수 있는"],
         "usageNote": "",
         "characters": []
       },
       {
         "text": "링크를 공유드립니다",
         "gloss": "Here is a link",
-        "sourceTexts": [
-          "Here is a link"
-        ],
+        "sourceTexts": ["Here is a link"],
         "baseForm": "공유드리다",
         "literalMeaning": "(I) humbly share the link",
         "naturalMeaning": "here is a link",
         "grammar": "드립니다 is the humble formal form of 드리다, used when giving something to the listener.",
         "omissions": "I is implicit.",
-        "grammarHighlights": [
-          "드립니다"
-        ],
+        "grammarHighlights": ["드립니다"],
         "usageNote": "공유드리다 is common workplace politeness.",
         "characters": [
           {
@@ -92,17 +82,13 @@
       {
         "text": "직접 사용해 보시고",
         "gloss": "try it yourself",
-        "sourceTexts": [
-          "try it yourself"
-        ],
+        "sourceTexts": ["try it yourself"],
         "baseForm": "사용하다",
         "literalMeaning": "use (it) directly and",
         "naturalMeaning": "try it yourself",
         "grammar": "보시고 joins the honorific 보시다 (try) with -고 (and).",
         "omissions": "You is implicit.",
-        "grammarHighlights": [
-          "보시고"
-        ],
+        "grammarHighlights": ["보시고"],
         "usageNote": "",
         "characters": []
       }

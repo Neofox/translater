@@ -13,3 +13,6 @@ go/internal/contract/data/
 src/server/promptTemplates.generated.json
 src/server/resultTypes.generated.ts
 docs/superpowers/reports/data/
+
+# Generated parity corpus (scripts/learning-corpus.ts)
+go/internal/learning/testdata/

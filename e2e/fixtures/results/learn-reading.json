@@ -11,9 +11,7 @@
       {
         "text": "오늘",
         "gloss": "today",
-        "sourceTexts": [
-          "today"
-        ],
+        "sourceTexts": ["today"],
         "baseForm": "오늘",
         "literalMeaning": "today",
         "naturalMeaning": "today",
@@ -26,34 +24,26 @@
       {
         "text": "도와줘서",
         "gloss": "for helping me",
-        "sourceTexts": [
-          "for helping me"
-        ],
+        "sourceTexts": ["for helping me"],
         "baseForm": "도와주다",
         "literalMeaning": "because (you) helped (me)",
         "naturalMeaning": "for helping me",
         "grammar": "-어서 (here 줘서) attaches to 도와주다 to give the reason for the thanks.",
         "omissions": "You and me are implicit; Korean drops them when context makes them clear.",
-        "grammarHighlights": [
-          "줘서"
-        ],
+        "grammarHighlights": ["줘서"],
         "usageNote": "도와주다 emphasizes helping another person.",
         "characters": []
       },
       {
         "text": "고마워요",
         "gloss": "thanks",
-        "sourceTexts": [
-          "Thanks"
-        ],
+        "sourceTexts": ["Thanks"],
         "baseForm": "고맙다",
         "literalMeaning": "(I) am grateful",
         "naturalMeaning": "thank you",
         "grammar": "고마워요 is the polite present form of 고맙다.",
         "omissions": "The speaker is implicit.",
-        "grammarHighlights": [
-          "고마워요"
-        ],
+        "grammarHighlights": ["고마워요"],
         "usageNote": "",
         "characters": []
       }

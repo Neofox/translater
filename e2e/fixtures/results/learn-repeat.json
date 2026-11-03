@@ -11,9 +11,7 @@
       {
         "text": "네",
         "gloss": "yes",
-        "sourceTexts": [
-          "Yes"
-        ],
+        "sourceTexts": ["Yes"],
         "baseForm": "네",
         "literalMeaning": "yes",
         "naturalMeaning": "yes",
@@ -26,9 +24,7 @@
       {
         "text": "네",
         "gloss": "yes",
-        "sourceTexts": [
-          "yes"
-        ],
+        "sourceTexts": ["yes"],
         "baseForm": "네",
         "literalMeaning": "yes",
         "naturalMeaning": "yes",
@@ -41,17 +37,13 @@
       {
         "text": "좋아요",
         "gloss": "sounds good",
-        "sourceTexts": [
-          "sounds good"
-        ],
+        "sourceTexts": ["sounds good"],
         "baseForm": "좋다",
         "literalMeaning": "(it) is good",
         "naturalMeaning": "sounds good",
         "grammar": "좋아요 is the polite present form of 좋다.",
         "omissions": "",
-        "grammarHighlights": [
-          "좋아요"
-        ],
+        "grammarHighlights": ["좋아요"],
         "usageNote": "",
         "characters": []
       }
