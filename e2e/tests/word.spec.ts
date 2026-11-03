@@ -16,7 +16,6 @@ import {
   test,
   waitForDone,
   waitForMain,
-  waitForStats,
 } from './helpers'
 
 /** A word input selecting `name`'s fixture: `head`, then the marker with a
@@ -106,12 +105,30 @@ test('dictionary shows the next pending section while streaming @word', async ({
   await page.getByTestId('clear-input').click()
 })
 
+test('a word run stopped before any dictionary entry renders no dictionary @word', async ({ page, fake }) => {
+  await skipWithoutReference(page)
+  const fx = fixture('word-slow')
+  await fillSource(page, wordInput('word-slow', 'ty'))
+  await waitForMain(page, fx.result.primaryTranslation!)
+  // Streaming, and no POS entry has closed yet: only the skeleton.
+  await expect(meta(page).locator('.animate-pulse')).toHaveCount(1)
+  await expect(meta(page).locator('span.italic')).toHaveCount(0)
+  // An edit aborts the run; the pane stays during the debounce, without
+  // an empty dictionary block (WordSourceMeta returns null).
+  await source(page).press('End')
+  await source(page).press('z')
+  await expect(page.locator('.word-source-meta')).toHaveCount(0)
+  expect(await fake.requests()).toBe(1)
+})
+
 test('the chosen POS tab survives later dictionary updates @word', async ({ page }) => {
   await skipWithoutReference(page)
   await fillSource(page, wordInput('word-slow', 'ty'))
   // Tabs appear once a second POS entry has closed; etymology and the
   // other fields still stream after it.
   await meta(page).getByRole('button', { name: 'noun', exact: true }).click()
+  // Still streaming after the click, so later partials provably arrive.
+  await expect(meta(page).locator('.animate-pulse')).toHaveCount(1)
   await waitForDone(page)
   await expect(meta(page).locator('.animate-pulse')).toHaveCount(0)
   await expect(meta(page).locator('span.italic').filter({ visible: true })).toHaveText('noun')
@@ -120,20 +137,25 @@ test('the chosen POS tab survives later dictionary updates @word', async ({ page
   ).toBeVisible()
 })
 
-test('synonym starts a new lookup @word', async ({ page, fake }) => {
+test('synonym starts a new lookup @word', async ({ page }) => {
   await skipWithoutReference(page)
   await fillSource(page, wordInput('word', 'thanks'))
   await waitForDone(page)
-  expect(await fake.requests()).toBe(1)
-  const synonym = fixture('word').result.synonyms as string[]
-  await meta(page).getByRole('button', { name: synonym[0], exact: true }).click()
-  await expect(source(page)).toHaveValue(synonym[0]!)
+  const synonym = (fixture('word').result.synonyms as string[])[0]!
+  // The app's own translation request (Go: form fields, TS: server
+  // function JSON), whatever the server cache holds. Warm-ups never carry
+  // the text.
+  const encodings = [synonym, synonym.replaceAll(' ', '+'), encodeURIComponent(synonym)]
+  const lookup = page.waitForRequest(
+    (r) => r.method() === 'POST' && encodings.some((s) => (r.postData() ?? '').includes(s)),
+  )
+  const clicked = Date.now()
+  await meta(page).getByRole('button', { name: synonym, exact: true }).click()
+  await expect(source(page)).toHaveValue(synonym)
   await expect(source(page)).toBeFocused()
-  // No fixture matches the bare synonym, so the default (sentence-shaped)
-  // reply fails the word schema and is never cached: every run is a request.
-  await waitForStats(fake, (s) => s.requests === 2)
-  const { lastBodies } = await fake.stats()
-  expect(lastBodies.at(-1)).toContain(synonym[0])
+  await lookup
+  // Debounced like typing (800 ms), not immediate like Paste.
+  expect(Date.now() - clicked).toBeGreaterThanOrEqual(300)
 })
 
 test('only real character origins are shown @word', async ({ page }) => {

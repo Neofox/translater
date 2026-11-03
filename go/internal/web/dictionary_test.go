@@ -112,6 +112,46 @@ func TestPosTabClassesMatchDictionaryJS(t *testing.T) {
 	}
 }
 
+// dictionary.js finds the POS tabs as `.word-source-meta > .mb-4 > button`:
+// the tabs block must be the only direct child with that class, in every
+// state.
+func TestOnlyPosTabsBlockIsMb4(t *testing.T) {
+	full := WordMetaView{
+		POS: []POSView{
+			{Pos: "interjection", Senses: []SenseView{{Definition: "a", Register: []string{"r"}, Examples: []string{"e"}}, {Definition: "b", Examples: []string{"e"}}}},
+			{Pos: "noun", Senses: []SenseView{{Definition: "c"}}},
+		},
+		Etymology: "e", Notes: "n", Grammar: "g", Synonyms: []string{"s"},
+		Characters: []learning.CharacterNote{{Word: "학교", Chars: []learning.CharNote{{Char: "學", Meaning: "l"}, {Char: "校", Meaning: "s"}}}},
+	}
+	streaming := full
+	streaming.Streaming, streaming.Synonyms = true, nil
+	single := full
+	single.POS = full.POS[:1]
+	for name, tc := range map[string]struct {
+		v    WordMetaView
+		tabs int
+	}{
+		"done": {full, 1}, "streaming": {streaming, 1}, "one POS": {single, 0},
+		"empty streaming": {WordMetaView{Streaming: true}, 0},
+	} {
+		meta := find(renderMeta(t, tc.v), byClass("word-source-meta"))
+		var mb4 []*html.Node
+		for _, c := range elementChildren(meta) {
+			if hasClass(c, "mb-4") {
+				mb4 = append(mb4, c)
+			}
+		}
+		if len(mb4) != tc.tabs {
+			t.Errorf("%s: %d .mb-4 children, want %d", name, len(mb4), tc.tabs)
+			continue
+		}
+		if tc.tabs == 1 && (mb4[0] != elementChildren(meta)[0] || len(elementChildren(mb4[0])) != len(tc.v.POS)) {
+			t.Errorf("%s: the .mb-4 child is not the POS tabs block", name)
+		}
+	}
+}
+
 func TestWordMetaPOSVariants(t *testing.T) {
 	pos := []POSView{
 		{Pos: "interjection", Senses: []SenseView{{Definition: "first"}, {Definition: "second", Examples: []string{"ex"}}}},

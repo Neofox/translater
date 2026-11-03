@@ -11,8 +11,8 @@ const SEPARATE = ['workspace', 'split', 'book']
 // PosTabs' class strings (go/internal/web/dictionary.templ).
 const TAB_ON = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-accent/60 bg-accent-soft text-ink'
 const TAB_OFF = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-border bg-panel text-ink-soft hover:text-ink'
-// The POS tabs are the first block's buttons (only PosTabs has mb-4); the
-// synonyms are the other buttons.
+// The POS tabs are the first block's buttons (only PosTabs has mb-4, see
+// TestOnlyPosTabsBlockIsMb4); the synonyms are the other buttons.
 const TABS = '.word-source-meta > .mb-4 > button'
 
 /** The active tab after a swap: it persists within a run, and resets on a
@@ -75,9 +75,12 @@ export function initDictionary(app, composer) {
       meta.replaceChildren()
     }
     // A stopped run keeps what it received; TS drops the skeleton once
-    // nothing streams.
-    if (live && !app.streaming())
+    // nothing streams, and renders nothing when nothing was received.
+    if (live && !app.streaming()) {
       for (const pulse of meta.querySelectorAll('.animate-pulse')) pulse.closest('.word-source-meta > *')?.remove()
+      const box = meta.querySelector('.word-source-meta')
+      if (box && !box.children.length) box.remove()
+    }
     // TS mounts the pane only then; base.css selects on its presence, so it
     // waits in a hidden dock otherwise.
     const home = word && separate ? inputPanel : dock
