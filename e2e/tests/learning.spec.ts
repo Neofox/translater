@@ -59,7 +59,7 @@ async function mirrorText(page: Page): Promise<string | null> {
       document
         .querySelector('[data-testid="source-highlight"]')
         // The mirror ends with a zero-width space (U+200B).
-        ?.textContent?.replaceAll(String.fromCharCode(0x200b), '') ?? null,
+        ?.textContent.replaceAll(String.fromCharCode(0x200b), '') ?? null,
   )
 }
 
@@ -273,7 +273,7 @@ test('Breakdown action never appears before phrase details arrive or after compl
       if (
         document.querySelector('[data-testid="breakdown-button"]') ||
         [...document.querySelectorAll('button')].some((b) =>
-          /breakdown/i.test(b.textContent ?? ''),
+          /breakdown/i.test(b.textContent),
         )
       )
         log.breakdown = true
