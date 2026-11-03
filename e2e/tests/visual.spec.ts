@@ -14,17 +14,9 @@ import { APP } from '../ports'
 // reports an unexpected pass once every listed gap is closed, so the owning
 // task must remove its entry. Never list a difference without its owner.
 type Gap = { reason: string; projects?: RegExp }
-const CONTEXT: Gap = {
-  reason: 'Task 24: reply-context toggle in composer-meta',
-}
 const GO_GAPS: Record<string, Gap[]> = {
-  empty: [CONTEXT],
-  'sentence-done': [
-    CONTEXT,
-    { reason: 'Task 26: Adjust disclosure in the header' },
-  ],
+  'sentence-done': [{ reason: 'Task 26: Adjust disclosure in the header' }],
   'error-provider': [
-    CONTEXT,
     { reason: 'Task 16: errorEnvHint line and Retry button for server errors' },
   ],
 }

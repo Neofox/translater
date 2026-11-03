@@ -48,11 +48,12 @@ export function place(popup, anchor, { align = 'start', offset = 6, maxHeight = 
 export function initPrefs(app, data) {
   const prefsForm = document.getElementById('prefs-form')
 
-  /** Apply UI strings to every [data-t] / [data-t-attr] element. */
-  function applyStrings() {
-    document.documentElement.lang = app.prefs.uiLang
-    for (const el of document.querySelectorAll('[data-t]')) el.textContent = app.t(el.dataset.t)
-    for (const el of document.querySelectorAll('[data-t-attr]'))
+  /** Apply UI strings to every [data-t] / [data-t-attr] element of root
+   * (the document, or a detached node about to be inserted). */
+  function applyStrings(root = document) {
+    if (root === document) document.documentElement.lang = app.prefs.uiLang
+    for (const el of root.querySelectorAll('[data-t]')) el.textContent = app.t(el.dataset.t)
+    for (const el of root.querySelectorAll('[data-t-attr]'))
       for (const pair of el.dataset.tAttr.split(' ')) {
         const [attr, key] = pair.split(':')
         el.setAttribute(attr, app.t(key))

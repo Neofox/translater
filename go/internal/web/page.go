@@ -25,6 +25,7 @@ var clientStrings = []string{
 	"clear", "clearInput", "clearInputTitle", "copy", "copied", "listen", "swapLanguages",
 	"streaming", "emptyMain", "inputCount", "charCount", "whyWording", "usage",
 	"translationFailedTitle", "translationFailed", "inputTooLong", "inputTooLongHint",
+	"contextToggle", "contextShort", "contextPlaceholder", "contextClear",
 }
 
 // Pages renders the document and the preference partials.

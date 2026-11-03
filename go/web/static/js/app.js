@@ -10,6 +10,7 @@ import {
   resolveTarget,
   routingDetected,
 } from './composer.js'
+import { initContext } from './context.js'
 import { initCopy, requestKey } from './copy.js'
 import { initLayout } from './layout.js'
 import { initPrefs } from './prefs.js'
@@ -36,6 +37,7 @@ const app = {
   pending: false,
   t: (key) => data.strings[app.prefs.uiLang]?.[key] ?? data.strings.en[key] ?? key,
   streaming: () => Boolean(app.pending && app.live && !app.live.done && !app.live.aborted),
+  /** The raw reply context (context.js). */
   context: () => '',
   refinements: () => [],
 
@@ -205,6 +207,7 @@ prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
 // InputPanel re-sizes the editor whenever the layout changes.
 document.addEventListener('nt-layout', () => composer.resize())
+initContext(app, () => composer.resize(), (root) => prefs.applyStrings(root))
 updateCount()
 copy.updateActions()
 if (matchMedia('(pointer: fine)').matches) ta.focus()
