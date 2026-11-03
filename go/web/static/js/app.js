@@ -14,6 +14,7 @@ import { initContext } from './context.js'
 import { initCopy, requestKey } from './copy.js'
 import { initDictionary } from './dictionary.js'
 import { initLayout } from './layout.js'
+import { initLearning } from './learning.js'
 import { initPrefs } from './prefs.js'
 import { initStream } from './stream.js'
 
@@ -40,7 +41,7 @@ const app = {
   prefs: data.prefs,
   /** The current run: { run, key, detected (its routing language), text,
    * intent, source, target, raw, main, mainReady, done, error, aborted,
-   * sourceLang, rationale, formality, register }. */
+   * sourceLang, headword, rationale, formality, register }. */
   live: null,
   pending: false,
   t: (key) => data.strings[app.prefs.uiLang]?.[key] ?? data.strings.en[key] ?? key,
@@ -134,7 +135,7 @@ const app = {
       run: crypto.randomUUID(), key: app.currentKey(), detected: app.routingDetected(),
       text: trimmed, intent, source, target,
       raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
-      sourceLang: null, rationale: '', formality: '',
+      sourceLang: null, headword: '', rationale: '', formality: '',
       register: intent === 'sentence' && target === 'ko' ? REGISTER[mode] : '',
     }
     app.live = live
@@ -178,6 +179,7 @@ const app = {
 
   updateActions() {
     copy.updateActions()
+    app.learning?.sync()
     dictionary?.sync()
   },
   copyMain: () => copy.copyMain(),
@@ -233,10 +235,12 @@ stream = initStream(app, form)
 copy = initCopy(app)
 prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
+app.learning = initLearning(app)
 dictionary = initDictionary(app, composer)
 // InputPanel re-sizes the editor whenever the layout changes.
 document.addEventListener('nt-layout', () => {
   composer.resize()
+  app.learning.sync()
   dictionary.sync()
 })
 initContext(app, () => composer.resize(), (root) => prefs.applyStrings(root))

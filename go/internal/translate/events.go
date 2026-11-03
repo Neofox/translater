@@ -15,6 +15,7 @@ import (
 // superseded run.
 const (
 	evSourceLang = "nt-source-lang"
+	evHeadword   = "nt-headword" // word intent: names the reference heading
 	evMainDelta  = "nt-main-delta"
 	evMainReady  = "nt-main-ready"
 	evTextDelta  = "nt-text-delta"

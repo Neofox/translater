@@ -27,7 +27,7 @@ var clientStrings = []string{
 	"translationFailedTitle", "translationFailed", "inputTooLong", "inputTooLongHint",
 	"errorEnvHint", "retry",
 	"contextToggle", "contextShort", "contextPlaceholder", "contextClear",
-	"notes", "learn", "wordDetails", "pos", "primaryMeaning", "otherMeanings", "etymology",
+	"notes", "learn", "wordDetails", "breakdown", "closeLearning", "pos", "primaryMeaning", "otherMeanings", "etymology",
 	"grammar", "synonyms", "hanja", "kanji", "hanzi", "characters",
 }
 

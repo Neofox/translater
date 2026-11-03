@@ -206,6 +206,10 @@ func (p *processor) handle(ev jsonstream.Event) bool {
 			switch key {
 			case "sourceLang":
 				return p.out.event(evSourceLang, langPayload{Run: p.run, Lang: ev.Text})
+			case "headword":
+				if p.word {
+					return p.out.event(evHeadword, textPayload{Run: p.run, Text: ev.Text})
+				}
 			case p.f.main:
 				return p.out.event(evMainReady, readyPayload{Run: p.run, Main: prompt.JSTrim(ev.Text)})
 			}

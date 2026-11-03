@@ -1,6 +1,6 @@
 // Word dictionary (WordSourceMeta.tsx state) and the word parts of the
-// reference pane (ReferencePanel.tsx, InspectableTranslation's word
-// trigger) that Task 17 extends.
+// reference pane (its placement, and InspectableTranslation's word trigger
+// state; learning.js handles activation).
 //
 // Hand-written: the active POS tab is client state the server cannot know.
 // The server renders one block variant per POS into #word-meta (inactive
@@ -32,7 +32,6 @@ export function initDictionary(app, composer) {
   const panel = meta.closest('.reference-panel')
   const dock = panel.parentElement
   const inputPanel = $('.input-panel')
-  const heading = panel.querySelector('.reference-heading')
   const main = $('#main-translation')
   let state = { run: null, active: 0 }
   let shownRun = null
@@ -81,21 +80,18 @@ export function initDictionary(app, composer) {
       const box = meta.querySelector('.word-source-meta')
       if (box && !box.children.length) box.remove()
     }
-    // TS mounts the pane only then; base.css selects on its presence, so it
-    // waits in a hidden dock otherwise.
-    const home = word && separate ? inputPanel : dock
+    // TS mounts the pane only then (and not under an open learning
+    // surface); base.css selects on its presence, so it waits in a hidden
+    // dock otherwise. learning.js writes its heading.
+    const home = word && separate && !app.learning.panelOpen() ? inputPanel : dock
     if (panel.parentElement !== home) home.append(panel)
-    heading.textContent = app.t(layout.desktop ? 'wordDetails' : 'learn')
 
     const trigger = main.querySelector('.word-details-trigger')
-    const canOpen = Boolean(
-      trigger && live?.done && !app.pending && !live.error && live.raw && live.key === app.currentKey(),
-    )
+    const canOpen = Boolean(trigger && app.learning.canOpen())
     set(main, 'data-inspectable', canOpen ? 'true' : null)
     if (!trigger) return
     trigger.disabled = !canOpen
     set(trigger, 'aria-label', `${app.t('wordDetails')}: ${live?.raw ?? ''}`)
-    set(trigger, 'aria-expanded', String(separate))
   }
 
   return { sync }

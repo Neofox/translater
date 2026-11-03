@@ -125,4 +125,39 @@ export const STATES: VisualState[] = [
         ).toContainText('cheers')
     },
   },
+  {
+    // Desktop workspace after activating the word trigger: the reference
+    // heading names the headword and holds focus (its focus outline).
+    name: 'reference-word',
+    projects: /-(macbook-14|macbook-16|desktop-short)$/,
+    async setup(page) {
+      await openApp(page)
+      await fillSource(page, '[fx:word] thanks')
+      await waitForDone(page)
+      await page.getByTestId('word-details-trigger').click()
+      const heading = page.locator('.reference-heading')
+      await expect(heading).toBeFocused()
+      await expect(heading).toHaveText('Word details · thanks')
+      await expect(
+        page.locator('.reference-panel .word-source-meta'),
+      ).toContainText('cheers')
+    },
+  },
+  {
+    // Every other layout (split and book included) opens the full-size
+    // learning surface with the dictionary over the Copy/Listen dock.
+    name: 'learning-word-open',
+    projects: /-(portrait|landscape)$/,
+    async setup(page) {
+      await openApp(page)
+      await fillSource(page, '[fx:word] thanks')
+      await waitForDone(page)
+      await page.getByTestId('word-details-trigger').click()
+      const panel = page.getByTestId('learning-panel')
+      await expect(
+        panel.getByRole('button', { name: 'Close learning' }),
+      ).toBeFocused()
+      await expect(panel.locator('.word-source-meta')).toContainText('cheers')
+    },
+  },
 ]

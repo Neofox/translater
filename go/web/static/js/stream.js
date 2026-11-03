@@ -269,6 +269,9 @@ export function initStream(app, form) {
       live.sourceLang = d.lang
       app.sourceReported(live)
     },
+    'nt-headword'(live, d) {
+      live.headword = d.text
+    },
     'nt-main-delta'(live, d) {
       live.raw += d.text
       if (!live.mainReady) interp.set(live.raw.trimStart())
