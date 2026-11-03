@@ -55,7 +55,8 @@ func PillClass(tone, size, class string) string {
 		ink + " " + pillTone[tone] + " " + pillSize[size] + " " + class
 }
 
-// Pill is the canonical button chip (Pill.tsx): type="button", the caller's
+// Pill is the canonical button chip (Pill.tsx): type="button" unless the
+// caller's attributes set one (React's rest props override it), the other
 // attributes, then the class.
 func Pill(p PillProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -79,11 +80,24 @@ func Pill(p PillProps) templ.Component {
 			templ_7745c5c3_ElementWriter := templ_7745c5c3_Buffer
 			templ_7745c5c3_Buffer := templ.GetBuffer()
 			var templ_7745c5c3_ElementScripts []templ.ComponentScript
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<button type=\"button\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<button type=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "button", p.Attrs)
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(pillType(p.Attrs)).Resolve(ctx)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/ui/pill.templ`, Line: 51, Col: 33}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "button", pillRest(p.Attrs))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -101,7 +115,7 @@ func Pill(p PillProps) templ.Component {
 			}
 			templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, ">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, ">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -109,12 +123,37 @@ func Pill(p PillProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		return nil
 	})
+}
+
+func pillType(attrs templ.Attributes) string {
+	if t, ok := attrs["type"].(string); ok {
+		return t
+	}
+	return "button"
+}
+
+// pillRest is attrs without type. A class there would be a second class
+// attribute: Pill.tsx takes it as className, so callers pass PillProps.Class.
+func pillRest(attrs templ.Attributes) templ.Attributes {
+	if _, ok := attrs["class"]; ok {
+		panic("ui.Pill: pass the class as PillProps.Class, not in Attrs")
+	}
+	if _, ok := attrs["type"]; !ok {
+		return attrs
+	}
+	rest := make(templ.Attributes, len(attrs))
+	for k, v := range attrs {
+		if k != "type" {
+			rest[k] = v
+		}
+	}
+	return rest
 }
 
 var _ = templruntime.GeneratedTemplate
