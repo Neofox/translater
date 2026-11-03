@@ -99,6 +99,7 @@ test('stale result disables copy @core', async ({ page, fake }) => {
   await expect(copyButton(page)).toBeEnabled()
 
   await recordResult(page)
+  const old = fixture('slow').result.main!
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
@@ -471,6 +472,7 @@ test('late events from a superseded run are ignored @core', async ({
         once: true,
       })
   })
+  const old = fixture('slow').result.main!
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
@@ -488,8 +490,17 @@ test('late events from a superseded run are ignored @core', async ({
   expect(start).toBeGreaterThanOrEqual(0)
   for (let i = 0; i < start; i++) {
     expect(log[i]!.copy).toBe(false)
-    if (i > 0)
-      expect(log[i]!.text!.length).toBeLessThanOrEqual(log[i - 1]!.text!.length)
+    if (APP === 'go') {
+      // Go freezes an aborted main.
+      if (i > 0)
+        expect(log[i]!.text!.length).toBeLessThanOrEqual(
+          log[i - 1]!.text!.length,
+        )
+    } else {
+      // TS reveals the already-received rest of the current interpolation
+      // burst on abort: growth is fine, but only with the old run's text.
+      expect(old.startsWith(log[i]!.text ?? '')).toBe(true)
+    }
   }
   for (const entry of log.slice(start)) {
     expect(second.startsWith(entry.text ?? '')).toBe(true)
