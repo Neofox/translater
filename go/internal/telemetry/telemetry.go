@@ -49,10 +49,6 @@ const (
 	metadataPrefix = "langfuse.observation.metadata."
 )
 
-// Aborted is the outcome of a run whose client left (a superseded or
-// cancelled translation). It is a fixed status message, like the llm kinds.
-const Aborted llm.Kind = "aborted"
-
 // Tracer creates generation spans. A nil *Tracer is the disabled tracer:
 // every method is a no-op.
 type Tracer struct {
@@ -267,9 +263,10 @@ func (t *Tracer) StartGeneration(ctx context.Context, rc RuntimeContext) *Genera
 }
 
 // End records the token usage the provider reported (omitted when none was)
-// and the outcome, then ends and exports the span. kind is "" on success,
-// a classified llm.Kind on failure, or Aborted when the client left; it is
-// the only failure detail recorded (as the span status message).
+// and the outcome, then ends and exports the span. kind is a classified
+// llm.Kind on failure, the only failure detail recorded (as the span status
+// message); it is "" on success and for a run whose client left, which,
+// like the AI SDK's onAbort, ends with an unset status.
 func (g *Generation) End(usage llm.Usage, kind llm.Kind) {
 	if g == nil {
 		return

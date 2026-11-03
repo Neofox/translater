@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -323,6 +324,27 @@ func TestOTLPHeaders(t *testing.T) {
 	}
 	if bytes.Contains(rcv.bodies[0], []byte(canary)) {
 		t.Error("export body carries content")
+	}
+}
+
+func TestSlowReceiverIsCutAtTwoSeconds(t *testing.T) {
+	logs := captureLog(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(5 * time.Second):
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(srv.Close)
+	tr := Setup(env(map[string]string{"LANGFUSE_PUBLIC_KEY": "pk", "LANGFUSE_SECRET_KEY": "sk", "LANGFUSE_BASE_URL": srv.URL}))
+	start := time.Now()
+	tr.StartGeneration(context.Background(), NewRuntimeContext(canaryInput(), testCfg, "v", analytics())).
+		End(llm.Usage{}, "")
+	if d := time.Since(start); d < 1500*time.Millisecond || d > 2500*time.Millisecond {
+		t.Fatalf("End took %v, want the 2 s export timeout", d)
+	}
+	if c := strings.Count(logs.String(), "[langfuse]"); c != 1 {
+		t.Fatalf("warnings = %d, want 1", c)
 	}
 }
 

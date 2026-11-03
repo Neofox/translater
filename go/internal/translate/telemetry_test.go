@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	collectorpb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -190,6 +192,39 @@ func TestFailedRunRecordsKindOnly(t *testing.T) {
 	}
 	if bytes.Contains(bodies[0], []byte(canary)) || bytes.Contains(bodies[0], []byte("Rate limit reached")) {
 		t.Error("export carries content or provider text")
+	}
+}
+
+func TestAbortedRunEndsWithoutError(t *testing.T) {
+	e, rcv := tracedEnv(t, http.StatusOK)
+	ctx, cancel := context.WithCancel(context.Background())
+	resp := e.post(t, ctx, form("[fx:slow] hi "+canary))
+	sc := bufio.NewScanner(resp.Body)
+	for sc.Scan() {
+		if strings.HasPrefix(sc.Text(), "event: "+evMainDelta) {
+			break
+		}
+	}
+	cancel()
+	resp.Body.Close()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, spans := rcv.snapshot(); len(spans) == 1 {
+			// As the AI SDK's onAbort: no error status, and no usage the
+			// provider never reported.
+			s := spans[0]
+			if s.GetStatus().GetCode() != tracepb.Status_STATUS_CODE_UNSET || s.GetStatus().GetMessage() != "" {
+				t.Errorf("aborted span status %v", s.GetStatus())
+			}
+			if _, ok := spanAttrs(s)["gen_ai.usage.input_tokens"]; ok {
+				t.Error("aborted span reports usage")
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("aborted run exported no span")
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 

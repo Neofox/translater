@@ -157,14 +157,17 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	// upstream stream: on hosts that do not cancel r.Context() on client
 	// disconnect (Vercel), that is the only disconnect signal.
 	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
 	// The span ends when the handler returns: after nt-done (or nt-error)
 	// has been written and flushed, so export never delays visible output.
-	// A run left early (client gone, write failure) ends as Aborted.
+	// It records only a classified failure kind; a run whose client left
+	// ends without one, as the AI SDK's onAbort does.
 	var usage llm.Usage
-	outcome := telemetry.Aborted
+	var outcome llm.Kind
 	gen := s.tracer.StartGeneration(ctx, telemetry.NewRuntimeContext(in, s.cfg, s.c.CacheVersion, analytics))
-	defer func() { gen.End(usage, outcome) }()
+	defer func() {
+		cancel()
+		gen.End(usage, outcome)
+	}()
 	fail := func(kind llm.Kind) {
 		outcome = kind
 		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
@@ -195,7 +198,6 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cache.Add(key, doc)
-	outcome = ""
 	if p.end() {
 		out.event(evDone, runPayload{Run: run})
 	}
