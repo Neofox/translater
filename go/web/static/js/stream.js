@@ -121,6 +121,7 @@ export function initStream(app, form) {
   const empty = $('result-empty')
   const errorBox = $('result-error')
   const details = $('result-details')
+  const learningRows = $('learning-sentence')
   const explanation = $('main-explanation')
   const panel = document.querySelector('.output-panel')
   const status = $('result-status')
@@ -226,6 +227,8 @@ export function initStream(app, form) {
       main.replaceChildren(trigger)
     } else main.replaceChildren(mainText)
     details.replaceChildren()
+    // The previous run's breakdown rows go too (its nt-learning stays with it).
+    learningRows.replaceChildren()
     renderState()
   }
 

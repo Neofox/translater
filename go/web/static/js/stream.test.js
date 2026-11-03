@@ -11,6 +11,16 @@ test('only events of the current running run are accepted', () => {
   assert.equal(accepts({ ...live, error: { message: 'x' } }, { run: 'b' }), false, 'after nt-error')
 })
 
+// nt-learning carries ranges for one run's text: a superseded or aborted
+// run's ranges must never decorate the current result.
+test('nt-learning of another or an aborted run is ignored', () => {
+  const learning = { run: 'a', side: 'target', language: 'ko', chunks: [{ s: 0, e: 2, src: [], g: [] }], partial: false }
+  const live = { run: 'b', aborted: false, error: null }
+  assert.equal(accepts(live, learning), false, 'superseded run')
+  assert.equal(accepts({ ...live, run: 'a', aborted: true }, learning), false, 'aborted run')
+  assert.equal(accepts({ ...live, run: 'a' }, learning), true, 'current run')
+})
+
 const graphemes = (s) => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map((p) => p.segment)
 
 test('graphemeEnds counts whole graphemes after the offset', () => {
