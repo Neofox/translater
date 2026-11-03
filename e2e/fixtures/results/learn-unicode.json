@@ -1,0 +1,71 @@
+{
+  "match": "[fx:learn-unicode]",
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 20,
+  "result": {
+    "sourceLang": "ko",
+    "targetLang": "en",
+    "main": "Thank you so much! 👨‍👩‍👧 I watched it with my family.",
+    "learningPhrases": [
+      {
+        "text": "정말 고마워요",
+        "gloss": "thank you so much",
+        "sourceTexts": [
+          "Thank you so much"
+        ],
+        "baseForm": "고맙다",
+        "literalMeaning": "really (I) am grateful",
+        "naturalMeaning": "thank you so much",
+        "grammar": "고마워요 is the polite present form of 고맙다; 정말 intensifies it.",
+        "omissions": "The speaker is implicit.",
+        "grammarHighlights": [
+          "고마워요"
+        ],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "가족이랑 같이 봤어요",
+        "gloss": "I watched it with my family",
+        "sourceTexts": [
+          "I watched it with my family"
+        ],
+        "baseForm": "보다",
+        "literalMeaning": "(I) watched together with family",
+        "naturalMeaning": "I watched it with my family",
+        "grammar": "-이랑 means with after a consonant; 봤어요 is the polite past of 보다.",
+        "omissions": "I and it are implicit.",
+        "grammarHighlights": [
+          "이랑",
+          "봤어요"
+        ],
+        "usageNote": "",
+        "characters": [
+          {
+            "word": "가족",
+            "chars": [
+              {
+                "char": "家",
+                "meaning": "house"
+              },
+              {
+                "char": "族",
+                "meaning": "clan"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "rationale": "Keeps the emoji and the warm tone.",
+    "alternatives": [
+      {
+        "text": "Thanks a lot! 👨‍👩‍👧 We watched it as a family.",
+        "note": "Says the whole family watched together."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}
