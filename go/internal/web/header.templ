@@ -27,7 +27,7 @@ templ header(v View) {
 			</select>
 			@ui.Pill(ui.PillProps{Size: "md", Class: "settings-trigger", Attrs: templ.Attributes{
 				"aria-label": v.T("settings"), "data-t-attr": "aria-label:settings", "data-testid": "settings-button",
-				"aria-haspopup": "dialog", "popovertarget": "settings-popover",
+				"aria-haspopup": "dialog", "aria-expanded": "false", "popovertarget": "settings-popover",
 			}}) {
 				@icons.Icon("settings", 18, nil)
 			}

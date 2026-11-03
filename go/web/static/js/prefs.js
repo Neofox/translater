@@ -176,13 +176,16 @@ export function initPrefs(app, data) {
     menu.replaceChildren(...items)
   }
 
-  // More… listbox: options exist only while open (one listbox in the DOM).
+  // Popover triggers mirror their state in aria-expanded (Floating UI's
+  // useRole does this for Settings and the listboxes). More… listbox options
+  // exist only while open (one listbox in the DOM).
   document.addEventListener('beforetoggle', (event) => {
     const menu = event.target
-    if (!(menu instanceof HTMLElement) || menu.getAttribute('role') !== 'listbox') return
+    if (!(menu instanceof HTMLElement) || !menu.hasAttribute('popover')) return
     const trigger = document.querySelector(`[popovertarget="${menu.id}"]`)
     const open = event.newState === 'open'
     trigger?.setAttribute('aria-expanded', String(open))
+    if (menu.getAttribute('role') !== 'listbox') return
     if (open) fillMenu(menu)
     else menu.replaceChildren()
   }, true)

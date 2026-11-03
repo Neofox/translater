@@ -137,7 +137,7 @@ func outputPanel(v View) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button  disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
 			"aria-label": v.T("copy"), "title": v.T("copy"), "data-t-attr": "aria-label:copy title:copy",
 			"data-testid": "copy-button", "disabled": true,
 		}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
@@ -183,7 +183,7 @@ func outputPanel(v View) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Size: "md", Class: "listen-button disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
+		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Size: "md", Class: "listen-button  disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
 			"disabled": true, "aria-label": v.T("listen"), "title": v.T("listen"), "data-t-attr": "aria-label:listen title:listen",
 			"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
 		}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
@@ -218,20 +218,20 @@ func outputPanel(v View) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Prefs.Target).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/output.templ`, Line: 54, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/output.templ`, Line: 54, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" data-testid=\"main-translation\" tabindex=\"-1\"></p><section id=\"main-explanation\" class=\"main-explanation detail-why\" hidden><h3 class=\"sr-only\"></h3><div class=\"main-explanation-skeleton\" aria-hidden=\"true\"><span class=\"skeleton-line\"></span> <span class=\"skeleton-line\"></span></div><p class=\"detail-enter\" hidden></p></section><div id=\"result-details\" class=\"result-details\"></div></div><div id=\"result-empty\" class=\"result-empty\"><p data-t=\"emptyMain\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" data-testid=\"main-translation\" tabindex=\"-1\"></p><section id=\"main-explanation\" class=\"main-explanation detail-why\" hidden><h3 class=\"sr-only\"></h3><div class=\"main-explanation-skeleton\" aria-hidden=\"true\"><span class=\"skeleton-line\"></span> <span class=\"skeleton-line\"></span></div><p class=\"detail-enter\" hidden></p></section><div class=\"tight-learning-slot\" data-testid=\"tight-learning-slot\"></div><div id=\"result-details\" class=\"result-details\"></div></div><div id=\"result-empty\" class=\"result-empty\"><p data-t=\"emptyMain\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(v.T("emptyMain"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/output.templ`, Line: 66, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/output.templ`, Line: 67, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {

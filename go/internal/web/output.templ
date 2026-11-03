@@ -25,7 +25,7 @@ templ outputPanel(v View) {
 		</div>
 		<div class="result-actions" data-testid="output-toolbar">
 			<div class="primary-result-actions">
-				@ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+				@ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button  disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
 					"aria-label": v.T("copy"), "title": v.T("copy"), "data-t-attr": "aria-label:copy title:copy",
 					"data-testid": "copy-button", "disabled": true,
 				}}) {
@@ -33,7 +33,7 @@ templ outputPanel(v View) {
 					<span data-t="copy">{ v.T("copy") }</span>
 				}
 				<span class="relative inline-flex shrink-0">
-					@ui.Pill(ui.PillProps{Size: "md", Class: "listen-button disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
+					@ui.Pill(ui.PillProps{Size: "md", Class: "listen-button  disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
 						"disabled": true, "aria-label": v.T("listen"), "title": v.T("listen"), "data-t-attr": "aria-label:listen title:listen",
 						"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
 					}}) {
@@ -51,7 +51,7 @@ templ outputPanel(v View) {
 				<p class="state-hint mt-2 text-ink-dim" hidden></p>
 			</div>
 			<div id="result-content" class="result-content" hidden>
-				<p id="main-translation" class="result-main" lang={ v.Prefs.Target } data-testid="main-translation" tabindex="-1"></p>
+				<p id="main-translation" class="result-main " lang={ v.Prefs.Target } data-testid="main-translation" tabindex="-1"></p>
 				<section id="main-explanation" class="main-explanation detail-why" hidden>
 					<h3 class="sr-only"></h3>
 					<div class="main-explanation-skeleton" aria-hidden="true">
@@ -60,6 +60,7 @@ templ outputPanel(v View) {
 					</div>
 					<p class="detail-enter" hidden></p>
 				</section>
+				<div class="tight-learning-slot" data-testid="tight-learning-slot"></div>
 				<div id="result-details" class="result-details"></div>
 			</div>
 			<div id="result-empty" class="result-empty">

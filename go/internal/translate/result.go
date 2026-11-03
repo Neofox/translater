@@ -144,7 +144,7 @@ func (p *processor) alternative(index int, raw []byte) bool {
 	if json.Unmarshal(raw, &alt) != nil {
 		return true
 	}
-	html, ok := p.render(web.AlternativeRow(index, p.word, alt.Text, alt.Note, alt.Register, p.c.T(p.uiLang, "copy")))
+	html, ok := p.render(web.AlternativeRow(index, p.word, alt.Text, alt.Note, alt.Register, p.c.T(p.uiLang, "copy"), p.c.T(p.uiLang, "listen")))
 	if !ok {
 		return false
 	}

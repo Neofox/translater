@@ -205,7 +205,7 @@ func header(v View) templ.Component {
 		})
 		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Size: "md", Class: "settings-trigger", Attrs: templ.Attributes{
 			"aria-label": v.T("settings"), "data-t-attr": "aria-label:settings", "data-testid": "settings-button",
-			"aria-haspopup": "dialog", "popovertarget": "settings-popover",
+			"aria-haspopup": "dialog", "aria-expanded": "false", "popovertarget": "settings-popover",
 		}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

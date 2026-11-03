@@ -39,7 +39,8 @@ export function initCopy(app) {
   const toolbar = document.querySelector('[data-testid="output-toolbar"]')
   const mainCopy = toolbar.querySelector('[data-testid="copy-button"]')
   const mainListen = toolbar.querySelector('[data-testid="listen-button"]')
-  const alternatives = () => document.querySelectorAll('#alternatives [data-testid="copy-button"]')
+  const alternatives = () =>
+    document.querySelectorAll('#alternatives [data-testid="copy-button"], #alternatives [data-testid="listen-button"]')
 
   /** Enable controls only for the complete, current, error-free result. */
   function updateActions() {

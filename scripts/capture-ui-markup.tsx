@@ -14,6 +14,7 @@ import { createElement } from 'react'
 import type { ComponentType } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as lucide from 'lucide-react'
+import type { LucideProps } from 'lucide-react'
 import Pill from '../src/components/ui/Pill'
 import Tag from '../src/components/ui/Tag'
 
@@ -39,7 +40,7 @@ type Case =
       html: string
     }
 
-const icons = lucide as unknown as Record<string, ComponentType<object>>
+const icons = lucide as unknown as Record<string, ComponentType<LucideProps>>
 
 function pascal(name: string): string {
   return name

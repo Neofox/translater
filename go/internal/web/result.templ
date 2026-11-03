@@ -27,9 +27,10 @@ templ ResultSkeleton(title string) {
 
 // AlternativeRow is one completed alternative (AlternativeItem.tsx). Word
 // rows always use the wrapper with register tags: WordView passes children
-// (an array, truthy even when empty). The Copy button renders disabled; the
-// client enables it once the whole current result has completed.
-templ AlternativeRow(index int, word bool, text, note string, registers []string, copyLabel string) {
+// (an array, truthy even when empty). Copy and Listen (ListenButton.tsx,
+// compact) render disabled; the client enables them once the whole current
+// result has completed. Listen has no speech yet (stage 5), like the main one.
+templ AlternativeRow(index int, word bool, text, note string, registers []string, copyLabel, listenLabel string) {
 	<li data-testid="alternative-item" class="alternative-item detail-enter group flow-root rounded-lg border border-border bg-panel px-3 py-2" style={ templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms") }>
 		if text != "" {
 			<div class="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
@@ -38,6 +39,14 @@ templ AlternativeRow(index int, word bool, text, note string, registers []string
 				}}) {
 					@icons.Icon("copy", 14, nil)
 				}
+				<span class="relative inline-flex shrink-0">
+					@ui.Pill(ui.PillProps{Class: "listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
+						"disabled": true, "aria-label": listenLabel, "title": listenLabel,
+						"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
+					}}) {
+						@icons.Icon("volume-2", 14, nil)
+					}
+				</span>
 			</div>
 		}
 		if word {
