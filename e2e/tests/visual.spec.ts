@@ -16,26 +16,9 @@ import { APP } from '../ports'
 // because base.css selects on presence (e.g. .app-settings:has(.adjust-menu)).
 // The Go run checks that nothing visible matches `tsHide`: once the owning
 // task renders the element, the gap entry must go. Never list a difference
-// without its owner. `both` marks an element Go already renders without its
-// final layout: both runs remove it.
-type Gap = { reason: string; tsHide: string; projects?: RegExp; both?: boolean }
-const ADJUST: Gap = {
-  reason: 'Task 26: Adjust inline chips, summary and floating panel (Task 25 renders a plain disclosure)',
-  tsHide: '.adjust-menu',
-  both: true,
-}
-const GO_GAPS: Record<string, Gap[]> = {
-  'sentence-done': [ADJUST],
-  'error-provider': [ADJUST],
-  'streaming-skeleton': [ADJUST],
-  'listen-loading': [ADJUST],
-  'listen-playing': [ADJUST],
-  'listen-error': [ADJUST],
-  'learning-reference': [ADJUST],
-  'learning-source-underlines': [ADJUST],
-  'refine-softer': [ADJUST],
-  'refine-rollback': [ADJUST],
-}
+// without its owner. None remain: every state compares strictly.
+type Gap = { reason: string; tsHide: string; projects?: RegExp }
+const GO_GAPS: Record<string, Gap[]> = {}
 
 // Pixels that may differ per screenshot. Both apps render on the same
 // machine with the same fonts, so identical markup and CSS give identical
@@ -88,7 +71,7 @@ for (const state of STATES) {
       (gap) => !gap.projects || gap.projects.test(testInfo.project.name),
     )
     for (const gap of gaps) {
-      if (APP === 'ts' || gap.both) {
+      if (APP === 'ts') {
         const removed = await page.evaluate(
           (selector) =>
             [...document.querySelectorAll(selector)].map((e) => e.remove()).length,
@@ -102,7 +85,7 @@ for (const state of STATES) {
         ).toHaveCount(0)
       }
     }
-    if (gaps.some((gap) => APP === 'ts' || gap.both)) await settle(page)
+    if (gaps.length && APP === 'ts') await settle(page)
     // Soft, so one run reports the pixel, ARIA and DOM diffs together.
     // An absolute pixel budget: a ratio allowed a missing label to pass.
     await expect.soft(page).toHaveScreenshot(`${state.name}.png`, {

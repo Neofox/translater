@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CHIPS, MAX_UNDO, add, customLabel, remove } from './refine.js'
+import { CHIPS, MAX_UNDO, add, customLabel, remove, summary } from './refine.js'
 
 const empty = { refinements: [], previousMain: '', stack: [] }
 const [softer, direct, shorter, playful] = Object.values(CHIPS)
@@ -50,4 +50,11 @@ test('the undo stack keeps the last 10 snapshots', () => {
 test('customLabel shows the first 20 characters', () => {
   assert.equal(customLabel('make it a bit less formal'), 'make it a bit less f…')
   assert.equal(customLabel('x'.repeat(20)), 'x'.repeat(20))
+})
+
+test('summary names chips by their label and shortens custom text', () => {
+  const t = (key) => ({ refineSofter: 'Softer', refineShorter: 'Shorter' })[key] ?? key
+  assert.equal(summary([], t), '')
+  assert.equal(summary([softer, shorter], t), 'Softer · Shorter')
+  assert.equal(summary([softer, 'make it a bit less formal'], t), 'Softer · make it a bit less f…')
 })

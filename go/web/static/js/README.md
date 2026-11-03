@@ -19,7 +19,8 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox (fill, placement)    |
 | `listbox.js`  | More listbox keyboard, roving focus, hover focus and typeahead (useListNavigation, useTypeahead) |
 | `settings.js` | Settings popover: placement, focus in and back, `aria-controls`, `aria-owns` mirror      |
-| `refine.js`   | Refine chips and custom adjustment (`template#adjust-template`), caps, `previousMain`, rollback stack of a failed refine |
+| `refine.js`   | Refine chips and custom adjustment, caps, `previousMain`, rollback stack of a failed refine |
+| `adjust.js`   | Adjust menu (`template#adjust-template`): measured in-row chips or trigger, summary, floating panel clear of Copy/Listen, outside/Escape dismissal, `--adjust-panel-height` |
 | `float.js`    | Fixed popup placement (offset/flip/shift/size, Adjust clearance), `autoUpdate`, `panelBoundary`, `closeOnFocusOut` |
 | `inspect.js`  | Selection-safe main text and source grammar taps (`isInspectTap`, `textOffsetAtPoint`, 400 ms grace; port of `phrasePointer.ts`, `InspectableTranslation.tsx`, `SourceHighlight.tsx`) |
 

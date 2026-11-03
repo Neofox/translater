@@ -81,8 +81,10 @@ function viewportRect() {
 /** Place `floating` (fixed) next to `reference` and return compute()'s
  * result. `boundary` (an element) narrows the viewport; `clearance` is an
  * element the box must not overlap (AdjustMenu); `maxHeight` caps the
- * box at the available height (Floating UI's size middleware). */
-export function position(reference, floating, { boundary, clearance, maxHeight, ...options }) {
+ * box at the available height (Floating UI's size middleware).
+ * `translate` writes useFloating's floatingStyles (left/top 0 and a
+ * translate) instead of left/top. */
+export function position(reference, floating, { boundary, clearance, maxHeight, translate, ...options }) {
   let clip = viewportRect()
   if (boundary) {
     // Its padding box (getClippingElementRect): inside borders and scrollbars.
@@ -114,8 +116,14 @@ export function position(reference, floating, { boundary, clearance, maxHeight, 
     // The new height moves a box placed above; keep the chosen side.
     result = run({ placement: result.placement, flip: false })
   }
-  style.left = `${result.x}px`
-  style.top = `${result.y}px`
+  if (translate) {
+    style.left = style.top = '0px'
+    style.transform = `translate(${result.x}px, ${result.y}px)`
+    if (window.devicePixelRatio >= 1.5) style.willChange = 'transform'
+  } else {
+    style.left = `${result.x}px`
+    style.top = `${result.y}px`
+  }
   return result
 }
 

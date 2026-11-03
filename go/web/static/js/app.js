@@ -201,6 +201,7 @@ const app = {
     app.refine?.sync()
   },
   copyMain: () => copy.copyMain(),
+  stopSpeech: () => speech.reset(),
   warm: () => fetch('/warm', { method: 'POST' }).catch(() => {}),
   setSwapBusy(busy) {
     const button = document.querySelector('.swap-button')

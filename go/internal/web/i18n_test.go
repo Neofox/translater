@@ -99,6 +99,8 @@ func textCovered(n *html.Node) bool {
 		return true
 	case hasClass(parent, "input-count"): // updateCount() rewrites it
 		return true
+	case parent.Parent != nil && attrVal(parent.Parent, "data-testid") == "adjust-button": // adjust.js adds the summary
+		return true
 	case parent.Data == "script" && attrVal(parent, "id") == "nt-data": // prefs.uiLang
 		return true
 	}
@@ -116,6 +118,8 @@ func attrCovered(n *html.Node, key string) bool {
 	}
 	switch {
 	case n.Data == "html" && key == "lang": // applyStrings sets it
+		return true
+	case attrVal(n, "data-testid") == "adjust-button" && key == "aria-label": // adjust.js adds the summary
 		return true
 	case n.Parent != nil && attrVal(n.Parent, "aria-label") == "UI language" && (key == "aria-pressed" || key == "class"): // syncControls
 		return true

@@ -1,10 +1,11 @@
 // Refinements: RefineRow.tsx's chips and custom adjustment, with
 // TranslatorContext's refine state (caps, previousMain, the snapshot stack
-// that rolls a failed refine back), inside a plain Adjust disclosure until
-// Task 26 measures and places it.
+// that rolls a failed refine back), inside the Adjust menu (adjust.js).
 //
 // Hand-written: these are app rules ported from the TS components; the
 // markup is server-rendered once (refine.templ) and only updated here.
+
+import { initAdjust } from './adjust.js'
 
 export const MAX_UNDO = 10
 const MAX_REFINEMENTS = 3
@@ -17,9 +18,21 @@ export const CHIPS = {
   shorter: 'make it shorter',
   playful: 'make it more playful',
 }
+const LABELS = {
+  softer: 'refineSofter',
+  direct: 'refineMoreDirect',
+  shorter: 'refineShorter',
+  playful: 'refineMorePlayful',
+}
 const isCustom = (r) => !Object.values(CHIPS).includes(r)
 
 export const customLabel = (text) => (text.length > 20 ? `${text.slice(0, 20)}…` : text)
+
+/** AdjustMenu's summary of the active adjustments. */
+export function summary(refinements, t) {
+  const id = (r) => Object.keys(CHIPS).find((k) => CHIPS[k] === r)
+  return refinements.map((r) => (id(r) ? t(LABELS[id(r)]) : customLabel(r))).join(' · ')
+}
 
 const push = (stack, snap) => [...stack.slice(1 - MAX_UNDO), snap]
 
@@ -45,28 +58,25 @@ const empty = () => ({ refinements: [], previousMain: '', stack: [] })
 const clone = (el) => [...el.childNodes].map((n) => n.cloneNode(true))
 
 /**
- * Wire the Adjust menu. `restore(live, nodes)` shows an earlier run again
+ * Wire the refine row. `restore(live, nodes)` shows an earlier run again
  * (stream.js); `relabel(root)` applies the UI language to a detached node.
  * Sets app.refinements and app.refineFailed (stream.js asks it before
  * showing a server error). Returns { sync, edited, fill }.
  */
 export function initRefine(app, form, restore, relabel) {
   const $ = (id) => document.getElementById(id)
-  const tpl = $('adjust-template')
-  const menu = tpl.content.firstElementChild
+  const ta = document.querySelector('[data-testid="input-textarea"]')
+  const adjust = initAdjust(app, ta, relabel)
+  const menu = adjust.menu
   const q = (id) => menu.querySelector(`[data-testid="${id}"]`)
-  const trigger = q('adjust-button')
-  const content = menu.querySelector('.adjust-content')
   const row = menu.querySelector('.refine-row')
   const notice = q('refine-error')
-  const collapsed = menu.querySelector('.adjust-error')
   const chips = [...menu.querySelectorAll('[data-testid^="refine-chip-"]')]
   const customButton = q('refine-custom')
   const customTrigger = q('refine-custom-trigger')
   const editor = menu.querySelector('.refine-custom-editor')
   const input = q('refine-freeform')
   const apply = q('refine-apply')
-  const ta = document.querySelector('[data-testid="input-textarea"]')
   const details = $('result-details')
   const rows = $('learning-sentence')
   // Pill tones: the rendered class string, then data-active-class.
@@ -75,7 +85,6 @@ export function initRefine(app, form, restore, relabel) {
   customTrigger.append(customLabelText)
   const tones = new Map([...chips, customTrigger].map((b) => [b, [b.className, b.dataset.activeClass]]))
   let state = empty()
-  let open = false
   let customOpen = false
   let error = null
   // A refine run is pending (TS refineInFlightRef); cleared by any finished
@@ -95,16 +104,12 @@ export function initRefine(app, form, restore, relabel) {
   function sync() {
     const live = app.live
     const show = live?.intent === 'sentence' && !live.error?.input
-    if (show !== menu.isConnected) {
-      if (show) {
-        relabel(menu)
-        tpl.before(menu)
-      } else {
-        menu.remove()
-        open = customOpen = false
-        input.value = ''
-      }
+    // TS unmounts the menu: RefineRow's draft and editor go with it.
+    if (!show && menu.isConnected) {
+      customOpen = false
+      input.value = ''
     }
+    adjust.show(show)
     if (live?.done && live.run !== seen) {
       seen = live.run
       error = null
@@ -137,17 +142,13 @@ export function initRefine(app, form, restore, relabel) {
     editor.hidden = input.hidden = Boolean(custom) || !customOpen
     input.disabled = !ok || cap
     apply.disabled = !ok || cap || !input.value.trim()
+    // React reflects a controlled input's value into its attribute.
+    if (input.getAttribute('value') !== input.value) input.setAttribute('value', input.value)
     // React's text nodes: label, ": ", message.
     const message = error === null ? [] : [app.t('refineFailed'), ': ', error]
     notice.hidden = error === null
     notice.replaceChildren(...message)
-    collapsed.hidden = error === null || open
-    collapsed.replaceChildren(...message)
-    trigger.setAttribute('aria-expanded', open)
-    content.toggleAttribute('data-open', open)
-    if (open) content.removeAttribute('aria-hidden')
-    else content.setAttribute('aria-hidden', 'true')
-    content.inert = !open
+    adjust.sync({ summary: summary(r, app.t), error, refinements: r, intent: live?.intent, hasError: row.hidden })
   }
 
   /** Apply `fn` (add/remove) to the current result and re-run now. */
@@ -155,6 +156,8 @@ export function initRefine(app, form, restore, relabel) {
     const live = app.live
     if (!ready()) return false
     const { refinements, previousMain } = state
+    // The snapshot keeps idle rows: no voice survives into it.
+    app.stopSpeech()
     const next = fn(state, arg, live.main ?? '', {
       live, refinements, previousMain, details: clone(details), rows: clone(rows),
     })
@@ -174,8 +177,7 @@ export function initRefine(app, form, restore, relabel) {
     const button = event.target instanceof Element ? event.target.closest('button') : null
     const id = button?.dataset.testid ?? ''
     const r = state.refinements
-    if (id === 'adjust-button') open = !open
-    else if (id.startsWith('refine-chip-')) {
+    if (id.startsWith('refine-chip-')) {
       const instruction = CHIPS[id.slice(12)]
       if (r.includes(instruction)) change(remove, r.indexOf(instruction))
       else change(add, instruction)
@@ -188,9 +190,11 @@ export function initRefine(app, form, restore, relabel) {
     } else if (id === 'refine-apply') submit()
     else if (id === 'refine-close') {
       // AdjustMenu's onCloseCustom: the draft stays, focus returns to the
-      // source (Task 26 keeps an inline menu open).
-      customOpen = open = false
-      ta.focus({ preventScroll: true })
+      // source.
+      customOpen = false
+      sync()
+      adjust.closeCustom()
+      return
     } else return
     sync()
   })
@@ -214,6 +218,12 @@ export function initRefine(app, form, restore, relabel) {
     // RefineRow stays mounted (TS restores in the same commit as the
     // error): an open custom editor stays open with its draft.
     rows.replaceChildren(...snap.rows)
+    // A Copy clicked before the refine was cloned while it said Copied.
+    for (const node of snap.details)
+      for (const button of node.querySelectorAll?.('[data-testid="copy-button"]') ?? []) {
+        button.setAttribute('aria-label', app.t('copy'))
+        button.title = app.t('copy')
+      }
     fill()
     restore(snap.live, snap.details)
     return true

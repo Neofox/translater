@@ -17,6 +17,8 @@ import {
 } from '../tests/helpers'
 import type { Fake } from '../tests/helpers'
 import { installSyntheticAudio } from '../tests/syntheticAudio'
+import { installFakeVisualViewport } from '../perf/page-scripts'
+import type { PageGlobals } from '../perf/page-scripts'
 
 export type VisualState = {
   name: string
@@ -296,7 +298,8 @@ export const STATES: VisualState[] = [
   },
   {
     // A refined result: the Softer re-run replaced main, rationale,
-    // alternatives and phrase rows (the Adjust menu itself is Task 26's).
+    // alternatives and phrase rows; the open panel shows Softer pressed and
+    // the trigger its summary.
     name: 'refine-softer',
     async setup(page) {
       await refinePlain(page)
@@ -326,10 +329,64 @@ export const STATES: VisualState[] = [
       await restMouse(page)
     },
   },
+  {
+    // The collapsed trigger opened: the panel floats under it (on desktop
+    // left of Copy/Listen) without moving the header or the result.
+    name: 'adjust-open',
+    async setup(page) {
+      await refinePlain(page)
+      await expect(page.locator('.adjust-content[data-open]')).toHaveAttribute(
+        'data-overlay',
+        'true',
+      )
+      await restMouse(page)
+    },
+  },
+  {
+    // A desktop header with room for the chips (a wider settings column than
+    // its half of the header): they sit beside Tone and the trigger hides.
+    name: 'adjust-inline',
+    projects: /-(macbook-14|macbook-16|desktop-short)$/,
+    async setup(page) {
+      await openApp(page)
+      await fillSource(page, visualText('plain'))
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+      await page.locator('.app-header').evaluate((e: HTMLElement) => {
+        e.style.gridTemplateColumns = 'auto minmax(0, 1fr)'
+      })
+      await expect(page.locator('.adjust-menu')).toHaveAttribute(
+        'data-inline',
+        'true',
+      )
+      await expect(page.getByTestId('refine-chip-softer')).toBeEnabled()
+    },
+  },
+  {
+    // A tight software keyboard (simulated visual viewport) with the Custom
+    // editor open: it takes over the header, with 44 px Apply/Close.
+    name: 'adjust-custom-tight',
+    projects: /^(chromium|webkit)-(iphone-)?portrait$/,
+    async setup(page) {
+      await page.addInitScript(installFakeVisualViewport)
+      await refinePlain(page)
+      await page.getByTestId('refine-custom-trigger').click()
+      const field = page.getByTestId('refine-freeform')
+      await field.fill('gentler please')
+      await page.evaluate(async () => {
+        ;(window as unknown as PageGlobals).__keyboard!.set(319, 0)
+        await new Promise(requestAnimationFrame)
+      })
+      const shell = page.locator('.app-shell')
+      await expect(shell).toHaveAttribute('data-keyboard', 'true')
+      await expect(shell).toHaveAttribute('data-tight', 'true')
+      await expect(field).toBeFocused()
+      await restMouse(page)
+    },
+  },
 ]
 
-/** The pointer leaves where the Adjust controls were: their placement
- * differs until Task 26, and a hover on the main text shows. */
+/** The pointer leaves the control it last clicked, so no hover shows. */
 async function restMouse(page: Page): Promise<void> {
   await page.mouse.move(0, 0)
 }

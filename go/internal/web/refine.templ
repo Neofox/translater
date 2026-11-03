@@ -12,31 +12,6 @@ var refineChips = []struct{ ID, Key string }{
 	{"shorter", "refineShorter"}, {"playful", "refineMorePlayful"},
 }
 
-// adjustTemplate is AdjustMenu.tsx around the single RefineRow, as a
-// template: TS mounts the menu only for a sentence result, and base.css
-// selects on its presence (.app-settings:has(.adjust-menu)). refine.js
-// clones it once and inserts or removes that node, so drafts survive.
-// Until Task 26 it is a plain disclosure (no inline chips, summary or
-// floating placement).
-templ adjustTemplate(v View) {
-	<template id="adjust-template">
-		<div class="adjust-menu">
-			@ui.Pill(ui.PillProps{Size: "md", Class: "adjust-trigger ", Attrs: templ.Attributes{
-				"aria-expanded": "false", "aria-controls": "adjust-content", "data-testid": "adjust-button",
-				"aria-label": v.T("adjust"), "data-t-attr": "aria-label:adjust",
-			}}) {
-				<span data-t="adjust">{ v.T("adjust") }</span>
-				@icons.Icon("chevron-down", 14, nil)
-			}
-			<div id="adjust-content" class="adjust-content" role="group" aria-label={ v.T("adjust") } data-t-attr="aria-label:adjust" aria-hidden="true" inert>
-				<span class="adjust-inline-label" data-t="adjust">{ v.T("adjust") }</span>
-				@refineRow(v)
-			</div>
-			<p class="adjust-error" role="alert" hidden></p>
-		</div>
-	</template>
-}
-
 // refineRow is RefineRow.tsx. Both custom variants stay mounted: the active
 // custom button, or the trigger with its editor (TS renders one of them);
 // refine.js shows one and keeps every control's state.
