@@ -355,7 +355,15 @@ export function initLearning(app) {
     openAt(chunk?.s)
   }
 
-  initMainTaps({ key: () => state.identity, onInspect: inspectMain })
+  initMainTaps({
+    key: () => state.identity,
+    // InspectableTranslation's chunks: the prepared target-side highlights.
+    hits: () => {
+      const ranges = learning()
+      return ranges && ranges.side !== 'source' ? ranges.chunks.flatMap((c) => c.g) : []
+    },
+    onInspect: inspectMain,
+  })
   initSourceTaps(ta, {
     mirror: () => (learning()?.side === 'source' ? mirror : null),
     key: () => state.identity,

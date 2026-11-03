@@ -38,8 +38,9 @@ const MAIN = '[data-testid="main-translation"]'
  * state: a timer from another state never fires (TS resets on text,
  * disabled and resetKey). The main text is interactive while it carries
  * `data-inspectable`; its `role=button` form inspects anywhere, otherwise a
- * tap must land on a grammar phrase when there are any. */
-export function initMainTaps({ key, onInspect }) {
+ * tap must land inside one of the `hits()` grammar ranges ([start, end]
+ * UTF-16 offsets) when there are any. */
+export function initMainTaps({ key, hits, onInspect }) {
   let down = null
   let timer
   const cancel = () => {
@@ -75,9 +76,11 @@ export function initMainTaps({ key, onInspect }) {
     const text = main.textContent
     const offset = textOffsetAtPoint(main, event.clientX, event.clientY)
     if (offset === null || offset >= text.length) return
-    const phrases = [...main.querySelectorAll('.inspectable-phrase')]
+    // The full grammar ranges, not the rendered phrases: the selected mark
+    // replaces the phrases inside it.
+    const ranges = hits()
     const whole = main.getAttribute('role') === 'button'
-    if (!whole && phrases.length && !phrases.some((el) => offset >= +el.dataset.start && offset < +el.dataset.start + el.textContent.length)) return
+    if (!whole && ranges.length && !ranges.some(([s, e]) => offset >= s && offset < e)) return
     // Let native double-click and long-press selection win before inspecting.
     timer = setTimeout(() => {
       timer = undefined

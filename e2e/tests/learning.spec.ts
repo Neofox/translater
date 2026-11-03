@@ -916,3 +916,101 @@ test('the word-details trigger ignores a drag and a long press @learning @word',
     await expect(page.locator('.reference-heading')).toBeFocused()
   else await expect(panel(page)).toBeVisible()
 })
+
+/** Client centre of the character at `index` of `needle` in the main text. */
+async function mainCharPoint(page: Page, needle: string, index = 0) {
+  return page.evaluate(
+    ([text, offset]) => {
+      const main = document.querySelector('[data-testid="main-translation"]')!
+      const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.textContent!.indexOf(text)
+        if (at < 0) continue
+        const range = document.createRange()
+        range.setStart(node, at + offset)
+        range.setEnd(node, at + offset + 1)
+        const rect = range.getBoundingClientRect()
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      }
+      throw new Error(`main text has no ${text}`)
+    },
+    [needle, index] as const,
+  )
+}
+
+test('desktop grammar hit targets stay sparse after a phrase is selected @learning', async ({
+  page,
+}) => {
+  test.skip(!(await isDesktop(page)), 'desktop sparse hit targets')
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  await expect.poll(() => inspectables(page)).toEqual(['지내요'])
+  await mainTranslation(page).getByTestId('inspectable-phrase').click()
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+  // 오늘 has no grammar highlight: a tap there is plain text.
+  const today = await mainCharPoint(page, '오늘')
+  await page.mouse.click(today.x, today.y)
+  await settle(page)
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+  await expect(rows(page).nth(0)).toHaveAttribute('aria-expanded', 'false')
+  await expect(rows(page).nth(1)).toHaveAttribute('aria-expanded', 'true')
+  // The grammar highlight inside the selected mark still inspects: after
+  // the row collapses (no mark, learning open), a tap there selects again.
+  const inside = await mainCharPoint(page, '지내요', 1)
+  await page.mouse.click(inside.x, inside.y)
+  await settle(page)
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+  await rows(page).nth(1).click()
+  await expect(page.getByTestId('selected-phrase')).toHaveCount(0)
+  await page.mouse.click(inside.x, inside.y)
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+})
+
+test('touch taps inspect the main text and source grammar @learning', async ({
+  page,
+}) => {
+  test.skip(await isDesktop(page), 'touch layouts')
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  await expect.poll(() => inspectables(page)).toEqual(['지내요'])
+  await mainTranslation(page).getByTestId('inspectable-phrase').tap()
+  await expect(panel(page)).toBeVisible()
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+  await closeLearning(page)
+  await readingResult(page)
+  await source(page).tap({ position: await grammarPosition(page) })
+  await expect(
+    page.getByRole('region', { name: '도와줘서', exact: true }),
+  ).toBeVisible()
+  await closeLearning(page)
+  expect(await editor(page)).toMatchObject({ same: true, focused: true })
+})
+
+test('mobile translation taps after an emoji map through counterpart quotations to the source phrase @learning', async ({
+  page,
+}) => {
+  test.skip(
+    await isDesktop(page),
+    'the desktop translation is plain when learning the source',
+  )
+  await readKorean(
+    page,
+    'learn-unicode',
+    '정말 고마워요! 👨‍👩‍👧 가족이랑 같이 봤어요.',
+  )
+  await expect(mainTranslation(page)).toHaveAttribute('role', 'button')
+  // `I` of "I watched…", right after the family emoji (8 UTF-16 units, 5
+  // code points): a miscount lands on the emoji, which has no phrase.
+  for (const [needle, phrase] of [
+    ['I watched', '가족이랑 같이 봤어요'],
+    ['Thank you', '정말 고마워요'],
+  ] as const) {
+    const at = await mainCharPoint(page, needle)
+    await page.mouse.click(at.x, at.y)
+    await expect(panel(page)).toBeVisible()
+    await expect(
+      page.getByRole('region', { name: phrase, exact: true }),
+    ).toBeVisible()
+    await closeLearning(page)
+  }
+})
