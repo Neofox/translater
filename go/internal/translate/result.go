@@ -49,7 +49,7 @@ type processor struct {
 	f      fields
 	scan   *jsonstream.Scanner
 	doc    strings.Builder
-	closed map[string]bool // top-level strings already closed (first one wins)
+	closed map[string]bool   // top-level strings already closed (first one wins)
 	meta   *web.WordMetaView // word intent: the dictionary fields completed so far
 	seen   map[string]bool   // dictionary fields already taken (first one wins)
 	// Alternatives (none for a long-form sentence). SentenceView/WordView

@@ -666,7 +666,9 @@ test('retry re-runs a failed translation @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
   await retry.click()
   await waitForStats(fake, (s) => s.requests === 2)
-  await expect(alert.getByRole('button', { name: STRINGS.en.retry })).toBeVisible()
+  await expect(
+    alert.getByRole('button', { name: STRINGS.en.retry }),
+  ).toBeVisible()
   expect(await fake.requests()).toBe(2)
 })
 
@@ -694,9 +696,7 @@ test('swap uses the translated text when the result is current @core', async ({
   if (bodies.length > 1) expect(userText(bodies[1]!)).toContain(main)
 })
 
-test('register label names the Korean speech level @core', async ({
-  page,
-}) => {
+test('register label names the Korean speech level @core', async ({ page }) => {
   await pickLanguage(page, 'target', 'ko')
   await setTone(page, 'casual')
   await fillSource(page, sentence('plain'))
