@@ -6,6 +6,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './helpers'
 import { STATES } from '../visual/states'
+import { domSnapshot } from '../visual/dom'
 import { APP } from '../ports'
 
 // Known Go-vs-TS differences, each owned by a later task and scoped to the
@@ -31,6 +32,14 @@ const GO_GAPS: Record<string, Gap[]> = {
     },
   ],
 }
+
+// Pixels that may differ per screenshot. Both apps render on the same
+// machine with the same fonts, so identical markup and CSS give identical
+// pixels; a ratio (0.001 = 221 px on a phone) let a missing label pass.
+const MAX_DIFF_PIXELS = 0
+
+// The scroll containers (result and reference panes).
+const SCROLLERS = '.result-scroll, .reference-scroll'
 
 // Pretendard loads from a CDN with `font-display: optional`, so whether it
 // renders depends on timing. Both apps render the system-font fallback.
@@ -90,14 +99,33 @@ for (const state of STATES) {
       }
     }
     if (APP === 'ts' && gaps.length > 0) await settle(page)
-    // Soft, so one run reports the pixel, ARIA template and ARIA tree diffs.
+    // Soft, so one run reports the pixel, ARIA and DOM diffs together.
+    // An absolute pixel budget: a ratio allowed a missing label to pass.
     await expect.soft(page).toHaveScreenshot(`${state.name}.png`, {
       animations: 'disabled',
       caret: 'hide',
+      fullPage: true,
       mask: [page.locator('.animate-pulse, .result-cursor')],
       threshold: 0.1,
-      maxDiffPixelRatio: 0.001,
+      maxDiffPixels: MAX_DIFF_PIXELS,
     })
+    // The page itself never scrolls (fixed app shell), so content below the
+    // fold lives in the scroll containers: capture each scrolled to its end.
+    const scrollers = page.locator(SCROLLERS).filter({ visible: true })
+    for (let i = 0; i < (await scrollers.count()); i++) {
+      const scroller = scrollers.nth(i)
+      await scroller.evaluate((e) => e.scrollTo({ top: e.scrollHeight }))
+      await expect
+        .soft(scroller)
+        .toHaveScreenshot(`${state.name}-scroll-${i}.png`, {
+          animations: 'disabled',
+          caret: 'hide',
+          mask: [page.locator('.animate-pulse, .result-cursor')],
+          threshold: 0.1,
+          maxDiffPixels: MAX_DIFF_PIXELS,
+        })
+      await scroller.evaluate((e) => e.scrollTo({ top: 0 }))
+    }
     await expect.soft(page.locator('body')).toMatchAriaSnapshot({
       name: `${state.name}.aria.yml`,
     })
@@ -105,8 +133,11 @@ for (const state of STATES) {
     // pass (children 'contain'; 'deep-equal' cannot work because the stored
     // template drops text already in a node's name). The whole tree must
     // also be identical, so an element only Go renders fails too.
-    expect(await page.locator('body').ariaSnapshot()).toMatchSnapshot(
-      `${state.name}.aria-tree.txt`,
-    )
+    expect
+      .soft(await page.locator('body').ariaSnapshot())
+      .toMatchSnapshot(`${state.name}.aria-tree.txt`)
+    // Markup the ARIA tree does not show: class strings, test ids, lang and
+    // aria-* attributes and element structure (e2e/visual/dom.ts).
+    expect(await domSnapshot(page)).toMatchSnapshot(`${state.name}-dom.txt`)
   })
 }
