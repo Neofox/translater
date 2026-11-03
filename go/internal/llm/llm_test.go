@@ -106,7 +106,7 @@ func TestStreamTextDeltasEqualFixtureAndWireBodyEqualsInput(t *testing.T) {
 	in := body(t, "[fx:stream]")
 	var sb strings.Builder
 	n := 0
-	for d, err := range c.StreamText(context.Background(), in) {
+	for d, err := range c.StreamText(context.Background(), in, nil) {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestClassifyFixtures(t *testing.T) {
 	}
 	for marker, want := range cases {
 		var got error
-		for _, err := range c.StreamText(context.Background(), body(t, marker)) {
+		for _, err := range c.StreamText(context.Background(), body(t, marker), nil) {
 			got = err
 			break
 		}
@@ -168,7 +168,7 @@ func TestClassifyFixtures(t *testing.T) {
 
 func TestNoRetryOn429(t *testing.T) {
 	c, base := setup(t)
-	for range c.StreamText(context.Background(), body(t, "[fx:error-rate]")) {
+	for range c.StreamText(context.Background(), body(t, "[fx:error-rate]"), nil) {
 	}
 	if s := waitIdle(t, base); s.Requests != 1 {
 		t.Fatalf("requests = %d, want 1 (no retries)", s.Requests)
@@ -185,7 +185,7 @@ func TestMissingAPIKey(t *testing.T) {
 		return ""
 	})
 	var got error
-	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]")) {
+	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]"), nil) {
 		got = err
 	}
 	if !errors.Is(got, llm.ErrMissingAPIKey) || llm.Classify(got) != llm.KindConfiguration {
@@ -209,13 +209,13 @@ func TestAPIKeyReadPerRequest(t *testing.T) {
 		}
 		return ""
 	})
-	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]")) {
+	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]"), nil) {
 		if !errors.Is(err, llm.ErrMissingAPIKey) {
 			t.Fatalf("want missing key, got %v", err)
 		}
 	}
 	key = "sk-late"
-	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]")) {
+	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]"), nil) {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -228,7 +228,7 @@ func TestCancelAfterFirstDeltaAbortsUpstream(t *testing.T) {
 	defer cancel()
 	var last error
 	deltas := 0
-	for d, err := range c.StreamText(ctx, body(t, "[fx:slow]")) {
+	for d, err := range c.StreamText(ctx, body(t, "[fx:slow]"), nil) {
 		if err != nil {
 			last = err
 			break
@@ -289,7 +289,7 @@ func TestStreamFaults(t *testing.T) {
 			c := faultClient(t, tc.name, tc.fault)
 			deltas := 0
 			var got error
-			for _, err := range c.StreamText(context.Background(), body(t, "[fx:"+tc.name+"]")) {
+			for _, err := range c.StreamText(context.Background(), body(t, "[fx:"+tc.name+"]"), nil) {
 				if err != nil {
 					got = err
 					break
@@ -315,10 +315,32 @@ func TestStreamFaults(t *testing.T) {
 	}
 }
 
+func TestStreamTextReportsUsage(t *testing.T) {
+	c, _ := setup(t)
+	var usage llm.Usage
+	n := 0
+	for _, err := range c.StreamText(context.Background(), body(t, "[fx:stream]"), &usage) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		n++
+	}
+	// The fake reports 1200 input tokens and 3 output tokens per chunk.
+	if usage.InputTokens != 1200 || usage.OutputTokens != int64(n*3) {
+		t.Fatalf("usage = %+v, want {1200 %d}", usage, n*3)
+	}
+	var none llm.Usage
+	for range c.StreamText(context.Background(), body(t, "[fx:error-rate]"), &none) {
+	}
+	if none != (llm.Usage{}) {
+		t.Fatalf("usage after an error event = %+v, want zero", none)
+	}
+}
+
 func TestHTTPErrorsAreContentFree(t *testing.T) {
 	c, _ := setup(t)
 	for _, marker := range []string{"[fx:error-auth]", "[fx:error-budget]", "[fx:error-rate]", "[fx:error-model]", "[fx:error-provider]"} {
-		for _, err := range c.StreamText(context.Background(), body(t, marker)) {
+		for _, err := range c.StreamText(context.Background(), body(t, marker), nil) {
 			for _, leak := range []string{"Incorrect API key", "exceeded your current quota", "Rate limit reached", "does not exist", "server had an error"} {
 				if strings.Contains(err.Error(), leak) {
 					t.Errorf("%s leaks %q: %v", marker, leak, err)

@@ -13,6 +13,7 @@ import (
 	"neotranslate/internal/contract"
 	"neotranslate/internal/llm"
 	"neotranslate/internal/speech"
+	"neotranslate/internal/telemetry"
 	"neotranslate/internal/translate"
 	"neotranslate/internal/web"
 	assets "neotranslate/web"
@@ -43,7 +44,8 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 	// An invalid TRANSLATE_* setting must not take the page down: runs end
 	// with the localized configuration error instead (as in the TS app and
 	// for a missing OPENAI_API_KEY). The message names the variable only.
-	var opts []translate.Option
+	// Langfuse traces are on only when both keys are set; never fatal.
+	opts := []translate.Option{translate.WithTracer(telemetry.Setup(getenv))}
 	cfg, err := config.LoadTranslate(getenv)
 	if err != nil {
 		log.Printf("translation disabled: %v", err)

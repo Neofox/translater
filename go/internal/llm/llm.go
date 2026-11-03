@@ -60,6 +60,12 @@ func codeFailure(code string) error {
 	return &failure{KindProvider, "provider error"}
 }
 
+// Usage is the token usage reported for one response.
+type Usage struct {
+	InputTokens  int64
+	OutputTokens int64
+}
+
 // Client sends Responses requests. The API key is read per request.
 type Client struct {
 	getenv func(string) string
@@ -83,7 +89,10 @@ func New(getenv func(string) string) *Client {
 // A cancelled ctx stops the stream and yields context.Canceled (or the
 // deadline error): callers must check ctx.Err()/errors.Is before Classify.
 // Every yielded error is content-free (safe to log); use Classify for its Kind.
-func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, error] {
+// When usage is non-nil it receives the token usage the provider reports on
+// a completed, incomplete or failed response (those are billed); it stays
+// zero otherwise.
+func (c *Client) StreamText(ctx context.Context, body []byte, usage *Usage) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		key := c.getenv("OPENAI_API_KEY")
 		if key == "" {
@@ -97,6 +106,12 @@ func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, 
 		completed := false
 		for stream.Next() {
 			ev := stream.Current()
+			switch ev.Type {
+			case "response.completed", "response.incomplete", "response.failed":
+				if usage != nil {
+					*usage = Usage{InputTokens: ev.Response.Usage.InputTokens, OutputTokens: ev.Response.Usage.OutputTokens}
+				}
+			}
 			switch ev.Type {
 			case "response.output_text.delta":
 				if !yield(ev.Delta, nil) {

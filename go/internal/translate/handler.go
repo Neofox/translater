@@ -9,7 +9,8 @@
 // santhosh-tekuri/jsonschema and cached in hashicorp/golang-lru.
 //
 // Nothing about content (source, context, refinements, prompts, output,
-// provider errors) is logged.
+// provider errors) is logged. Runs that reach OpenAI are traced as
+// content-free Langfuse generations (internal/telemetry) when configured.
 package translate
 
 import (
@@ -17,7 +18,10 @@ import (
 	"errors"
 	"mime"
 	"net/http"
+	"net/url"
 	"regexp"
+	"slices"
+	"strconv"
 	"unicode/utf8"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -27,6 +31,7 @@ import (
 	"neotranslate/internal/contract"
 	"neotranslate/internal/llm"
 	"neotranslate/internal/prompt"
+	"neotranslate/internal/telemetry"
 )
 
 const (
@@ -36,6 +41,12 @@ const (
 
 // runID is the client's run UUID, echoed in every event.
 var runID = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
+// uuid is zod's z.uuid() shape for the optional analytics ids.
+var uuid = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// triggers are TranslationTrigger (useTranslate.ts); the default is debounce.
+var triggers = []string{"debounce", "paste", "enter", "blur", "force", "refinement"}
 
 // errorKeys maps each failure kind to its STRINGS entry, as
 // publicTranslationError (src/server/translationError.ts) does.
@@ -60,6 +71,8 @@ type Server struct {
 	// configuration error, as the TS app does per request; the page still
 	// works.
 	cfgErr error
+	// tracer is nil (no-op) unless Langfuse is configured.
+	tracer *telemetry.Tracer
 }
 
 // Option configures a Server.
@@ -69,6 +82,9 @@ type Option func(*Server)
 // unused): /translate answers each valid request with the localized
 // "configuration" nt-error and makes no upstream call.
 func WithConfigError(err error) Option { return func(s *Server) { s.cfgErr = err } }
+
+// WithTracer traces each run that reaches OpenAI (never cache hits).
+func WithTracer(t *telemetry.Tracer) Option { return func(s *Server) { s.tracer = t } }
 
 // NewServer builds the handlers. The embedded schemas always compile; a
 // failure is a build defect and panics.
@@ -101,7 +117,7 @@ func (s *Server) HandleWarm(w http.ResponseWriter, _ *http.Request) {
 // partial per completed alternative, ending with exactly one nt-done or
 // nt-error, after which the response closes.
 func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
-	run, in, err := s.parse(w, r)
+	run, in, analytics, err := s.parse(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -142,10 +158,18 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	// disconnect (Vercel), that is the only disconnect signal.
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
+	// The span ends when the handler returns: after nt-done (or nt-error)
+	// has been written and flushed, so export never delays visible output.
+	// A run left early (client gone, write failure) ends as Aborted.
+	var usage llm.Usage
+	outcome := telemetry.Aborted
+	gen := s.tracer.StartGeneration(ctx, telemetry.NewRuntimeContext(in, s.cfg, s.c.CacheVersion, analytics))
+	defer func() { gen.End(usage, outcome) }()
 	fail := func(kind llm.Kind) {
+		outcome = kind
 		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
 	}
-	for delta, err := range s.llm.StreamText(ctx, body) {
+	for delta, err := range s.llm.StreamText(ctx, body, &usage) {
 		if err != nil {
 			if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 				return // the client left; nobody to tell
@@ -171,6 +195,7 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cache.Add(key, doc)
+	outcome = ""
 	if p.end() {
 		out.event(evDone, runPayload{Run: run})
 	}
@@ -195,7 +220,8 @@ var errBadForm = errors.New("invalid translation input: malformed form")
 // parse reads the form (urlencoded or multipart), rejects invalid UTF-8 and
 // a malformed run id, defaults uiLang to "en" and validates the limits.
 // Errors name fields only, never user text.
-func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.TranslateInput, error) {
+func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.TranslateInput, telemetry.Analytics, error) {
+	var none telemetry.Analytics
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	var err error
 	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt == "multipart/form-data" {
@@ -204,19 +230,19 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 		err = r.ParseForm()
 	}
 	if err != nil {
-		return "", prompt.TranslateInput{}, errBadForm
+		return "", prompt.TranslateInput{}, none, errBadForm
 	}
 	form := r.PostForm
 	for name, values := range form {
 		for _, v := range values {
 			if !utf8.ValidString(name) || !utf8.ValidString(v) {
-				return "", prompt.TranslateInput{}, &prompt.FieldError{Field: "form", Reason: "is not valid UTF-8"}
+				return "", prompt.TranslateInput{}, none, &prompt.FieldError{Field: "form", Reason: "is not valid UTF-8"}
 			}
 		}
 	}
 	run := form.Get("run")
 	if !runID.MatchString(run) {
-		return "", prompt.TranslateInput{}, &prompt.FieldError{Field: "run", Reason: "is not a valid run id"}
+		return "", prompt.TranslateInput{}, none, &prompt.FieldError{Field: "run", Reason: "is not a valid run id"}
 	}
 	// The page keeps one hidden refinements input, empty when there are none.
 	var refinements []string
@@ -240,7 +266,44 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 		in.UILang = "en"
 	}
 	if err := in.Validate(s.c.Limits); err != nil {
-		return "", prompt.TranslateInput{}, err
+		return "", prompt.TranslateInput{}, none, err
 	}
-	return run, in, nil
+	analytics, err := parseAnalytics(form, run)
+	if err != nil {
+		return "", prompt.TranslateInput{}, none, err
+	}
+	return run, in, analytics, nil
+}
+
+// parseAnalytics validates the optional analytics fields (useTranslate.ts).
+// They reach telemetry only, never the prompt or the cache key. Absent
+// fields keep the TS defaults.
+func parseAnalytics(form url.Values, run string) (telemetry.Analytics, error) {
+	bad := func(field, reason string) error { return &prompt.FieldError{Field: field, Reason: reason} }
+	a := telemetry.Analytics{
+		SessionID:       form.Get("analyticsSessionId"),
+		RunID:           run,
+		SupersedesRunID: form.Get("supersedesRunId"),
+		InputRevision:   -1,
+		Trigger:         form.Get("trigger"),
+	}
+	if a.SessionID != "" && !uuid.MatchString(a.SessionID) {
+		return a, bad("analyticsSessionId", "is not a UUID")
+	}
+	if a.SupersedesRunID != "" && !uuid.MatchString(a.SupersedesRunID) {
+		return a, bad("supersedesRunId", "is not a UUID")
+	}
+	if v := form.Get("inputRevision"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return a, bad("inputRevision", "is not a non-negative integer")
+		}
+		a.InputRevision = n
+	}
+	if a.Trigger == "" {
+		a.Trigger = "debounce"
+	} else if !slices.Contains(triggers, a.Trigger) {
+		return a, bad("trigger", "is not supported")
+	}
+	return a, nil
 }

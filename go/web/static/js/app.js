@@ -28,6 +28,13 @@ let composer, stream, copy, prefs, dictionary
 let modelDetected = null
 // Input for which the done-time safety net already flipped the target.
 let flipGuard = null
+// Run analytics (useTranslate.ts), sent to Langfuse only: a per-page id
+// (memory only, never a durable user id), the input revision, and the run a
+// new run replaces. Never part of the request key.
+const analyticsSessionId = crypto.randomUUID()
+let inputRevision = ta.value.trim() ? 1 : 0
+let revisedText = ta.value
+let supersededRun = null
 
 const app = {
   prefs: data.prefs,
@@ -74,10 +81,12 @@ const app = {
     if (target !== app.prefs.target) prefs.set('target', target, { quiet: true })
   },
 
-  /** Stop the in-flight run; its late events are ignored from now on. */
+  /** Stop the in-flight run; its late events are ignored from now on. The
+   * next run reports that it supersedes it. */
   abort() {
     if (!app.pending) return
     app.pending = false
+    if (app.live) supersededRun = app.live.run
     if (app.live) app.live.aborted = true
     htmx.trigger(form, 'htmx:abort')
     stream.stop()
@@ -85,9 +94,14 @@ const app = {
 
   inputChanged() {
     app.abort()
+    if (ta.value !== revisedText) {
+      revisedText = ta.value
+      inputRevision += 1
+    }
     const trimmed = ta.value.trim()
     if (flipGuard !== trimmed) flipGuard = null
     if (!trimmed) {
+      supersededRun = null
       app.live = null
       stream.clear()
     }
@@ -106,7 +120,8 @@ const app = {
     composer.schedule()
   },
 
-  run() {
+  /** Start a run now; `trigger` says why (debounce, paste, blur, force…). */
+  run(trigger = 'force') {
     const text = ta.value
     const trimmed = text.trim()
     if (!trimmed) return
@@ -134,7 +149,9 @@ const app = {
     const values = {
       run: live.run, text: trimmed, source, target, mode, intent, uiLang,
       context: app.context(), previousMain: '', refinements: '',
+      analyticsSessionId, supersedesRunId: supersededRun ?? '', inputRevision, trigger,
     }
+    supersededRun = null
     for (const [name, value] of Object.entries(values))
       if (form.elements[name]) form.elements[name].value = value
     app.pending = true

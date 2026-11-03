@@ -22,6 +22,7 @@ import (
 	"neotranslate/internal/fakeopenai"
 	"neotranslate/internal/jsonstream"
 	"neotranslate/internal/llm"
+	"neotranslate/internal/telemetry"
 )
 
 const fixturesDir = "../../../e2e/fixtures/results"
@@ -91,7 +92,8 @@ func newEnv(t *testing.T, dir string, vars map[string]string) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := NewServer(c, cfg, llm.New(getenv))
+	// As in main.go: tracing is on only when vars set both Langfuse keys.
+	s := NewServer(c, cfg, llm.New(getenv), WithTracer(telemetry.Setup(getenv)))
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /translate", s.HandleTranslate)
 	mux.HandleFunc("POST /warm", s.HandleWarm)

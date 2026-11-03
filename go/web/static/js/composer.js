@@ -98,11 +98,13 @@ export function initComposer(app, ta) {
       immediate = false
       return
     }
+    // Only a paste skips the debounce (TS queueImmediate('paste')).
+    const trigger = immediate ? 'paste' : 'debounce'
     const delay = immediate ? 0 : debounceFor(text, DEBOUNCE_MS)
     immediate = false
     timer = setTimeout(() => {
       timer = null
-      app.run('debounce')
+      app.run(trigger)
     }, delay)
   }
   const changed = () => {

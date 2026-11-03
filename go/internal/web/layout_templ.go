@@ -135,7 +135,7 @@ func Page(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"></script></head><body class=\"bg-bg text-ink font-sans antialiased\"><main class=\"app-shell\" data-layout=\"stack\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"></script><script defer src=\"/_vercel/insights/script.js\"></script></head><body class=\"bg-bg text-ink font-sans antialiased\"><main class=\"app-shell\" data-layout=\"stack\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

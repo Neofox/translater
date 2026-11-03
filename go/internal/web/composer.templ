@@ -45,10 +45,11 @@ templ inputPanel(v View) {
 }
 
 // translateForm carries one run's fields; app.js fills them and triggers
-// nt-run. hx-sync replace aborts the previous run's request.
+// nt-run. hx-sync replace aborts the previous run's request. The analytics
+// fields reach Langfuse metadata only, never the prompt or cache key.
 templ translateForm() {
 	<form id="translate-form" hx-post="/translate" hx-trigger="nt-run" hx-sync="this:replace" hx-swap="none" hidden>
-		for _, name := range []string{"run", "text", "source", "target", "mode", "intent", "uiLang", "context", "previousMain", "refinements"} {
+		for _, name := range []string{"run", "text", "source", "target", "mode", "intent", "uiLang", "context", "previousMain", "refinements", "analyticsSessionId", "supersedesRunId", "inputRevision", "trigger"} {
 			<input type="hidden" name={ name }/>
 		}
 	</form>
