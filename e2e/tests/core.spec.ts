@@ -92,6 +92,29 @@ test('copy enables at main-ready before done @core', async ({ page, fake }) => {
   await stopStream(page, fake, 0)
 })
 
+test('swap button shows the busy spinner while streaming @core', async ({
+  page,
+  fake,
+}) => {
+  const swap = page.locator('.swap-button')
+  // TS renders one of the two icons; Go keeps both and hides one.
+  const icon = (name: 'swap' | 'busy') =>
+    swap.locator(
+      name === 'busy' ? '.lucide-loader-circle' : '.lucide-arrow-right-left',
+    )
+  await expect(icon('swap')).toBeVisible()
+  await expect(icon('busy')).toBeHidden()
+  await fillSource(page, sentence('slow'))
+  await expect(page.locator('.output-panel[aria-busy="true"]')).toHaveCount(1, {
+    timeout: 15_000,
+  })
+  await expect(icon('busy')).toBeVisible()
+  await expect(icon('swap')).toBeHidden()
+  await stopStream(page, fake, 0)
+  await expect(icon('swap')).toBeVisible()
+  await expect(icon('busy')).toBeHidden()
+})
+
 test('stale result disables copy @core', async ({ page, fake }) => {
   await fillSource(page, sentence('plain'))
   await waitForMain(page, fixture('plain').result.main!)

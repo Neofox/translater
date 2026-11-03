@@ -164,8 +164,9 @@ const app = {
   setSwapBusy(busy) {
     const button = document.querySelector('.swap-button')
     if (!button) return
-    button.querySelector('[data-icon="swap"]').hidden = busy
-    button.querySelector('[data-icon="busy"]').hidden = !busy
+    // The icons are <svg>: SVGElement has no `hidden` property.
+    button.querySelector('[data-icon="swap"]').toggleAttribute('hidden', busy)
+    button.querySelector('[data-icon="busy"]').toggleAttribute('hidden', !busy)
   },
 }
 
