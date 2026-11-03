@@ -153,3 +153,34 @@ export function panelBoundary(reference) {
     boundary: ['book', 'laptop', 'split', 'workspace'].includes(layout) ? (panel ?? undefined) : undefined,
   }
 }
+
+/** Popups closeOnFocusOut hid: their close must not return focus. */
+export const leftFocus = new WeakSet()
+
+/** Floating UI's closeOnFocusOut (non-modal FloatingFocusManager in a
+ * FloatingPortal) for every native popover and its popovertarget trigger,
+ * delegated on document: focus leaving the trigger for anything but its
+ * popup (Shift+Tab past it, focusing another control), or Tab leaving the
+ * popup, hides it and leaves focus where it went. Focus moved out of the
+ * popup any other way (a script) keeps it open, as the portal's
+ * insideReactTree check does. */
+export function closeOnFocusOut() {
+  let tabbed = false
+  document.addEventListener('keydown', (event) => (tabbed = event.key === 'Tab'), true)
+  document.addEventListener('focusout', (event) => {
+    const viaTab = tabbed
+    tabbed = false
+    const from = event.target
+    if (!(from instanceof Element)) return
+    const id = from.getAttribute('popovertarget')
+    const popup = id ? document.getElementById(id) : from.closest('[popover]')
+    const to = event.relatedTarget
+    if (!popup || !to || popup.contains(to) || (!id && !viaTab)) return
+    if (document.querySelector(`[popovertarget="${popup.id}"]`)?.contains(to)) return
+    queueMicrotask(() => {
+      if (!popup.matches(':popover-open')) return
+      leftFocus.add(popup)
+      popup.hidePopover()
+    })
+  })
+}

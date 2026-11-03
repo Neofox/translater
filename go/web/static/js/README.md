@@ -16,9 +16,10 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | `dictionary.js` | Word dictionary POS tabs (active variant across `#word-meta` swaps), synonym lookup, reference pane placement, word-details trigger state |
 | `pcm.js`      | `PcmPlayer`: little-endian PCM16 scheduled on Web Audio (port of `pcmPlayer.ts`)          |
 | `speech.js`   | Listen buttons: gesture-bound audio unlock, single page-wide voice, `/speech` stream, replay cache |
-| `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox (placement, typeahead) |
+| `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox (fill, placement)    |
+| `listbox.js`  | More listbox keyboard, roving focus, hover focus and typeahead (useListNavigation, useTypeahead) |
 | `settings.js` | Settings popover: placement, focus in and back, `aria-controls`, `aria-owns` mirror      |
-| `float.js`    | Fixed popup placement (offset/flip/shift/size, Adjust clearance), `autoUpdate`, `panelBoundary` |
+| `float.js`    | Fixed popup placement (offset/flip/shift/size, Adjust clearance), `autoUpdate`, `panelBoundary`, `closeOnFocusOut` |
 
 ## Language detection
 

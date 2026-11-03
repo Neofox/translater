@@ -5,7 +5,8 @@
 // preferences.ts) and the controls are a few native buttons. Popups use the
 // native `popover` attribute, placed by float.js.
 
-import { autoUpdate, panelBoundary, position } from './float.js'
+import { autoUpdate, closeOnFocusOut, panelBoundary, position } from './float.js'
+import { initListbox } from './listbox.js'
 import { initSettings } from './settings.js'
 
 /** Cookie string for `prefs`, byte-compatible with encodePreferencesCookie. */
@@ -97,7 +98,7 @@ export function initPrefs(app, data) {
       if (isOpen(menu) && !menu.firstElementChild) {
         document.querySelector(`[popovertarget="${menu.id}"]`)?.setAttribute('aria-expanded', 'true')
         fillMenu(menu)
-        focusOption(menu)
+        opened(menu)
       }
   })
 
@@ -142,12 +143,10 @@ export function initPrefs(app, data) {
       return false
     }
   }
-  // A pointer-opened Select focuses the list itself (no active option) or
-  // its selected option (useListNavigation).
-  const focusOption = (menu) => {
-    menu.tabIndex = -1
-    ;(menu.querySelector('[aria-selected="true"]') ?? menu).focus()
-  }
+  // Keyboard, hover and typeahead (Select's searchLabel is the English
+  // name); a list or Settings closes when focus leaves it.
+  const opened = initListbox((option) => data.languages.find((l) => l.code === option.dataset.value)?.promptName ?? '')
+  closeOnFocusOut()
 
   /** The options a bar's More listbox offers: every language not shown as a
    * visible chip (Select.tsx options). */
@@ -166,6 +165,7 @@ export function initPrefs(app, data) {
       const button = item.querySelector('button')
       const selected = lang.code === value
       button.dataset.value = lang.code
+      button.tabIndex = -1
       button.setAttribute('aria-selected', String(selected))
       button.classList.toggle('text-accent', selected)
       button.classList.toggle('text-ink', !selected)
@@ -200,9 +200,6 @@ export function initPrefs(app, data) {
     if (!(popup instanceof HTMLElement) || popup.getAttribute('role') !== 'listbox') return
     unfollow?.()
     unfollow = null
-    clearTimeout(typedTimer)
-    typed = ''
-    matched = null
     const trigger = document.querySelector(`[popovertarget="${popup.id}"]`)
     if (event.newState !== 'open' || !trigger) return
     unfollow = autoUpdate(trigger, popup, () => {
@@ -210,59 +207,8 @@ export function initPrefs(app, data) {
       position(trigger, popup, { placement: 'bottom-start', offset: 6, flip: true, maxHeight: 320, ...panelBoundary(trigger) })
     })
     popup.style.visibility = ''
-    focusOption(popup)
-    prev = selectedIndex(popup)
+    opened(popup)
   }, true)
-
-  // Keyboard (useListNavigation with loop, useTypeahead): arrows move the
-  // active option; typed characters jump to the next option whose English
-  // name (promptName, Select's searchLabel) starts with them, searching after
-  // the selected or active option. Repeating one first letter cycles through
-  // its matches, a miss or 750 ms of quiet starts over.
-  let typed = ''
-  let typedTimer = 0
-  let matched = null
-  let prev = -1
-  const options = (list) => [...list.querySelectorAll('button')]
-  const selectedIndex = (list) => options(list).findIndex((o) => o.getAttribute('aria-selected') === 'true')
-  const searchLabel = (option) => data.languages.find((l) => l.code === option.dataset.value)?.promptName ?? ''
-  document.addEventListener('keydown', (event) => {
-    const list = event.target instanceof Element && event.target.closest('[role="listbox"][popover]')
-    if (!list) return
-    const items = options(list)
-    const n = items.length
-    const selected = selectedIndex(list)
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      const down = event.key === 'ArrowDown'
-      const i = items.indexOf(event.target)
-      const next = i < 0 ? (down ? 0 : n - 1) : (i + (down ? 1 : -1) + n) % n
-      items[next]?.focus()
-      if (!typed) prev = selected >= 0 ? selected : next
-      return
-    }
-    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
-    const labels = items.map(searchLabel)
-    const find = (list_, text) => list_.find((t) => t.toLocaleLowerCase().startsWith(text.toLocaleLowerCase()))
-    if (event.key !== ' ' || (typed && typed[0] !== ' ' && find(labels, typed))) event.preventDefault()
-    const rapid = labels.every((t) => t[0]?.toLocaleLowerCase() !== t[1]?.toLocaleLowerCase())
-    if (rapid && typed === event.key) {
-      typed = ''
-      prev = matched
-    }
-    typed += event.key
-    clearTimeout(typedTimer)
-    typedTimer = setTimeout(() => {
-      typed = ''
-      prev = matched
-    }, 750)
-    const start = (prev || 0) + 1
-    const hit = find([...labels.slice(start), ...labels.slice(0, start)], typed)
-    if (hit !== undefined) {
-      matched = labels.indexOf(hit)
-      items[matched].focus()
-    } else if (event.key !== ' ') typed = ''
-  })
 
   initSettings()
   syncControls()
