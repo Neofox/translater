@@ -269,6 +269,32 @@ export const STATES: VisualState[] = [
     },
   },
   {
+    // The mobile learning surface opened from the main text, with one
+    // phrase expanded: the heading names it, the reference is hidden and
+    // the Copy/Listen dock stays beneath.
+    name: 'learning-open',
+    projects: /-(portrait|landscape)$/,
+    async setup(page) {
+      await openApp(page)
+      // No marker: the default fixture, with learning phrases.
+      await fillSource(page, 'How are you doing today, my friend?')
+      await waitForDone(page)
+      // On the text itself: a tap past the end of a short line is ignored.
+      await page
+        .getByTestId('main-translation')
+        .click({ position: { x: 4, y: 8 } })
+      const panel = page.getByTestId('learning-panel')
+      await expect(panel).toBeVisible()
+      const row = page.getByTestId('learning-chunk').nth(1)
+      await row.click()
+      await expect(row).toHaveAttribute('aria-expanded', 'true')
+      await expect(panel.getByRole('heading', { level: 2 })).toHaveText(
+        'Learn · 어떻게 지내요',
+      )
+      await restMouse(page)
+    },
+  },
+  {
     // A refined result: the Softer re-run replaced main, rationale,
     // alternatives and phrase rows (the Adjust menu itself is Task 26's).
     name: 'refine-softer',

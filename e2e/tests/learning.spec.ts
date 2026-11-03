@@ -23,6 +23,7 @@ import {
   mainTranslation,
   nonce,
   openApp,
+  readClipboard,
   sentence,
   setUiLang,
   source,
@@ -1013,4 +1014,341 @@ test('mobile translation taps after an emoji map through counterpart quotations 
     ).toBeVisible()
     await closeLearning(page)
   }
+})
+
+// The mobile learning surface (LearningPanel.tsx): a full-size reading view
+// with Close/Escape over the original Copy/Listen dock. The background is
+// inert, the reference pane hidden, and closing restores focus.
+
+const BACKGROUND = ['.input-panel', '.target-toolbar', '.result-scroll']
+
+async function backgroundInert(page: Page): Promise<boolean[]> {
+  return page.evaluate(
+    (selectors) =>
+      selectors.map((s) => (document.querySelector(s) as HTMLElement).inert),
+    BACKGROUND,
+  )
+}
+
+/** The control lies inside the window (visibleRect in the TS test). */
+async function inViewport(page: Page, testid: string) {
+  const box = await page.evaluate((id) => {
+    const el =
+      document.querySelector(
+        `[data-testid="output-toolbar"] [data-testid="${id}"]`,
+      ) ?? document.querySelector(`[data-testid="${id}"]`)!
+    const r = el.getBoundingClientRect()
+    return {
+      left: r.left,
+      right: r.right,
+      top: r.top,
+      bottom: r.bottom,
+      width: innerWidth,
+      height: innerHeight,
+    }
+  }, testid)
+  expect(box.left).toBeGreaterThanOrEqual(-1)
+  expect(box.right).toBeLessThanOrEqual(box.width + 1)
+  expect(box.top).toBeGreaterThanOrEqual(-1)
+  expect(box.bottom).toBeLessThanOrEqual(box.height + 1)
+}
+
+test('mobile text opens a full learning view without a Breakdown button @learning', async ({
+  page,
+}) => {
+  test.skip(await isDesktop(page), 'the desktop shows the reference pane')
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  await expect(page.getByTestId('breakdown-button')).toHaveCount(0)
+  // Marks the source and action nodes, so later reads can tell they stayed
+  // mounted (TS keeps them; neither app replaces them).
+  const KEPT = [
+    '[data-testid="input-textarea"]',
+    '[data-testid="output-toolbar"] [data-testid="copy-button"]',
+    '[data-testid="output-toolbar"] [data-testid="listen-button"]',
+    '[data-testid="paste-input"]',
+    '[data-testid="clear-input"]',
+  ]
+  await page.evaluate((selectors) => {
+    for (const s of selectors)
+      (document.querySelector(s) as unknown as { __t21: boolean }).__t21 = true
+  }, KEPT)
+  const kept = () =>
+    page.evaluate(
+      (selectors) =>
+        selectors.map(
+          (s) =>
+            (document.querySelector(s) as unknown as { __t21?: boolean })
+              .__t21 === true,
+        ),
+      KEPT,
+    )
+  await openOverview(page)
+  const box = (await panel(page).boundingBox())!
+  expect(box.height).toBeGreaterThan(
+    (await page.evaluate(() => innerHeight)) * 0.75,
+  )
+  // The same Copy node, visible and usable beneath the surface.
+  expect(await kept()).toEqual(KEPT.map(() => true))
+  await inViewport(page, 'copy-button')
+  await expect(copyButton(page)).toBeEnabled()
+  // Close and the rows are its only controls: no minimize, no Breakdown.
+  await expect(panel(page).getByRole('button')).toHaveCount(
+    1 + (await rows(page).count()),
+  )
+  // The heading names the selected phrase.
+  const heading = panel(page).getByRole('heading', { level: 2 })
+  await expect(heading).toHaveText(STRINGS.en.learn)
+  await rows(page).nth(1).click()
+  await expect(heading).toHaveText(`${STRINGS.en.learn} · 어떻게 지내요`)
+  // The inspector reads in the surface; the background is inert, and the
+  // reference pane, header and source are out of the way.
+  await expect(
+    panel(page).locator(
+      '.learning-panel-body [data-testid="learning-inspector"]',
+    ),
+  ).toHaveCount(1)
+  expect(await backgroundInert(page)).toEqual([true, true, true])
+  await expect(page.locator('.reference-panel')).toBeHidden()
+  await expect(page.locator('.app-header')).toBeHidden()
+  await expect(source(page)).toBeHidden()
+  // The body scrolls on its own.
+  expect(
+    await panel(page)
+      .locator('.learning-panel-body')
+      .evaluate((el) => getComputedStyle(el).overflowY),
+  ).toMatch(/auto|scroll/)
+  // Escape inside the surface closes it, like Close, and focus returns to
+  // the main text. (WebKit leaves a tapped row unfocused, and an Escape
+  // from the page clears the source in both apps.)
+  await rows(page).nth(1).focus()
+  await page.keyboard.press('Escape')
+  await expect(panel(page)).toBeHidden()
+  await expect(mainTranslation(page)).toBeVisible()
+  await expect(mainTranslation(page)).toBeFocused()
+  expect(await backgroundInert(page)).toEqual([false, false, false])
+  await openOverview(page)
+  await closeLearning(page)
+  await expect(mainTranslation(page)).toBeFocused()
+  expect(await kept()).toEqual(KEPT.map(() => true))
+})
+
+test('initial phrase details preserve Copy Paste Clear through overview and inspection @learning', async ({
+  page,
+}) => {
+  const input = `How are you doing today ${nonce()}`
+  await fillSource(page, input)
+  await waitForDone(page)
+  await openOverview(page)
+  await expect(rows(page).nth(1)).toBeVisible()
+  await rows(page).nth(1).click()
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+  await expect(mirror(page).locator('mark')).toHaveText('How are you doing')
+  await expect(source(page)).toHaveValue(input)
+  await inViewport(page, 'copy-button')
+  // Copy still copies the main text while learning is open.
+  await copyButton(page).click()
+  expect(await readClipboard(page)).toBe(DEFAULT_MAIN)
+  await closeLearning(page)
+  for (const id of ['paste-input', 'clear-input']) {
+    await inViewport(page, id)
+    const styles = await page.getByTestId(id).evaluate((button) => ({
+      height: button.getBoundingClientRect().height,
+      label: getComputedStyle(button.querySelector('span')!).display,
+      direction: getComputedStyle(button).flexDirection,
+    }))
+    expect(styles.height).toBeGreaterThanOrEqual(44)
+    expect(styles.label).not.toBe('none')
+    expect(styles.direction).toBe('row')
+  }
+  await openOverview(page)
+  await expect(rows(page).first()).toBeVisible()
+  await closeLearning(page)
+  await page.getByTestId('clear-input').click()
+  await expect(source(page)).toHaveValue('')
+  await expect(source(page)).toBeFocused()
+  await expect(page.getByTestId('selected-phrase')).toHaveCount(0)
+})
+
+test('closing learning opened from a source underline restores the exact caret @learning', async ({
+  page,
+}) => {
+  test.skip(await isDesktop(page), 'the desktop leaves source focus in place')
+  const text = `${Array(40).fill('다른 문장입니다.').join('\n')}\n오늘 도와줘서 고마워요.`
+  await readingResult(page, text)
+  await page.evaluate(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>(
+      '[data-testid="input-textarea"]',
+    )!
+    ta.focus()
+    ta.setSelectionRange(ta.value.length, ta.value.length)
+    ta.scrollTop = ta.scrollHeight
+  })
+  // The mirror follows the scrolled editor before the underline is read.
+  const scrolled = (await editor(page)).scroll
+  expect(scrolled).toBeGreaterThan(0)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.querySelector('[data-testid="source-highlight"]')!.scrollTop,
+      ),
+    )
+    .toBe(scrolled)
+  const read = () =>
+    page.evaluate(() => {
+      const ta = document.querySelector<HTMLTextAreaElement>(
+        '[data-testid="input-textarea"]',
+      )!
+      return {
+        start: ta.selectionStart,
+        end: ta.selectionEnd,
+        direction: ta.selectionDirection,
+        top: ta.scrollTop,
+      }
+    })
+  await source(page).click({ position: await grammarPosition(page) })
+  // The editor state of the tap, before its grace period opens learning.
+  const tapped = await read()
+  expect(tapped.top).toBeGreaterThan(0)
+  await expect(
+    page.getByRole('region', { name: '도와줘서', exact: true }),
+  ).toBeVisible()
+  // A tap leaves a collapsed caret, so the open surface moves the editor
+  // state instead: a backward 3–7 selection, while the hidden editor has
+  // lost its scroll. Close brings back the state of the tap.
+  await page.evaluate(() =>
+    document
+      .querySelector<HTMLTextAreaElement>('[data-testid="input-textarea"]')!
+      .setSelectionRange(3, 7, 'backward'),
+  )
+  expect(await read()).toMatchObject({
+    start: 3,
+    end: 7,
+    direction: 'backward',
+    top: 0,
+  })
+  await closeLearning(page)
+  expect(await read()).toEqual(tapped)
+  expect(await editor(page)).toMatchObject({ same: true, focused: true })
+  // Opened from the main text, Close returns to the main text.
+  await source(page).blur()
+  await mainTranslation(page).click({ position: { x: 4, y: 8 } })
+  await expect(panel(page)).toBeVisible()
+  await closeLearning(page)
+  await expect(mainTranslation(page)).toBeFocused()
+})
+
+for (const height of [440, 320])
+  test(`learning can be deliberately restored at a short ${height}-pixel portrait height @learning`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 382, height })
+    await openApp(page)
+    await fillSource(page, `How are you doing today ${nonce()}`)
+    await waitForDone(page)
+    await openOverview(page)
+    // No minimize: the surface shows its rows straight away.
+    await expect(
+      page.getByRole('button', { name: /show learning/i }),
+    ).toHaveCount(0)
+    await expect(rows(page).nth(1)).toBeVisible()
+    await rows(page).nth(1).click()
+    await expect(rows(page).nth(1)).toBeVisible()
+    await inViewport(page, 'copy-button')
+    expect((await panel(page).boundingBox())!.height).toBeGreaterThan(
+      height * 0.7,
+    )
+    await closeLearning(page)
+    for (const id of ['copy-button', 'paste-input', 'clear-input'])
+      await inViewport(page, id)
+  })
+
+test('long results keep primary actions visible through incremental keyboard shrink and pan @learning', async ({
+  page,
+}) => {
+  await page.addInitScript(installFakeVisualViewport)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.evaluate(() =>
+    document.documentElement.style.setProperty('--safe-area-bottom', '20px'),
+  )
+  const line = 'Thanks for helping me today.'
+  await fillSource(
+    page,
+    `${Array(8).fill(line).join('\n\n')}\n${fixture('learn-long').match} ${nonce()}`,
+  )
+  await waitForDone(page)
+  await openOverview(page)
+  await expect(rows(page).nth(1)).toBeVisible()
+  await rows(page).nth(1).click()
+  await closeLearning(page)
+  await markSource(page)
+  await page.evaluate(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>(
+      '[data-testid="input-textarea"]',
+    )!
+    ta.focus()
+    ta.setSelectionRange(2, 8)
+  })
+  type Keyboard = { __keyboard: { set: (h: number, top: number) => void } }
+  const initial = await page.evaluate(() => innerHeight)
+  for (const ratio of [0.85, 0.7, 0.55]) {
+    await page.evaluate(
+      (h) => (window as unknown as Keyboard).__keyboard.set(h, 0),
+      Math.floor(initial * ratio),
+    )
+    await page.evaluate(() => new Promise(requestAnimationFrame))
+  }
+  const visible = Math.floor(initial * 0.55)
+  await page.evaluate(
+    (h) => (window as unknown as Keyboard).__keyboard.set(h, 12),
+    visible,
+  )
+  await expect(page.locator('.app-shell')).toHaveAttribute('data-keyboard')
+  for (const control of [
+    copyButton(page),
+    page.getByTestId('paste-input'),
+    page.getByTestId('clear-input'),
+  ])
+    await expect
+      .poll(async () => {
+        const r = (await control.boundingBox())!
+        return [r.y >= 12 - 1, r.y + r.height <= visible + 12 + 1]
+      })
+      .toEqual([true, true])
+  expect(await editor(page)).toMatchObject({
+    same: true,
+    focused: true,
+    caret: [2, 8],
+  })
+  await expect(panel(page)).toBeHidden()
+})
+
+test('context and learner details remain usable without a popup @learning @word', async ({
+  page,
+}) => {
+  // The context field before the source, so no context edit re-runs a
+  // result while its trigger is tapped (the TS test's result never re-runs).
+  await page.getByTestId('context-toggle').click()
+  await page
+    .getByTestId('context-textarea')
+    .fill('A friendly colleague helped with a deadline.')
+  await expect(page.getByTestId('context-toggle')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  await page.getByTestId('context-clear').click()
+  await expect(page.getByTestId('context-textarea')).toHaveValue('')
+  await page.getByTestId('context-toggle').click()
+  await fillSource(page, '[fx:word] thanks')
+  await waitForDone(page)
+  await page.getByTestId('word-details-trigger').click()
+  // The pointer tap waits out the selection grace period before opening.
+  await expect(page.getByTestId('learning-inspector')).toBeVisible()
+  await expect(
+    page.getByText(fixture('word').result.grammar as string, { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Learning tips', exact: true }),
+  ).toHaveCount(0)
 })
