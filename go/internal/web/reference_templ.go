@@ -16,7 +16,7 @@ import templruntime "github.com/a-h/templ/runtime"
 // workspace/split/book layout; base.css selects on its presence there
 // (.input-panel:has(> .reference-panel)), so otherwise it waits in this
 // hidden dock and dictionary.js moves it. #word-meta receives the server's
-// WordMeta partials; the heading text is set by dictionary.js.
+// WordMeta partials; learning.js writes the heading text.
 func referencePanel(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

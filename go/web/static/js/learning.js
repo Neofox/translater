@@ -7,7 +7,8 @@
 // server-rendered markup (no library models it). Handlers are delegated on
 // document, so swapped or moved nodes need no rebinding.
 
-const SEPARATE = ['workspace', 'split', 'book']
+/** Layouts with a reference pane beside the source (TranslatorWorkspace). */
+export const SEPARATE = ['workspace', 'split', 'book']
 
 /** The word state resets whenever its identity (the run, and whether its
  * result can open) changes (LearningContext's wordIdentity effect). */

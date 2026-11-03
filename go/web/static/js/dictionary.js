@@ -7,7 +7,8 @@
 // ones `hidden`); this module shows the active variant again after every
 // swap. Handlers are delegated on document.
 
-const SEPARATE = ['workspace', 'split', 'book']
+import { SEPARATE } from './learning.js'
+
 // PosTabs' class strings (go/internal/web/dictionary.templ).
 const TAB_ON = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-accent/60 bg-accent-soft text-ink'
 const TAB_OFF = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-border bg-panel text-ink-soft hover:text-ink'

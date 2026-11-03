@@ -195,12 +195,13 @@ test('the chosen POS tab survives later dictionary updates @word', async ({
   ).toBeVisible()
 })
 
-// Compact layouts skip: TS focuses the source while the learning surface
-// still makes it inert, so the two apps end with focus in different places.
+// Compact layouts look up from the learning surface. TS then loses focus
+// (it focuses the source while the surface still makes it inert, a TS bug
+// Go does not replicate), so only the reference layouts check focus.
 test('synonym starts a new lookup @word', async ({ page }) => {
-  await skipWithoutReference(page)
   await fillSource(page, wordInput('word', 'thanks'))
   await waitForDone(page)
+  const dictionary = await openDictionary(page)
   const synonym = (fixture('word').result.synonyms as string[])[0]!
   // The app's own translation request (Go: form fields, TS: server
   // function JSON), whatever the server cache holds. Warm-ups never carry
@@ -216,9 +217,9 @@ test('synonym starts a new lookup @word', async ({ page }) => {
       encodings.some((s) => (r.postData() ?? '').includes(s)),
   )
   const clicked = Date.now()
-  await meta(page).getByRole('button', { name: synonym, exact: true }).click()
+  await dictionary.getByRole('button', { name: synonym, exact: true }).click()
   await expect(source(page)).toHaveValue(synonym)
-  await expect(source(page)).toBeFocused()
+  if (await separateReference(page)) await expect(source(page)).toBeFocused()
   await lookup
   // Debounced like typing (800 ms), not immediate like Paste.
   expect(Date.now() - clicked).toBeGreaterThanOrEqual(300)

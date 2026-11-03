@@ -7,7 +7,7 @@ package web
 // workspace/split/book layout; base.css selects on its presence there
 // (.input-panel:has(> .reference-panel)), so otherwise it waits in this
 // hidden dock and dictionary.js moves it. #word-meta receives the server's
-// WordMeta partials; the heading text is set by dictionary.js.
+// WordMeta partials; learning.js writes the heading text.
 templ referencePanel(v View) {
 	<div id="reference-dock" hidden>
 		<section class="reference-panel" aria-label={ v.T("notes") } data-t-attr="aria-label:notes">
