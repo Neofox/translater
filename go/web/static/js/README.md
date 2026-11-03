@@ -19,6 +19,7 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox (fill, placement)    |
 | `listbox.js`  | More listbox keyboard, roving focus, hover focus and typeahead (useListNavigation, useTypeahead) |
 | `settings.js` | Settings popover: placement, focus in and back, `aria-controls`, `aria-owns` mirror      |
+| `refine.js`   | Refine chips and custom adjustment (`template#adjust-template`), caps, `previousMain`, rollback stack of a failed refine |
 | `float.js`    | Fixed popup placement (offset/flip/shift/size, Adjust clearance), `autoUpdate`, `panelBoundary`, `closeOnFocusOut` |
 
 ## Language detection

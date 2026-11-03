@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -89,7 +90,7 @@ func TestStreamsFixtureAsResponsesSSE(t *testing.T) {
 	defer srv.Close()
 	fx := loadFixture(t, "plain.json")
 
-	res := post(t, context.Background(), srv.URL, "hello "+fx.Match)
+	res := post(t, context.Background(), srv.URL, "hello "+fx.Match.String())
 	defer res.Body.Close()
 	if ct := res.Header.Get("Content-Type"); ct != "text/event-stream" {
 		t.Fatalf("content-type %q", ct)
@@ -132,7 +133,7 @@ func TestSplitsFallInsideEscapes(t *testing.T) {
 	srv := httptest.NewServer(fakeopenai.Handler(fixturesDir))
 	defer srv.Close()
 	fx := loadFixture(t, "markup.json")
-	res := post(t, context.Background(), srv.URL, fx.Match)
+	res := post(t, context.Background(), srv.URL, fx.Match.String())
 	defer res.Body.Close()
 	var deltas []string
 	for _, e := range readEvents(t, res.Body) {
@@ -159,7 +160,7 @@ func TestEmojiFixtureEscapesSurrogates(t *testing.T) {
 	srv := httptest.NewServer(fakeopenai.Handler(fixturesDir))
 	defer srv.Close()
 	fx := loadFixture(t, "emoji.json")
-	res := post(t, context.Background(), srv.URL, fx.Match)
+	res := post(t, context.Background(), srv.URL, fx.Match.String())
 	defer res.Body.Close()
 	var got strings.Builder
 	for _, e := range readEvents(t, res.Body) {
@@ -188,7 +189,7 @@ func TestErrorFixture(t *testing.T) {
 	srv := httptest.NewServer(fakeopenai.Handler(fixturesDir))
 	defer srv.Close()
 	fx := loadFixture(t, "error-budget.json")
-	res := post(t, context.Background(), srv.URL, fx.Match)
+	res := post(t, context.Background(), srv.URL, fx.Match.String())
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 429 || !strings.Contains(string(b), "insufficient_quota") {
@@ -243,7 +244,7 @@ func TestActiveTracksInFlightRequests(t *testing.T) {
 	fx := loadFixture(t, "slow.json")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	res := post(t, ctx, srv.URL, fx.Match)
+	res := post(t, ctx, srv.URL, fx.Match.String())
 	br := bufio.NewReader(res.Body)
 	for {
 		line, err := br.ReadString('\n')
@@ -280,7 +281,7 @@ func TestActiveTracksInFlightRequests(t *testing.T) {
 	}
 
 	// Completed and error responses leave Active too.
-	for _, m := range []string{"no marker here", loadFixture(t, "error-rate.json").Match} {
+	for _, m := range []string{"no marker here", loadFixture(t, "error-rate.json").Match.String()} {
 		r := post(t, context.Background(), srv.URL, m)
 		io.Copy(io.Discard, r.Body)
 		r.Body.Close()
@@ -296,7 +297,7 @@ func TestAbortCounted(t *testing.T) {
 	fx := loadFixture(t, "slow.json")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	res := post(t, ctx, srv.URL, fx.Match)
+	res := post(t, ctx, srv.URL, fx.Match.String())
 	br := bufio.NewReader(res.Body)
 	for { // wait until at least one delta arrived
 		line, err := br.ReadString('\n')
@@ -434,5 +435,42 @@ func TestFaultHangHoldsUntilAbort(t *testing.T) {
 			t.Fatalf("after the client left: %+v", st)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// A fixture's match may be a list whose entries must all occur; the fixture
+// with the most entries wins, then the first by filename.
+func TestMatchListMostSpecificWins(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, match string, status int) {
+		t.Helper()
+		body := `{"match":` + match + `,"result":null,"error":{"status":` + strconv.Itoa(status) + `}}`
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("default.json", `""`, 418)
+	write("a.json", `"[x]"`, 501)
+	write("b.json", `["[x]","soft"]`, 502)
+	write("c.json", `["[x]","[z]"]`, 503)
+	write("d.json", `["[y]"]`, 504)
+	srv := httptest.NewServer(fakeopenai.Handler(dir))
+	defer srv.Close()
+	for text, want := range map[string]int{
+		"hello [x]":        501, // one entry
+		"[x] make it soft": 502, // both entries beat one
+		"soft only":        418, // a list needs every entry
+		"[x] soft [z]":     502, // a tie goes to the first file
+		"[x] [z]":          503,
+		"[y]":              504,
+	} {
+		res := post(t, context.Background(), srv.URL, text)
+		res.Body.Close()
+		if res.StatusCode != want {
+			t.Errorf("%q: status %d, want %d", text, res.StatusCode, want)
+		}
+	}
+	if m := loadFixture(t, "plain.json").Match; len(m) != 1 || m[0] != "[fx:plain]" {
+		t.Errorf("string match = %q, want [[fx:plain]]", m)
 	}
 }

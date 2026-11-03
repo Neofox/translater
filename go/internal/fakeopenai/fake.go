@@ -36,11 +36,13 @@ const (
 	respID         = "resp_fake0001"
 )
 
-// Fixture is one canned reply. Match is a substring looked for in the last
-// user text part of the request; default.json answers everything else. A
-// non-nil Error replaces the stream with an HTTP error response.
+// Fixture is one canned reply. Match lists substrings that must all occur in
+// the last user text part of the request; when several fixtures match, the
+// one with the most entries wins, then the first by filename. default.json
+// answers everything else. A non-nil Error replaces the stream with an HTTP
+// error response.
 type Fixture struct {
-	Match   string         `json:"match"`
+	Match   Match          `json:"match"`
 	Intent  string         `json:"intent"`
 	Chunk   int            `json:"chunk"`
 	DelayMs *int           `json:"delayMs"`
@@ -48,6 +50,37 @@ type Fixture struct {
 	Result  jsontext.Value `json:"result"`
 	Error   *FixtureError  `json:"error"`
 	Fault   *Fault         `json:"fault"`
+}
+
+// Match is a fixture's "match": one substring, or a JSON array of them.
+type Match []string
+
+// UnmarshalJSON accepts a string or an array of strings.
+func (m *Match) UnmarshalJSON(b []byte) error {
+	var one string
+	if json.Unmarshal(b, &one) == nil {
+		*m = Match{one}
+		return nil
+	}
+	var all []string
+	if err := json.Unmarshal(b, &all); err != nil {
+		return err
+	}
+	*m = all
+	return nil
+}
+
+// String is a user text that contains every entry.
+func (m Match) String() string { return strings.Join(m, " ") }
+
+// in reports whether every entry occurs in text.
+func (m Match) in(text string) bool {
+	for _, s := range m {
+		if !strings.Contains(text, s) {
+			return false
+		}
+	}
+	return true
 }
 
 // Fault cuts a stream short after After deltas. Kind is one of: "error"
@@ -180,7 +213,7 @@ func (s *server) loadFixtures() (matched []Fixture, def *Fixture, err error) {
 		}
 		if e.Name() == defaultFixture {
 			def = &f
-		} else if f.Match != "" {
+		} else if len(f.Match) > 0 && !slices.Contains(f.Match, "") {
 			matched = append(matched, f)
 		}
 	}
@@ -222,10 +255,10 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fx := def
-	for i := range matched {
-		if strings.Contains(text, matched[i].Match) {
-			fx = &matched[i]
-			break
+	best := 0
+	for i := range matched { // filename order: a tie keeps the earlier file
+		if n := len(matched[i].Match); n > best && matched[i].Match.in(text) {
+			fx, best = &matched[i], n
 		}
 	}
 	if fx == nil {

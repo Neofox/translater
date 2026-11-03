@@ -268,7 +268,56 @@ export const STATES: VisualState[] = [
       ])
     },
   },
+  {
+    // A refined result: the Softer re-run replaced main, rationale,
+    // alternatives and phrase rows (the Adjust menu itself is Task 26's).
+    name: 'refine-softer',
+    async setup(page) {
+      await refinePlain(page)
+      await page.getByTestId('refine-chip-softer').click()
+      await expect(page.getByTestId('main-translation')).toHaveText(
+        '오늘 어떻게 지내세요?',
+      )
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(1)
+      await restMouse(page)
+    },
+  },
+  {
+    // A failed refine rolled back: the previous result, rows and
+    // explanation, with no error view.
+    name: 'refine-rollback',
+    async setup(page) {
+      await refinePlain(page)
+      await page.getByTestId('refine-custom-trigger').click()
+      await page.getByTestId('refine-freeform').fill('[fx:refine-fail]')
+      await page.getByTestId('refine-freeform').press('Enter')
+      await expect(page.getByTestId('refine-error')).toBeVisible({
+        timeout: 20_000,
+      })
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+      await restMouse(page)
+    },
+  },
 ]
+
+/** The pointer leaves where the Adjust controls were: their placement
+ * differs until Task 26, and a hover on the main text shows. */
+async function restMouse(page: Page): Promise<void> {
+  await page.mouse.move(0, 0)
+}
+
+/** The plain fixture's finished result with its refine chips showing. */
+async function refinePlain(page: Page): Promise<void> {
+  await openApp(page)
+  await fillSource(page, visualText('plain'))
+  await waitForDone(page)
+  await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+  const trigger = page.getByTestId('adjust-button')
+  if (await trigger.isVisible()) await trigger.click()
+  await expect(page.getByTestId('refine-chip-softer')).toBeEnabled()
+}
 
 /** The visual fixture's result, then a tap on its main Listen. */
 async function listenTo(page: Page): Promise<void> {

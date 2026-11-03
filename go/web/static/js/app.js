@@ -16,6 +16,7 @@ import { initDictionary } from './dictionary.js'
 import { initLayout } from './layout.js'
 import { initLearning } from './learning.js'
 import { initPrefs } from './prefs.js'
+import { initRefine } from './refine.js'
 import { initSpeech } from './speech.js'
 import { initStream } from './stream.js'
 
@@ -98,6 +99,7 @@ const app = {
   inputChanged() {
     app.abort()
     speech.reset()
+    app.refine.edited()
     if (ta.value !== revisedText) {
       revisedText = ta.value
       inputRevision += 1
@@ -156,12 +158,13 @@ const app = {
     // The server trims the prompt text; learning ranges use the raw value.
     const values = {
       run: live.run, text, source, target, mode, intent, uiLang,
-      context: app.context(), previousMain: '', refinements: '',
+      context: app.context(),
       analyticsSessionId, supersedesRunId: supersededRun ?? '', inputRevision, trigger,
     }
     supersededRun = null
     for (const [name, value] of Object.entries(values))
       if (form.elements[name]) form.elements[name].value = value
+    app.refine.fill()
     app.pending = true
     stream.start(live)
     htmx.trigger(form, 'nt-run')
@@ -195,6 +198,7 @@ const app = {
     speech?.sync()
     app.learning?.sync()
     dictionary?.sync()
+    app.refine?.sync()
   },
   copyMain: () => copy.copyMain(),
   warm: () => fetch('/warm', { method: 'POST' }).catch(() => {}),
@@ -250,6 +254,7 @@ copy = initCopy(app)
 speech = initSpeech(app, data.languages.map((l) => l.code))
 prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
+app.refine = initRefine(app, form, stream.restore, (root) => prefs.applyStrings(root))
 app.learning = initLearning(app)
 dictionary = initDictionary(app, composer)
 // InputPanel re-sizes the editor whenever the layout changes.

@@ -16,11 +16,13 @@ import { APP } from '../ports'
 // because base.css selects on presence (e.g. .app-settings:has(.adjust-menu)).
 // The Go run checks that nothing visible matches `tsHide`: once the owning
 // task renders the element, the gap entry must go. Never list a difference
-// without its owner.
-type Gap = { reason: string; tsHide: string; projects?: RegExp }
+// without its owner. `both` marks an element Go already renders without its
+// final layout: both runs remove it.
+type Gap = { reason: string; tsHide: string; projects?: RegExp; both?: boolean }
 const ADJUST: Gap = {
-  reason: 'Task 26: Adjust disclosure in the header',
+  reason: 'Task 26: Adjust inline chips, summary and floating panel (Task 25 renders a plain disclosure)',
   tsHide: '.adjust-menu',
+  both: true,
 }
 const GO_GAPS: Record<string, Gap[]> = {
   'sentence-done': [ADJUST],
@@ -31,6 +33,8 @@ const GO_GAPS: Record<string, Gap[]> = {
   'listen-error': [ADJUST],
   'learning-reference': [ADJUST],
   'learning-source-underlines': [ADJUST],
+  'refine-softer': [ADJUST],
+  'refine-rollback': [ADJUST],
 }
 
 // Pixels that may differ per screenshot. Both apps render on the same
@@ -84,13 +88,13 @@ for (const state of STATES) {
       (gap) => !gap.projects || gap.projects.test(testInfo.project.name),
     )
     for (const gap of gaps) {
-      if (APP === 'ts') {
+      if (APP === 'ts' || gap.both) {
         const removed = await page.evaluate(
           (selector) =>
             [...document.querySelectorAll(selector)].map((e) => e.remove()).length,
           gap.tsHide,
         )
-        expect(removed, `TS renders ${gap.tsHide} (${gap.reason})`).toBeGreaterThan(0)
+        expect(removed, `${APP} renders ${gap.tsHide} (${gap.reason})`).toBeGreaterThan(0)
       } else {
         await expect(
           page.locator(gap.tsHide).filter({ visible: true }),
@@ -98,7 +102,7 @@ for (const state of STATES) {
         ).toHaveCount(0)
       }
     }
-    if (APP === 'ts' && gaps.length > 0) await settle(page)
+    if (gaps.some((gap) => APP === 'ts' || gap.both)) await settle(page)
     // Soft, so one run reports the pixel, ARIA and DOM diffs together.
     // An absolute pixel budget: a ratio allowed a missing label to pass.
     await expect.soft(page).toHaveScreenshot(`${state.name}.png`, {

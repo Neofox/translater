@@ -1,7 +1,7 @@
 package web
 
-// Header (TranslatorWorkspace.tsx app-header): brand, Tone (ModeToggle.tsx)
-// and the Settings trigger (SettingsMenu.tsx). Labels carry data-t keys so
+// Header (TranslatorWorkspace.tsx app-header): brand, Tone (ModeToggle.tsx),
+// Adjust (refine.templ) and the Settings trigger (SettingsMenu.tsx). Labels carry data-t keys so
 // prefs.js relabels them on a UI-language switch without a swap.
 templ header(v View) {
 	<header class="app-header">
@@ -20,6 +20,7 @@ templ header(v View) {
 					<option value={ m.Value } selected?={ v.Prefs.Mode == m.Value } data-t={ m.Key }>{ v.T(m.Key) }</option>
 				}
 			</select>
+			@adjustTemplate(v)
 			@settingsTrigger(v)
 		</div>
 	</header>

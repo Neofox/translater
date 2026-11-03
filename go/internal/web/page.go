@@ -30,6 +30,8 @@ var clientStrings = []string{
 	"notes", "learn", "wordDetails", "breakdown", "closeLearning", "pos", "primaryMeaning", "otherMeanings", "etymology",
 	"grammar", "synonyms", "hanja", "kanji", "hanzi", "characters",
 	"speechLoading", "stopListening", "stopSpeech", "speechFailed", "speechUnavailable", "speechTooLong",
+	"adjust", "refineLabel", "refineSofter", "refineMoreDirect", "refineShorter", "refineMorePlayful",
+	"refineCustom", "refineApply", "refineClose", "refinePlaceholder", "refineRemove", "refineFailed",
 }
 
 // Pages renders the document and the preference partials.

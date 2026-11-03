@@ -9,8 +9,8 @@ package web
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// Header (TranslatorWorkspace.tsx app-header): brand, Tone (ModeToggle.tsx)
-// and the Settings trigger (SettingsMenu.tsx). Labels carry data-t keys so
+// Header (TranslatorWorkspace.tsx app-header): brand, Tone (ModeToggle.tsx),
+// Adjust (refine.templ) and the Settings trigger (SettingsMenu.tsx). Labels carry data-t keys so
 // prefs.js relabels them on a UI-language switch without a swap.
 func header(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -164,6 +164,10 @@ func header(v View) templ.Component {
 			}
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</select>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = adjustTemplate(v).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

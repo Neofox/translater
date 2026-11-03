@@ -238,6 +238,17 @@ export function initStream(app, form) {
     renderState()
   }
 
+  /** Show an earlier, finished sentence run again (refine rollback);
+   * `nodes` are the #result-details children it had. */
+  function restore(live, nodes) {
+    app.live = live
+    main.lang = live.targetLang ?? live.target
+    main.replaceChildren(mainText)
+    details.replaceChildren(...nodes)
+    interp.flush(live.main)
+    renderState()
+  }
+
   /** Freeze an aborted run's main where it is: nothing more appears. */
   function stop() {
     interp.halt()
@@ -249,8 +260,11 @@ export function initStream(app, form) {
    * transition. */
   function showError(message, inputHint) {
     const live = app.live
-    live.error = { message }
     const server = inputHint === undefined
+    // A failed refinement rolls back instead (refine.js).
+    if (server && app.refineFailed?.(message)) return
+    // TS keeps no live result for an input error.
+    live.error = { message, input: !server }
     const show = () => {
       if (app.live !== live) return
       interp.reset()
@@ -364,5 +378,5 @@ export function initStream(app, form) {
     if (!document.hidden) reveal()
   })
 
-  return { start, clear, stop, showError, renderState, renderExplanation }
+  return { start, clear, stop, restore, showError, renderState, renderExplanation }
 }

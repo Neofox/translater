@@ -1,0 +1,48 @@
+{
+  "match": ["[fx:plain]", "make it softer"],
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 20,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "오늘 어떻게 지내세요?",
+    "learningPhrases": [
+      {
+        "text": "오늘",
+        "gloss": "today",
+        "sourceTexts": ["today"],
+        "baseForm": "",
+        "literalMeaning": "",
+        "naturalMeaning": "",
+        "grammar": "",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "어떻게 지내세요",
+        "gloss": "how are you doing",
+        "sourceTexts": ["How are you doing"],
+        "baseForm": "지내다",
+        "literalMeaning": "how (you) get along",
+        "naturalMeaning": "how are you doing",
+        "grammar": "지내세요 adds the honorific -시- and the polite ending -어요 to 지내다.",
+        "omissions": "The subject you is understood.",
+        "grammarHighlights": ["지내세요"],
+        "usageNote": "",
+        "characters": []
+      }
+    ],
+    "rationale": "The honorific 지내세요 softens the greeting: it shows gentle respect without the stiffness of a formal ending.",
+    "alternatives": [
+      {
+        "text": "오늘 잘 지내고 계세요?",
+        "note": "계세요 is an even gentler honorific form, suited to someone older."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}
