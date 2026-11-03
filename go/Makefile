@@ -7,6 +7,9 @@ TAILWIND := mise exec -- tailwindcss
 CSS_IN   := web/static/css/input.css
 CSS_OUT  := web/static/css/app.css
 SIZE_MAX := 40960
+# The TS app's stylesheet, compiled from src/styles.css with the same
+# Tailwind CLI (within ~25 B gzip of the Vite build's), as the CSS budget.
+TS_CSS   := $(or $(TMPDIR),/tmp)/neotranslate-ts-styles.css
 
 .PHONY: all generate styles icons templ css test size check
 
@@ -36,9 +39,10 @@ test:
 	node --test 'web/static/js/*.test.js'
 
 # Gzip bytes of every script GET / loads (htmx and hx-sse included), and of
-# the stylesheet (at most the TS app's 28.7 KiB).
+# the stylesheet (at most the TS app's, compiled now).
 size:
-	go run ./cmd/assetsize -max $(SIZE_MAX)
+	$(TAILWIND) --cwd .. --input src/styles.css --output $(TS_CSS) --minify
+	go run ./cmd/assetsize -max $(SIZE_MAX) -css-ref $(TS_CSS)
 
 # Regenerate everything and fail when the committed copies changed.
 check: generate
