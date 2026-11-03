@@ -109,7 +109,8 @@ export function initLayout(panels) {
     if (measuring) return
     measuring = true
     try {
-      // Reads first, then writes, so one measure forces a single layout.
+      // Inputs are read before any write; the panels' height is read after
+      // --app-height is written (it depends on it).
       const focused = document.activeElement
       const editing =
         focused instanceof HTMLElement &&
@@ -134,10 +135,11 @@ export function initLayout(panels) {
         },
         state,
       )
-      const height = panels.clientHeight || result.appHeight
+      // Like useWorkspaceLayout: the panels' height follows --app-height,
+      // so read it only after writing the new value.
       shell.style.setProperty('--app-height', `${result.appHeight}px`)
       shell.style.setProperty('--app-top', `${result.appTop}px`)
-      panels.style.setProperty('--workspace-height', `${height}px`)
+      panels.style.setProperty('--workspace-height', `${panels.clientHeight || result.appHeight}px`)
       const previous = state.layout
       state = { natural: result.natural, layout: result.layout }
       if (result.layout === previous && !pending) return

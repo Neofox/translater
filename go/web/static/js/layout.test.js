@@ -1,6 +1,56 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { COMPACT_LAYOUT, decideLayout, initialLayoutState } from './layout.js'
+import { COMPACT_LAYOUT, decideLayout, initLayout, initialLayoutState } from './layout.js'
+
+// Minimal DOM for initLayout: the panels' height follows the shell's
+// --app-height (minus a 64 px header), as the CSS grid does.
+class FakeElement {
+  constructor() {
+    this.props = new Map()
+    this.attrs = new Map()
+    this.dataset = {}
+    this.style = {
+      setProperty: (k, v) => this.props.set(k, v),
+      getPropertyValue: (k) => this.props.get(k) ?? '',
+    }
+  }
+  setAttribute(k, v) { this.attrs.set(k, v) }
+  removeAttribute(k) { this.attrs.delete(k) }
+  querySelector() { return null }
+  contains() { return false }
+  addEventListener() {}
+}
+
+test('measure writes --app-height before reading the panels height (useWorkspaceLayout order)', () => {
+  const saved = ['window', 'document', 'HTMLElement', 'getComputedStyle', 'ResizeObserver'].map((k) => [k, globalThis[k]])
+  try {
+    const shell = new FakeElement()
+    const panels = new FakeElement()
+    panels.closest = () => shell
+    Object.defineProperty(panels, 'clientWidth', { get: () => 594 })
+    Object.defineProperty(panels, 'clientHeight', {
+      get: () => Math.max(0, (parseFloat(shell.style.getPropertyValue('--app-height')) || 0) - 64),
+    })
+    const viewport = Object.assign(new EventTarget(), { height: 736, offsetTop: 0, scale: 1 })
+    globalThis.window = {
+      innerWidth: 594, innerHeight: 736, visualViewport: viewport,
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
+      addEventListener() {},
+    }
+    globalThis.document = Object.assign(new EventTarget(), { activeElement: null, body: {} })
+    globalThis.HTMLElement = FakeElement
+    globalThis.getComputedStyle = (el) => el.style
+    globalThis.ResizeObserver = undefined
+    initLayout(panels)
+    assert.equal(panels.style.getPropertyValue('--workspace-height'), '672px')
+    viewport.height = 320
+    viewport.dispatchEvent(new Event('resize'))
+    assert.equal(shell.style.getPropertyValue('--app-height'), '320px')
+    assert.equal(panels.style.getPropertyValue('--workspace-height'), '256px')
+  } finally {
+    for (const [k, v] of saved) globalThis[k] = v
+  }
+})
 
 // A window whose measurements a test changes step by step, threading the
 // layout state like layout.js's measure() does (cases from
