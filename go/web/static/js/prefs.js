@@ -142,8 +142,12 @@ export function initPrefs(app, data) {
       return false
     }
   }
-  const focusOption = (menu) =>
-    (menu.querySelector('[aria-selected="true"]') ?? menu.querySelector('button'))?.focus()
+  // A pointer-opened Select focuses the list itself (no active option) or
+  // its selected option (useListNavigation).
+  const focusOption = (menu) => {
+    menu.tabIndex = -1
+    ;(menu.querySelector('[aria-selected="true"]') ?? menu).focus()
+  }
 
   /** The options a bar's More listbox offers: every language not shown as a
    * visible chip (Select.tsx options). */
@@ -196,37 +200,68 @@ export function initPrefs(app, data) {
     if (!(popup instanceof HTMLElement) || popup.getAttribute('role') !== 'listbox') return
     unfollow?.()
     unfollow = null
+    clearTimeout(typedTimer)
+    typed = ''
+    matched = null
     const trigger = document.querySelector(`[popovertarget="${popup.id}"]`)
     if (event.newState !== 'open' || !trigger) return
-    popup.style.minWidth = `${trigger.offsetWidth}px`
-    unfollow = autoUpdate(trigger, popup, () =>
-      position(trigger, popup, { placement: 'bottom-start', offset: 6, flip: true, maxHeight: 320, ...panelBoundary(trigger) }))
+    unfollow = autoUpdate(trigger, popup, () => {
+      popup.style.minWidth = `${trigger.getBoundingClientRect().width}px`
+      position(trigger, popup, { placement: 'bottom-start', offset: 6, flip: true, maxHeight: 320, ...panelBoundary(trigger) })
+    })
     popup.style.visibility = ''
     focusOption(popup)
+    prev = selectedIndex(popup)
   }, true)
-  // Arrow keys move between options; typing focuses the next option whose
-  // label starts with the typed text (useTypeahead, reset after 750 ms).
+
+  // Keyboard (useListNavigation with loop, useTypeahead): arrows move the
+  // active option; typed characters jump to the next option whose English
+  // name (promptName, Select's searchLabel) starts with them, searching after
+  // the selected or active option. Repeating one first letter cycles through
+  // its matches, a miss or 750 ms of quiet starts over.
   let typed = ''
-  let typedAt = 0
+  let typedTimer = 0
+  let matched = null
+  let prev = -1
+  const options = (list) => [...list.querySelectorAll('button')]
+  const selectedIndex = (list) => options(list).findIndex((o) => o.getAttribute('aria-selected') === 'true')
+  const searchLabel = (option) => data.languages.find((l) => l.code === option.dataset.value)?.promptName ?? ''
   document.addEventListener('keydown', (event) => {
-    const option = event.target instanceof Element && event.target.closest('[data-testid="select-option"]')
-    if (!option) return
-    const options = [...option.closest('[role="listbox"]').querySelectorAll('button')]
-    const n = options.length
-    let i = options.indexOf(option)
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') i += event.key === 'ArrowDown' ? 1 : -1
-    else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      typed = (event.timeStamp - typedAt > 750 ? '' : typed) + event.key.toLowerCase()
-      typedAt = event.timeStamp
-      // A new search starts after the focused option; a longer one may stay.
-      const from = typed.length > 1 ? i : i + 1
-      const k = options.findIndex((_, k) =>
-        options[(from + k) % n].textContent.trim().toLowerCase().startsWith(typed))
-      if (k < 0) return
-      i = from + k
-    } else return
-    event.preventDefault()
-    options[(i + n) % n].focus()
+    const list = event.target instanceof Element && event.target.closest('[role="listbox"][popover]')
+    if (!list) return
+    const items = options(list)
+    const n = items.length
+    const selected = selectedIndex(list)
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      const down = event.key === 'ArrowDown'
+      const i = items.indexOf(event.target)
+      const next = i < 0 ? (down ? 0 : n - 1) : (i + (down ? 1 : -1) + n) % n
+      items[next]?.focus()
+      if (!typed) prev = selected >= 0 ? selected : next
+      return
+    }
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
+    const labels = items.map(searchLabel)
+    const find = (list_, text) => list_.find((t) => t.toLocaleLowerCase().startsWith(text.toLocaleLowerCase()))
+    if (event.key !== ' ' || (typed && typed[0] !== ' ' && find(labels, typed))) event.preventDefault()
+    const rapid = labels.every((t) => t[0]?.toLocaleLowerCase() !== t[1]?.toLocaleLowerCase())
+    if (rapid && typed === event.key) {
+      typed = ''
+      prev = matched
+    }
+    typed += event.key
+    clearTimeout(typedTimer)
+    typedTimer = setTimeout(() => {
+      typed = ''
+      prev = matched
+    }, 750)
+    const start = (prev || 0) + 1
+    const hit = find([...labels.slice(start), ...labels.slice(0, start)], typed)
+    if (hit !== undefined) {
+      matched = labels.indexOf(hit)
+      items[matched].focus()
+    } else if (event.key !== ' ') typed = ''
   })
 
   initSettings()

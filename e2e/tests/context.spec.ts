@@ -162,7 +162,10 @@ const viewportBox = (page: Page): Promise<Box> =>
 test('makes UI language available in settings and persists an explicit choice @context', async ({
   page,
   context,
+  browserName,
 }) => {
+  // WebKit (the macOS default) does not Tab to buttons.
+  const tabsToButtons = browserName !== 'webkit'
   const trigger = page.getByTestId('settings-button')
   const dialog = page.getByRole('dialog', { name: 'Settings' })
   const group = page.getByRole('group', { name: 'UI language' })
@@ -180,8 +183,10 @@ test('makes UI language available in settings and persists an explicit choice @c
   // Non-modal: focus moves to the dialog, Tab reaches the toggle, and
   // Escape returns focus to the trigger.
   await expect(dialog).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(button('EN')).toBeFocused()
+  if (tabsToButtons) {
+    await page.keyboard.press('Tab')
+    await expect(button('EN')).toBeFocused()
+  }
   await page.keyboard.press('Escape')
   await expect(group).toBeHidden()
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
@@ -193,6 +198,42 @@ test('makes UI language available in settings and persists an explicit choice @c
   await page.locator('.app-brand').click()
   await expect(group).toBeHidden()
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+  // Tab past the last control leaves the popup: it closes and focus stays
+  // on the next control after the trigger (closeOnFocusOut).
+  const focusedOutside = () =>
+    page.evaluate(() => {
+      const a = document.activeElement
+      return Boolean(
+        a &&
+          a !== document.body &&
+          !a.closest('.settings-popover, .settings-trigger'),
+      )
+    })
+  if (tabsToButtons) {
+    await trigger.click()
+    await expect(dialog).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(button('EN')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(button('한')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(group).toBeHidden()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(await focusedOutside()).toBe(true)
+  }
+  // Shift+Tab from the dialog reaches the trigger and keeps it open; once
+  // more leaves both, closing without returning focus.
+  if (tabsToButtons) {
+    await trigger.click()
+    await expect(dialog).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(trigger).toBeFocused()
+    await expect(group).toBeVisible()
+    await page.keyboard.press('Shift+Tab')
+    await expect(group).toBeHidden()
+    expect(await focusedOutside()).toBe(true)
+  }
 
   await trigger.click()
   await button('한').click()
@@ -250,6 +291,44 @@ async function checkPopups(page: Page): Promise<void> {
   }
 }
 
+/** A listbox wider than the room right of its trigger must stay inside the
+ * pane's padding box (Floating UI's clipping rect for the boundary) minus
+ * 8 px: flip tries the end alignment, shift clamps. Clipped by the
+ * viewport alone it would overhang the pane. The
+ * source pane is the left one in split and book layouts. */
+async function checkPaneClamp(page: Page): Promise<void> {
+  const more = page
+    .getByRole('group', { name: 'Source language', exact: true })
+    .getByTestId('lang-more-trigger')
+  const pane = await more.locator('xpath=ancestor::section[1]').evaluate((e) => {
+    const r = e.getBoundingClientRect()
+    const left = r.left + e.clientLeft
+    const top = r.top + e.clientTop
+    return { left, top, right: left + e.clientWidth, bottom: top + e.clientHeight }
+  })
+  expect(pane.right).toBeLessThan((await viewportBox(page)).right - 100)
+  // Narrower than the pane, wider than the room right of the trigger.
+  const width = pane.right - pane.left - 24
+  expect((await box(more)).left + width).toBeGreaterThan(pane.right)
+  await page.evaluate((width) => {
+    const style = document.createElement('style')
+    style.id = 'wide-listbox'
+    style.textContent = `[role="listbox"] { width: ${width}px !important; }`
+    document.head.append(style)
+  }, width)
+  await more.click()
+  const listbox = page.getByRole('listbox')
+  await expect(listbox).toBeVisible()
+  const menu = await box(listbox)
+  expectInside(menu, pane, 8, 'clamped menu')
+  // Both alignments overflow the pane; bottom-end overflows less, so flip
+  // keeps it and shift moves it right to the pane's left padding.
+  expect(Math.abs(menu.left - pane.left - 8)).toBeLessThanOrEqual(0.5)
+  await page.keyboard.press('Escape')
+  await expect(more).toHaveAttribute('aria-expanded', 'false')
+  await page.evaluate(() => document.getElementById('wide-listbox')?.remove())
+}
+
 test('settings popover stays inside its pane in split and book layouts @context', async ({
   page,
   browserName,
@@ -259,6 +338,7 @@ test('settings popover stays inside its pane in split and book layouts @context'
   await page.setViewportSize({ width: 736, height: 594 })
   await expect(panels).toHaveAttribute('data-layout', 'split')
   await checkPopups(page)
+  await checkPaneClamp(page)
 
   // The same screen folded like a book. Chromium emulates the posture and
   // a vertical fold over CDP; WebKit cannot.
@@ -276,6 +356,7 @@ test('settings popover stays inside its pane in split and book layouts @context'
   })
   await expect(panels).toHaveAttribute('data-layout', 'book')
   await checkPopups(page)
+  await checkPaneClamp(page)
 })
 
 test('language menus stay within the viewport and support keyboard selection @context', async ({
@@ -304,4 +385,52 @@ test('language menus stay within the viewport and support keyboard selection @co
       group.getByRole('button', { name: 'Français' }),
     ).toHaveAttribute('aria-pressed', 'true')
   }
+})
+
+test('language menu typeahead matches English language names @context', async ({
+  page,
+}) => {
+  // Narrow bars show only the selected chip, so the menus hold English and
+  // Japanese (and Auto once another source is chosen).
+  await page.setViewportSize({ width: 300, height: 640 })
+  const bar = (name: string) => page.getByRole('group', { name, exact: true })
+  const listbox = page.getByRole('listbox')
+  const option = (name: string) => listbox.getByRole('option', { name, exact: true })
+  async function open(name: string): Promise<void> {
+    await bar(name).getByTestId('lang-more-trigger').click()
+    await expect(listbox).toBeVisible()
+    await expect
+      .poll(() => listbox.evaluate((l) => l.contains(document.activeElement)))
+      .toBe(true)
+  }
+  async function close(name: string): Promise<void> {
+    await page.keyboard.press('Escape')
+    await expect(bar(name).getByTestId('lang-more-trigger')).toHaveAttribute('aria-expanded', 'false')
+  }
+
+  // 日本語 is found by "Japanese".
+  await open('Target language')
+  await expect(option('English')).toHaveCount(1)
+  await page.keyboard.press('j')
+  await expect(option('日本語')).toBeFocused()
+  await close('Target language')
+  // The search starts at the first option (no active one yet).
+  await open('Target language')
+  await page.keyboard.press('e')
+  await expect(option('English')).toBeFocused()
+  await close('Target language')
+
+  // Source English, then Auto joins the menu: its name is not "Auto…".
+  await open('Source language')
+  await page.keyboard.press('e')
+  await expect(option('English')).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(bar('Source language').getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true')
+  await open('Source language')
+  await expect(option('Auto')).toHaveCount(1)
+  await page.keyboard.press('a')
+  await expect(option('Auto')).not.toBeFocused()
+  await page.keyboard.press('Enter')
+  await close('Source language')
+  await expect(bar('Source language').getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true')
 })

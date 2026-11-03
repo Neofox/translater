@@ -3,7 +3,8 @@
 //
 // Hand-written: the native popover attribute already gives the toggle,
 // Escape and outside-press dismissal; this adds what Floating UI did on top:
-// fixed placement while open, focus moving in and back, and the trigger's
+// fixed placement while open, focus moving in and back, closing when focus
+// leaves for an unrelated element (closeOnFocusOut) and the trigger's
 // aria-controls (useRole). prefs.js mirrors aria-expanded for every popover.
 
 import { autoUpdate, panelBoundary, position } from './float.js'
@@ -18,6 +19,9 @@ export function initSettings() {
   owner.setAttribute('aria-owns', popup.id)
   owner.style.position = 'fixed'
   let stop = null
+  // Focus was inside when closing began; focus left (no return).
+  let inside = false
+  let left = false
 
   const place = () =>
     position(trigger, popup, { placement: 'bottom-end', offset: 8, flip: true, ...panelBoundary(trigger) })
@@ -25,7 +29,30 @@ export function initSettings() {
   // Hidden until placed (Floating UI's isPositioned).
   popup.addEventListener('beforetoggle', (event) => {
     if (event.newState === 'open') popup.style.visibility = 'hidden'
+    else inside = popup.contains(document.activeElement)
   })
+  // closeOnFocusOut, as FloatingPortal applies it: focus leaving the trigger
+  // for anything but the popup (Shift+Tab past it, a press on another
+  // control), or tabbing out of the popup (its after-guard), closes it and
+  // leaves focus where it went. Focus moved out of the popup by a script
+  // keeps it open (the portal's insideReactTree check).
+  let tabbed = false
+  popup.addEventListener('keydown', (event) => {
+    tabbed = event.key === 'Tab'
+  })
+  const focusOut = (event) => {
+    const to = event.relatedTarget
+    const viaTab = tabbed
+    tabbed = false
+    if (!to || popup.contains(to) || trigger.contains(to) || (event.currentTarget === popup && !viaTab)) return
+    queueMicrotask(() => {
+      if (!popup.matches(':popover-open')) return
+      left = true
+      popup.hidePopover()
+    })
+  }
+  popup.addEventListener('focusout', focusOut)
+  trigger.addEventListener('focusout', focusOut)
   popup.addEventListener('toggle', (event) => {
     stop?.()
     stop = null
@@ -40,10 +67,10 @@ export function initSettings() {
     } else {
       trigger.removeAttribute('aria-controls')
       owner.remove()
-      // Focus returns to the trigger unless the dismissing press focused
-      // something else.
-      const active = document.activeElement
-      if (!active || active === document.body || popup.contains(active)) trigger.focus()
+      // Focus returns to the trigger when it was inside or fell to the
+      // body (Floating UI's returnFocus), not after it left on its own.
+      if (!left && (inside || document.activeElement === document.body)) trigger.focus({ preventScroll: true })
+      left = false
     }
   })
 }

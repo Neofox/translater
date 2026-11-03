@@ -6,33 +6,65 @@
 // cannot express the pane-bounded shift or the clearance rule.
 
 const sides = (p) => (typeof p === 'number' ? { top: p, right: p, bottom: p, left: p } : p)
+const OPPOSITE = { top: 'bottom', bottom: 'top', start: 'end', end: 'start', left: 'right', right: 'left' }
+const otherSide = (p) => p.replace(/^\w+/, (s) => OPPOSITE[s])
+const otherAlignment = (p) => p.replace(/\w+$/, (a) => OPPOSITE[a])
 
-/** Coordinates for a floating box of `floating` size next to the
- * `reference` rect, kept inside `clip` (a rect) minus `padding`. Rects have
- * left/top/right/bottom. Returns {x, y, placement, availableHeight}. */
+/** Coordinates for a floating box of `floating` size (top|bottom-start|end
+ * of the `reference` rect), kept inside `clip` (a rect) minus `padding`.
+ * Rects have left/top/right/bottom (and width for the reference). Returns
+ * {x, y, placement, availableHeight}. */
 export function compute({ reference, floating, clip, placement, offset = 0, padding = 0, flip, clearance, dpr = 1 }) {
   const pad = sides(padding)
   const { width: w, height: h } = floating
-  const top = clip.top + pad.top
-  const bottom = clip.bottom - pad.bottom
-  const below = reference.bottom + offset
-  const above = reference.top - offset - h
-  // Flip (Floating UI's bestFit): the other side when it overflows less.
-  const overflow = (upward) => (upward ? top - above : below + h - bottom)
-  let up = placement.startsWith('top')
-  if (flip && overflow(up) > 0 && overflow(!up) < overflow(up)) up = !up
-  let x = placement.endsWith('end') ? reference.right - w : reference.left
-  const y = up ? above : below
-  // Shift: Floating UI clamps the start edge last, so it wins when too wide.
-  x = Math.max(clip.left + pad.left, Math.min(x, clip.right - pad.right - w))
+  const room = { top: clip.top + pad.top, bottom: clip.bottom - pad.bottom, left: clip.left + pad.left, right: clip.right - pad.right }
+  const at = (p) => ({
+    x: p.endsWith('end') ? reference.right - w : reference.left,
+    y: p.startsWith('top') ? reference.top - offset - h : reference.bottom + offset,
+  })
+  // detectOverflow on the placement's side, then its two alignment sides
+  // (getAlignmentSides: a start-aligned box overflows right first, unless
+  // the reference is the wider one).
+  const overflows = (p) => {
+    const { x, y } = at(p)
+    const o = { top: room.top - y, bottom: y + h - room.bottom, left: room.left - x, right: x + w - room.right }
+    let align = p.endsWith('start') ? 'right' : 'left'
+    if (reference.width > w) align = OPPOSITE[align]
+    return [o[p.split('-')[0]], o[align], o[OPPOSITE[align]]]
+  }
+  // flip(): the first placement that fits, trying the other alignment, the
+  // other side and both; else the one fitting its side with the least
+  // alignment overflow; else the least total overflow (bestFit).
+  let chosen = placement
+  if (flip) {
+    const tried = []
+    chosen = undefined
+    for (const p of [placement, otherAlignment(placement), otherSide(placement), otherAlignment(otherSide(placement))]) {
+      const o = overflows(p)
+      tried.push([p, o])
+      if (o.every((v) => v <= 0)) {
+        chosen = p
+        break
+      }
+    }
+    const total = (o) => o.reduce((sum, v) => sum + Math.max(v, 0), 0)
+    chosen ??=
+      tried.filter(([, o]) => o[0] <= 0).sort((a, b) => a[1][1] - b[1][1])[0]?.[0] ??
+      tried.sort((a, b) => total(a[1]) - total(b[1]))[0][0]
+  }
+  let { x, y } = at(chosen)
+  // shift() on the main axis: the start edge is clamped last, so it wins
+  // when the box is too wide.
+  x = Math.max(room.left, Math.min(x, room.right - w))
   if (clearance && y < clearance.bottom && y + h > clearance.top)
     x = Math.max(16, Math.min(x, clearance.left - w - 12))
   const round = (v) => Math.round(v * dpr) / dpr
+  const up = chosen.startsWith('top')
   return {
     x: round(x),
     y: round(y),
-    placement: placement.replace(/^\w+/, up ? 'top' : 'bottom'),
-    availableHeight: Math.min(up ? reference.top - offset - top : bottom - below, bottom - top),
+    placement: chosen,
+    availableHeight: Math.min(up ? reference.top - offset - room.top : room.bottom - reference.bottom - offset, room.bottom - room.top),
   }
 }
 
@@ -53,12 +85,15 @@ function viewportRect() {
 export function position(reference, floating, { boundary, clearance, maxHeight, ...options }) {
   let clip = viewportRect()
   if (boundary) {
+    // Its padding box (getClippingElementRect): inside borders and scrollbars.
     const b = boundary.getBoundingClientRect()
+    const left = b.left + boundary.clientLeft
+    const top = b.top + boundary.clientTop
     clip = {
-      left: Math.max(clip.left, b.left),
-      top: Math.max(clip.top, b.top),
-      right: Math.min(clip.right, b.right),
-      bottom: Math.min(clip.bottom, b.bottom),
+      left: Math.max(clip.left, left),
+      top: Math.max(clip.top, top),
+      right: Math.min(clip.right, left + boundary.clientWidth),
+      bottom: Math.min(clip.bottom, top + boundary.clientHeight),
     }
   }
   const style = floating.style
@@ -66,7 +101,7 @@ export function position(reference, floating, { boundary, clearance, maxHeight, 
   const run = (overrides) =>
     compute({
       reference: reference.getBoundingClientRect(),
-      floating: { width: floating.offsetWidth, height: floating.offsetHeight },
+      floating: floating.getBoundingClientRect(),
       clip,
       clearance: clearance?.getBoundingClientRect(),
       dpr: window.devicePixelRatio || 1,

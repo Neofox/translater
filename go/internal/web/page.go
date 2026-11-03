@@ -59,7 +59,7 @@ func NewPages(c *contract.Contract, static *Static, opts ...PagesOption) *Pages 
 	}
 	langs := make([]map[string]string, len(c.Languages))
 	for i, l := range c.Languages {
-		langs[i] = map[string]string{"code": l.Code, "label": l.Label}
+		langs[i] = map[string]string{"code": l.Code, "label": l.Label, "promptName": l.PromptName}
 	}
 	fields := make([]string, len(c.Prefs.Fields))
 	for i, f := range c.Prefs.Fields {

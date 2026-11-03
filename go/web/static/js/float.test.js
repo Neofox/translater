@@ -55,6 +55,25 @@ test('flip keeps the side that overflows less when neither fits', () => {
   assert.equal(down.placement, 'bottom-start')
 })
 
+test('flip tries the other alignment: the least alignment overflow among boxes that fit their side', () => {
+  // A wide list under a trigger near the right edge of a 368 px pane
+  // (Floating UI 1.8 picks bottom-end, then shift clamps the left edge).
+  const opts = {
+    ...base,
+    clip: rect(0, 57, 368, 537),
+    floating: { width: 344, height: 142 },
+    reference: rect(228.34375, 65, 110, 44),
+    placement: 'bottom-start',
+    offset: 6,
+  }
+  const flipped = compute({ ...opts, flip: true })
+  assert.deepEqual([flipped.placement, flipped.x, flipped.y], ['bottom-end', 8, 115])
+  assert.equal(compute(opts).x, 16)
+  // A box that fits where it is stays (Settings: bottom-end at the right).
+  const fits = compute({ ...base, reference: rect(700, 10, 44, 44), placement: 'bottom-end', offset: 8, flip: true })
+  assert.deepEqual([fits.placement, fits.x], ['bottom-end', 544])
+})
+
 test('a top placement stays on top without flip', () => {
   const r = compute({ ...base, reference: rect(100, 300, 40, 20), placement: 'top-start', offset: 6 })
   assert.deepEqual([r.y, r.placement], [194, 'top-start'])
