@@ -728,6 +728,9 @@ test('streaming deltas stay urgent and only completion starts a result transitio
       return original.apply(this, args)
     }
   })
+  // The first half needs motion allowed whatever the project emulates
+  // (webkit-portrait runs with reduced motion, where Go starts none).
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openApp(page)
   // React's hydration may start one transition of its own; count from here.
   await page.evaluate(() => {
