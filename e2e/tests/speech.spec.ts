@@ -271,6 +271,12 @@ test('stop during slow unlock sends no request @speech', async ({
     fixture('default').result.alternatives![0]!.text,
   ])
   expect(await closedContexts(page)).toEqual([true, true])
+  // Both unlocks ran synchronously inside their taps (iPhone requires it).
+  const gestures = (await audioState(page)).contexts.map((c) => c.inGesture)
+  expect(gestures).toEqual([
+    { created: true, resume: true },
+    { created: true, resume: true },
+  ])
 })
 
 test('editing input cancels playback and switching sentence to word resets the result @speech', async ({
@@ -448,6 +454,34 @@ test('sends the result language @speech', async ({ page, fake }) => {
   )
   expect(english!.instructions).toBe(
     'Read the text aloud in English with natural native pronunciation, at a clear, relaxed pace.',
+  )
+})
+
+// OutputPanel.tsx: the model-reported targetLang, not the selected target,
+// sets the main text's lang, the register label (Korean sentences only) and
+// the Listen language. target-lang.json reports French with Korean selected.
+test('the reported target language drives lang, register label and Listen @speech', async ({
+  page,
+  fake,
+}) => {
+  await open(page)
+  await translate(page, 'default')
+  await expect(mainTranslation(page)).toHaveAttribute('lang', 'ko')
+  await expect(page.locator('.main-explanation .section-tag')).toHaveText(
+    '해요체',
+  )
+  await translate(page, 'target-lang')
+  await expectLanguage(page, 'target', 'ko')
+  await expect(mainTranslation(page)).toHaveText(
+    fixture('target-lang').result.main!,
+  )
+  await expect(mainTranslation(page)).toHaveAttribute('lang', 'fr')
+  await expect(page.locator('.main-explanation p')).toBeVisible()
+  await expect(page.locator('.main-explanation .section-tag')).toHaveCount(0)
+  await playThrough(page, listenButton(page))
+  const [french] = await fake.speechBodies()
+  expect(french!.instructions).toBe(
+    'Read the text aloud in French with natural native pronunciation, at a clear, relaxed pace.',
   )
 })
 

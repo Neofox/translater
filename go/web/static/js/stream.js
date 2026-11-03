@@ -269,6 +269,13 @@ export function initStream(app, form) {
       live.sourceLang = d.lang
       app.sourceReported(live)
     },
+    // The main text's lang and the Listen language follow the report too.
+    'nt-target-lang'(live, d) {
+      live.targetLang = d.lang
+      main.lang = d.lang
+      app.targetReported(live)
+      renderExplanation()
+    },
     'nt-headword'(live, d) {
       live.headword = d.text
     },

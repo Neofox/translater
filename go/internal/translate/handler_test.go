@@ -349,6 +349,7 @@ func TestDuplicateMainKey(t *testing.T) {
 	}
 	want := []string{
 		`nt-source-lang {"run":"run-1","lang":"en"}`,
+		`nt-target-lang {"run":"run-1","lang":"ko"}`,
 		`nt-main-delta {"run":"run-1","text":" a "}`,
 		`nt-main-ready {"run":"run-1","main":"a"}`,
 		`nt-text-delta {"run":"run-1","field":"rationale","text":"r"}`,

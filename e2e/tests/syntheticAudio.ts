@@ -13,7 +13,14 @@ export type AudioOptions = {
 /** What the page's synthetic audio saw (see `audioState`). */
 export type AudioState = {
   /** AudioContexts created, oldest first: one per unlocked tap. */
-  contexts: Array<{ closed: boolean; resumed: boolean; sources: number }>
+  contexts: Array<{
+    closed: boolean
+    resumed: boolean
+    sources: number
+    /** Created and resume() called while a click was being dispatched:
+     * iPhone unlocks audio only inside the user gesture. */
+    inGesture: { created: boolean; resume: boolean }
+  }>
 }
 
 export async function installSyntheticAudio(
@@ -30,6 +37,9 @@ export async function installSyntheticAudio(
       stop(): void
     }
     let held = Boolean(opts.holdResume)
+    // window.event is the event being dispatched, here the tap's click.
+    const inClick = () =>
+      (window as unknown as { event?: Event }).event?.type === 'click'
     const waiting: Array<() => void> = []
     const instances: Context[] = []
 
@@ -41,11 +51,13 @@ export async function installSyntheticAudio(
       resumed = false
       /** After finish(): later sources end as soon as they start. */
       finishing = false
+      inGesture = { created: inClick(), resume: false }
 
       constructor() {
         instances.push(this)
       }
       resume() {
+        this.inGesture.resume = inClick()
         const done = () => {
           this.resumed = true
         }
@@ -124,6 +136,7 @@ export async function audioState(page: Page): Promise<AudioState> {
             closed: boolean
             resumed: boolean
             sources: unknown[]
+            inGesture: { created: boolean; resume: boolean }
           }>
         }
       }
@@ -133,6 +146,7 @@ export async function audioState(page: Page): Promise<AudioState> {
         closed: c.closed,
         resumed: c.resumed,
         sources: c.sources.length,
+        inGesture: { ...c.inGesture },
       })),
     }
   })

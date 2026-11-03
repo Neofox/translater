@@ -140,7 +140,8 @@ const app = {
       text: trimmed, intent, source, target,
       raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
       sourceLang: null, headword: '', rationale: '', formality: '',
-      register: intent === 'sentence' && target === 'ko' ? REGISTER[mode] : '',
+      // Set from the model's targetLang (nt-target-lang), as TS does.
+      mode, targetLang: null, register: '',
     }
     app.live = live
     if (trimmed.length > data.limits.maxInputChars) {
@@ -162,6 +163,12 @@ const app = {
     app.pending = true
     stream.start(live)
     htmx.trigger(form, 'nt-run')
+  },
+
+  /** The model named the output language of the current run: OutputPanel's
+   * register label needs a reported Korean sentence. */
+  targetReported(live) {
+    live.register = live.intent === 'sentence' && live.targetLang === 'ko' ? REGISTER[live.mode] : ''
   },
 
   /** The model named the source language of the current run. */
@@ -238,7 +245,7 @@ document.addEventListener('click', (event) => {
 app.layout = initLayout(document.querySelector('.translator-panels'))
 stream = initStream(app, form)
 copy = initCopy(app)
-speech = initSpeech(app)
+speech = initSpeech(app, data.languages.map((l) => l.code))
 prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
 app.learning = initLearning(app)

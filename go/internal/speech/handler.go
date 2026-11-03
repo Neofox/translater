@@ -87,6 +87,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hdr := w.Header()
 	hdr.Set("Content-Type", "audio/L16;rate="+strconv.Itoa(rate)+";channels=1")
 	hdr.Set("Cache-Control", "no-store")
+	// The whole clip is known: a declared length turns a body cut short
+	// into a client read error instead of a shorter, seemingly complete
+	// clip (speech.js caches only a fully read body).
+	hdr.Set("Content-Length", strconv.Itoa(len(pcm)))
 	w.WriteHeader(http.StatusOK)
 	for len(pcm) > 0 {
 		n := min(writeSize, len(pcm))

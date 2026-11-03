@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json/v2"
+	"errors"
 	"io"
 	"log"
 	"log/slog"
@@ -391,5 +392,52 @@ func TestNoContentLogged(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Errorf("speech logged %q", buf.String())
+	}
+}
+
+// cutOff passes the first n body bytes, then fails every Write, as when the
+// platform ends the function mid-response.
+type cutOff struct {
+	http.ResponseWriter
+	n int
+}
+
+func (w *cutOff) Write(b []byte) (int, error) {
+	if w.n <= 0 {
+		return 0, io.ErrClosedPipe
+	}
+	b = b[:min(len(b), w.n)]
+	w.n -= len(b)
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *cutOff) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// The PCM length is declared up front, so a body cut short is a read error
+// for the client, never a shorter clip it could cache as complete (TS's
+// stream ends with an explicit done chunk instead).
+func TestTruncatedAudioIsAReadError(t *testing.T) {
+	r := newRig(t, nil, 90*time.Second)
+	res, body := r.post(t, context.Background(), "[fx:speech-big]", "en", "en")
+	if res.StatusCode != 200 || res.ContentLength != 2621440 || len(body) != 2621440 {
+		t.Fatalf("status %d, Content-Length %q, %d B", res.StatusCode, res.Header.Get("Content-Length"), len(body))
+	}
+
+	fake := httptest.NewServer(fakeopenai.Handler(fixturesDir))
+	defer fake.Close()
+	getenv := env(map[string]string{"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": fake.URL + "/v1"})
+	h := speech.NewHandler(llm.New(getenv), getenv, 90*time.Second)
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		h.ServeHTTP(&cutOff{ResponseWriter: w, n: 100_000}, req)
+	}))
+	defer app.Close()
+	cut, err := http.PostForm(app.URL, url.Values{"text": {"[fx:speech-big]"}, "language": {"en"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cut.Body.Close()
+	got, err := io.ReadAll(cut.Body)
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("read %d B, err %v: want io.ErrUnexpectedEOF", len(got), err)
 	}
 }

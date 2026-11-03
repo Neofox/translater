@@ -10,12 +10,11 @@ import { MAX_AUDIO_BYTES, PcmPlayer } from './pcm.js'
 export const MAX_SPEECH_CHARS = 4000
 export const MAX_CACHE_BYTES = 4 * 1024 * 1024
 const MAX_CACHE_ENTRIES = 3
-const LANGUAGES = ['auto', 'en', 'ko', 'ja', 'fr', 'es', 'zh']
 
 export const replayKey = (text, language) => JSON.stringify([text, language])
 
-/** The request language: a known code, otherwise auto. */
-export const speechLanguage = (code) => (LANGUAGES.includes(code) ? code : 'auto')
+/** The request language: one of `codes` (nt-data languages), otherwise auto. */
+export const speechLanguage = (code, codes) => (codes.includes(code) ? code : 'auto')
 
 /** Sample rate of an `audio/L16;rate=N;channels=1` response, or null. */
 export function parseRate(contentType) {
@@ -67,7 +66,51 @@ const ERROR_CLASS =
   'absolute right-0 top-full z-20 mt-1 max-w-[calc(100vw-2rem)] truncate whitespace-nowrap rounded-md border border-border bg-panel px-2 py-1 text-xs text-ink shadow-sm'
 const SELECTOR = '[data-testid="listen-button"]'
 
-export function initSpeech(app) {
+/**
+ * Feed `player` the audio for `key`: replayed from `cache`, or POSTed to
+ * /speech (`body`) and cached once the whole body has been read. Resolves
+ * true once the audio has ended, or false once `isCurrent()` turns false (a
+ * stopped or superseded voice: its late bytes are dropped). Throws on any
+ * failure, a body cut short included, so nothing partial is cached.
+ * `owner.reader` is set for cancellation; `playing()` runs at the first
+ * audible chunk.
+ */
+export async function loadAudio({ key, body, player, cache, owner, isCurrent, playing, request = fetch }) {
+  const cached = cache.get(key)
+  if (cached) {
+    for (const chunk of cached.chunks) player.append(chunk, cached.rate)
+    playing()
+    await player.endInput()
+    return true
+  }
+  const res = await request('/speech', { method: 'POST', body, signal: owner.controller.signal })
+  if (!isCurrent()) {
+    void res.body?.cancel().catch(() => {})
+    return false
+  }
+  const rate = parseRate(res.headers.get('Content-Type'))
+  if (!res.ok || !res.body || !rate) throw new Error('Speech failed')
+  const reader = res.body.getReader()
+  owner.reader = reader
+  const chunks = []
+  let bytes = 0
+  for (;;) {
+    const next = await reader.read()
+    // Late bytes after Stop (Vercel keeps generating) are dropped.
+    if (!isCurrent()) return false
+    if (next.done) break
+    bytes += next.value.byteLength
+    if (bytes > MAX_AUDIO_BYTES) throw new Error('Audio exceeds playback limit')
+    if (player.append(next.value, rate)) playing()
+    chunks.push(next.value)
+  }
+  const finished = player.endInput()
+  cache.set(key, { chunks, bytes, rate })
+  await finished
+  return true
+}
+
+export function initSpeech(app, codes) {
   // Page memory only; a redeployed voice/model applies after a reload.
   const cache = createReplayCache()
   // The one playback (set only by a tap): { button, controller, player, reader }.
@@ -82,10 +125,13 @@ export function initSpeech(app) {
     const text = row
       ? (row.querySelector('.alternative-text')?.textContent ?? '')
       : (live?.main ?? '')
-    return { text, language: live?.target ?? app.prefs.target }
+    return { text, language: live?.targetLang ?? live?.target ?? app.prefs.target }
   }
 
   function render(button, status) {
+    // Chunks arrive many times a second; only a change touches the DOM.
+    if (button._speechStatus === status) return
+    button._speechStatus = status
     const active = status !== 'idle'
     const key = status === 'loading' ? 'speechLoading' : active ? 'stopListening' : 'listen'
     button.className = active
@@ -175,42 +221,13 @@ export function initSpeech(app) {
         await resumed
         // Stopped during a slow unlock: never send the paid request.
         if (!isCurrent()) return
-        const cached = cache.get(key)
-        if (cached) {
-          for (const chunk of cached.chunks) player.append(chunk, cached.rate)
-          render(button, 'playing')
-          await player.endInput()
-        } else {
-          const body = new FormData()
-          body.set('text', text)
-          body.set('language', speechLanguage(language))
-          body.set('uiLang', app.prefs.uiLang)
-          const res = await fetch('/speech', { method: 'POST', body, signal: current.controller.signal })
-          if (!isCurrent()) {
-            void res.body?.cancel().catch(() => {})
-            return
-          }
-          const rate = parseRate(res.headers.get('Content-Type'))
-          if (!res.ok || !res.body || !rate) throw new Error('Speech failed')
-          const reader = res.body.getReader()
-          current.reader = reader
-          const chunks = []
-          let bytes = 0
-          for (;;) {
-            const next = await reader.read()
-            // Late bytes after Stop (Vercel keeps generating) are dropped.
-            if (!isCurrent()) return
-            if (next.done) break
-            bytes += next.value.byteLength
-            if (bytes > MAX_AUDIO_BYTES) throw new Error('Audio exceeds playback limit')
-            if (player.append(next.value, rate)) render(button, 'playing')
-            chunks.push(next.value)
-          }
-          const finished = player.endInput()
-          cache.set(key, { chunks, bytes, rate })
-          await finished
-        }
-        if (isCurrent()) {
+        const body = new FormData()
+        body.set('text', text)
+        body.set('language', speechLanguage(language, codes))
+        body.set('uiLang', app.prefs.uiLang)
+        const playing = () => render(button, 'playing')
+        const ended = await loadAudio({ key, body, player, cache, owner: current, isCurrent, playing })
+        if (ended && isCurrent()) {
           owner = null
           player.stop()
           render(button, 'idle')
