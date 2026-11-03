@@ -8,7 +8,7 @@ import (
 // outputPanel is OutputPanel.tsx. stream.js fills the result regions from
 // the nt-* events; #result-details receives the server's partials
 // (ResultSkeleton, AlternativeRow). Copy/Listen are disabled until the
-// current run allows them (copy.js). Listen has no speech yet (stage 5).
+// current run allows them (copy.js); speech.js plays Listen.
 templ outputPanel(v View) {
 	<section class="output-panel" aria-label={ v.T("translation") } data-t-attr="aria-label:translation" aria-busy="false">
 		<div class="target-toolbar" data-testid="target-toolbar">
@@ -30,15 +30,7 @@ templ outputPanel(v View) {
 					@icons.Icon("copy", 14, nil)
 					<span data-t="copy">{ v.T("copy") }</span>
 				}
-				<span class="relative inline-flex shrink-0">
-					@ui.Pill(ui.PillProps{Size: "md", Class: "listen-button  disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
-						"disabled": true, "aria-label": v.T("listen"), "title": v.T("listen"), "data-t-attr": "aria-label:listen title:listen",
-						"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
-					}}) {
-						@icons.Icon("volume-2", 14, nil)
-						<span data-t="listen">{ v.T("listen") }</span>
-					}
-				</span>
+				@listenButton(v.T("listen"), true)
 			</div>
 		</div>
 		<div id="translation-result" class="result-scroll scrollbar-thin" data-testid="translation-result" tabindex="0" aria-label={ v.T("translation") } data-t-attr="aria-label:translation">

@@ -1,0 +1,21 @@
+{
+  "match": "[fx:speech-en]",
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 0,
+  "result": {
+    "sourceLang": "ko",
+    "targetLang": "en",
+    "main": "오늘 어떻게 지내요?",
+    "learningPhrases": [],
+    "rationale": "Reports targetLang en for the default fixture's main text, so Listen keys the same text under another language.",
+    "alternatives": [
+      {
+        "text": "Speech language check [fx:speech-en]",
+        "note": "The only alternative of the en speech fixture."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

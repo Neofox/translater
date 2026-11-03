@@ -16,6 +16,7 @@ import { initDictionary } from './dictionary.js'
 import { initLayout } from './layout.js'
 import { initLearning } from './learning.js'
 import { initPrefs } from './prefs.js'
+import { initSpeech } from './speech.js'
 import { initStream } from './stream.js'
 
 const data = JSON.parse(document.getElementById('nt-data').textContent)
@@ -24,7 +25,7 @@ const ta = document.querySelector('[data-testid="input-textarea"]')
 const VALID_DETECTED = ['en', 'ko', 'ja', 'fr', 'es', 'zh']
 const REGISTER = { friends: '반말', casual: '해요체', professional: '존댓말' }
 
-let composer, stream, copy, prefs, dictionary
+let composer, stream, copy, prefs, dictionary, speech
 // The model's report for an exact input, kept while that input stays.
 let modelDetected = null
 // Input for which the done-time safety net already flipped the target.
@@ -95,6 +96,7 @@ const app = {
 
   inputChanged() {
     app.abort()
+    speech.reset()
     if (ta.value !== revisedText) {
       revisedText = ta.value
       inputRevision += 1
@@ -115,6 +117,7 @@ const app = {
   /** Tone, languages or UI language changed: abort and re-run debounced. */
   settingsChanged() {
     app.abort()
+    speech.reset()
     app.autoSwap()
     updateCount()
     app.updateActions()
@@ -127,6 +130,7 @@ const app = {
     const trimmed = text.trim()
     if (!trimmed) return
     app.abort()
+    speech.reset()
     composer.clearTimer()
     const { source, mode, uiLang } = app.prefs
     const target = app.translationTarget()
@@ -179,6 +183,7 @@ const app = {
 
   updateActions() {
     copy.updateActions()
+    speech?.sync()
     app.learning?.sync()
     dictionary?.sync()
   },
@@ -233,6 +238,7 @@ document.addEventListener('click', (event) => {
 app.layout = initLayout(document.querySelector('.translator-panels'))
 stream = initStream(app, form)
 copy = initCopy(app)
+speech = initSpeech(app)
 prefs = initPrefs(app, data)
 composer = initComposer(app, ta)
 app.learning = initLearning(app)

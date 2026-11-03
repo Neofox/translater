@@ -26,6 +26,9 @@ const GO_GAPS: Record<string, Gap[]> = {
   'sentence-done': [ADJUST],
   'error-provider': [ADJUST],
   'streaming-skeleton': [ADJUST],
+  'listen-loading': [ADJUST],
+  'listen-playing': [ADJUST],
+  'listen-error': [ADJUST],
 }
 
 // Pixels that may differ per screenshot. Both apps render on the same

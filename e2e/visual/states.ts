@@ -9,8 +9,14 @@
 // never for a fixed time.
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { fillSource, openApp, waitForDone } from '../tests/helpers'
+import {
+  fillSource,
+  listenButton,
+  openApp,
+  waitForDone,
+} from '../tests/helpers'
 import type { Fake } from '../tests/helpers'
+import { installSyntheticAudio } from '../tests/syntheticAudio'
 
 export type VisualState = {
   name: string
@@ -179,4 +185,55 @@ export const STATES: VisualState[] = [
       await expect(panel.locator('.word-source-meta')).toContainText('cheers')
     },
   },
+  {
+    // Main Listen tapped while the audio unlock is still pending (synthetic
+    // audio holds resume): the active tone, spinner and Stop label. No
+    // speech request is sent.
+    name: 'listen-loading',
+    async setup(page, fake) {
+      await installSyntheticAudio(page, { holdResume: true })
+      await listenTo(page)
+      await expect(listenButton(page)).toHaveAttribute('aria-busy', 'true')
+      expect((await fake.stats()).speechRequests).toBe(0)
+    },
+  },
+  {
+    // Main Listen playing: the fake's audio has arrived and synthetic audio
+    // never ends it, so the Stop state holds.
+    name: 'listen-playing',
+    async setup(page, fake) {
+      await installSyntheticAudio(page)
+      await listenTo(page)
+      await expect(listenButton(page)).toHaveAttribute('aria-busy', 'false')
+      await expect(listenButton(page)).toHaveAttribute('aria-pressed', 'true')
+      await expect.poll(async () => (await fake.stats()).active).toBe(0)
+      expect((await fake.stats()).speechRequests).toBe(1)
+    },
+  },
+  {
+    // A failed Listen (the fake's speech upstream answers 500): the error
+    // notice under the main button.
+    name: 'listen-error',
+    async setup(page, fake) {
+      await installSyntheticAudio(page)
+      await openApp(page)
+      await fillSource(page, visualText('speech-error'))
+      await waitForDone(page)
+      await listenButton(page).click()
+      await expect(
+        page.getByTestId('output-toolbar').getByRole('status'),
+      ).toHaveText("Couldn't play audio. Try again.")
+      await expect(listenButton(page)).toHaveAttribute('aria-pressed', 'false')
+      expect((await fake.stats()).speechRequests).toBe(1)
+    },
+  },
 ]
+
+/** The visual fixture's result, then a tap on its main Listen. */
+async function listenTo(page: Page): Promise<void> {
+  await openApp(page)
+  await fillSource(page, visualText('visual'))
+  await waitForDone(page)
+  await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+  await listenButton(page).click()
+}

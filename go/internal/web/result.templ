@@ -36,14 +36,7 @@ templ AlternativeSkeleton(copyLabel, listenLabel string) {
 			}}) {
 				@icons.Icon("copy", 14, nil)
 			}
-			<span class="relative inline-flex shrink-0">
-				@ui.Pill(ui.PillProps{Class: "listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
-					"disabled": true, "aria-label": listenLabel, "title": listenLabel,
-					"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
-				}}) {
-					@icons.Icon("volume-2", 14, nil)
-				}
-			</span>
+			@listenButton(listenLabel, false)
 		</div>
 		<p class="alternative-text"><span class="animate-pulse"></span></p>
 		<p class="alternative-note"><span class="animate-pulse"></span></p>
@@ -54,7 +47,7 @@ templ AlternativeSkeleton(copyLabel, listenLabel string) {
 // rows always use the wrapper with register tags: WordView passes children
 // (an array, truthy even when empty). Copy and Listen (ListenButton.tsx,
 // compact) render disabled; the client enables them once the whole current
-// result has completed. Listen has no speech yet (stage 5), like the main one.
+// result has completed; speech.js plays Listen, like the main one.
 templ AlternativeRow(index int, word bool, text, note string, registers []string, copyLabel, listenLabel string) {
 	<li data-testid="alternative-item" class="alternative-item detail-enter group flow-root rounded-lg border border-border bg-panel px-3 py-2" style={ templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms") }>
 		if text != "" {
@@ -64,14 +57,7 @@ templ AlternativeRow(index int, word bool, text, note string, registers []string
 				}}) {
 					@icons.Icon("copy", 14, nil)
 				}
-				<span class="relative inline-flex shrink-0">
-					@ui.Pill(ui.PillProps{Class: "listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", Attrs: templ.Attributes{
-						"disabled": true, "aria-label": listenLabel, "title": listenLabel,
-						"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
-					}}) {
-						@icons.Icon("volume-2", 14, nil)
-					}
-				</span>
+				@listenButton(listenLabel, false)
 			</div>
 		}
 		if word {
