@@ -21,6 +21,7 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | `settings.js` | Settings popover: placement, focus in and back, `aria-controls`, `aria-owns` mirror      |
 | `refine.js`   | Refine chips and custom adjustment (`template#adjust-template`), caps, `previousMain`, rollback stack of a failed refine |
 | `float.js`    | Fixed popup placement (offset/flip/shift/size, Adjust clearance), `autoUpdate`, `panelBoundary`, `closeOnFocusOut` |
+| `inspect.js`  | Selection-safe main text and source grammar taps (`isInspectTap`, `textOffsetAtPoint`, 400 ms grace; port of `phrasePointer.ts`, `InspectableTranslation.tsx`, `SourceHighlight.tsx`) |
 
 ## Language detection
 

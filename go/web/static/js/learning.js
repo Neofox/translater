@@ -11,7 +11,10 @@
 // offsets, no text) just before nt-done; everything shown here derives from
 // them, the current run and the textarea value, so phrase inspection is
 // local page state only and is never stored or sent. Handlers are delegated
-// on document, so swapped or moved nodes need no rebinding.
+// on document, so swapped or moved nodes need no rebinding. Taps on the main
+// text and the source grammar come from inspect.js.
+
+import { initMainTaps, initSourceTaps } from './inspect.js'
 
 /** Layouts with a reference pane beside the source (TranslatorWorkspace). */
 export const SEPARATE = ['workspace', 'split', 'book']
@@ -111,6 +114,9 @@ export function initLearning(app) {
   let mirror = null
   let mirrored = ''
   let scrolledTo = null
+  // The editor state when learning opened from a source grammar tap
+  // (LearningContext's sourceFocus), restored when the surface closes.
+  let saved = null
 
   /** The current, finished, error-free result (LearningContext's canOpen). */
   const canOpen = () => {
@@ -140,8 +146,17 @@ export function initLearning(app) {
     } else {
       delete panel.dataset.expanded
       home.append(inspector)
-      // LearningPanel's close effect; a disabled trigger keeps focus where it is.
-      ;(main.querySelector('.word-details-trigger') ?? main).focus({ preventScroll: true })
+      // LearningPanel's close effect: the exact editor state when opened from
+      // the source and the result is unchanged, else the trigger or the main
+      // text (a disabled trigger keeps focus where it is).
+      const source = saved
+      saved = null
+      if (source?.identity === state.identity && ta.isConnected) {
+        ta.focus({ preventScroll: true })
+        ta.setSelectionRange(source.start, source.end, source.direction)
+        ta.scrollTop = source.top
+        ta.scrollLeft = source.left
+      } else (main.querySelector('.word-details-trigger') ?? main).focus({ preventScroll: true })
     }
   }
 
@@ -301,6 +316,52 @@ export function initLearning(app) {
     app.updateActions()
   }
 
+  /** LearningContext's openAt: learning opens on the phrase containing
+   * `offset` (none for the overview). A source grammar tap keeps the exact
+   * editor state for the close. */
+  function openAt(offset, origin) {
+    const ranges = learning()
+    if (!ranges) return
+    saved = origin === 'source' ? { start: ta.selectionStart, end: ta.selectionEnd, direction: ta.selectionDirection, top: ta.scrollTop, left: ta.scrollLeft, identity: state.identity } : null
+    const index = offset === undefined ? -1 : ranges.chunks.findIndex((c) => offset >= c.s && offset < c.e)
+    state = { ...state, open: true, chunk: index < 0 ? null : index }
+    // On mobile the surface replaces the editor, so its keyboard goes.
+    if (origin === 'source' && !layout().desktop) ta.blur()
+    app.updateActions()
+  }
+
+  /** The word trigger's activation (OutputPanel's word onInspect). */
+  function activateWord() {
+    const { mode, desktop } = layout()
+    state = activate(state, { canOpen: canOpen(), separate: SEPARATE.includes(mode) })
+    app.updateActions()
+    // ReferencePanel's effect: the heading takes focus on every activation.
+    if (desktop && state.open) {
+      heading.focus({ preventScroll: true })
+      home.scrollTo({ top: 0 })
+    }
+  }
+
+  /** A main text tap at `offset` (OutputPanel's sentence onInspect). When
+   * learning the original source, the tapped translation maps to the phrase
+   * whose counterpart quotation contains it, else to the overview. */
+  function inspectMain(offset) {
+    if (app.live?.intent === 'word') return activateWord()
+    const ranges = learning()
+    if (!ranges) return
+    if (!layout().desktop && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    if (ranges.side !== 'source') return openAt(offset)
+    const chunk = ranges.chunks.find((c) => c.src.some(([s, e]) => offset >= s && offset < e))
+    openAt(chunk?.s)
+  }
+
+  initMainTaps({ key: () => state.identity, onInspect: inspectMain })
+  initSourceTaps(ta, {
+    mirror: () => (learning()?.side === 'source' ? mirror : null),
+    key: () => state.identity,
+    onInspect: (offset) => openAt(offset, 'source'),
+  })
+
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null
     if (target?.closest('.learning-panel-header button')) return close()
@@ -313,21 +374,19 @@ export function initLearning(app) {
       app.updateActions()
       return
     }
+    // Keyboard clicks only: pointer taps go through the selection-safe
+    // gesture of inspect.js.
     const trigger = target?.closest('.word-details-trigger')
-    if (!trigger || trigger.disabled) return
-    // Until the selection-safe tap of Task 20, any click activates (TS:
-    // keyboard clicks here, pointer taps after a 400 ms grace period).
-    const { mode, desktop } = layout()
-    state = activate(state, { canOpen: canOpen(), separate: SEPARATE.includes(mode) })
-    app.updateActions()
-    // ReferencePanel's effect: the heading takes focus on every activation.
-    if (desktop && state.open) {
-      heading.focus({ preventScroll: true })
-      home.scrollTo({ top: 0 })
-    }
+    if (trigger && !trigger.disabled && event.detail === 0) activateWord()
   })
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || !shown || !event.target.closest?.('.output-panel')) return
+    const target = event.target instanceof Element ? event.target : null
+    // The mobile main text is a button that opens learning.
+    if ((event.key === 'Enter' || event.key === ' ') && target === main && main.getAttribute('role') === 'button' && main.dataset.inspectable === 'true') {
+      event.preventDefault()
+      return inspectMain(0)
+    }
+    if (event.key !== 'Escape' || !shown || !target?.closest('.output-panel')) return
     event.stopPropagation()
     close()
   })

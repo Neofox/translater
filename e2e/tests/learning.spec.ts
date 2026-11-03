@@ -3,13 +3,16 @@
 // selected mark, SourceHighlight.tsx's source mirror. Ports of
 // tests/browser/learning.browser.tsx.
 //
-// The rows show in the reference pane of workspace/split/book layouts once
-// the result is done. Compact layouts show them only in the learning surface,
-// which opens from a tap on the main text (Task 20/21), so the row parts of
-// these tests skip there. Selecting a row opens learning: split and book then
-// show the rows in the full-size surface, the desktop workspace keeps them
-// beside the source.
+// The rows show in the reference pane of the desktop workspace once the
+// result is done; every other layout shows them in the learning surface,
+// which a tap on the main text opens (openOverview, as in the TS test).
+//
+// Inspection gestures (phrasePointer.ts, InspectableTranslation.tsx,
+// SourceHighlight.tsx): a short stationary tap inspects after a 400 ms
+// selection grace period; drag, long press and double-click keep native
+// selection and editing.
 import type { Page } from '@playwright/test'
+import { installFakeVisualViewport } from '../perf/page-scripts'
 import {
   STRINGS,
   copyButton,
@@ -24,20 +27,13 @@ import {
   setUiLang,
   source,
   test,
+  translationResult,
   waitForDone,
   waitForMain,
 } from './helpers'
 
 const rows = (page: Page) => page.getByTestId('learning-chunk')
 const mirror = (page: Page) => page.getByTestId('source-highlight')
-
-/** The layout shows the reference pane (ReferencePanel.tsx). */
-async function separateReference(page: Page): Promise<boolean> {
-  const layout = await page
-    .locator('.translator-panels')
-    .getAttribute('data-layout')
-  return ['workspace', 'split', 'book'].includes(layout ?? '')
-}
 
 /** The desktop workspace (`desktop` in useWorkspaceLayout.ts). */
 async function isDesktop(page: Page): Promise<boolean> {
@@ -80,6 +76,108 @@ async function readKorean(page: Page, name: string, text: string) {
 
 const DEFAULT_MAIN = '오늘 어떻게 지내요?'
 
+const panel = (page: Page) => page.getByTestId('learning-panel')
+const visibleDetails = (page: Page) =>
+  page.locator('.phrase-detail').filter({ visible: true })
+
+/** The whole-message rows (TS openOverview): compact layouts open the
+ * learning surface with a tap on the main text, then any phrase the tap
+ * selected collapses. */
+async function openOverview(page: Page) {
+  if (!(await isDesktop(page))) {
+    // On the text itself: a short main line ends before the paragraph's
+    // centre, and a tap past the end of the text does not inspect.
+    if (!(await panel(page).isVisible()))
+      await mainTranslation(page).click({ position: { x: 4, y: 8 } })
+    await expect(panel(page)).toBeVisible()
+  }
+  const expanded = page.locator(
+    '[data-testid="learning-chunk"][aria-expanded="true"]',
+  )
+  if (await expanded.count()) await expanded.first().click()
+  await expect(expanded).toHaveCount(0)
+}
+
+async function closeLearning(page: Page) {
+  if (await panel(page).isVisible())
+    await page
+      .getByRole('button', { name: STRINGS.en.closeLearning, exact: true })
+      .click()
+  await expect(panel(page)).toBeHidden()
+}
+
+/** Centre of the `nth` source grammar underline, relative to the textarea
+ * (sourceGrammarPosition in the TS test). */
+async function grammarPosition(page: Page, nth = 0) {
+  return page.evaluate((index) => {
+    const grammar = document.querySelectorAll('[data-testid="source-grammar"]')[
+      index
+    ]!
+    const field = document
+      .querySelector('[data-testid="input-textarea"]')!
+      .getBoundingClientRect()
+    // A wrapped underline has a rectangle per line; take one the editor
+    // shows (a short editor scrolls its first lines away).
+    const rects = [...grammar.getClientRects()]
+    const rect =
+      rects.find(
+        (r) =>
+          r.top + r.height / 2 > field.top &&
+          r.top + r.height / 2 < field.bottom,
+      ) ?? rects[0]!
+    return {
+      x: rect.left + rect.width / 2 - field.left,
+      y: rect.top + rect.height / 2 - field.top,
+    }
+  }, nth)
+}
+
+type Editor = {
+  same: boolean
+  focused: boolean
+  value: string
+  caret: [number, number]
+  scroll: number
+}
+
+/** Marks the textarea node so later reads can tell it was never replaced. */
+async function markSource(page: Page) {
+  await page.evaluate(() => {
+    ;(
+      document.querySelector('[data-testid="input-textarea"]') as unknown as {
+        __t20: boolean
+      }
+    ).__t20 = true
+  })
+}
+
+async function editor(page: Page): Promise<Editor> {
+  return page.evaluate(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>(
+      '[data-testid="input-textarea"]',
+    )!
+    return {
+      same: (ta as unknown as { __t20?: boolean }).__t20 === true,
+      focused: document.activeElement === ta,
+      value: ta.value,
+      caret: [ta.selectionStart, ta.selectionEnd] as [number, number],
+      scroll: ta.scrollTop,
+    }
+  })
+}
+
+/** The learn-reading result with the editor unfocused, like a page the
+ * reader comes back to (fill focuses it). */
+async function readingResult(page: Page, text = '오늘 도와줘서 고마워요.') {
+  const input = await readKorean(page, 'learn-reading', text)
+  await source(page).blur()
+  await expect(page.getByTestId('source-grammar')).toHaveCount(2)
+  await markSource(page)
+  return input
+}
+
+const settle = (page: Page) => page.waitForTimeout(450)
+
 test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
@@ -96,25 +194,24 @@ test('initial phrase details reveal locally and only grammar constructions are u
     'data-inspectable',
     'true',
   )
-  if (await separateReference(page)) {
-    const row = rows(page).nth(1)
-    await expect(row).toContainText('어떻게 지내요')
-    await row.click()
-    await expect(row).toHaveAttribute('aria-expanded', 'true')
-    const detail = page.locator('.phrase-detail').filter({ visible: true })
-    await expect(detail).toHaveCount(1)
-    await expect(detail.locator('dt')).toContainText([
-      STRINGS.en.inThisSentence,
-      STRINGS.en.baseForm,
-      STRINGS.en.grammar,
-    ])
-    await expect(detail.getByText('지내다', { exact: true })).toBeVisible()
-    await expect(detail.locator('dd[lang="ko"]')).toHaveText('지내다')
-    await expect(
-      page.getByRole('button', { name: 'More detail', exact: true }),
-    ).toHaveCount(0)
-    await expect(page.getByTestId('learning-detail-skeleton')).toHaveCount(0)
-  }
+  await openOverview(page)
+  const row = rows(page).nth(1)
+  await expect(row).toContainText('어떻게 지내요')
+  await row.click()
+  await expect(row).toHaveAttribute('aria-expanded', 'true')
+  const detail = visibleDetails(page)
+  await expect(detail).toHaveCount(1)
+  await expect(detail.locator('dt')).toContainText([
+    STRINGS.en.inThisSentence,
+    STRINGS.en.baseForm,
+    STRINGS.en.grammar,
+  ])
+  await expect(detail.getByText('지내다', { exact: true })).toBeVisible()
+  await expect(detail.locator('dd[lang="ko"]')).toHaveText('지내다')
+  await expect(
+    page.getByRole('button', { name: 'More detail', exact: true }),
+  ).toHaveCount(0)
+  await expect(page.getByTestId('learning-detail-skeleton')).toHaveCount(0)
   // Phrase inspection is local: no request beyond the translation.
   expect(await fake.requests()).toBe(1)
 })
@@ -168,7 +265,7 @@ test('English UI breaks down original Korean when translating into English @lear
     line: 'underline',
     before: true,
   })
-  if (!(await separateReference(page))) return
+  await openOverview(page)
   const row = rows(page).nth(1)
   await expect(row).toContainText('도와줘서')
   await row.click()
@@ -205,7 +302,7 @@ test('Korean UI breaks down original English when translating into Korean @learn
     'are you doing',
     'my',
   ])
-  if (!(await separateReference(page))) return
+  await openOverview(page)
   await expect(rows(page).first()).toContainText('How are you doing')
   await rows(page).first().click()
   if (desktop)
@@ -227,30 +324,25 @@ test('whole-message breakdown keeps every phrase visible with inline details and
   await expect
     .poll(() => inspectables(page))
     .toEqual(Array(8).fill(['줘서', '고마워요']).flat())
-  test.skip(
-    !(await separateReference(page)),
-    'compact layouts show the rows in the learning surface (Task 20/21)',
-  )
-  await expect(rows(page)).toHaveCount(24)
+  await openOverview(page)
+  await expect(rows(page).filter({ visible: true })).toHaveCount(24)
   await expect(page.locator('.learning-sentences')).toHaveCount(0)
-  const visibleDetails = page
-    .locator('.phrase-detail')
-    .filter({ visible: true })
+  const details = visibleDetails(page)
   await rows(page).nth(4).click()
   await expect(rows(page).nth(4)).toHaveAttribute('aria-expanded', 'true')
   await expect(rows(page)).toHaveCount(24)
-  await expect(visibleDetails).toHaveCount(1)
+  await expect(details).toHaveCount(1)
   await expect(
-    visibleDetails.getByText('도와주다 emphasizes helping another person.', {
+    details.getByText('도와주다 emphasizes helping another person.', {
       exact: true,
     }),
   ).toBeVisible()
   await rows(page).nth(7).click()
   await expect(rows(page).nth(7)).toHaveAttribute('aria-expanded', 'true')
   await expect(rows(page).nth(4)).toHaveAttribute('aria-expanded', 'false')
-  await expect(visibleDetails).toHaveCount(1)
+  await expect(details).toHaveCount(1)
   await rows(page).nth(7).click()
-  await expect(visibleDetails).toHaveCount(0)
+  await expect(details).toHaveCount(0)
   await expect(rows(page)).toHaveCount(24)
 })
 
@@ -285,7 +377,8 @@ test('Breakdown action never appears before phrase details arrive or after compl
     })
   })
   await readKorean(page, 'learn-reading', '오늘 도와줘서 고마워요.')
-  if (await separateReference(page)) await expect(rows(page)).toHaveCount(3)
+  await openOverview(page)
+  await expect(rows(page).filter({ visible: true })).toHaveCount(3)
   const log = await page.evaluate(
     () =>
       (
@@ -312,7 +405,7 @@ test('overlapping model quotes keep the remaining Korean source breakdown usable
     '드립니다',
     '보시고',
   ])
-  if (!(await separateReference(page))) return
+  await openOverview(page)
   await expect(rows(page)).toHaveCount(2)
   await expect(rows(page).first()).toContainText('링크를 공유드립니다')
   await rows(page).first().click()
@@ -325,18 +418,16 @@ test('overlapping model quotes keep the remaining Korean source breakdown usable
 test('initial phrase inspection clears on input edits, translation errors and Clear @learning', async ({
   page,
 }) => {
-  const separate = await separateReference(page)
   const select = async () => {
     await expect.poll(() => inspectables(page)).toEqual(['지내요'])
-    if (!separate) return
+    await openOverview(page)
     await rows(page).nth(1).click()
     await expect(page.getByTestId('selected-phrase')).toHaveText(
       '어떻게 지내요',
     )
     // The counterpart quotation is marked under the source.
     await expect(mirror(page).locator('mark')).toHaveText('How are you doing')
-    if (!(await isDesktop(page)))
-      await page.getByRole('button', { name: STRINGS.en.closeLearning }).click()
+    await closeLearning(page)
   }
   const cleared = async () => {
     await expect(page.getByTestId('selected-phrase')).toHaveCount(0)
@@ -395,8 +486,8 @@ test('learning from a superseded run is ignored @learning', async ({
     '줘서',
     '고마워요',
   ])
-  if (await separateReference(page))
-    await expect(rows(page)).toHaveText([/^오늘/, /^도와줘서/, /^고마워요/])
+  await openOverview(page)
+  await expect(rows(page)).toHaveText([/^오늘/, /^도와줘서/, /^고마워요/])
 })
 
 test('no-alternatives desktop example keeps all learning facts in phrase details @learning', async ({
@@ -466,4 +557,362 @@ test('no-alternatives desktop example keeps all learning facts in phrase details
       node,
     ),
   ).toEqual([1, 3])
+})
+
+// ----- Inspection gestures ---------------------------------------------------
+
+test('a deliberate phrase tap selects its chunk without interfering with native selection @learning', async ({
+  page,
+  fake,
+}) => {
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  await expect.poll(() => inspectables(page)).toEqual(['지내요'])
+  const start = Date.now()
+  await mainTranslation(page).getByTestId('inspectable-phrase').click()
+  await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
+  // The selection grace period runs first.
+  expect(Date.now() - start).toBeGreaterThanOrEqual(400)
+  await expect(rows(page).nth(1)).toHaveAttribute('aria-expanded', 'true')
+  await expect(
+    page.getByRole('region', { name: '어떻게 지내요', exact: true }),
+  ).toBeVisible()
+  if (!(await isDesktop(page)))
+    await expect(mainTranslation(page)).toHaveAttribute('aria-expanded', 'true')
+  await closeLearning(page)
+  // A native selection inside the main text still works afterwards.
+  await page.evaluate(() => window.getSelection()?.removeAllRanges())
+  // The phrase, or the selected mark where the desktop keeps it.
+  await mainTranslation(page).locator('span, mark').first().dblclick()
+  await settle(page)
+  expect(
+    await page.evaluate(() => window.getSelection()?.toString() ?? ''),
+  ).not.toBe('')
+  await expect(panel(page)).toBeHidden()
+  expect(await fake.requests()).toBe(1)
+})
+
+test('deselecting native text and a long press do not inspect grammar @learning', async ({
+  page,
+}) => {
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  await expect.poll(() => inspectables(page)).toEqual(['지내요'])
+  // Focus the frame first: Playwright's first focus transfer can clear a
+  // native selection before pointerdown arrives.
+  await translationResult(page).click({ position: { x: 1, y: 1 } })
+  await page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((a) =>
+          Number.isFinite(a.effect?.getComputedTiming().endTime ?? 0),
+        )
+        .map((a) => a.finished.catch(() => {})),
+    )
+    const main = document.querySelector('[data-testid="main-translation"]')!
+    const range = document.createRange()
+    range.selectNodeContents(main)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    const log: boolean[] = []
+    ;(window as unknown as { __selectedAtDown: boolean[] }).__selectedAtDown =
+      log
+    document.addEventListener(
+      'pointerdown',
+      () => log.push(Boolean(window.getSelection()?.toString())),
+      { capture: true, once: true },
+    )
+  })
+  await mainTranslation(page).getByTestId('inspectable-phrase').click()
+  await settle(page)
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { __selectedAtDown: boolean[] }).__selectedAtDown,
+    ),
+  ).toEqual([true])
+  await expect(page.getByTestId('selected-phrase')).toHaveCount(0)
+  await expect(panel(page)).toBeHidden()
+  await page.evaluate(() => window.getSelection()?.removeAllRanges())
+  await mainTranslation(page)
+    .getByTestId('inspectable-phrase')
+    .click({ delay: 600 })
+  await settle(page)
+  await expect(page.getByTestId('selected-phrase')).toHaveCount(0)
+  await expect(panel(page)).toBeHidden()
+  await expect(
+    page.locator('[data-testid="learning-chunk"][aria-expanded="true"]'),
+  ).toHaveCount(0)
+})
+
+test('double-click selects a word without opening learning @learning', async ({
+  page,
+}) => {
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  await expect.poll(() => inspectables(page)).toEqual(['지내요'])
+  await mainTranslation(page).getByTestId('inspectable-phrase').dblclick()
+  await settle(page)
+  expect(
+    await page.evaluate(() => window.getSelection()?.toString() ?? ''),
+  ).not.toBe('')
+  await expect(page.getByTestId('selected-phrase')).toHaveCount(0)
+  await expect(panel(page)).toBeHidden()
+  // The source editor: double-click and long press on a grammar underline
+  // keep ordinary editing.
+  await page.evaluate(() => window.getSelection()?.removeAllRanges())
+  await readingResult(page)
+  await source(page).dblclick({ position: await grammarPosition(page) })
+  await settle(page)
+  const doubled = await editor(page)
+  expect(doubled.caret[1]).toBeGreaterThan(doubled.caret[0])
+  await source(page).click({
+    position: await grammarPosition(page),
+    delay: 600,
+  })
+  await settle(page)
+  await expect(visibleDetails(page)).toHaveCount(0)
+  await expect(panel(page)).toBeHidden()
+  expect((await editor(page)).same).toBe(true)
+})
+
+test('tapping source grammar opens its phrase and preserves the editor caret @learning', async ({
+  page,
+}) => {
+  const input = await readingResult(page)
+  await source(page).click({ position: await grammarPosition(page) })
+  const caret = (await editor(page)).caret
+  await expect(
+    page.getByRole('region', { name: '도와줘서', exact: true }),
+  ).toBeVisible()
+  const opened = await editor(page)
+  expect(opened).toMatchObject({ same: true, value: input, caret })
+  // The desktop workspace leaves source focus in place.
+  if (await isDesktop(page)) expect(opened.focused).toBe(true)
+  await closeLearning(page)
+  expect(await editor(page)).toMatchObject({
+    same: true,
+    focused: true,
+    caret,
+  })
+  await page.keyboard.type(' 수정')
+  await expect(visibleDetails(page)).toHaveCount(0)
+  await expect(mirror(page)).toHaveCount(0)
+})
+
+for (const cancelTap of [false, true])
+  test(`scrolled source grammar stays accurate and scrolling cancels a pending tap (${cancelTap}) @learning`, async ({
+    page,
+  }) => {
+    const text = `${Array(40).fill('다른 문장입니다.').join('\n')}\n오늘 도와줘서 고마워요.`
+    await readingResult(page, text)
+    await page.evaluate(() => {
+      const ta = document.querySelector<HTMLTextAreaElement>(
+        '[data-testid="input-textarea"]',
+      )!
+      ta.focus()
+      ta.setSelectionRange(ta.value.length, ta.value.length)
+      ta.scrollTop = ta.scrollHeight
+    })
+    const scrolled = await editor(page)
+    expect(scrolled.scroll).toBeGreaterThan(0)
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.querySelector('[data-testid="source-highlight"]')!
+              .scrollTop,
+        ),
+      )
+      .toBe(scrolled.scroll)
+    await source(page).click({ position: await grammarPosition(page) })
+    const { caret, scroll } = await editor(page)
+    if (cancelTap) {
+      await page.evaluate(() => {
+        document.querySelector<HTMLTextAreaElement>(
+          '[data-testid="input-textarea"]',
+        )!.scrollTop = 0
+      })
+      await settle(page)
+      await expect(visibleDetails(page)).toHaveCount(0)
+      await expect(panel(page)).toBeHidden()
+      return
+    }
+    await expect(
+      page.getByRole('region', { name: '도와줘서', exact: true }),
+    ).toBeVisible()
+    await closeLearning(page)
+    expect(await editor(page)).toMatchObject({
+      same: true,
+      focused: true,
+      caret,
+      scroll,
+    })
+  })
+
+test('source grammar tap survives the keyboard opening on focus @learning', async ({
+  page,
+}) => {
+  test.skip(await isDesktop(page), 'no software keyboard on the desktop')
+  await page.addInitScript(installFakeVisualViewport)
+  await page.reload({ waitUntil: 'networkidle' })
+  await readingResult(page)
+  await page.evaluate(() => {
+    document.querySelector('[data-testid="input-textarea"]')!.addEventListener(
+      'focus',
+      () =>
+        (
+          window as unknown as {
+            __keyboard: { set: (h: number, top: number) => void }
+          }
+        ).__keyboard.set(Math.floor(window.innerHeight * 0.5), 0),
+      { once: true },
+    )
+  })
+  await source(page).click({ position: await grammarPosition(page) })
+  const { caret } = await editor(page)
+  await expect(
+    page.getByRole('region', { name: '도와줘서', exact: true }),
+  ).toBeVisible()
+  await closeLearning(page)
+  expect(await editor(page)).toMatchObject({
+    same: true,
+    focused: true,
+    caret,
+  })
+})
+
+test('dragging from a source grammar underline selects native editor text @learning', async ({
+  page,
+}) => {
+  await readingResult(page)
+  const start = await grammarPosition(page)
+  const box = (await source(page).boundingBox())!
+  const x = box.x + start.x
+  const y = box.y + start.y
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 50, y, { steps: 5 })
+  await page.mouse.up()
+  await settle(page)
+  const after = await editor(page)
+  expect(after.caret[1]).toBeGreaterThan(after.caret[0])
+  expect(after.same).toBe(true)
+  await expect(visibleDetails(page)).toHaveCount(0)
+  await expect(panel(page)).toBeHidden()
+})
+
+test('source grammar is visible before selecting a phrase and never changes editing @learning', async ({
+  page,
+}) => {
+  const input = await readingResult(page)
+  await expect(page.getByTestId('source-grammar')).toHaveText([
+    '줘서',
+    '고마워요',
+  ])
+  expect(await mirrorText(page)).toBe(input)
+  const styles = await page.evaluate(() => {
+    const m = document.querySelector('[data-testid="source-highlight"]')!
+    return {
+      pointer: getComputedStyle(m).pointerEvents,
+      line: getComputedStyle(m.querySelector('[data-testid="source-grammar"]')!)
+        .textDecorationLine,
+    }
+  })
+  expect(styles).toEqual({ pointer: 'none', line: 'underline' })
+  // Typing straight after a tap cancels it and edits as usual.
+  await source(page).click({ position: await grammarPosition(page) })
+  const { caret } = await editor(page)
+  await page.keyboard.type('x')
+  await settle(page)
+  await expect(visibleDetails(page)).toHaveCount(0)
+  await expect(panel(page)).toBeHidden()
+  expect(await editor(page)).toMatchObject({
+    same: true,
+    focused: true,
+    value: input.slice(0, caret[0]) + 'x' + input.slice(caret[1]),
+    caret: [caret[0] + 1, caret[0] + 1],
+  })
+  await expect(mirror(page)).toHaveCount(0)
+  // A selection made in the editor stays.
+  await page.evaluate(() =>
+    document
+      .querySelector<HTMLTextAreaElement>('[data-testid="input-textarea"]')!
+      .setSelectionRange(3, 7),
+  )
+  expect((await editor(page)).caret).toEqual([3, 7])
+})
+
+test('source grammar tap after emoji opens its phrase @learning', async ({
+  page,
+}) => {
+  await readKorean(
+    page,
+    'learn-unicode',
+    '정말 고마워요! 👨‍👩‍👧 가족이랑 같이 봤어요.',
+  )
+  await source(page).blur()
+  await markSource(page)
+  await expect(page.getByTestId('source-grammar')).toHaveText([
+    '고마워요',
+    '이랑',
+    '봤어요',
+  ])
+  await source(page).click({ position: await grammarPosition(page, 2) })
+  await expect(
+    page.getByRole('region', { name: '가족이랑 같이 봤어요', exact: true }),
+  ).toBeVisible()
+  await closeLearning(page)
+  expect(await editor(page)).toMatchObject({ same: true, focused: true })
+})
+
+test('keyboard Enter opens mobile learning from the main text @learning', async ({
+  page,
+}) => {
+  test.skip(await isDesktop(page), 'the desktop main text is not a button')
+  await fillSource(page, `How are you doing today ${nonce()}`)
+  await waitForDone(page)
+  const main = mainTranslation(page)
+  await expect(main).toHaveAttribute('role', 'button')
+  for (const key of ['Enter', ' ']) {
+    await main.focus()
+    await page.keyboard.press(key)
+    await expect(panel(page)).toBeVisible()
+    await expect(main).toHaveAttribute('aria-expanded', 'true')
+    await closeLearning(page)
+    await expect(main).toBeFocused()
+    await expect(main).toHaveAttribute('aria-expanded', 'false')
+  }
+})
+
+test('the word-details trigger ignores a drag and a long press @learning @word', async ({
+  page,
+}) => {
+  await fillSource(
+    page,
+    `thanks ${fixture('word').match}${nonce().slice(0, 5)}`,
+  )
+  await waitForDone(page)
+  const trigger = page.getByTestId('word-details-trigger')
+  await expect(trigger).toBeEnabled()
+  const box = (await trigger.boundingBox())!
+  const x = box.x + 4
+  const y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 30, y, { steps: 5 })
+  await page.mouse.up()
+  await trigger.click({ delay: 600 })
+  await settle(page)
+  await expect(panel(page)).toBeHidden()
+  await expect(
+    page.locator('.reference-panel[data-word-active="true"]'),
+  ).toHaveCount(0)
+  await expect(page.locator('.reference-heading:focus')).toHaveCount(0)
+  // A short stationary tap still opens the details.
+  await trigger.click()
+  if (await isDesktop(page))
+    await expect(page.locator('.reference-heading')).toBeFocused()
+  else await expect(panel(page)).toBeVisible()
 })

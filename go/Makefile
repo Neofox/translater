@@ -6,7 +6,9 @@
 TAILWIND := mise exec -- tailwindcss
 CSS_IN   := web/static/css/input.css
 CSS_OUT  := web/static/css/app.css
-SIZE_MAX := 40960
+# Script gzip target: 40 KB, raised to 42 KB with the inspection gestures
+# (a target, not a gate: never cut a feature or parity to meet it).
+SIZE_MAX := 43008
 # The TS app's stylesheet, compiled from src/styles.css with the same
 # Tailwind CLI, as the CSS budget. Run from src/ so automatic source
 # detection scans only the TS sources: from the repository root it also
