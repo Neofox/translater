@@ -114,6 +114,9 @@ export default defineConfig({
     '../test-results/visual-baseline/{projectName}/{arg}{ext}',
   updateSnapshots: APP === 'go' ? 'none' : 'missing',
   globalSetup: './global-setup.ts',
+  // The TS-vs-Go visual parity tests need the baselines `npm run e2e:visual`
+  // (e2e/visual/run.mjs) writes first; plain e2e runs skip them.
+  grepInvert: process.env.E2E_VISUAL ? undefined : /@visual/,
   fullyParallel: true,
   workers: WORKERS,
   retries: 0,
