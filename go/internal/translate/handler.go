@@ -42,8 +42,9 @@ const (
 // runID is the client's run UUID, echoed in every event.
 var runID = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 
-// uuid is zod's z.uuid() shape for the optional analytics ids.
-var uuid = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+// uuid is zod 4's z.uuid() regex (zod/v4/core/regexes.js): RFC 9562
+// version 1-8 and variant digits, or the nil and max UUIDs.
+var uuid = regexp.MustCompile(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$`)
 
 // triggers are TranslationTrigger (useTranslate.ts); the default is debounce.
 var triggers = []string{"debounce", "paste", "enter", "blur", "force", "refinement"}
@@ -163,7 +164,10 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	// ends without one, as the AI SDK's onAbort does.
 	var usage llm.Usage
 	var outcome llm.Kind
-	gen := s.tracer.StartGeneration(ctx, telemetry.NewRuntimeContext(in, s.cfg, s.c.CacheVersion, analytics))
+	var gen *telemetry.Generation
+	if s.tracer != nil {
+		gen = s.tracer.StartGeneration(ctx, telemetry.NewRuntimeContext(in, s.cfg, s.c.CacheVersion, analytics))
+	}
 	defer func() {
 		cancel()
 		gen.End(usage, outcome)
@@ -279,15 +283,19 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 
 // parseAnalytics validates the optional analytics fields (useTranslate.ts).
 // They reach telemetry only, never the prompt or the cache key. Absent
-// fields keep the TS defaults.
+// fields keep the TS defaults. The run id doubles as the analytics run id
+// (TS analyticsRunId) only when it is a UUID; any other accepted run id is
+// reported as "".
 func parseAnalytics(form url.Values, run string) (telemetry.Analytics, error) {
 	bad := func(field, reason string) error { return &prompt.FieldError{Field: field, Reason: reason} }
 	a := telemetry.Analytics{
 		SessionID:       form.Get("analyticsSessionId"),
-		RunID:           run,
 		SupersedesRunID: form.Get("supersedesRunId"),
 		InputRevision:   -1,
 		Trigger:         form.Get("trigger"),
+	}
+	if uuid.MatchString(run) {
+		a.RunID = run
 	}
 	if a.SessionID != "" && !uuid.MatchString(a.SessionID) {
 		return a, bad("analyticsSessionId", "is not a UUID")

@@ -176,7 +176,7 @@ func NewRuntimeContext(in prompt.TranslateInput, cfg config.Translate, promptVer
 		HasContext:         in.Context != "",
 		RefinementCount:    len(in.Refinements),
 		RequestKind:        kind,
-		InputLengthBucket:  LengthBucket(utf16Len(strings.TrimSpace(in.Text))),
+		InputLengthBucket:  LengthBucket(utf16Len(in.Text)),
 		IsPolish:           in.Source == in.Target,
 		PromptVersion:      promptVersion,
 		RequestedModel:     cfg.Model,
@@ -207,7 +207,8 @@ func LengthBucket(n int) string {
 	return "2001+"
 }
 
-// utf16Len is JS String.prototype.length (the TS client sends trimmed text).
+// utf16Len is JS String.prototype.length (TS data.text.length, measured on
+// the text as posted).
 func utf16Len(s string) int {
 	n := 0
 	for _, r := range s {

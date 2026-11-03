@@ -146,7 +146,7 @@ func TestAttributeKeysExactlyAllowlist(t *testing.T) {
 		"langfuse.observation.metadata.hasContext":        "true",
 		"langfuse.observation.metadata.refinementCount":   "2",
 		"langfuse.observation.metadata.requestKind":       "refinement",
-		"langfuse.observation.metadata.inputLengthBucket": "1-24",
+		"langfuse.observation.metadata.inputLengthBucket": "25-100", // untrimmed "  source <canary>  "
 		"langfuse.observation.metadata.isPolish":          "false",
 		"langfuse.observation.metadata.promptVersion":     "v9",
 		"langfuse.observation.metadata.requestedModel":    "gpt-6.1-terra",
@@ -197,10 +197,15 @@ func TestRuntimeContext(t *testing.T) {
 			t.Errorf("LengthBucket(%d) = %q, want %q", n, got, want)
 		}
 	}
-	// UTF-16 units of the trimmed text: "😀" counts 2, Hangul 1 each.
-	in.Text = " " + strings.Repeat("😀", 12) + "\n"
+	// TS data.text.length: UTF-16 units of the text as posted ("😀" counts
+	// 2), surrounding whitespace included.
+	in.Text = strings.Repeat("😀", 12)
 	if rc := NewRuntimeContext(in, testCfg, "v", Analytics{}); rc.InputLengthBucket != "1-24" {
 		t.Errorf("12 emoji bucket %q", rc.InputLengthBucket)
+	}
+	in.Text = " " + strings.Repeat("😀", 12)
+	if rc := NewRuntimeContext(in, testCfg, "v", Analytics{}); rc.InputLengthBucket != "25-100" {
+		t.Errorf("space + 12 emoji bucket %q", rc.InputLengthBucket)
 	}
 	in.Text = strings.Repeat("😀", 13)
 	if rc := NewRuntimeContext(in, testCfg, "v", Analytics{}); rc.InputLengthBucket != "25-100" {

@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -108,6 +109,7 @@ func stringLeaves(v any, out *[]string) {
 func TestNoContentInSpans(t *testing.T) {
 	e, rcv := tracedEnv(t, http.StatusOK)
 	evs := parseSSE(t, e.run(t, form("How are you doing today? "+canary,
+		"run", "22222222-2222-4222-8222-222222222222",
 		"context", "Replying to "+canary,
 		"refinements", "custom "+canary,
 		"previousMain", "previous "+canary,
@@ -158,7 +160,7 @@ func TestNoContentInSpans(t *testing.T) {
 	for k, v := range map[string]string{
 		"langfuse.observation.metadata.requestKind":        "refinement",
 		"langfuse.observation.metadata.trigger":            "refinement",
-		"langfuse.observation.metadata.clientRunId":        "run-1",
+		"langfuse.observation.metadata.clientRunId":        "22222222-2222-4222-8222-222222222222",
 		"langfuse.observation.metadata.analyticsSessionId": "11111111-1111-4111-8111-111111111111",
 		"langfuse.observation.metadata.supersedesRunId":    "33333333-3333-4333-8333-333333333333",
 		"langfuse.observation.metadata.inputLengthBucket":  "25-100",
@@ -171,6 +173,36 @@ func TestNoContentInSpans(t *testing.T) {
 	if !strings.Contains(attrs["langfuse.observation.metadata.inputRevision"], "7") ||
 		!strings.Contains(attrs["gen_ai.usage.input_tokens"], "1200") {
 		t.Errorf("int attributes %q / %q", attrs["langfuse.observation.metadata.inputRevision"], attrs["gen_ai.usage.input_tokens"])
+	}
+}
+
+func TestParseAnalyticsUUIDs(t *testing.T) {
+	for run, want := range map[string]string{
+		"22222222-2222-4222-8222-222222222222": "22222222-2222-4222-8222-222222222222",
+		"00000000-0000-0000-0000-000000000000": "00000000-0000-0000-0000-000000000000",
+		"FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF": "", // zod's max UUID is lowercase only
+		"run-1":                                "", // a valid run id, not a UUID
+		"22222222-2222-9222-8222-222222222222": "", // version 9
+		"22222222-2222-4222-c222-222222222222": "", // variant c
+	} {
+		a, err := parseAnalytics(url.Values{}, run)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a.RunID != want {
+			t.Errorf("run %q: RunID %q, want %q", run, a.RunID, want)
+		}
+	}
+	for _, bad := range []string{
+		"11111111-1111-0111-8111-111111111111", // version 0
+		"11111111-1111-4111-7111-111111111111", // variant 7
+	} {
+		if _, err := parseAnalytics(url.Values{"analyticsSessionId": {bad}}, "run-1"); err == nil {
+			t.Errorf("analyticsSessionId %q accepted", bad)
+		}
+		if _, err := parseAnalytics(url.Values{"supersedesRunId": {bad}}, "run-1"); err == nil {
+			t.Errorf("supersedesRunId %q accepted", bad)
+		}
 	}
 }
 
