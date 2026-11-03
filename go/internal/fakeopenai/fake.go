@@ -1,6 +1,7 @@
 // Package fakeopenai is a fake OpenAI Responses API server for tests: it
-// replays canned fixtures as a streamed `POST /v1/responses`, so browser and
-// unit tests (TypeScript app and Go app alike) never make paid calls.
+// replays canned fixtures as a streamed `POST /v1/responses` and answers
+// `POST /v1/audio/speech` with a deterministic WAV (speech.go), so browser
+// and unit tests (TypeScript app and Go app alike) never make paid calls.
 //
 // Hand-written because no maintained library fakes the Responses streaming
 // protocol; the SSE writer is stdlib. Event shapes follow the OpenAI
@@ -73,15 +74,19 @@ type FixtureError struct {
 	Body   jsontext.Value `json:"body"`
 }
 
-// Stats is the body of GET /_stats. Active counts requests still being
-// served; it is live state, so /_reset keeps it. A request leaves Active only
-// after any abort it caused has been counted, so a caller that waits for
-// Active == 0 before /_reset cannot have a late abort leak past the reset.
+// Stats is the body of GET /_stats. Active counts requests (translation and
+// speech) still being served; it is live state, so /_reset keeps it. A
+// request leaves Active only after any abort it caused has been counted, so a
+// caller that waits for Active == 0 before /_reset cannot have a late abort
+// leak past the reset. Speech requests have their own counters.
 type Stats struct {
-	Requests   int      `json:"requests"`
-	Aborted    int      `json:"aborted"`
-	Active     int      `json:"active"`
-	LastBodies []string `json:"lastBodies"`
+	Requests         int      `json:"requests"`
+	Aborted          int      `json:"aborted"`
+	Active           int      `json:"active"`
+	LastBodies       []string `json:"lastBodies"`
+	SpeechRequests   int      `json:"speechRequests"`
+	SpeechAborted    int      `json:"speechAborted"`
+	LastSpeechBodies []string `json:"lastSpeechBodies"`
 }
 
 type server struct {
@@ -93,9 +98,10 @@ type server struct {
 // Handler serves the fake API, reading fixtures from fixturesDir on every
 // request so edits show up without a restart.
 func Handler(fixturesDir string) http.Handler {
-	s := &server{dir: fixturesDir, st: Stats{LastBodies: []string{}}}
+	s := &server{dir: fixturesDir, st: Stats{LastBodies: []string{}, LastSpeechBodies: []string{}}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/responses", s.responses)
+	mux.HandleFunc("POST /v1/audio/speech", s.speech)
 	mux.HandleFunc("GET /_stats", s.stats)
 	mux.HandleFunc("POST /_reset", s.reset)
 	return mux
@@ -111,7 +117,7 @@ func (s *server) stats(w http.ResponseWriter, _ *http.Request) {
 
 func (s *server) reset(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
-	s.st = Stats{Active: s.st.Active, LastBodies: []string{}}
+	s.st = Stats{Active: s.st.Active, LastBodies: []string{}, LastSpeechBodies: []string{}}
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }

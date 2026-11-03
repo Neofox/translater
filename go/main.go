@@ -1,6 +1,7 @@
 // Command neotranslate serves the translator: GET / (page), POST /translate
-// (one streaming run), POST /warm, POST /prefs and the hashed /static/
-// assets. It listens on $PORT (default 3000).
+// (one streaming run), POST /speech (pronunciation PCM), POST /warm,
+// POST /prefs and the hashed /static/ assets. It listens on $PORT (default
+// 3000).
 package main
 
 import (
@@ -11,6 +12,7 @@ import (
 	"neotranslate/internal/config"
 	"neotranslate/internal/contract"
 	"neotranslate/internal/llm"
+	"neotranslate/internal/speech"
 	"neotranslate/internal/translate"
 	"neotranslate/internal/web"
 	assets "neotranslate/web"
@@ -47,7 +49,8 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 		log.Printf("translation disabled: %v", err)
 		opts = append(opts, translate.WithConfigError(err))
 	}
-	tr := translate.NewServer(c, cfg, llm.New(getenv), opts...)
+	client := llm.New(getenv)
+	tr := translate.NewServer(c, cfg, client, opts...)
 	pages := web.NewPages(c, static)
 
 	mux := http.NewServeMux()
@@ -55,6 +58,9 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 	mux.HandleFunc("POST /prefs", pages.HandlePrefs)
 	mux.HandleFunc("POST /translate", tr.HandleTranslate)
 	mux.HandleFunc("POST /warm", tr.HandleWarm)
+	// An invalid SPEECH_* setting answers each request with the localized
+	// configuration error; it never takes the page down.
+	mux.Handle("POST /speech", speech.NewHandler(client, getenv, speech.Timeout))
 	mux.Handle("GET /static/", static)
 	if getenv("NT_SPIKE") == "1" {
 		registerSpike(mux, static.URL)

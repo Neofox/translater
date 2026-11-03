@@ -20,6 +20,7 @@ let streamText: typeof import('ai').streamText
 let translationRequest: typeof import('../src/server/translationRequest').translationRequest
 let resolveTranslateConfig: typeof import('../src/server/openai').resolveTranslateConfig
 let classifyTranslationError: typeof import('../src/server/translationError').classifyTranslationError
+let handleSpeech: typeof import('../src/server/speech.server').handleSpeech
 
 function freePort(): Promise<number> {
   return new Promise((ok, fail) => {
@@ -59,7 +60,29 @@ async function stats() {
     requests: number
     aborted: number
     lastBodies: string[]
+    speechRequests: number
+    lastSpeechBodies: string[]
   }>
+}
+
+/** The production TS speech path against the fake: PCM bytes and rate. */
+async function speak(text: string) {
+  const stream = await handleSpeech(
+    { text, language: 'ko', uiLang: 'en' },
+    new AbortController().signal,
+    { env: {} },
+  )
+  const chunks: Uint8Array[] = []
+  const rates = new Set<number>()
+  let done = false
+  for await (const chunk of stream) {
+    if (chunk.type === 'done') done = true
+    else {
+      chunks.push(chunk.audio)
+      rates.add(chunk.sampleRate)
+    }
+  }
+  return { pcm: Buffer.concat(chunks), rates: [...rates], done }
 }
 
 beforeAll(async () => {
@@ -91,6 +114,7 @@ beforeAll(async () => {
   ;({ classifyTranslationError } = await import(
     '../src/server/translationError'
   ))
+  ;({ handleSpeech } = await import('../src/server/speech.server'))
 }, 60_000)
 
 afterAll(() => {
@@ -179,5 +203,35 @@ describe('Go fake OpenAI upstream', () => {
       await new Promise((r) => setTimeout(r, 40))
     }
     expect((await stats()).aborted).toBe(1)
+  }, 30_000)
+
+  it('serves speech WAV the TS validator accepts as the 24 kHz tone', async () => {
+    const before = (await stats()).speechRequests
+    const { pcm, rates, done } = await speak('  안녕하세요  ')
+    expect(done).toBe(true)
+    expect(rates).toEqual([24000])
+    expect(pcm.byteLength).toBe(12000)
+    expect(pcm.readInt16LE(0)).toBe(0)
+    expect(pcm.readInt16LE(2)).toBeGreaterThan(0)
+    const after = await stats()
+    expect(after.speechRequests).toBe(before + 1)
+    const sent = JSON.parse(after.lastSpeechBodies.at(-1) ?? '{}')
+    expect(sent).toMatchObject({
+      model: 'gpt-4o-mini-tts',
+      voice: 'marin',
+      input: '안녕하세요',
+      response_format: 'wav',
+      instructions: expect.stringContaining('in Korean'),
+    })
+  }, 30_000)
+
+  it('speech variants: big audio passes, errors and 8-bit WAV fail', async () => {
+    expect((await speak('x [fx:speech-big]')).pcm.byteLength).toBe(2621440)
+    await expect(speak('x [fx:speech-error]')).rejects.toThrow(
+      'Pronunciation failed.',
+    )
+    await expect(speak('x [fx:speech-bad]')).rejects.toThrow(
+      'Pronunciation failed.',
+    )
   }, 30_000)
 })

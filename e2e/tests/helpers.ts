@@ -13,9 +13,14 @@ export const STRINGS: Record<UiLang, Record<StringKey, string>> = strings
 export type Stats = {
   requests: number
   aborted: number
-  /** Requests the fake is still serving; /_reset keeps it. */
+  /** Requests (translation and speech) the fake is still serving; /_reset
+   * keeps it. */
   active: number
   lastBodies: string[]
+  /** POST /v1/audio/speech requests, counted apart from translations. */
+  speechRequests: number
+  speechAborted: number
+  lastSpeechBodies: string[]
 }
 
 /** Client for this worker's fake OpenAI server. */
@@ -44,6 +49,14 @@ export class Fake {
   async bodies(): Promise<Array<Record<string, unknown>>> {
     const { lastBodies } = await this.stats()
     return lastBodies.map((body) => JSON.parse(body) as Record<string, unknown>)
+  }
+
+  /** Parsed speech request bodies (the last five), oldest first. */
+  async speechBodies(): Promise<Array<Record<string, unknown>>> {
+    const { lastSpeechBodies } = await this.stats()
+    return lastSpeechBodies.map(
+      (body) => JSON.parse(body) as Record<string, unknown>,
+    )
   }
 }
 
@@ -186,7 +199,7 @@ export async function waitForStats(
     if (predicate(stats)) return Date.now() - start
     if (Date.now() - start > timeout)
       throw new Error(
-        `fake stats never matched: ${JSON.stringify({ ...stats, lastBodies: stats.lastBodies.length })}`,
+        `fake stats never matched: ${JSON.stringify({ ...stats, lastBodies: stats.lastBodies.length, lastSpeechBodies: stats.lastSpeechBodies.length })}`,
       )
     await new Promise((resolve) => setTimeout(resolve, 25))
   }

@@ -129,6 +129,19 @@ func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, 
 	}
 }
 
+// Speech posts one text-to-speech request (POST /audio/speech) and returns
+// the raw response; the caller closes its body. The API key is read per
+// request (ErrMissingAPIKey when empty) and retries stay disabled. Errors are
+// returned as the SDK reports them and may contain provider text: callers
+// classify them and never log or show them.
+func (c *Client) Speech(ctx context.Context, params openai.AudioSpeechNewParams) (*http.Response, error) {
+	key := c.getenv("OPENAI_API_KEY")
+	if key == "" {
+		return nil, ErrMissingAPIKey
+	}
+	return c.oai.Audio.Speech.New(ctx, params, option.WithAPIKey(key), option.WithMaxRetries(0))
+}
+
 // sanitize drops provider text from SDK errors. Context errors pass through.
 func sanitize(err error) error {
 	var se *ssestream.StreamError

@@ -1,0 +1,25 @@
+{
+  "match": "[fx:speech-big]",
+  "intent": "sentence",
+  "chunk": 24,
+  "delayMs": 10,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "안녕하세요 [fx:speech-big]",
+    "learningPhrases": [],
+    "rationale": "The fake speech upstream returns 2.5 MiB of PCM for any text containing [fx:speech-big].",
+    "alternatives": [
+      {
+        "text": "안녕 [fx:speech-big]",
+        "note": "The fake speech upstream returns 2.5 MiB of PCM for this alternative too."
+      },
+      {
+        "text": "안녕하십니까 [fx:speech-big]",
+        "note": "The fake speech upstream returns 2.5 MiB of PCM for this alternative too."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

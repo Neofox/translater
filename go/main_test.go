@@ -82,6 +82,46 @@ func TestInvalidConfigServesPageAndConfigurationError(t *testing.T) {
 	}
 }
 
+// POST /speech is routed: an invalid SPEECH_MODEL keeps the page up and
+// answers with the localized configuration error, never calling upstream;
+// GET is not routed.
+func TestSpeechRoute(t *testing.T) {
+	upstreamCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamCalls++
+		http.Error(w, "unexpected", http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+	env := map[string]string{
+		"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": upstream.URL + "/v1",
+		"SPEECH_MODEL": "openai/gpt-4o-mini-tts",
+	}
+	mux, err := newMux(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatalf("newMux: %v", err)
+	}
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	if res, err := http.Get(srv.URL + "/"); err != nil || res.StatusCode != 200 {
+		t.Fatalf("GET / failed")
+	}
+	res, err := http.PostForm(srv.URL+"/speech", url.Values{"text": {"안녕"}, "language": {"ko"}, "uiLang": {"ko"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != 500 || string(body) != `{"error":"발음 재생 설정이 올바르지 않아요."}` {
+		t.Errorf("POST /speech = %d %s", res.StatusCode, body)
+	}
+	if res, err := http.Get(srv.URL + "/speech"); err != nil || res.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("GET /speech = %v, %v", res.StatusCode, err)
+	}
+	if upstreamCalls != 0 {
+		t.Errorf("upstream called %d times", upstreamCalls)
+	}
+}
+
 func between(s, start, end string) string {
 	_, after, _ := strings.Cut(s, start)
 	v, _, _ := strings.Cut(after, end)
