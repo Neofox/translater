@@ -29,6 +29,7 @@ var clientStrings = []string{
 	"contextToggle", "contextShort", "contextPlaceholder", "contextClear",
 	"notes", "learn", "wordDetails", "breakdown", "closeLearning", "pos", "primaryMeaning", "otherMeanings", "etymology",
 	"grammar", "synonyms", "hanja", "kanji", "hanzi", "characters",
+	"speechLoading", "stopListening", "stopSpeech", "speechFailed", "speechUnavailable", "speechTooLong",
 }
 
 // Pages renders the document and the preference partials.
@@ -36,10 +37,19 @@ type Pages struct {
 	c      *contract.Contract
 	static *Static
 	data   map[string]any // client data without the per-request prefs
+	// vercelAnalytics renders the Vercel Web Analytics script, which only a
+	// Vercel deployment serves (locally it would 404 during page load).
+	vercelAnalytics bool
 }
 
+// PagesOption configures Pages.
+type PagesOption func(*Pages)
+
+// WithVercelAnalytics renders the Vercel Web Analytics script tag.
+func WithVercelAnalytics(on bool) PagesOption { return func(p *Pages) { p.vercelAnalytics = on } }
+
 // NewPages prepares the request-independent client data.
-func NewPages(c *contract.Contract, static *Static) *Pages {
+func NewPages(c *contract.Contract, static *Static, opts ...PagesOption) *Pages {
 	strs := map[string]map[string]string{}
 	for _, ui := range []string{"en", "ko"} {
 		strs[ui] = map[string]string{}
@@ -55,16 +65,20 @@ func NewPages(c *contract.Contract, static *Static) *Pages {
 	for i, f := range c.Prefs.Fields {
 		fields[i] = f.Key
 	}
-	return &Pages{c: c, static: static, data: map[string]any{
+	p := &Pages{c: c, static: static, data: map[string]any{
 		"strings":   strs,
 		"languages": langs,
 		"limits":    map[string]any{"maxInputChars": c.Limits.MaxInputChars, "inputWarnFraction": c.Limits.InputWarnFraction},
 		"rules":     map[string]any{"cookie": c.Prefs.Cookie, "version": c.Prefs.Version, "maxAge": c.Prefs.MaxAgeSeconds, "fields": fields},
 	}}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 func (p *Pages) view(pr prefs.Preferences) View {
-	return View{Prefs: pr, Contract: p.c, Static: p.static}
+	return View{Prefs: pr, Contract: p.c, Static: p.static, VercelAnalytics: p.vercelAnalytics}
 }
 
 // HandlePage is GET /: the full page for the request's preferences.

@@ -15,6 +15,8 @@ type View struct {
 	Static   *Static
 	// Data is the JSON the client modules start from (#nt-data).
 	Data string
+	// VercelAnalytics renders the Vercel Web Analytics script (on Vercel only).
+	VercelAnalytics bool
 }
 
 // T is the UI string for key in the request's UI language.

@@ -122,6 +122,30 @@ func TestSpeechRoute(t *testing.T) {
 	}
 }
 
+// The Vercel Web Analytics script exists only on Vercel, which sets VERCEL
+// (and VERCEL_ENV) in its runtime; elsewhere the page must not request it.
+func TestVercelAnalyticsOnlyOnVercel(t *testing.T) {
+	const tag = `<script defer src="/_vercel/insights/script.js"></script></head>`
+	for _, tc := range []struct {
+		env  map[string]string
+		want bool
+	}{
+		{map[string]string{}, false},
+		{map[string]string{"VERCEL": "1"}, true},
+		{map[string]string{"VERCEL_ENV": "preview"}, true},
+	} {
+		mux, err := newMux(func(k string) string { return tc.env[k] })
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+		if got := strings.Contains(rec.Body.String(), tag); got != tc.want {
+			t.Errorf("env %v: analytics tag present = %v, want %v", tc.env, got, tc.want)
+		}
+	}
+}
+
 func between(s, start, end string) string {
 	_, after, _ := strings.Cut(s, start)
 	v, _, _ := strings.Cut(after, end)

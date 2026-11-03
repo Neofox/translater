@@ -53,7 +53,10 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 	}
 	client := llm.New(getenv)
 	tr := translate.NewServer(c, cfg, client, opts...)
-	pages := web.NewPages(c, static)
+	// Vercel sets VERCEL/VERCEL_ENV in its runtime; only there does
+	// /_vercel/insights/script.js exist.
+	onVercel := getenv("VERCEL") != "" || getenv("VERCEL_ENV") != ""
+	pages := web.NewPages(c, static, web.WithVercelAnalytics(onVercel))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", pages.HandlePage)

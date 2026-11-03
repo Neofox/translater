@@ -26,9 +26,11 @@ templ Page(v View) {
 			<script defer src={ v.Asset("vendor/htmx.min.js") }></script>
 			<script defer src={ v.Asset("vendor/hx-sse.min.js") }></script>
 			<script type="module" src={ v.Asset("js/app.js") }></script>
-			// Vercel Web Analytics (TS <Analytics/>, production script). Vercel
-			// serves the path; it is absent (404) when running locally.
-			<script defer src="/_vercel/insights/script.js"></script>
+			// Vercel Web Analytics (TS <Analytics/>, production script). Only a
+			// Vercel deployment serves the path, so it is rendered only there.
+			if v.VercelAnalytics {
+				<script defer src="/_vercel/insights/script.js"></script>
+			}
 		</head>
 		<body class="bg-bg text-ink font-sans antialiased">
 			<main class="app-shell" data-layout="stack">

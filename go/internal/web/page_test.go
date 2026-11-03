@@ -44,7 +44,6 @@ func TestPageRendersFromCookie(t *testing.T) {
 		`data-testid="input-textarea"`,
 		`placeholder="입력하거나 붙여넣으세요"`,
 		`"prefs":{"mode":"professional","recentSource":null,"recentTarget":"fr","source":"auto","target":"fr","uiLang":"ko"}`,
-		`<script defer src="/_vercel/insights/script.js"></script></head>`,
 		`<input type="hidden" name="analyticsSessionId"><input type="hidden" name="supersedesRunId"><input type="hidden" name="inputRevision"><input type="hidden" name="trigger"></form>`,
 	} {
 		if !strings.Contains(body, want) {
