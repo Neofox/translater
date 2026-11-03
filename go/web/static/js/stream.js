@@ -123,6 +123,13 @@ export function initStream(app, form) {
   const panel = document.querySelector('.output-panel')
   const status = $('result-status')
 
+  // SentenceView/WordView mark result-details while alternative rows exist;
+  // htmx swaps the rows in, so follow them.
+  new MutationObserver(() => {
+    const has = details.querySelector('.alternative-item')
+    details.className = `result-details ${has ? 'has-alternatives' : ''}`
+  }).observe(details, { childList: true, subtree: true })
+
   const interp = createInterpolator((text) => {
     mainText.data = text
   }, { immediate: reduced })
@@ -185,7 +192,8 @@ export function initStream(app, form) {
   function start(live) {
     interp.reset()
     main.lang = live.target
-    main.classList.toggle('result-word', live.intent === 'word')
+    // The TSX template literal, spaces included (classList would drop them).
+    main.className = `result-main ${live.intent === 'word' ? 'result-word' : ''}`
     details.replaceChildren()
     renderState()
   }
