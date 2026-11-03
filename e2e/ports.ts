@@ -16,11 +16,12 @@ export const TS_BUILD: 'dev' | 'prod' =
 export const WORKERS = Math.max(1, Number(process.env.E2E_WORKERS ?? 3) || 1)
 
 // E2E_PORT_OFFSET shifts every port, so two suites can run at once (e.g.
-// two worktrees, or two agents in one): 50 keeps them apart for up to 50
-// workers.
+// two worktrees, or two agents in one): offsets at least E2E_WORKERS apart
+// never collide. The bases are 2000 apart so an offset in one app's band
+// cannot land on another app's (or the fake's) ports.
 const OFFSET = Number(process.env.E2E_PORT_OFFSET ?? 0) || 0
-const FAKE_BASE_PORT = 3901 + OFFSET
-const APP_BASE_PORT: Record<AppKind, number> = { ts: 3100 + OFFSET, go: 3200 + OFFSET }
+const FAKE_BASE_PORT = 7101 + OFFSET
+const APP_BASE_PORT: Record<AppKind, number> = { ts: 3101 + OFFSET, go: 5101 + OFFSET }
 
 export function fakePort(index: number): number {
   return FAKE_BASE_PORT + index

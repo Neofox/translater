@@ -73,7 +73,8 @@ import type {
 const ROOT = resolve(import.meta.dirname, '../..')
 const GO_DIR = join(ROOT, 'go')
 const BIN_DIR = join(tmpdir(), 'neotranslate-perf')
-// Separate from the e2e suite's ports (fake 3901+, ts 3100+, go 3200+) so a
+// Separate from the e2e suite's ports (ts 3101+, go 5101+, fake 7101+, each
+// plus E2E_PORT_OFFSET) so a
 // running parity suite is never measured or disturbed.
 const PORTS = {
   fake: 3951,
