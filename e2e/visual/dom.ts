@@ -1,14 +1,16 @@
 // Normalised DOM snapshot for the TS-vs-Go parity harness: one line per
-// rendered element with its tag, raw class string (spaces count), data-testid,
-// role, lang, aria-* attributes and own text, indented by depth.
+// rendered element with its tag, every attribute (sorted by name, raw values,
+// so class strings keep their spaces) and its own text, indented by depth.
 //
-// Left out, because they are not markup the user can meet:
-// - [hidden], [inert] and closed [popover] subtrees (Go keeps some elements
-//   mounted this way where TS unmounts them; see go/web/static/css/go.css);
-// - script, style, template, link, meta and noscript, and the inside of
-//   <svg> (icon markup is compared by TestPrimitivesMatchReact);
-// - every other attribute: Go's i18n hooks (data-t, data-t-attr), htmx and
-//   runtime state (hx-*, data-active-class, inline style) differ by design.
+// Not compared:
+// - [hidden], [inert] and closed [popover] subtrees. Go keeps some elements
+//   mounted this way where TS unmounts them (go/web/static/css/go.css); open
+//   ones are compared like any other element.
+// - script, style, template, link, meta and noscript elements, and the
+//   inside of <svg> (icon markup is compared by TestPrimitivesMatchReact).
+// - A textarea's text: React mirrors the value into its text content, Go
+//   sets only the value. The ARIA snapshots compare the value.
+// - The attributes in IGNORED, each a difference by design (reasons there).
 // ID references (aria-controls, aria-labelledby, …) keep only their presence:
 // React generates its ids.
 import type { Page } from '@playwright/test'
@@ -16,6 +18,28 @@ import type { Page } from '@playwright/test'
 export async function domSnapshot(page: Page): Promise<string> {
   return page.evaluate(() => {
     const SKIP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'NOSCRIPT'])
+    const IGNORED = [
+      // Go's UI-language hooks (prefs.js relabels in place).
+      /^data-t$/,
+      /^data-t-attr$/,
+      // htmx request wiring.
+      /^hx-/,
+      // ContextToggle's active class string, swapped in by context.js.
+      /^data-active-class$/,
+      // Runtime inline styles (Floating UI coordinates, editor auto-grow
+      // heights, animation delays) are covered by the screenshots.
+      /^style$/,
+      // Element ids: React's are generated (useId), Go's are fixed hooks.
+      /^id$/,
+      // Go's swap-button icon hooks (OutputPanel renders one icon instead).
+      /^data-icon$/,
+      // React's <ViewTransition> markers (vt-update, vt-name, …); Go's
+      // transition uses base.css's view-transition-class instead.
+      /^vt-/,
+      // Native popover wiring (TS positions with Floating UI portals).
+      /^popover$/,
+      /^popovertarget$/,
+    ]
     const IDREFS = new Set([
       'aria-controls',
       'aria-labelledby',
@@ -25,22 +49,17 @@ export async function domSnapshot(page: Page): Promise<string> {
       'aria-details',
       'aria-errormessage',
       'aria-flowto',
+      'for',
     ])
     const lines: string[] = []
     const walk = (el: Element, depth: number) => {
       if (SKIP.has(el.tagName) || el.hasAttribute('hidden') || el.hasAttribute('inert')) return
       if (el.hasAttribute('popover') && !el.matches(':popover-open')) return
       const parts = [el.tagName.toLowerCase()]
-      const cls = el.getAttribute('class')
-      if (cls !== null) parts.push(`class=${JSON.stringify(cls)}`)
-      for (const name of ['data-testid', 'role', 'lang']) {
-        const value = el.getAttribute(name)
-        if (value !== null) parts.push(`${name}=${JSON.stringify(value)}`)
-      }
-      for (const name of el.getAttributeNames().filter((n) => n.startsWith('aria-')).sort())
+      for (const name of el.getAttributeNames().sort()) {
+        if (IGNORED.some((re) => re.test(name))) continue
         parts.push(IDREFS.has(name) ? `${name}=<ref>` : `${name}=${JSON.stringify(el.getAttribute(name))}`)
-      // A textarea's text is its value (ARIA snapshots compare it); React
-      // also mirrors the value into its text content, Go does not.
+      }
       const text = el.tagName === 'TEXTAREA' ? '' : [...el.childNodes]
         .filter((n) => n.nodeType === Node.TEXT_NODE)
         .map((n) => n.textContent!.replace(/\s+/g, ' ').trim())

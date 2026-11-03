@@ -36,7 +36,7 @@ func TestPageRendersFromCookie(t *testing.T) {
 	for _, want := range []string{
 		`<html lang="ko"`,
 		`aria-label="말투"`,
-		`data-value="professional" aria-pressed="true"`,
+		`aria-pressed="true" data-t="modeProfessional"`,
 		`<option value="professional" selected`,
 		`aria-pressed="true" data-testid="lang-chip" data-value="fr"`,
 		`aria-label="UI language"`,

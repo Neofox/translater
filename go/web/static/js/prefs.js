@@ -60,11 +60,16 @@ export function initPrefs(app, data) {
       }
   }
 
+  /** A Tone button's mode: the narrow-screen select's option at the same
+   * index (ModeToggle.tsx renders no value attribute on the buttons). */
+  const modeOf = (button) =>
+    document.querySelectorAll('.mode-select option')[[...button.parentElement.children].indexOf(button)]?.value
+
   /** Pressed states that must not wait for the /prefs round trip. */
   function syncControls() {
     const p = app.prefs
     for (const b of document.querySelectorAll('.mode-segment button'))
-      b.setAttribute('aria-pressed', String(b.dataset.value === p.mode))
+      b.setAttribute('aria-pressed', String(modeOf(b) === p.mode))
     const select = document.querySelector('.mode-select')
     if (select) select.value = p.mode
     // Pressed looks come from CSS on [aria-pressed] (base.css, go.css).
@@ -126,7 +131,7 @@ export function initPrefs(app, data) {
   document.addEventListener('click', (event) => {
     const el = event.target instanceof Element ? event.target : null
     const mode = el?.closest('.mode-segment button')
-    if (mode) return set('mode', mode.dataset.value)
+    if (mode) return set('mode', modeOf(mode))
     const ui = el?.closest('[data-ui-lang]')
     if (ui) return set('uiLang', ui.dataset.uiLang)
     const chip = el?.closest('[data-testid="lang-chip"]')

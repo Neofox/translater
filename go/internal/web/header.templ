@@ -17,7 +17,7 @@ templ header(v View) {
 		<div class="app-settings">
 			<div class="mode-segment" role="group" aria-label={ v.T("tone") } data-t-attr="aria-label:tone">
 				for _, m := range modes {
-					<button type="button" data-value={ m.Value } aria-pressed={ boolString(v.Prefs.Mode == m.Value) } data-t={ m.Key }>{ v.T(m.Key) }</button>
+					<button type="button" aria-pressed={ boolString(v.Prefs.Mode == m.Value) } data-t={ m.Key }>{ v.T(m.Key) }</button>
 				}
 			</div>
 			<select class="mode-select" aria-label={ v.T("tone") } data-t-attr="aria-label:tone">
