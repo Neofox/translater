@@ -60,6 +60,10 @@ func TestBoundaries(t *testing.T) {
 			t.Errorf("unexpected boundary %d in %v", not, got)
 		}
 	}
+	// Conjoining jamo ᄀ+ᅡ+ᆨ form one Hangul syllable grapheme (GB6–8).
+	if jamo := boundaries("각x"); len(jamo) != 3 || !jamo[0] || !jamo[3] || !jamo[4] {
+		t.Errorf("conjoining jamo boundaries = %v, want {0, 3, 4}", jamo)
+	}
 	if empty := boundaries(""); len(empty) != 1 || !empty[0] {
 		t.Errorf("boundaries(\"\") = %v, want {0}", empty)
 	}
