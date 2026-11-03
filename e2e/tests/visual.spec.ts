@@ -8,24 +8,32 @@ import { expect, test } from './helpers'
 import { STATES } from '../visual/states'
 import { APP } from '../ports'
 
-// Known Go-vs-TS differences per state, each owned by a later task. These
-// states are expected to fail on Go (test.fail): Playwright reports an
-// unexpected pass once every listed gap is closed, so the owning task must
-// remove its entry. Never list a difference without its owning task.
-const LAYOUT =
-  'Task 27: measured data-layout/data-desktop and source-first panel order (workspace/split)'
-const CONTEXT = 'Task 24: reply-context toggle in composer-meta'
-const GO_GAPS: Record<string, string[]> = {
+// Known Go-vs-TS differences per state, each owned by a later task. A state
+// with gaps in a project is expected to fail on Go there (test.fail, declared
+// only once setup has settled, so a broken setup still fails): Playwright
+// reports an unexpected pass once every listed gap is closed, so the owning
+// task must remove its entry. Never list a difference without its owner.
+type Gap = { reason: string; projects?: RegExp }
+const LAYOUT: Gap = {
+  reason:
+    'Task 27: measured data-layout/data-desktop and source-first panel order',
+  // Workspace and split projects; portrait ones stay stacked in both apps.
+  projects: /macbook|desktop-short|landscape/,
+}
+const CONTEXT: Gap = {
+  reason: 'Task 24: reply-context toggle in composer-meta',
+}
+const GO_GAPS: Record<string, Gap[]> = {
   empty: [CONTEXT, LAYOUT],
   'sentence-done': [
     CONTEXT,
     LAYOUT,
-    'Task 26: Adjust disclosure in the header',
+    { reason: 'Task 26: Adjust disclosure in the header' },
   ],
   'error-provider': [
     CONTEXT,
     LAYOUT,
-    'Task 16: errorEnvHint line and Retry button for server errors',
+    { reason: 'Task 16: errorEnvHint line and Retry button for server errors' },
   ],
 }
 
@@ -65,16 +73,18 @@ for (const state of STATES) {
       Boolean(state.projects) && !state.projects!.test(testInfo.project.name),
       `${state.name} does not apply to ${testInfo.project.name}`,
     )
-    // E2E_VISUAL_STRICT=1 runs the known gaps as ordinary tests, so their
-    // diff images and ARIA diffs are written (expected failures keep none).
-    const gaps = GO_GAPS[state.name] ?? []
-    test.fail(
-      APP === 'go' && gaps.length > 0 && !process.env.E2E_VISUAL_STRICT,
-      gaps.join('; '),
-    )
     await page.route(WEB_FONTS, (route) => route.abort())
     await state.setup(page, fake)
     await settle(page)
+    // E2E_VISUAL_STRICT=1 runs the known gaps as ordinary tests, so their
+    // diff images and ARIA diffs are written (expected failures keep none).
+    const gaps = (GO_GAPS[state.name] ?? []).filter(
+      (gap) => !gap.projects || gap.projects.test(testInfo.project.name),
+    )
+    test.fail(
+      APP === 'go' && gaps.length > 0 && !process.env.E2E_VISUAL_STRICT,
+      gaps.map((gap) => gap.reason).join('; '),
+    )
     // Soft, so one run reports the pixel, ARIA template and ARIA tree diffs.
     await expect.soft(page).toHaveScreenshot(`${state.name}.png`, {
       animations: 'disabled',
