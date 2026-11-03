@@ -132,14 +132,22 @@ func (c *Client) StreamText(ctx context.Context, body []byte) iter.Seq2[string, 
 // Speech posts one text-to-speech request (POST /audio/speech) and returns
 // the raw response; the caller closes its body. The API key is read per
 // request (ErrMissingAPIKey when empty) and retries stay disabled. Errors are
-// returned as the SDK reports them and may contain provider text: callers
-// classify them and never log or show them.
+// content-free like StreamText's: ErrMissingAPIKey, the bare context error
+// when ctx ended, or a failure carrying only its Kind (use Classify). The
+// SDK's *openai.Error, which keeps the raw provider body, never escapes.
 func (c *Client) Speech(ctx context.Context, params openai.AudioSpeechNewParams) (*http.Response, error) {
 	key := c.getenv("OPENAI_API_KEY")
 	if key == "" {
 		return nil, ErrMissingAPIKey
 	}
-	return c.oai.Audio.Speech.New(ctx, params, option.WithAPIKey(key), option.WithMaxRetries(0))
+	res, err := c.oai.Audio.Speech.New(ctx, params, option.WithAPIKey(key), option.WithMaxRetries(0))
+	if err != nil {
+		if cerr := ctx.Err(); cerr != nil {
+			return nil, cerr
+		}
+		return nil, sanitize(err)
+	}
+	return res, nil
 }
 
 // sanitize drops provider text from SDK errors. Context errors pass through.

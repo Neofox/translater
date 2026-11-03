@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -218,6 +219,31 @@ func TestInvalidWAVIsBadGateway(t *testing.T) {
 	res, body := r.post(t, context.Background(), "[fx:speech-bad]", "en", "ko")
 	if res.StatusCode != http.StatusBadGateway || errorOf(t, body) != failedKO {
 		t.Fatalf("status %d: %s", res.StatusCode, body)
+	}
+}
+
+// The rate in Content-Type is the one the WAV reports, at both limits.
+func TestContentTypeRateFromWAV(t *testing.T) {
+	for _, rate := range []uint32{8000, 48000} {
+		pcm := []byte{1, 0, 2, 0, 3, 0, 4, 0}
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "audio/wav")
+			w.Write(wav(pcm, pcm16(rate)))
+		}))
+		getenv := env(map[string]string{"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": upstream.URL + "/v1"})
+		app := httptest.NewServer(speech.NewHandler(llm.New(getenv), getenv, 90*time.Second))
+		res, err := http.PostForm(app.URL, url.Values{"text": {"hi"}, "language": {"en"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		app.Close()
+		upstream.Close()
+		want := "audio/L16;rate=" + strconv.Itoa(int(rate)) + ";channels=1"
+		if res.StatusCode != 200 || res.Header.Get("Content-Type") != want || !bytes.Equal(body, pcm) {
+			t.Errorf("%d Hz: %d %q % x", rate, res.StatusCode, res.Header.Get("Content-Type"), body)
+		}
 	}
 }
 

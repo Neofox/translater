@@ -136,7 +136,7 @@ func FuzzPCMFromWAV(f *testing.F) {
 		if err != nil {
 			return
 		}
-		if len(pcm) == 0 || len(pcm)%2 != 0 || rate < 8000 || rate > 48000 {
+		if len(pcm) == 0 || len(pcm)%2 != 0 || len(pcm) > speech.MaxAudioBytes || rate < 8000 || rate > 48000 {
 			t.Fatalf("accepted pcm=%d rate=%d", len(pcm), rate)
 		}
 	})

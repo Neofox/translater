@@ -44,7 +44,10 @@ type handler struct {
 // validates is anything written. Errors are JSON {"error": message} in the
 // request's uiLang: 400 invalid input, 500 configuration (SPEECH_* or a
 // missing OPENAI_API_KEY), 502 provider failure or invalid audio, 504 when
-// timeout elapses. A client that leaves cancels the upstream request.
+// timeout elapses. The upstream request runs under r.Context(), so a client
+// that leaves cancels it only where the host cancels r.Context() on
+// disconnect (net/http does); on Vercel the request is not cancelled and the
+// upstream call runs until it completes or the timeout elapses.
 func NewHandler(c *llm.Client, getenv func(string) string, timeout time.Duration) http.Handler {
 	cfg, err := LoadConfig(getenv)
 	return &handler{client: c, cfg: cfg, cfgErr: err, timeout: timeout}
