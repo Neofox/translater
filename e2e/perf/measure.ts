@@ -92,7 +92,9 @@ const FIXTURE = 'stream'
 const S: Selectors = {
   source: '[data-testid="input-textarea"]',
   main: '[data-testid="main-translation"]',
-  copy: '[data-testid="output-toolbar"] [data-testid="copy-button"]',
+  // The class, not a test id: the deployed TS app (master) has no
+  // data-testid on its Copy button; both apps render `.copy-button` there.
+  copy: '[data-testid="output-toolbar"] .copy-button',
   listen: '[data-testid="output-toolbar"] [data-testid="listen-button"]',
 }
 const CLEAR = '[data-testid="clear-input"]'
@@ -1225,10 +1227,19 @@ async function probeRun(
     await page.addInitScript(installInputTracker, S)
     const before = fake ? await fake.requests() : null
     await page.goto(url, { waitUntil: 'commit', timeout: 120_000 })
-    const state = { idle: false }
+    const state: { idle: boolean; error: unknown } = {
+      idle: false,
+      error: null,
+    }
+    // Settled while the loop below types: a rejection (networkidle timeout)
+    // is recorded and rethrown after the loop, never left unhandled (an
+    // unhandled rejection here killed a whole --live run).
     const idle = page
       .waitForLoadState('networkidle', { timeout: 120_000 })
-      .then(() => (state.idle = true))
+      .then(
+        () => (state.idle = true),
+        (error: unknown) => (state.error = error ?? 'networkidle failed'),
+      )
     let afterIdle = 0
     const deadline = Date.now() + 120_000
     while (Date.now() < deadline) {
@@ -1236,10 +1247,12 @@ async function probeRun(
         .evaluate(focusSource, S.source)
         .catch(() => false)
       if (focused) await page.keyboard.type(' ')
+      if (state.error) break
       if (state.idle && ++afterIdle >= 5) break
       await page.waitForTimeout(state.idle ? 100 : focused ? 25 : 10)
     }
     await idle
+    if (state.error) throw state.error
     // Longer than the 800 ms debounce for text without final punctuation.
     await page.waitForTimeout(1500)
     const events = await page.evaluate(
