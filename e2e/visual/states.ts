@@ -8,7 +8,7 @@
 // deterministic, settled state: wait for the condition that ends the state,
 // never for a fixed time.
 import { expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { CDPSession, Page } from '@playwright/test'
 import {
   fillSource,
   listenButton,
@@ -24,7 +24,18 @@ export type VisualState = {
   name: string
   /** Projects (by name) the state applies to; all when absent. */
   projects?: RegExp
+  /** A folded posture (CDP emulation): the spec captures through the
+   * state's CDP session (foldSession) and checks the layout is still this
+   * mode before and after every capture. */
+  folded?: 'laptop' | 'book'
   setup(page: Page, fake: Fake): Promise<void>
+}
+
+const foldSessions = new WeakMap<Page, CDPSession>()
+
+/** The CDP session that folded `page` (fold()), if any. */
+export function foldSession(page: Page): CDPSession | undefined {
+  return foldSessions.get(page)
 }
 
 /** Fixed sentence input for `fixture`'s reply (e2e/fixtures/results). The
@@ -481,6 +492,7 @@ export const STATES: VisualState[] = [
     // result above the fold, editor below it.
     name: 'layout-fold-laptop',
     projects: /^chromium-(.+-)?portrait$/,
+    folded: 'laptop',
     async setup(page) {
       await fold(page, 'horizontal')
       await expect(page.locator('.app-shell')).toHaveAttribute(
@@ -494,6 +506,7 @@ export const STATES: VisualState[] = [
     // segments.
     name: 'layout-fold-book',
     projects: /^chromium-(.+-)?landscape$/,
+    folded: 'book',
     async setup(page) {
       await fold(page, 'vertical')
       await expect(page.locator('.app-shell')).toHaveAttribute(
@@ -519,10 +532,12 @@ async function fold(
   const { width, height } = page.viewportSize()!
   const extent = orientation === 'vertical' ? width : height
   // One session, left attached until the page closes: CDP overrides belong
-  // to their session, and detaching it drops the fold (checked in Task 28).
-  // Playwright's own screenshot also replaces the device metrics, which
-  // drops the display feature: see the Task 28 report.
+  // to their session, and detaching it drops the fold. Playwright's own
+  // screenshots re-apply its device metrics, which drops the display
+  // feature (the page unfolds), so visual.spec.ts captures folded states
+  // through this session instead (Task 28).
   const cdp = await page.context().newCDPSession(page)
+  foldSessions.set(page, cdp)
   await cdp.send('Emulation.setDevicePostureOverride', {
     posture: { type: 'folded' },
   })
