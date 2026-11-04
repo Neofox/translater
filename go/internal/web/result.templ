@@ -15,9 +15,10 @@ import (
 // ResultSkeleton is the content of #result-details at the start of a run:
 // the always-open alternatives section with an empty #alternatives list that
 // AlternativeRow partials are appended to. The section stays mounted while
-// empty (TS unmounts it); CSS hides it until it holds an alternative item.
+// empty (TS unmounts it, and never mounts it for long-form input) under
+// `hidden`, which stream.js lifts once it holds an alternative item.
 templ ResultSkeleton(title string) {
-	<section class="result-section detail-alternatives" aria-labelledby="alternatives-title">
+	<section class="result-section detail-alternatives" aria-labelledby="alternatives-title" hidden>
 		<h3 id="alternatives-title" class="result-section-title"><span>{ title }</span></h3>
 		<div id="alternatives-body" class="result-section-body">
 			<ul id="alternatives" class="alternative-list"></ul>

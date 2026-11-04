@@ -126,11 +126,13 @@ export function initStream(app, form) {
   const panel = document.querySelector('.output-panel')
   const status = $('result-status')
 
-  // SentenceView/WordView mark result-details while alternative rows exist;
-  // htmx swaps the rows in, so follow them.
+  // SentenceView/WordView mark result-details while alternative rows exist
+  // and mount the section only then (the server sends it hidden); htmx
+  // swaps the rows in, so follow them.
   new MutationObserver(() => {
     const has = details.querySelector('.alternative-item')
     details.className = `result-details ${has ? 'has-alternatives' : ''}`
+    details.querySelector('.detail-alternatives')?.toggleAttribute('hidden', !has)
   }).observe(details, { childList: true, subtree: true })
 
   const interp = createInterpolator((text) => {

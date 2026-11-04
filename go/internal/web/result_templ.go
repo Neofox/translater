@@ -24,7 +24,8 @@ import (
 // ResultSkeleton is the content of #result-details at the start of a run:
 // the always-open alternatives section with an empty #alternatives list that
 // AlternativeRow partials are appended to. The section stays mounted while
-// empty (TS unmounts it); CSS hides it until it holds an alternative item.
+// empty (TS unmounts it, and never mounts it for long-form input) under
+// `hidden`, which stream.js lifts once it holds an alternative item.
 func ResultSkeleton(title string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -42,14 +43,14 @@ func ResultSkeleton(title string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"result-section detail-alternatives\" aria-labelledby=\"alternatives-title\"><h3 id=\"alternatives-title\" class=\"result-section-title\"><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"result-section detail-alternatives\" aria-labelledby=\"alternatives-title\" hidden><h3 id=\"alternatives-title\" class=\"result-section-title\"><span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 21, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 22, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -152,7 +153,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 52, Col: 215}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 53, Col: 215}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -208,7 +209,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 65, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 66, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -234,7 +235,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(r)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 68, Col: 9}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 69, Col: 9}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -259,7 +260,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 73, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 74, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -278,7 +279,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 76, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 77, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {

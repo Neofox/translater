@@ -652,7 +652,43 @@ test('long-form input hides alternatives @core', async ({ page, fake }) => {
   await waitForDone(page)
   await expect(page.locator('.alternative-item')).toHaveCount(0)
   await expect(page.locator('.detail-alternatives')).toBeHidden()
+  // TS unmounts the section; a mounted copy must sit under `hidden`, which
+  // the DOM snapshot treats as absent (not merely hidden by a CSS rule).
+  expect(
+    await page.evaluate(
+      () =>
+        [...document.querySelectorAll('.detail-alternatives')].filter(
+          (e) => !e.closest('[hidden]'),
+        ).length,
+    ),
+  ).toBe(0)
   expect(await fake.requests()).toBe(1)
+})
+
+test('a short sentence without alternatives mounts no alternatives section @core', async ({
+  page,
+}) => {
+  // learn-long's reply has no alternatives; a short single sentence is not
+  // long-form, so the section's absence comes from the empty list alone.
+  await fillSource(
+    page,
+    `How are you ${fixture('learn-long').match} ${nonce()}`,
+  )
+  await waitForDone(page)
+  await expect(page.locator('.alternative-item')).toHaveCount(0)
+  expect(
+    await page.evaluate(
+      () =>
+        [...document.querySelectorAll('.detail-alternatives')].filter(
+          (e) => !e.closest('[hidden]'),
+        ).length,
+    ),
+  ).toBe(0)
+  // The next run with alternatives shows the section again.
+  await fillSource(page, sentence('default'))
+  await waitForDone(page)
+  await expect(page.locator('.detail-alternatives')).toBeVisible()
+  await expect(page.locator('.alternative-item')).toHaveCount(2)
 })
 
 test('retry re-runs a failed translation @core', async ({ page, fake }) => {

@@ -385,6 +385,20 @@ export const STATES: VisualState[] = [
     },
   },
   {
+    // Long-form input: no alternatives section at all (TS never mounts it;
+    // Go keeps it under `hidden`).
+    name: 'longform-done',
+    async setup(page) {
+      await openApp(page)
+      await fillSource(
+        page,
+        'Hi there.\nHow are you doing today, my friend? [fx:longform]',
+      )
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(0)
+    },
+  },
+  {
     // A finished result while a software keyboard (simulated visual
     // viewport) covers half the phone: result first, focused editor and
     // its actions above the keyboard.
