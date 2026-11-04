@@ -312,8 +312,12 @@ test('failed refine rolls back to the previous result with a compact notice @ref
   const phrases = await page.getByTestId('inspectable-phrase').count()
   // A phrase selected before the refine is not selected after the rollback
   // (the selection belongs to a result; LearningProvider resets it).
+  // Only the desktop workspace expands a row inline; elsewhere (split, book)
+  // selecting one opens the full learning surface, which hides the header
+  // and with it Adjust.
   const first = page.getByTestId('learning-chunk').first()
-  if (await first.isVisible()) {
+  const desktop = await page.locator('.app-shell[data-desktop]').count()
+  if (desktop && (await first.isVisible())) {
     await first.click()
     await expect(first).toHaveAttribute('aria-expanded', 'true')
   }
