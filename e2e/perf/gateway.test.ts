@@ -4,7 +4,11 @@ import { createServer, request } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, Server } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createGateway, isFontRequest } from './gateway.ts'
+import {
+  GATEWAY_IDLE_TIMEOUT_MS,
+  createGateway,
+  isFontRequest,
+} from './gateway.ts'
 
 const servers: Server[] = []
 
@@ -48,6 +52,16 @@ describe('gateway', () => {
     expect(
       isFontRequest('/assets/app.js', { 'sec-fetch-dest': 'script' }),
     ).toBe(false)
+  })
+
+  it('keeps idle browser connections open for longer than a measurement phase', () => {
+    // Node's default (5 s, closing at ~6 s) let a connection die between
+    // phases; the throttle proxy relays the close ~RTT/2 late, so WebKit
+    // reused the dying connection and lost the request (no retry).
+    const gateway = createGateway({ host: '127.0.0.1', port: 9 })
+    expect(GATEWAY_IDLE_TIMEOUT_MS).toBeGreaterThanOrEqual(5 * 60_000)
+    expect(gateway.keepAliveTimeout).toBe(GATEWAY_IDLE_TIMEOUT_MS)
+    expect(gateway.headersTimeout).toBeGreaterThan(gateway.keepAliveTimeout)
   })
 
   it('streams chunks as they come, answers fonts with 404 and propagates aborts', async () => {

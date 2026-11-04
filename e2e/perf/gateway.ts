@@ -44,9 +44,17 @@ function forwardable(raw: string[]): string[] {
   return out
 }
 
+/** Idle keep-alive for browser connections: longer than any gap between
+ * measurement phases. With Node's default (5 s, closing at ~6 s) a browser
+ * connection could die between phases; the throttle proxy relays that close
+ * ~RTT/2 late, so WebKit reused the dying connection for the next request and
+ * lost it (Chromium retries, WebKit does not). Production keeps connections
+ * open far longer than 6 s, so this also matches what the apps get live. */
+export const GATEWAY_IDLE_TIMEOUT_MS = 10 * 60_000
+
 export function createGateway(target: { host: string; port: number }): Server {
   const agent = new Agent({ keepAlive: true })
-  return createServer((req, res) => {
+  const server = createServer((req, res) => {
     if (isFontRequest(req.url ?? '', req.headers)) {
       res.writeHead(404, {
         'content-type': 'text/plain',
@@ -85,6 +93,10 @@ export function createGateway(target: { host: string; port: number }): Server {
     })
     req.pipe(upstream)
   })
+  server.keepAliveTimeout = GATEWAY_IDLE_TIMEOUT_MS
+  // Must exceed keepAliveTimeout, or Node closes idle sockets at headersTimeout.
+  server.headersTimeout = GATEWAY_IDLE_TIMEOUT_MS + 60_000
+  return server
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
@@ -93,7 +105,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   if (!port || !host || !targetPort)
     throw new Error('PORT and TARGET=host:port are required')
   const server = createGateway({ host, port: Number(targetPort) })
-  server.keepAliveTimeout = 5000
   server.listen(port, '127.0.0.1', () => {
     process.stdout.write(`gateway on ${port}\n`)
   })
