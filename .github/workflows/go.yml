@@ -98,16 +98,25 @@ jobs:
           npx tsx scripts/capture-ui-markup.tsx
           git diff --exit-code -- go/internal/web/testdata/react-markup.json
 
+  # Every e2e tag on both apps, all 18 projects (9 viewports × Chromium and
+  # WebKit), against the fake upstream. The TS leg serves its production
+  # build, as the parity sign-off does (vite dev adds dev-only skips and
+  # overlays). analytics/early-typing ride on @core and speechEndpoint on
+  # @speech; a test carrying two tags runs in both jobs. @visual runs in the
+  # visual job, @prod (billed) never runs here, and @review needs
+  # KEYBOARD_REVIEW, so it skips.
   e2e:
-    name: E2E core (${{ matrix.app }})
+    name: E2E @${{ matrix.tag }} (${{ matrix.app }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         app: [go, ts]
+        tag: [core, context, layout, learning, word, refine, speech]
     env:
       APP: ${{ matrix.app }}
+      E2E_TS_BUILD: prod
       OPENAI_API_KEY: test
       E2E_WORKERS: 3
     steps:
@@ -138,22 +147,25 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
 
       # mise-action puts go on PATH; Playwright spawns `go run` from go/.
-      - name: Core e2e
-        run: npx playwright test -c e2e --grep @core
+      - name: E2E @${{ matrix.tag }}
+        run: npx playwright test -c e2e --grep @${{ matrix.tag }}
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
-          name: playwright-report-${{ matrix.app }}
+          name: playwright-report-${{ matrix.app }}-${{ matrix.tag }}
           path: |
             test-results
           if-no-files-found: ignore
           retention-days: 7
 
+  # On demand only (Actions → Go app → Run workflow): the full visual run
+  # (28 states, 18 projects, TS baselines then Go compared) is long.
   visual:
     name: TS-vs-Go visual parity
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     env:
       OPENAI_API_KEY: test
       E2E_WORKERS: 3
