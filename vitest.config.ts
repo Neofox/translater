@@ -5,6 +5,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 // module runner alive and produces a misleading shutdown timeout after success.
 export default defineConfig({
   resolve: { tsconfigPaths: true },
-  // e2e/tests holds the Playwright parity suite (npm run e2e).
-  test: { exclude: [...configDefaults.exclude, 'e2e/tests/**'] },
+  // e2e/tests holds the Playwright parity suite (npm run e2e); go/ holds the
+  // Go app, whose client modules use node:test (node --test).
+  test: { exclude: [...configDefaults.exclude, 'e2e/tests/**', 'go/**'] },
 })
