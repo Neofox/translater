@@ -1,123 +1,158 @@
 # Go + htmx vs TypeScript: final performance comparison (Task 31)
 
-- Date: 2026-11-04. Status: **draft, fake runs only.** Live runs, DevTools traces and the closing recommendation are placeholders (marked **PENDING**) for the controller.
-- Apps: TS = TanStack Start production build (`npm run build`, Nitro Vercel preset) served by `e2e/perf/serve-ts.mjs`; Go = `go build` of `go/`. Both against the fake OpenAI server (`go/cmd/fakeopenai`, fixture `stream`), measured by the same harness, on the same machine, browsers and profiles as the stage-1 baseline ([`2026-11-02-baseline.md`](2026-11-02-baseline.md), which defines every metric).
-- Commands (run one after the other, nothing else running on the machine):
-  - `npx tsx e2e/perf/measure.ts --app ts --fake --runs 10 --out docs/superpowers/reports/data/2026-11-04-final-ts-fake.json` (at commit `e902c32`)
-  - `npx tsx e2e/perf/measure.ts --app go --fake --runs 10 --out docs/superpowers/reports/data/2026-11-04-final-go-fake.json` (re-run at commit `1992739`, after the early-typing fix; it replaces the first Go run at `e902c32`, see "Early typing" below)
-  - Tables: `npx tsx e2e/perf/table.ts docs/superpowers/reports/data/2026-11-04-final-ts-fake.json docs/superpowers/reports/data/2026-11-04-final-go-fake.json` (no `--allow-mismatch` needed: same profiles, harness hash `317267dd85bb`, Playwright 1.64.1, Chromium 156.0.8078.4, WebKit 27.2, Apple M1 Max).
-- Raw data: [`data/2026-11-04-final-ts-fake.json`](data/2026-11-04-final-ts-fake.json), [`data/2026-11-04-final-go-fake.json`](data/2026-11-04-final-go-fake.json). The TS app's sources did not change between the two commits (`1992739` touches only `go/` and an e2e spec), so the TS file stays valid. Both are marked dirty only because of the untracked `.headroom/` and `.serena/` tool folders.
-- All 240 runs succeeded (per app and profile: 10 load + 10 repeat load + 10 interaction + 10 probe; no `error` entries). Every settled-page translation made exactly one upstream request and showed the full fixture text; whitespace input never reached the upstream in either app.
+- Date: 2026-11-04. Status: **draft with fake and live runs.** The DevTools traces and the closing recommendation are placeholders (marked **PENDING**) for the controller.
+- Apps: TS = TanStack Start (`npm run build`, Nitro Vercel preset); Go = `go build` of `go/`. Same harness, same machine (Apple M1 Max, Playwright 1.64.1, Chromium 156.0.8078.4, WebKit 27.2), same profiles as the stage-1 baseline ([`2026-11-02-baseline.md`](2026-11-02-baseline.md), which defines every metric).
+- **Fake runs** (local production builds against the fake OpenAI server, fixture `stream`), one app after the other with nothing else running:
+  - `npx tsx e2e/perf/measure.ts --app ts --fake --runs 10 --out docs/superpowers/reports/data/2026-11-04-final-ts-fake.json`
+  - `npx tsx e2e/perf/measure.ts --app go --fake --runs 10 --out docs/superpowers/reports/data/2026-11-04-final-go-fake.json`
+- **Live runs** (billed; production deployments; throttle proxy as the browser's CONNECT proxy on the throttled profiles):
+  - `npx tsx e2e/perf/measure.ts --app ts --live --url https://www.neofox.dev --runs 10 --i-understand-this-is-billed --out docs/superpowers/reports/data/2026-11-04-final-ts-live.json`
+  - `npx tsx e2e/perf/measure.ts --app go --live --url https://translater-go.vercel.app --runs 10 --i-understand-this-is-billed --out docs/superpowers/reports/data/2026-11-04-final-go-live.json`
+- Tables: `npx tsx e2e/perf/table.ts <ts.json> <go.json>` for each pair; no `--allow-mismatch` needed (same profiles, harness `dd731a369455`, browsers, Playwright, machine).
+- All four files were measured at commit `0968bde`. The Go app includes the early-typing fix `1992739`, and production (translater-go) was redeployed with it before the live run. The files are marked dirty only because of the untracked `.headroom/` and `.serena/` tool folders.
+- Every run succeeded: 120/120 per file (per profile: 10 load + 10 repeat load + 10 interaction + 10 probe). In the fake runs every settled-page translation made exactly one upstream request with the full fixture text, and whitespace input never reached the upstream.
+
+Raw data: [`ts-fake`](data/2026-11-04-final-ts-fake.json), [`go-fake`](data/2026-11-04-final-go-fake.json), [`ts-live`](data/2026-11-04-final-ts-live.json), [`go-live`](data/2026-11-04-final-go-live.json).
 
 ## Harness changes since the baseline
 
-1. `e2e/perf/table.ts` (commit `e902c32`, presentation only, identical for both apps): the typing section's headline is now **First typeable (kept and acted on)** = `max(FCP, earliest kept keystroke, earliest acted-on keystroke)` of the burst typed at first focus, shown only when that burst stayed in the field **and** was translated (n/a otherwise), with the wipe/ignore gate rows directly below it. The retype model (settle, Clear, retype) moved to its own secondary section, "Dropped-run penalty". "Input kept from" (space probe) stays as a plain row.
-2. No change to `measure.ts`, `page-scripts.ts`, the proxy, the gateway or the profiles was needed for the finished Go app: the selectors (`input-textarea`, `main-translation`, `output-toolbar` Copy/Listen, `clear-input`), the app-agnostic done signal and the font blocking all work unchanged (Listen now exists in Go, so the Listen diagnostic is populated for both apps and matches done).
-3. Not a harness change, but an asymmetry to know: the TS app requests `/_vercel/insights/script.js` locally (404, counted as 0 bytes); the Go app renders that tag only on Vercel (Task 29), so in `--fake` it makes no such request. Both request it in `--live`.
+All apply to both apps identically. The harness hash (sha256 of `e2e/perf` sources and `e2e/tests/helpers.ts`) is now `dd731a369455` (baseline `e94a65d9c3c6`). Both apps were re-measured with it, in fake and live mode, so no comparison crosses harness versions. The earlier drafts of this report used `317267dd85bb`; their files are replaced.
 
-The harness hash differs from the baseline's (`e94a65d9c3c6`) because `e2e/tests/helpers.ts` (port scheme) and `table.ts` changed since; TS was re-measured in this session, so the TS/Go comparison never crosses harness versions.
+1. **Presentation** (`e902c32`, `table.ts`). The typing headline is **First typeable (kept and acted on)** = `max(FCP, earliest kept keystroke, earliest acted-on keystroke)` of the burst typed at first focus. It is shown only when that burst stayed in the field **and** was translated, and is n/a otherwise; the wipe/ignore gate rows sit directly below it. The retype model (settle, Clear, retype) moved to its own secondary section, "Dropped-run penalty".
+2. **Gateway keep-alive** (`a71aed5`, `gateway.ts` + test). The `--fake` gateway closed idle browser connections after Node's 5 s keep-alive (closing at ~6 s). The throttle proxy relays that close ~RTT/2 late, so WebKit reused the dying connection for the next request and lost it; Chromium retries such a request, WebKit does not. This caused the Go "iPhone repeat visit ignored 6/10" in the previous draft (an early-typed `POST /translate` sent on the dying connection failed with "network connection was lost"; diagnosed by the controller). It also explains the earlier "WebKit connection reuse / extra RTT" asymmetry on repeat navigations: TS's iPhone repeat-visit TTFB is now 581 ms instead of 1150 ms. The keep-alive now lives in `createGateway` (10 min, `headersTimeout` above it), longer than any measurement phase, as production's would be. A unit test asserts it.
+3. **Translation request count** (`be4c0c9`, `requests.ts` + test, `measure.ts`, `table.ts`). The page's own translation requests are counted per scenario from the browser side. A translation request is a same-origin POST whose body carries the text: the TS server-function JSON with a `"text"` key, or the Go `/translate` form with `text=`. The free warm-ups (TS server function, Go `/warm`) have empty bodies. In `--fake` the count equals the fake's `/_stats` count for every scenario of both apps. In `--live` it is the **billed count**, which the harness previously could not record. New rows: "Translation requests sent by the page".
+4. **Live-mode fixes** (`0968bde`, `measure.ts`):
+   - The deployed TS app (built from `master`) has no `data-testid` on its Copy button; the branch's TS has one. The harness waited for a Copy that never matched and failed every live TS interaction. Copy is now selected by its class (`[data-testid="output-toolbar"] .copy-button`), which both apps render.
+   - The space probe left a `networkidle` timeout as an unhandled rejection, which killed the whole first live TS attempt. It is now recorded as a failed probe run.
+5. No change was needed for the Go app's features: the selectors, the app-agnostic done signal and the font blocking work unchanged. Listen now exists in Go, so the Listen diagnostic is populated for both apps and matches done.
 
-## Headline: deciding metrics (median of 10; fake upstream, local production builds)
+Known asymmetry, not a harness change: locally (`--fake`) only TS requests `/_vercel/insights/script.js` (404, 0 bytes); Go renders that tag only on Vercel. Live, both load it (Go 200 now), and TS also loads Cloudflare's `beacon.min.js` (10.3 KB gzip), which counts in its live JS total.
 
-| Profile | Metric | TS | Go |
-| --- | --- | --- | --- |
-| iPhone WebKit, slow 4G | TTFB | 1152 ms | 1140 ms |
-| | FCP / LCP | 2613 / 2613 ms | 2566 / 2566 ms |
-| | **First typeable (kept and acted on)** | n/a: burst **wiped** 10/10 | **2579 ms** (10/10) |
-| | Input kept from (space probe) | 7531 ms | 2565 ms |
-| | Nav start to first main char, typing at first focus | 11221 ms (after the retype) | 5813 ms |
-| | Repeat visit: first typeable (kept and acted on) | n/a: wiped 10/10 (+ remainder billed 10/10) | 721 ms in 4/10; **ignored 6/10** (see below) |
-| Pixel Chromium, 4x CPU + slow 4G | TTFB | 1140 ms | 1137 ms |
-| | FCP / LCP | 3188 / 3188 ms | 3180 / 3180 ms |
-| | TBT | 11 ms | 0 ms |
-| | **First typeable (kept and acted on)** | n/a: wiped 10/10 | **3154 ms** (10/10) |
-| | Input kept from (space probe) | 8160 ms | 3148 ms |
-| | Nav start to first main char, typing at first focus | 11455 ms (after the retype) | 6384 ms |
-| | Repeat visit: first typeable (kept and acted on) | n/a: wiped 10/10 | 735 ms (10/10) |
-| MacBook Chromium | TTFB | 3 ms | 2 ms |
-| | FCP / LCP | 44 / 44 ms | 44 / 44 ms |
-| | **First typeable (kept and acted on)** | n/a: wiped 10/10 (remainder billed 1/10) | **48 ms** (10/10) |
-| | Input kept from (space probe) | 88 ms | 44 ms |
-| | Repeat visit: first typeable (kept and acted on) | 41 ms (10/10) | 26 ms (10/10) |
-| All | **Client JS, gzip -9 (external + inline)** | **285.3 KiB** (292,139 B; baseline 285.3 KiB) | **42.8 KiB** (43,863 B), −85 % |
-| All | **CSS, gzip -9** | 29.2 KiB (29,875 B; baseline 28.9 KiB) | 28.2 KiB (28,839 B) |
-| All | HTML, raw / gzip -9 | 16.5 KiB / 4.2 KiB | 36.7 KiB / 7.3 KiB |
-| All | All transferred, cold (uncompressed locally) | 1068 KiB | 290 KiB |
+## Headline: deciding metrics (median of 10)
 
-### Early typing (kept and acted on)
+Fake = local production builds, fonts blocked, uncompressed transfer (gzip sizes computed). Live = production deployments, real compression and fonts, OpenAI.
 
-- **TS** keeps nothing typed before React hydrates: the SSR textarea takes focus at FCP, hydration resets it, and text is kept only from 7.5 s (iPhone) / 8.2 s (Pixel) / 88 ms (MacBook). On iPhone repeat visits 10/10 (MacBook cold 1/10) the surviving tail of the wiped burst was translated as a request of its own, a billed fragment.
-- **Go** keeps every keystroke from first paint (the textarea is plain server HTML; "input kept from" = FCP on every profile, and no keystroke is ever lost: probe resolution n/a). Since `1992739`, text typed before the client modules run is also translated: at init, `app.js` starts the same debounced run an `input` event would have scheduled, but only on a fresh navigation (`performance.getEntriesByType('navigation')[0].type === 'navigate'`) and only when the value differs from the server default. The cold-visit burst is now kept and acted on 10/10 on every profile, so Go's headline equals its FCP-bound first focus: 2.58 s (iPhone), 3.15 s (Pixel), 48 ms (MacBook), against TS's "never, retype needed".
-- **Why the navigation-type check is needed:** browsers restore textarea values on reload and back/forward. WebKit restores this textarea on back/forward even with `autocomplete=off`. An unconditional init-time run would therefore bill a translation on every reload or back navigation with text in the field (speculative paid work). Reload and back/forward never start a run; a bfcache restore does not run the modules again. TS never sees restored text because hydration wipes the field.
-- First Go run, before the fix (commit `e902c32`, same harness, superseded by the file above): the burst was kept but **ignored** 10/10 on iPhone and Pixel (cold and repeat) and 3/10 on MacBook cold; nothing was translated until the user typed again, blurred or pressed Cmd/Ctrl+Enter.
+| Profile | Metric | TS fake | Go fake | TS live | Go live |
+| --- | --- | --- | --- | --- | --- |
+| iPhone WebKit, slow 4G | TTFB | 1141 ms | 1138 ms | 2725 ms (p90 3857) | **1780 ms** (p90 1822) |
+| | FCP = LCP | 2583 ms | 2544 ms | 6119 ms (p90 9555) | **2964 ms** (p90 2999) |
+| | **First typeable (kept and acted on)** | n/a: wiped 10/10 | **2549 ms** (10/10) | n/a: wiped 10/10 | **2956 ms** (10/10) |
+| | Repeat visit: first typeable | n/a: wiped 10/10 | 721 ms (10/10) | 1845 ms in 2/10; wiped 8/10 | 885 ms (10/10) |
+| Pixel Chromium, 4x CPU + slow 4G | TTFB | 1139 ms | 1140 ms | 2752 ms (p90 6634) | **1784 ms** (p90 1854) |
+| | FCP = LCP | 3198 ms | 3164 ms | 4930 ms (p90 15252) | **2986 ms** (p90 3108) |
+| | TBT | 21 ms | 0 ms | 25 ms | 0 ms |
+| | **First typeable (kept and acted on)** | n/a: wiped 10/10 | **3144 ms** (10/10) | n/a: wiped 10/10 | **2940 ms** (10/10) |
+| | Repeat visit: first typeable | n/a: wiped 10/10 | 735 ms (10/10) | n/a: wiped 10/10 | 982 ms (10/10) |
+| MacBook Chromium (no throttling) | TTFB | 3 ms | 2 ms | 1266 ms (p90 2424) | **33 ms** (p90 46) |
+| | FCP = LCP | 44 ms | 44 ms | 3006 ms (p90 4836) | **326 ms** (p90 436) |
+| | **First typeable (kept and acted on)** | n/a: wiped 10/10 | **49 ms** (10/10) | n/a: wiped 10/10 | **322 ms** (10/10) |
+| | Repeat visit: first typeable | 43 ms (10/10) | 24 ms (10/10) | 2204 ms in 4/10; wiped 6/10 | 253 ms (10/10) |
+| All | **Client JS, gzip -9 (external + inline)** | **285.3 KiB** (292,138 B) | **42.8 KiB** (43,863 B) | 303.9 KiB (incl. Cloudflare beacon 10.0 KiB + Vercel insights 2.0 KiB) | 44.8 KiB (incl. Vercel insights 2.0 KiB) |
+| All | JS transferred, live (compressed) | | | 312.3 KiB (br; beacon gzip) | **54.0 KiB** (br; 3 small files uncompressed) |
+| All | **CSS, gzip -9** | 29.2 KiB (29,875 B) | 28.2 KiB (28,839 B) | 28.3 KiB | 28.2 KiB |
+| All | All transferred, cold | 1068 KiB (uncompressed) | 290 KiB (uncompressed) | 505 KiB | **249 KiB** |
 
-### Remaining issue: iPhone repeat visit, ignored 6/10 (for the controller)
+### Gate rows beside the headline (typing at first focus)
 
-On the iPhone repeat visit, 6/10 bursts are still ignored after the fix. All Pixel and MacBook bursts and all iPhone cold bursts are acted on. What the data and two diagnostic runs show (a temporary, uncommitted copy of `measure.ts` that logged the page state; not part of the results):
+| Profile | Visit | TS fake: wiped / ignored / remainder billed | Go fake | TS live | Go live |
+| --- | --- | --- | --- | --- | --- |
+| iPhone | cold | 10 / 0 / 0 of 10 | 0 / 0 / 0 | 10 / 0 / **5** | 0 / 0 / 0 |
+| | repeat | 10 / 0 / **10** | 0 / 0 / 0 | 8 / 0 / **8** | 0 / 0 / 0 |
+| Pixel | cold | 10 / 0 / 0 | 0 / 0 / 0 | 10 / 0 / 0 | 0 / 0 / 0 |
+| | repeat | 10 / 0 / **1** | 0 / 0 / 0 | 10 / 0 / 0 | 0 / 0 / 0 |
+| MacBook | cold | 10 / 0 / **1** | 0 / 0 / 0 | 10 / 0 / 0 | 0 / 0 / 0 |
+| | repeat | 0 / 0 / 0 | 0 / 0 / 0 | 6 / 0 / **1** | 0 / 0 / 0 |
 
-- The repeat visits fall into two groups through the same throttle proxy. In 4/10 runs FCP is ~655 ms and the burst (first key ~721 ms) is still being typed when the modules run (DOMContentLoaded ~782 ms), so its later keystrokes fire ordinary `input` events: acted on. In 6/10 runs FCP is ~1215 ms (one extra RTT, consistent with a new connection), the burst ends (~1331 ms) just before the modules run (DOMContentLoaded ~1353 ms), so the new init path starts the run: ignored in every such run. The diagnostic reproduced it in 2 of 3 runs.
-- The navigation type is `navigate` in those runs and the value differs from the default, so the fix does fire: a run starts. Within ~700 ms of the last key the main text shows the stale/aborted placeholder `…` (`stream.js` `setMarks`: a live run that is no longer streaming and has no main text), Copy never enables, and **no request reaches the fake upstream**. The run is aborted before its request arrives. Cold visits use the same init path and are acted on 10/10. On cold visits the modules run ~2 s after the burst, when the page has finished loading; on these repeat visits the run starts while the page is still settling. So something that runs after module init on a fast warm load seems to abort it (a later `inputChanged`/`settingsChanged`/`htmx:abort` caller). Not investigated further: app code is out of this task's scope.
-- Cost: none. The aborted run sends nothing upstream (repeat-visit upstream requests are 1 per run, the retype).
-- The harness counts the `…` placeholder as "first main char" in these aborted runs. It does not change any reported row: those runs are dropped, so the counted first main char is the retype's.
+"Remainder billed" = the burst was wiped and its surviving tail was translated as a request of its own (an extra billed request) before the retype.
 
-Other deciding-metric notes:
+### Early typing
 
-- TTFB and FCP are equal within noise on the throttled profiles: both are dominated by the simulated link (2 RTT + document). Go's HTML is 2.2x larger (36.7 vs 16.5 KiB raw: server-rendered panels, `<template>`s and 6.3 KB of inline JSON data), so its document takes 197-199 ms on the link vs 84-90 ms. FCP is still equal or up to ~50 ms earlier, because the stylesheet is the only render-blocking resource in both.
-- Go's DOMContentLoaded is later on the throttled profiles (4545 vs 2568 ms iPhone; 5107 vs 3180 ms Pixel): it waits for all 21 deferred/module scripts (111 KiB uncompressed here). What must arrive before DOMContentLoaded differs between the two architectures, so the row is not comparable across them. The load event, when every script has arrived, is 4.5-5.1 s in both. In production the JS is compressed (Go 43.9 KB vs TS 292 KB gzip); the live run will show the effect.
-- Server cold start (local, Node client): TS 93 ms vs Go 2 ms first request; warm 4 vs 2 ms. Vercel cold starts are only visible in `--live`.
+- **TS** keeps nothing typed before React hydrates. The SSR textarea takes focus at first paint, but hydration resets it. Text is kept from 7.5 s (iPhone) / 8.2 s (Pixel) / 90 ms (MacBook) in the fake runs, and from 7.3 / 8.4 / 5.0 s live. Every cold burst on every profile was wiped, fake and live. A wiped burst's tail is often translated as a fragment (14 extra billed requests in the live run).
+- **Go** keeps every keystroke from first paint: the textarea is plain server HTML, "input kept from" = FCP on every profile, and no keystroke is ever lost (probe resolution n/a). Since `1992739` it also translates them. At init, `app.js` starts the same debounced run an `input` event would have scheduled, but only on a fresh navigation (`performance.getEntriesByType('navigation')[0].type === 'navigate'`) and only when the value differs from the server default. Every burst, cold and repeat, fake and live, on every profile, was kept and acted on (120/120 live and 60/60 fake typing scenarios).
+- **Why the navigation-type check matters:** browsers restore textarea values on reload and back/forward. WebKit restores this textarea on back/forward even with `autocomplete=off`. Starting a run for any text present at init would bill a translation on every reload or back navigation with text in the field. Only the `navigate` entry type prevents that; reload and back/forward never start a run, and a bfcache restore does not run the modules again. TS never sees restored text because hydration wipes the field.
+- The previous draft's "Go iPhone repeat visit ignored 6/10" was the gateway keep-alive artifact (harness change 2), not app behaviour. With the fix, 10/10 are acted on in both modes.
+
+### Other deciding-metric notes
+
+- **Fake:** TTFB and FCP are equal within noise on the throttled profiles; both are dominated by the simulated link (2 RTT + document). Go's HTML is 2.2x larger (36.7 vs 16.5 KiB raw: server-rendered panels, `<template>`s, 6.3 KB of inline JSON), yet its FCP is equal or ~40 ms earlier, because the stylesheet is the only render-blocking resource in both.
+- **Live:** Go is ahead on TTFB, FCP/LCP, first typeable and the load event on every profile. FCP is 2.96 vs 6.12 s on iPhone and 2.99 vs 4.93 s on Pixel, with a much tighter p90 (3.0 vs 9.6 s; 3.1 vs 15.3 s). On the MacBook it is 0.33 vs 3.0 s.
+- **Where the live difference comes from:**
+  - The TS site sits behind Cloudflare (`server: cloudflare`, then Vercel), so it pays an extra TLS hop. Curl from this machine: TS TLS 0.5-1.5 s and TTFB 1.0-2.1 s; Go TLS 0.02 s and TTFB 0.23-0.25 s. Node-client server TTFB: TS warm 1155 ms, Go 248 ms.
+  - TS transfers 312 KiB of compressed JS against Go's 54 KiB over the shared slow-4G link.
+  - Part of the TTFB gap is that hosting difference, not the app architecture. A like-for-like comparison would need both behind the same edge.
+  - The FCP and first-typeable gap on the throttled profiles (2-3 s) is larger than the TTFB gap (~1 s): the remainder is TS's render path (its FCP waits for more on the link).
+- **Go's DOMContentLoaded** is later in the fake runs (4530 vs 2543 ms iPhone; 5106 vs 3192 ms Pixel): it waits for all 21 deferred/module scripts, uncompressed locally. Live, with brotli, it is earlier on iPhone (3672 vs 6122 ms) and later on Pixel (6076 vs 5242 ms; 4x CPU). The load event is earlier for Go live on every profile.
+- **Server start (fake, local):** cold 97 vs 1 ms, warm 5 vs 0 ms. Live "cold" (the first request of the session): TS 1360 ms, Go 1034 ms.
+- **Function regions:** one `x-vercel-id` sample each shows the TS function in `icn1` (Seoul) and the Go function in `iad1` (Washington, D.C.), with the edge in `icn1` for Go. Each `/translate` therefore crosses the Pacific for Go but not for TS (OpenAI's own location is unknown). Worth pinning Go's region (`regions` in `go/vercel.json`) before drawing conclusions from the live translation timings below.
 
 ## Secondary metrics
 
-### Translation on the settled page (fake-paced)
+### Translation on the settled page
 
-| Profile | Last key to first main char (TS / Go) | Last key to Copy enabled | Last key to done |
-| --- | --- | --- | --- |
-| iPhone WebKit | 1295 / 1253 ms | 1606 / 1473 ms | 5447 / 5376 ms |
-| Pixel Chromium | 1262 / 1252 ms | 1559 / 1458 ms | 5287 / 5261 ms |
-| MacBook Chromium | 708 / 689 ms | 1030 / 911 ms | 4925 / 4905 ms |
+| Profile | Mode | Last key to first main char (TS / Go) | Last key to Copy enabled | Last key to done | Request end minus last DOM change |
+| --- | --- | --- | --- | --- | --- |
+| iPhone | fake | 1258 / 1243 ms | 1569 / 1466 ms | 5368 / 5395 ms | −24 / −23 ms |
+| | live | 4345 (p90 9258) / 5249 (p90 5501) ms | 4424 / 5310 ms | 7071 (p90 12631) / 5955 (p90 6172) ms | −17 / **+145** ms |
+| Pixel | fake | 1264 / 1256 ms | 1559 / 1465 ms | 5265 / 5331 ms | −34 / −24 ms |
+| | live | 3620 / 4922 ms | 4031 / 4951 ms | 6416 (p90 10965) / 5623 (p90 6596) ms | −32 / **+153** ms |
+| MacBook | fake | 686 / 673 ms | 989 / 895 ms | 4790 / 4781 ms | −19 / −13 ms |
+| | live | 3018 / 4637 ms | 3208 / 4740 ms | 6216 (p90 8833) / 5392 (p90 5853) ms | −16 / **+167** ms |
 
-These include the 400 ms sentence-final debounce and the fake's fixed pacing (6-rune chunks every 30 ms), so they show app overhead only. Go reaches the first main char 10-40 ms earlier, Copy ~100-130 ms earlier and done 20-70 ms earlier. Neither app holds a response open after its last DOM change (request end minus last DOM change −29 to −10 ms). **With real OpenAI these timings are dominated by the model** (first main char several seconds); expect the same tens-of-milliseconds difference there, not more.
+- **Fake** (400 ms debounce + app overhead + fixed fake pacing): Go reaches the first main char 10-15 ms earlier and Copy ~100 ms earlier; done is equal within ±30 ms.
+- **Live, OpenAI-dominated:** TS reaches the first main char and Copy **0.9-1.6 s earlier** (medians); Go has the earlier "done" (0.8-1.1 s) and much tighter p90s.
+- **Live, Go's main arrives as a block:** Copy enables only 0-184 ms after Go's first main char (median ~60 ms) in every live run, while TS shows main and then Copy up to 1.4 s apart. That is consistent with Go's main text reaching the browser in one block rather than token by token. Possible causes: buffering of the SSE response on the Vercel Go runtime or its compression, or the function region above. The fake runs stream incrementally in both apps through the same browser code, so the cause is between the Go function and the browser in production.
+- **Live, a held-open response:** "request end minus last DOM change" is **+145 to +211 ms for Go live** (negative everywhere in the fake runs and for TS live): the Go response stays open briefly after the last visible change.
+- **Not investigated (needs the Vercel side):** the stage-0 spike's incremental-streaming check on the real platform (spike report: "Preview deployment pending") would settle the block arrival and the held-open response. **This is the main open question for the recommendation:** time to first main char is the product's top priority (the user ranks speed to the main translation first).
 
-### Keyboard (simulated, mobile profiles; dy is not "lower is better")
+### Keyboard (simulated, mobile profiles, fake; dy is not "lower is better")
 
-Identical in both apps: main text dy 99 px (iPhone) / 58 px (Pixel), textarea dy 323 / 413 px, no pan needed (offsetTop 0), and main text, textarea and caret visible with focus kept 10/10 in both modes. Pixel layout-shift sum: visual mode 0.261 (TS) vs 0.246 (Go), resize mode 0.504 vs 0.498. Full rows in the tables below.
+Identical in both apps: main text dy 99 px (iPhone) / 58 px (Pixel), textarea dy 323 / 413 px, no pan needed (offsetTop 0). Main text, textarea and caret stay visible with focus kept, 10/10 in both modes. Pixel layout-shift sum: visual mode 0.258 (TS) vs 0.246 (Go), resize mode 0.504 vs 0.498. The live files repeat these rows with the same values.
 
-### Repeat visits (warm cache, 0 JS bytes transferred in both)
+### Repeat visits (warm cache)
 
-- iPhone: TTFB 1150 vs 573 ms, consistent with one extra RTT (a new connection) on the TS repeat navigation and a reused one for Go (the baseline saw the same ~1140 ms for TS). FCP 1191 vs 651 ms and LCP 1241 vs 720 ms follow from that, so read this as a connection-reuse effect, not app work. The same effect appears the other way round in the interaction runs' repeat visit: Go's repeat-visit FCP there is ~1215 ms in 6/10 runs (~655 ms in 4/10) while TS's is 622-660 ms in 10/10. That split is why Go's iPhone repeat "first focus" is 1278 ms, and it lines up exactly with the ignored bursts above. Why WebKit's connection reuse differs per app and scenario through the same proxy was not investigated. Pixel (Chromium) shows no such split.
-- Pixel: TTFB 581 / 574 ms, FCP 620 / 616 ms, LCP 652 / 712 ms, CLS 0.048 / 0.051.
-- MacBook: FCP 20 / 24 ms.
-- Repeat-visit HTML is 17 KiB (TS) vs 37 KiB (Go) per navigation: `private, no-store` documents in both.
+- **Fake:** iPhone TTFB 581 / 575 ms, FCP 615 / 651 ms, LCP 660 / 715 ms. Pixel FCP 620 / 612 ms, LCP 664 / 712 ms. MacBook FCP 20 / 20 ms. Go's LCP is ~50 ms later on the throttled profiles; its 37 KiB uncached HTML (vs 17 KiB) takes longer on the link.
+- **Live:**
+  - iPhone FCP 1232 vs 892 ms, Pixel 1246 vs 904 ms, MacBook 606 vs 264 ms.
+  - TS revalidates a script (340-354 B transferred) where Go's hashed assets are cache hits (0 B).
+  - HTML per navigation: 5.0 KiB (TS) vs 8.1 KiB (Go) compressed. Both serve `private, no-store` documents.
 
 ### Dropped-run penalty (retype model; secondary, never the headline)
 
-| Profile | First typeable incl. retype (TS / Go) | Settle point, dropped runs (TS / Go) | Clear + retype (TS / Go) |
-| --- | --- | --- | --- |
-| iPhone, cold | 9180 / 2579 ms (Go: none dropped) | 9119 / n/a | 77 / n/a |
-| iPhone, repeat | 3623 / 8149 ms (Go: 6/10 dropped) | 3553 / 3093 ms | 82 / 5102 ms |
-| Pixel, cold | 9789 / 3154 ms (Go: none dropped) | 9690 / n/a | 96 / n/a |
-| Pixel, repeat | 2533 / 735 ms (Go: none dropped) | 2446 / n/a | 91 / n/a |
-| MacBook, cold | 1220 / 48 ms (Go: none dropped) | 1134 / n/a | 84 / n/a |
-| MacBook, repeat | 41 / 26 ms (neither dropped) | n/a | n/a |
+Go has no dropped runs in either mode, so this applies to TS only.
 
-Go's only dropped runs are the 6 iPhone repeat visits above. Their "Clear + retype" of ~5.1 s is harness time, not app time: the aborted run's `…` placeholder satisfies the harness's "main shows text" wait at once, so the harness then waits its full 5 s for an upstream request that never comes before it clears and retypes. A user facing kept-but-untranslated text would more likely type one more key or press Cmd/Ctrl+Enter.
+| Profile | TS fake: first typeable incl. retype (cold / repeat) | TS live (cold / repeat) |
+| --- | --- | --- |
+| iPhone | 9113 / 3012 ms | 14244 / 10634 ms |
+| Pixel | 9795 / 2568 ms | 11679 / 4176 ms |
+| MacBook | 1193 / 43 ms | 7254 / 3960 ms |
 
-## Cost and behaviour: superseded upstream requests (fake runs)
+TS fake's harness wait (settle point minus "input kept from") is 1.0-1.6 s of those numbers, and Clear + retype is 57-95 ms.
 
-Counted from `/_stats.requests` deltas recorded per scenario, against the counted translations (one per typing scenario: the burst or, when dropped, the retype; one per settled-page translation). Settled-page translations are exactly 1 by construction (the harness fails any run with more), so 0 superseded there for both apps.
+## Cost and behaviour: superseded and billed translation requests
 
-| Profile | Scenario | TS upstream / counted | TS superseded | Go upstream / counted | Go superseded |
+Counted per scenario. Fake: the fake upstream's `/_stats.requests`, which matches the page's own count exactly in every scenario. Live: the page's own count (harness change 3). Counted translations = 1 per typing scenario (the burst or, if dropped, the retype) + 1 per settled-page translation; anything above that is a superseded request (sent and then replaced).
+
+| Profile | Scenario | TS fake sent (superseded) | Go fake | TS live | Go live |
 | --- | --- | --- | --- | --- | --- |
-| iPhone WebKit | typing at first focus, cold | 10 / 10 | 0 | 10 / 10 | 0 |
-| | typing at first focus, repeat visit | 20 / 10 | **10** (wiped burst's tail translated, then the retype) | 10 / 10 | 0 (6 aborted init-path runs sent nothing upstream) |
-| | settled page | 10 / 10 | 0 | 10 / 10 | 0 |
-| Pixel Chromium | cold / repeat / settled | 10 / 10 each | 0 | 10 / 10 each | 0 |
-| MacBook Chromium | typing at first focus, cold | 11 / 10 | **1** | 10 / 10 | 0 |
-| | repeat / settled | 10 / 10 each | 0 | 10 / 10 each | 0 |
-| All | whitespace probe | 0 requests | - | 0 requests | - |
-| **Total over 30 interaction runs** | | **101** for 90 counted | **11** | **90** for 90 counted | **0** |
+| iPhone | typing at first focus, cold | 10 (0) | 10 (0) | 15 (**5**) | 10 (0) |
+| | typing at first focus, repeat | 20 (**10**) | 10 (0) | 18 (**8**) | 10 (0) |
+| | settled page | 10 (0) | 10 (0) | 10 (0) | 10 (0) |
+| Pixel | cold / repeat / settled | 10 / 11 (**1**) / 10 | 10 / 10 / 10 | 10 / 10 / 10 | 10 / 10 / 10 |
+| MacBook | cold / repeat / settled | 11 (**1**) / 10 / 10 | 10 / 10 / 10 | 10 / 11 (**1**) / 10 | 10 / 10 / 10 |
+| All | whitespace probe | 0 | 0 | not measurable live | not measurable live |
+| **Total, 30 interaction runs** | | **102** (12 superseded) | **90** (0) | **104** (14 superseded) | **90** (0) |
 
-The count is the same whether or not the server cancels: superseded means "sent upstream and then replaced". The cost differs on Vercel. When TS aborts, the cancellation reaches OpenAI (`supportsCancellation: true`) and generation stops. Go's Vercel function cannot be cancelled (stage 0 decision), so a superseded Go request runs to completion and bills its full output. In these scenarios Go produced no superseded requests: it never translates a partial burst, because the init path runs once with the full text after the debounce. So the uncancellable path was not exercised. In real typing (edits mid-stream, the e2e `late events from a superseded run are ignored` case), each superseded Go run bills a full response where TS bills a partial one.
+- **Billed count of the live runs (actual):**
+  - TS **104**, Go **90**, against the harness's printed plan of 90-210 per app. The plan line was printed before each run: "3 profile(s) x 10 run(s) = 30 interaction run(s) … 90 to 210 billed translations".
+  - **Also billed this session (TS only):**
+    - A first live TS attempt that failed on the Copy selector. Every interaction failed, and the probe crash ended the run after 28 of 30 attempted interactions. Each attempted interaction sent at least the cold-visit translation(s) before failing, so roughly 28-35 requests; this was not recorded.
+    - One diagnostic translation.
+    - A 1-run validation (3).
+  - **Total billed this session ≈ 104 + 90 + ~32-39 ≈ 226-233 translations.** Go: exactly 90.
+- **Superseded requests:**
+  - Every superseded request in both modes is TS's wiped-burst fragment; Go produced none, because it never translates a partial burst.
+  - The count is the same whether or not the server cancels. The cost differs on Vercel: a superseded TS request is aborted at OpenAI (`supportsCancellation: true`), while Go's Vercel function cannot be cancelled (stage 0 decision), so a superseded Go run bills its full output.
+  - In real typing (edits mid-stream, the e2e `late events from a superseded run are ignored` case) Go would pay more per superseded run. In these scenarios TS paid for 14 fragments and Go for none.
 
 ## Code size
 
@@ -165,43 +200,7 @@ The stylesheet is shared: Go compiles the TS app's `src/styles.css` (synced to `
 | **Total** | 108,023 B | **43,794 B** (97 % of the 45,056 B target; 1,262 B headroom) |
 | CSS `app.css` | 144,461 B | 29,329 B (reference: TS stylesheet compiled now, 29,524 B) |
 
-`make size` uses Go's gzip. The harness rows above use `gzip -9` from Node's zlib on the served bodies (Go 43,863 B JS, 28,839 B CSS; TS 292,139 B JS, 29,875 B CSS). That is the method the baseline used, so the TS/Go comparison uses the harness numbers. The original budget was 40 KB. The user ruled size a target that never outranks performance, usability or parity, and it was raised to 42 KB (inspection gestures) and 44 KB (measured Adjust menu). TS client JS: 285.3 KiB gzip in two chunks (`index` 116.6 KB, `routes` 173.9 KB gzip) plus 1.6 KB inline, unchanged since the baseline. Go ships 6.7x less.
-
-## Live production runs: **PENDING (controller, billed; production must be redeployed with `1992739` first)**
-
-Billed request count for `--live --runs 10` (3 profiles x 10 runs = 30 interaction runs per app), from `measure.ts`'s plan (`interactions * 3` to `interactions * 7`):
-
-- **TS (https://www.neofox.dev): 90 to 210 billed translations.**
-- **Go (https://translater-go.vercel.app): 90 to 210 billed translations.**
-- **Both apps: 180 to 420.**
-
-The plan line, printed by `measure.ts --app go --live --url http://127.0.0.1:9 --runs 10` without the billed flag (nothing listens there; the plan prints and the harness refuses before any request; the count does not depend on the URL):
-
-```
---live plan against http://127.0.0.1:9: 3 profile(s) x 10 run(s) = 30 interaction run(s). Each makes at least 3 billed OpenAI translations (typing at first focus on a cold and on a repeat visit, one on the settled page) and up to 7 when typing at first focus is lost (a partial-text translation plus the retype, on each visit): 90 to 210 billed translations. Page loads, the whitespace probe and TTFB requests are free.
-```
-
-Expectation from the fake runs, same scenarios: TS 101, Go 90 (191 total). From the code path, a single interaction run makes at most 5 in practice (per visit: one partial-tail request + the retype, plus one settled-page request), so 7 is a conservative upper bound. Nothing else in `--live` is billed. The discarded warm-up runs only in `--fake`. Page loads, the whitespace probe, the TTFB requests and the app's `/warm` call make no OpenAI request, and Listen is never pressed.
-
-Commands:
-
-```
-npx tsx e2e/perf/measure.ts --app ts --live --url https://www.neofox.dev --runs 10 \
-  --i-understand-this-is-billed --out docs/superpowers/reports/data/2026-11-04-final-ts-live.json
-npx tsx e2e/perf/measure.ts --app go --live --url https://translater-go.vercel.app --runs 10 \
-  --i-understand-this-is-billed --out docs/superpowers/reports/data/2026-11-04-final-go-live.json
-npx tsx e2e/perf/table.ts docs/superpowers/reports/data/2026-11-04-final-ts-live.json docs/superpowers/reports/data/2026-11-04-final-go-live.json
-```
-
-Notes for the live run:
-
-- The throttle proxy is the browser's CONNECT proxy for both apps.
-- Live mode cannot count upstream requests or check the fixture text.
-- "Cold" TTFB is only the first request of the session.
-- Translation timings are dominated by OpenAI.
-- If Web Analytics is still not enabled on translater-go (Task 30), Go's `/_vercel/insights/script.js` 404s there (counted as 0 bytes, no effect on timings).
-
-Results: _PENDING_.
+`make size` uses Go's gzip. The harness rows above use `gzip -9` from Node's zlib on the served bodies (Go 43,863 B JS, 28,839 B CSS; TS 292,139 B JS, 29,875 B CSS). That is the method the baseline used, so the TS/Go comparison uses the harness numbers. The original budget was 40 KB. The user ruled size a target that never outranks performance, usability or parity, and it was raised to 42 KB (inspection gestures) and 44 KB (measured Adjust menu). TS client JS: 285.3 KiB gzip locally in two chunks plus 1.6 KB inline, unchanged since the baseline; the deployed TS (`master`) is 303.9 KiB including third-party beacons. Go ships 6.7x less.
 
 ## Chrome DevTools traces: **PENDING (controller)**
 
@@ -218,18 +217,386 @@ Settings for both production URLs: emulate 412x915 @2.625, Slow 4G, 4x CPU, cold
 | Insights | _PENDING_ | _PENDING_ |
 | Type one sentence, main visible | _PENDING_ | _PENDING_ |
 
-## Recommendation: **PENDING (controller, after live runs, DevTools traces and Task 32)**
+## Recommendation: **PENDING (controller, after DevTools traces and Task 32)**
 
 Caveats to weigh:
 
 - The Go runtime is Beta on Vercel.
-- Go's Vercel function cannot cancel superseded requests, so every superseded run bills its full output.
+- Go's Vercel function cannot cancel superseded requests, so every superseded run bills its full output (none occurred in these scenarios; TS paid for 14 fragments instead).
+- **Live time to first main char is 0.9-1.6 s later for Go**, with main arriving as a block. Check streaming/buffering on the Vercel Go runtime and pin the function region before deciding (see "Translation on the settled page").
+- The live page-load advantage is partly hosting: TS sits behind Cloudflare with an extra TLS hop.
 - Parity exceptions from Task 32's sign-off.
 - The Safari modulepreload recovery note (Task 17 checkpoint).
 - The shared TS behaviours kept in both apps by user decision (Escape clears the source outside open panels; compact synonym focus).
-- The iPhone repeat-visit abort of the early-typing run described above, if it is not fixed.
 
-## Full tables (fake runs)
+## Full tables: live runs
+
+Generated by `npx tsx e2e/perf/table.ts docs/superpowers/reports/data/2026-11-04-final-ts-live.json docs/superpowers/reports/data/2026-11-04-final-go-live.json`. Live mode cannot count upstream requests or check the fixture text (flag rows that need them show n/a); "Translation requests sent by the page" is the billed count.
+
+#### iphone-webkit-slow4g
+
+iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrottled (WebKit cannot be CPU-throttled)
+
+##### Page load, cold cache
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| TTFB | 2725 ms / 3857 ms | 1780 ms / 1822 ms |
+| Document transfer (responseEnd - responseStart) | 21 ms / 23 ms | 260 ms / 369 ms |
+| Document transfer expected on the link | 27 ms / 27 ms | 44 ms / 44 ms |
+| FCP | 6119 ms / 9555 ms | 2964 ms / 2999 ms |
+| LCP | 6119 ms / 9555 ms | 2964 ms / 2999 ms |
+| TBT (FCP to quiet) | n/a | n/a |
+| DOMContentLoaded | 6122 ms / 9557 ms | 3672 ms / 3881 ms |
+| load event | 9209 ms / 12906 ms | 5631 ms / 5714 ms |
+| CLS during load | n/a | n/a |
+| **JS total gzip (external + inline)** | 303.9 KiB / 303.9 KiB | 44.8 KiB / 44.8 KiB |
+| JS total raw (external + inline) | 962.3 KiB / 962.3 KiB | 109.9 KiB / 109.9 KiB |
+| JS external raw | 958.7 KiB / 958.7 KiB | 109.9 KiB / 109.9 KiB |
+| JS external transferred (incl. headers) | 312.7 KiB / 312.7 KiB | 54.5 KiB / 54.5 KiB |
+| JS external gzip -9 | 302.3 KiB / 302.3 KiB | 44.8 KiB / 44.8 KiB |
+| JS inline raw | 3687 B / 3687 B | 0 B / 0 B |
+| JS inline gzip -9 | 1645 B / 1646 B | 0 B / 0 B |
+| Inline data scripts raw (JSON) | 0 B / 0 B | 6317 B / 6317 B |
+| CSS external raw | 141.3 KiB / 141.3 KiB | 141.1 KiB / 141.1 KiB |
+| CSS external transferred (incl. headers) | 29.9 KiB / 29.9 KiB | 29.8 KiB / 29.8 KiB |
+| CSS external gzip -9 | 28.3 KiB / 28.3 KiB | 28.2 KiB / 28.2 KiB |
+| CSS inline raw | 0 B / 0 B | 0 B / 0 B |
+| CSS inline gzip -9 | 0 B / 0 B | 0 B / 0 B |
+| HTML raw | 16.8 KiB / 16.8 KiB | 36.8 KiB / 36.8 KiB |
+| HTML transferred (incl. headers) | 5134 B / 5134 B | 8345 B / 8345 B |
+| All transferred (incl. headers) | 505.0 KiB / 505.0 KiB | 249.5 KiB / 249.5 KiB |
+
+##### Typing during load (headline: first typeable, kept and acted on; gate: wiped/ignored, i.e. not acted on)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| **First typeable (kept and acted on)** | n/a | 2956 ms / 3074 ms |
+| Gate: typing at first focus wiped | 10/10 yes | 0/10 yes |
+| Gate: typing at first focus ignored | 0/10 yes | 0/10 yes |
+| Wiped and the remainder translated (extra upstream request) | 5/10 yes | 0/10 yes |
+| Translation requests sent by the page | 2 / 2 | 1 / 1 |
+| First focus (burst first keystroke) | 6652 ms / 12010 ms | 2956 ms / 3074 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 18348 ms / 23504 ms | 8981 ms / 9447 ms |
+| Input kept from (max(FCP, earliest kept keystroke), space probe) | 7255 ms / 9079 ms | 2897 ms / 3025 ms |
+| **First typeable (kept and acted on)** (repeat visit) | 1845 ms / 2266 ms (n=2) | 885 ms / 955 ms |
+| Gate: typing at first focus wiped (repeat visit) | 8/10 yes | 0/10 yes |
+| Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 0/10 yes |
+| Wiped and the remainder translated (extra upstream request) (repeat visit) | 8/10 yes | 0/10 yes |
+| Translation requests sent by the page (repeat visit) | 2 / 2 | 1 / 1 |
+| First focus (burst first keystroke) (repeat visit) | 1715 ms / 2342 ms | 885 ms / 955 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 14223 ms / 19662 ms | 5793 ms / 6816 ms |
+
+##### Dropped-run penalty (secondary: retype model = settle, Clear, retype)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| First typeable incl. the retype model | 14244 ms / 19025 ms | 2956 ms / 3074 ms |
+| of which harness wait (settle point - input kept from), dropped runs | 7229 ms / 11262 ms | n/a |
+| Harness settle point, dropped runs | 14185 ms / 18970 ms | n/a |
+| Clear + retype after settle, dropped runs | 64 ms / 73 ms | n/a |
+| First typeable incl. the retype model (repeat visit) | 10634 ms / 13866 ms | 885 ms / 955 ms |
+| Harness settle point, dropped runs (repeat visit) | 11256 ms / 15368 ms (n=8) | n/a |
+| Clear + retype after settle, dropped runs (repeat visit) | 60 ms / 88 ms (n=8) | n/a |
+
+##### Page load, repeat visit (same context, warm cache)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| TTFB (repeat) | 1128 ms / 1324 ms | 576 ms / 629 ms |
+| FCP (repeat) | 1232 ms / 1806 ms | 892 ms / 915 ms |
+| LCP (repeat) | 1232 ms / 1806 ms | 892 ms / 915 ms |
+| TBT (FCP to quiet) (repeat) | n/a | n/a |
+| DOMContentLoaded (repeat) | 1226 ms / 1799 ms | 904 ms / 927 ms |
+| load event (repeat) | 1233 ms / 1808 ms | 904 ms / 927 ms |
+| CLS during load (repeat) | n/a | n/a |
+| JS external transferred (repeat; 0 = cache hit) | 340 B / 340 B | 0 B / 0 B |
+| All transferred (repeat) | 6016 B / 6017 B | 8345 B / 8345 B |
+
+##### Translation on the settled page
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Last key to first main char | 4345 ms / 9258 ms | 5249 ms / 5501 ms |
+| Last key to Copy enabled | 4424 ms / 10242 ms | 5310 ms / 5509 ms |
+| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 7071 ms / 12631 ms | 5955 ms / 6172 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| Request end minus last DOM change (> 0: response held open) | -17 ms / -9 ms | 145 ms / 170 ms |
+| Diagnostic: last key to Listen enabled (if the app has it) | 7071 ms / 12631 ms | 5823 ms / 6061 ms |
+| JS loaded through done, gzip -9 | 303.9 KiB / 303.9 KiB | 44.8 KiB / 44.8 KiB |
+| JS loaded through done, raw | 962.3 KiB / 962.3 KiB | 109.9 KiB / 109.9 KiB |
+
+##### Keyboard open (simulated; dy is not "lower is better", read it with visibility)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| visualViewport shrink + pan: final visual viewport offsetTop (scroll-to-caret model) | 0 px / 0 px | 0 px / 0 px |
+| visualViewport shrink + pan: layout-shift sum | n/a | n/a |
+| visualViewport shrink + pan: main text dy | 99 px / 99 px | 99 px / 99 px |
+| visualViewport shrink + pan: source textarea dy | 323 px / 323 px | 323 px / 323 px |
+| visualViewport shrink + pan: main text visible | 10/10 yes | 10/10 yes |
+| visualViewport shrink + pan: textarea visible | 10/10 yes | 10/10 yes |
+| visualViewport shrink + pan: caret visible | 10/10 yes | 10/10 yes |
+| visualViewport shrink + pan: textarea keeps focus | 10/10 yes | 10/10 yes |
+| Layout viewport resize: final visual viewport offsetTop (scroll-to-caret model) | n/a | n/a |
+| Layout viewport resize: layout-shift sum | n/a | n/a |
+| Layout viewport resize: main text dy | 99 px / 99 px | 99 px / 99 px |
+| Layout viewport resize: source textarea dy | 323 px / 323 px | 323 px / 323 px |
+| Layout viewport resize: main text visible | 10/10 yes | 10/10 yes |
+| Layout viewport resize: textarea visible | 10/10 yes | 10/10 yes |
+| Layout viewport resize: caret visible | 10/10 yes | 10/10 yes |
+| Layout viewport resize: textarea keeps focus | 10/10 yes | 10/10 yes |
+
+##### Diagnostics: space probe during load
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Earliest kept keystroke | 7255 ms / 9079 ms | 2897 ms / 3025 ms |
+| Earliest keystroke shown (may be lost) | 5890 ms / 7516 ms | 2897 ms / 3025 ms |
+| Probe resolution (kept - last lost) | 81 ms / 86 ms | n/a |
+| Whitespace input reached upstream | n/a | n/a |
+
+#### pixel-chromium-4xcpu-slow4g
+
+Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle proxy
+
+##### Page load, cold cache
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| TTFB | 2752 ms / 6634 ms | 1784 ms / 1854 ms |
+| Document transfer (responseEnd - responseStart) | 23 ms / 1672 ms | 250 ms / 271 ms |
+| Document transfer expected on the link | 27 ms / 27 ms | 44 ms / 44 ms |
+| FCP | 4930 ms / 15252 ms | 2986 ms / 3108 ms |
+| LCP | 4930 ms / 15252 ms | 2986 ms / 3108 ms |
+| TBT (FCP to quiet) | 25 ms / 27 ms | 0 ms / 5 ms |
+| DOMContentLoaded | 5242 ms / 15251 ms | 6076 ms / 6232 ms |
+| load event | 8445 ms / 17883 ms | 6078 ms / 6234 ms |
+| CLS during load | 0.000 / 0.000 | 0.000 / 0.000 |
+| **JS total gzip (external + inline)** | 303.9 KiB / 303.9 KiB | 44.8 KiB / 44.8 KiB |
+| JS total raw (external + inline) | 962.3 KiB / 962.3 KiB | 109.9 KiB / 109.9 KiB |
+| JS external raw | 958.7 KiB / 958.7 KiB | 109.9 KiB / 109.9 KiB |
+| JS external transferred (incl. headers) | 312.3 KiB / 312.3 KiB | 54.0 KiB / 54.0 KiB |
+| JS external gzip -9 | 302.3 KiB / 302.3 KiB | 44.8 KiB / 44.8 KiB |
+| JS inline raw | 3687 B / 3687 B | 0 B / 0 B |
+| JS inline gzip -9 | 1645 B / 1649 B | 0 B / 0 B |
+| Inline data scripts raw (JSON) | 0 B / 0 B | 6317 B / 6317 B |
+| CSS external raw | 141.3 KiB / 141.3 KiB | 141.1 KiB / 141.1 KiB |
+| CSS external transferred (incl. headers) | 29.9 KiB / 29.9 KiB | 29.7 KiB / 29.7 KiB |
+| CSS external gzip -9 | 28.3 KiB / 28.3 KiB | 28.2 KiB / 28.2 KiB |
+| CSS inline raw | 0 B / 0 B | 0 B / 0 B |
+| CSS inline gzip -9 | 0 B / 0 B | 0 B / 0 B |
+| HTML raw | 16.8 KiB / 16.8 KiB | 36.8 KiB / 36.8 KiB |
+| HTML transferred (incl. headers) | 5116 B / 5117 B | 8309 B / 8309 B |
+| All transferred (incl. headers) | 504.6 KiB / 504.6 KiB | 249.0 KiB / 249.0 KiB |
+
+##### Typing during load (headline: first typeable, kept and acted on; gate: wiped/ignored, i.e. not acted on)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| **First typeable (kept and acted on)** | n/a | 2940 ms / 3072 ms |
+| Gate: typing at first focus wiped | 10/10 yes | 0/10 yes |
+| Gate: typing at first focus ignored | 0/10 yes | 0/10 yes |
+| Wiped and the remainder translated (extra upstream request) | 0/10 yes | 0/10 yes |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) | 5522 ms / 7414 ms | 2174 ms / 2224 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 15761 ms / 18026 ms | 11266 ms / 11931 ms |
+| Input kept from (max(FCP, earliest kept keystroke), space probe) | 8410 ms / 13909 ms | 2942 ms / 3072 ms |
+| **First typeable (kept and acted on)** (repeat visit) | n/a | 982 ms / 1100 ms |
+| Gate: typing at first focus wiped (repeat visit) | 10/10 yes | 0/10 yes |
+| Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 0/10 yes |
+| Wiped and the remainder translated (extra upstream request) (repeat visit) | 0/10 yes | 0/10 yes |
+| Translation requests sent by the page (repeat visit) | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) (repeat visit) | 1855 ms / 2974 ms | 982 ms / 1100 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 8889 ms / 9923 ms | 5867 ms / 6935 ms |
+
+##### Dropped-run penalty (secondary: retype model = settle, Clear, retype)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| First typeable incl. the retype model | 11679 ms / 14171 ms | 2940 ms / 3072 ms |
+| of which harness wait (settle point - input kept from), dropped runs | 2646 ms / 5719 ms | n/a |
+| Harness settle point, dropped runs | 11564 ms / 14068 ms | n/a |
+| Clear + retype after settle, dropped runs | 99 ms / 119 ms | n/a |
+| First typeable incl. the retype model (repeat visit) | 4176 ms / 5668 ms | 982 ms / 1100 ms |
+| Harness settle point, dropped runs (repeat visit) | 4087 ms / 5571 ms | n/a |
+| Clear + retype after settle, dropped runs (repeat visit) | 95 ms / 103 ms | n/a |
+
+##### Page load, repeat visit (same context, warm cache)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| TTFB (repeat) | 1158 ms / 2247 ms | 573 ms / 596 ms |
+| FCP (repeat) | 1246 ms / 2700 ms | 904 ms / 1012 ms |
+| LCP (repeat) | 1246 ms / 2700 ms | 904 ms / 1012 ms |
+| TBT (FCP to quiet) (repeat) | 0 ms / 0 ms | 0 ms / 0 ms |
+| DOMContentLoaded (repeat) | 1247 ms / 2684 ms | 919 ms / 1029 ms |
+| load event (repeat) | 1266 ms / 2703 ms | 920 ms / 1030 ms |
+| CLS during load (repeat) | 0.000 / 0.000 | 0.000 / 0.000 |
+| JS external transferred (repeat; 0 = cache hit) | 354 B / 354 B | 0 B / 0 B |
+| All transferred (repeat) | 11.9 KiB / 11.9 KiB | 14.4 KiB / 14.4 KiB |
+
+##### Translation on the settled page
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Last key to first main char | 3620 ms / 4949 ms | 4922 ms / 5865 ms |
+| Last key to Copy enabled | 4031 ms / 5181 ms | 4951 ms / 5900 ms |
+| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 6416 ms / 10965 ms | 5623 ms / 6596 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| Request end minus last DOM change (> 0: response held open) | -32 ms / -28 ms | 153 ms / 211 ms |
+| Diagnostic: last key to Listen enabled (if the app has it) | 6416 ms / 10965 ms | 5473 ms / 6313 ms |
+| JS loaded through done, gzip -9 | 303.9 KiB / 303.9 KiB | 44.8 KiB / 44.8 KiB |
+| JS loaded through done, raw | 962.3 KiB / 962.3 KiB | 109.9 KiB / 109.9 KiB |
+
+##### Keyboard open (simulated; dy is not "lower is better", read it with visibility)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| visualViewport shrink + pan: final visual viewport offsetTop (scroll-to-caret model) | 0 px / 0 px | 0 px / 0 px |
+| visualViewport shrink + pan: layout-shift sum | 0.259 / 0.265 | 0.246 / 0.246 |
+| visualViewport shrink + pan: main text dy | 58 px / 58 px | 58 px / 58 px |
+| visualViewport shrink + pan: source textarea dy | 413 px / 413 px | 413 px / 413 px |
+| visualViewport shrink + pan: main text visible | 10/10 yes | 10/10 yes |
+| visualViewport shrink + pan: textarea visible | 10/10 yes | 10/10 yes |
+| visualViewport shrink + pan: caret visible | 10/10 yes | 10/10 yes |
+| visualViewport shrink + pan: textarea keeps focus | 10/10 yes | 10/10 yes |
+| Layout viewport resize: final visual viewport offsetTop (scroll-to-caret model) | n/a | n/a |
+| Layout viewport resize: layout-shift sum | 0.533 / 0.545 | 0.501 / 0.513 |
+| Layout viewport resize: main text dy | 58 px / 58 px | 58 px / 58 px |
+| Layout viewport resize: source textarea dy | 413 px / 413 px | 413 px / 413 px |
+| Layout viewport resize: main text visible | 10/10 yes | 10/10 yes |
+| Layout viewport resize: textarea visible | 10/10 yes | 10/10 yes |
+| Layout viewport resize: caret visible | 10/10 yes | 10/10 yes |
+| Layout viewport resize: textarea keeps focus | 10/10 yes | 10/10 yes |
+
+##### Diagnostics: space probe during load
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Earliest kept keystroke | 8410 ms / 13909 ms | 2207 ms / 2234 ms |
+| Earliest keystroke shown (may be lost) | 4903 ms / 5493 ms | 2207 ms / 2234 ms |
+| Probe resolution (kept - last lost) | 189 ms / 195 ms | n/a |
+| Whitespace input reached upstream | n/a | n/a |
+
+#### macbook-chromium
+
+MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
+
+##### Page load, cold cache
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| TTFB | 1266 ms / 2424 ms | 33 ms / 46 ms |
+| Document transfer (responseEnd - responseStart) | 2 ms / 1045 ms | 218 ms / 267 ms |
+| Document transfer expected on the link | n/a | n/a |
+| FCP | 3006 ms / 4836 ms | 326 ms / 436 ms |
+| LCP | 3006 ms / 4836 ms | 326 ms / 436 ms |
+| TBT (FCP to quiet) | 0 ms / 0 ms | 0 ms / 0 ms |
+| DOMContentLoaded | 2999 ms / 4828 ms | 337 ms / 492 ms |
+| load event | 3572 ms / 4916 ms | 357 ms / 509 ms |
+| CLS during load | 0.000 / 0.000 | 0.000 / 0.000 |
+| **JS total gzip (external + inline)** | 303.9 KiB / 303.9 KiB | 44.8 KiB / 44.8 KiB |
+| JS total raw (external + inline) | 962.3 KiB / 962.3 KiB | 109.9 KiB / 109.9 KiB |
+| JS external raw | 958.7 KiB / 958.7 KiB | 109.9 KiB / 109.9 KiB |
+| JS external transferred (incl. headers) | 312.3 KiB / 312.3 KiB | 54.0 KiB / 54.0 KiB |
+| JS external gzip -9 | 302.3 KiB / 302.3 KiB | 44.8 KiB / 44.8 KiB |
+| JS inline raw | 3687 B / 3687 B | 0 B / 0 B |
+| JS inline gzip -9 | 1645 B / 1648 B | 0 B / 0 B |
+| Inline data scripts raw (JSON) | 0 B / 0 B | 6317 B / 6317 B |
+| CSS external raw | 141.3 KiB / 141.3 KiB | 141.1 KiB / 141.1 KiB |
+| CSS external transferred (incl. headers) | 29.9 KiB / 29.9 KiB | 29.7 KiB / 29.7 KiB |
+| CSS external gzip -9 | 28.3 KiB / 28.3 KiB | 28.2 KiB / 28.2 KiB |
+| CSS inline raw | 0 B / 0 B | 0 B / 0 B |
+| CSS inline gzip -9 | 0 B / 0 B | 0 B / 0 B |
+| HTML raw | 16.8 KiB / 16.8 KiB | 36.8 KiB / 36.8 KiB |
+| HTML transferred (incl. headers) | 5116 B / 5117 B | 8309 B / 8309 B |
+| All transferred (incl. headers) | 504.9 KiB / 504.9 KiB | 249.2 KiB / 249.3 KiB |
+
+##### Typing during load (headline: first typeable, kept and acted on; gate: wiped/ignored, i.e. not acted on)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| **First typeable (kept and acted on)** | n/a | 322 ms / 348 ms |
+| Gate: typing at first focus wiped | 10/10 yes | 0/10 yes |
+| Gate: typing at first focus ignored | 0/10 yes | 0/10 yes |
+| Wiped and the remainder translated (extra upstream request) | 0/10 yes | 0/10 yes |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) | 2600 ms / 4772 ms | 303 ms / 323 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 10742 ms / 15346 ms | 5015 ms / 5369 ms |
+| Input kept from (max(FCP, earliest kept keystroke), space probe) | 5021 ms / 9360 ms | 320 ms / 368 ms |
+| **First typeable (kept and acted on)** (repeat visit) | 2204 ms / 5168 ms (n=4) | 253 ms / 373 ms |
+| Gate: typing at first focus wiped (repeat visit) | 6/10 yes | 0/10 yes |
+| Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 0/10 yes |
+| Wiped and the remainder translated (extra upstream request) (repeat visit) | 1/10 yes | 0/10 yes |
+| Translation requests sent by the page (repeat visit) | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) (repeat visit) | 1678 ms / 4080 ms | 253 ms / 373 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 7751 ms / 11654 ms | 4916 ms / 5223 ms |
+
+##### Dropped-run penalty (secondary: retype model = settle, Clear, retype)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| First typeable incl. the retype model | 7254 ms / 11872 ms | 322 ms / 348 ms |
+| of which harness wait (settle point - input kept from), dropped runs | 2375 ms / 6606 ms | n/a |
+| Harness settle point, dropped runs | 7187 ms / 11809 ms | n/a |
+| Clear + retype after settle, dropped runs | 64 ms / 73 ms | n/a |
+| First typeable incl. the retype model (repeat visit) | 3960 ms / 5559 ms | 253 ms / 373 ms |
+| Harness settle point, dropped runs (repeat visit) | 4706 ms / 8249 ms (n=6) | n/a |
+| Clear + retype after settle, dropped runs (repeat visit) | 67 ms / 79 ms (n=6) | n/a |
+
+##### Page load, repeat visit (same context, warm cache)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| TTFB (repeat) | 547 ms / 885 ms | 8 ms / 12 ms |
+| FCP (repeat) | 606 ms / 4644 ms | 264 ms / 296 ms |
+| LCP (repeat) | 606 ms / 4644 ms | 264 ms / 296 ms |
+| TBT (FCP to quiet) (repeat) | 0 ms / 0 ms | 0 ms / 0 ms |
+| DOMContentLoaded (repeat) | 922 ms / 4638 ms | 262 ms / 297 ms |
+| load event (repeat) | 933 ms / 4638 ms | 262 ms / 297 ms |
+| CLS during load (repeat) | 0.000 / 0.000 | 0.000 / 0.000 |
+| JS external transferred (repeat; 0 = cache hit) | 354 B / 354 B | 0 B / 0 B |
+| All transferred (repeat) | 12.3 KiB / 12.3 KiB | 14.7 KiB / 14.7 KiB |
+
+##### Translation on the settled page
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Last key to first main char | 3018 ms / 4363 ms | 4637 ms / 5033 ms |
+| Last key to Copy enabled | 3208 ms / 4363 ms | 4740 ms / 5105 ms |
+| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 6216 ms / 8833 ms | 5392 ms / 5853 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| Request end minus last DOM change (> 0: response held open) | -16 ms / -9 ms | 167 ms / 180 ms |
+| Diagnostic: last key to Listen enabled (if the app has it) | 6216 ms / 8833 ms | 5251 ms / 5672 ms |
+| JS loaded through done, gzip -9 | 303.9 KiB / 303.9 KiB | 44.8 KiB / 44.8 KiB |
+| JS loaded through done, raw | 962.3 KiB / 962.3 KiB | 109.9 KiB / 109.9 KiB |
+
+##### Diagnostics: space probe during load
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Earliest kept keystroke | 5021 ms / 9360 ms | 305 ms / 343 ms |
+| Earliest keystroke shown (may be lost) | 2820 ms / 6534 ms | 305 ms / 343 ms |
+| Probe resolution (kept - last lost) | 55 ms / 63 ms | n/a |
+| Whitespace input reached upstream | n/a | n/a |
+
+#### Server TTFB (Node client, no browser)
+
+| Metric | ts (live) median / p90 | go (live) median / p90 |
+|---|---|---|
+| Cold (first request) | 1360 ms / 1360 ms | 1034 ms / 1034 ms |
+| Warm | 1155 ms / 1424 ms | 248 ms / 282 ms |
+
+- ts (live): Deployed URL: "cold" is only the first request of this session (a cold instance is likely but not guaranteed); warm = later requests 200 ms apart. Node client from this machine, includes network RTT.
+- go (live): Deployed URL: "cold" is only the first request of this session (a cold instance is likely but not guaranteed); warm = later requests 200 ms apart. Node client from this machine, includes network RTT.
+
+#### Measured on
+
+- ts (live): 2026-11-04T07:46:11.187Z, commit 0968bde39fcc (dirty), harness dd731a369455, Apple M1 Max, 10 cores, 32 GiB, darwin 27.0.0 arm64, Playwright 1.64.1, webkit 27.2, chromium 156.0.8078.4
+- go (live): 2026-11-04T08:08:04.719Z, commit 0968bde39fcc (dirty), harness dd731a369455, Apple M1 Max, 10 cores, 32 GiB, darwin 27.0.0 arm64, Playwright 1.64.1, webkit 27.2, chromium 156.0.8078.4
+
+## Full tables: fake runs
 
 Generated by `npx tsx e2e/perf/table.ts docs/superpowers/reports/data/2026-11-04-final-ts-fake.json docs/superpowers/reports/data/2026-11-04-final-go-fake.json`.
 
@@ -241,14 +608,14 @@ iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrot
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| TTFB | 1152 ms / 1161 ms | 1140 ms / 1146 ms |
-| Document transfer (responseEnd - responseStart) | 84 ms / 90 ms | 197 ms / 199 ms |
+| TTFB | 1141 ms / 1149 ms | 1138 ms / 1141 ms |
+| Document transfer (responseEnd - responseStart) | 89 ms / 90 ms | 199 ms / 200 ms |
 | Document transfer expected on the link | 91 ms / 91 ms | 201 ms / 201 ms |
-| FCP | 2613 ms / 2629 ms | 2566 ms / 2585 ms |
-| LCP | 2613 ms / 2629 ms | 2566 ms / 2585 ms |
+| FCP | 2583 ms / 2592 ms | 2544 ms / 2549 ms |
+| LCP | 2583 ms / 2592 ms | 2544 ms / 2549 ms |
 | TBT (FCP to quiet) | n/a | n/a |
-| DOMContentLoaded | 2568 ms / 2581 ms | 4545 ms / 4564 ms |
-| load event | 4493 ms / 4501 ms | 4546 ms / 4565 ms |
+| DOMContentLoaded | 2543 ms / 2554 ms | 4530 ms / 4544 ms |
+| load event | 4462 ms / 4472 ms | 4530 ms / 4545 ms |
 | CLS during load | n/a | n/a |
 | **JS total gzip (external + inline)** | 285.3 KiB / 285.3 KiB | 42.8 KiB / 42.8 KiB |
 | JS total raw (external + inline) | 907.4 KiB / 907.4 KiB | 105.5 KiB / 105.5 KiB |
@@ -256,7 +623,7 @@ iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrot
 | JS external transferred (incl. headers) | 904.3 KiB / 904.3 KiB | 111.3 KiB / 111.3 KiB |
 | JS external gzip -9 | 283.7 KiB / 283.7 KiB | 42.8 KiB / 42.8 KiB |
 | JS inline raw | 3687 B / 3687 B | 0 B / 0 B |
-| JS inline gzip -9 | 1645 B / 1647 B | 0 B / 0 B |
+| JS inline gzip -9 | 1644 B / 1644 B | 0 B / 0 B |
 | Inline data scripts raw (JSON) | 0 B / 0 B | 6317 B / 6317 B |
 | CSS external raw | 146.5 KiB / 146.5 KiB | 141.1 KiB / 141.1 KiB |
 | CSS external transferred (incl. headers) | 146.8 KiB / 146.8 KiB | 141.4 KiB / 141.4 KiB |
@@ -271,42 +638,44 @@ iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrot
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| **First typeable (kept and acted on)** | n/a | 2579 ms / 2600 ms |
+| **First typeable (kept and acted on)** | n/a | 2549 ms / 2559 ms |
 | Gate: typing at first focus wiped | 10/10 yes | 0/10 yes |
 | Gate: typing at first focus ignored | 0/10 yes | 0/10 yes |
 | Wiped and the remainder translated (extra upstream request) | 0/10 yes | 0/10 yes |
-| First focus (burst first keystroke) | 2642 ms / 2655 ms | 2579 ms / 2600 ms |
-| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 11221 ms / 11248 ms | 5813 ms / 5832 ms |
-| Input kept from (max(FCP, earliest kept keystroke), space probe) | 7531 ms / 7543 ms | 2565 ms / 2593 ms |
-| **First typeable (kept and acted on)** (repeat visit) | n/a | 721 ms / 735 ms (n=4) |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) | 2595 ms / 2607 ms | 2549 ms / 2559 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 10525 ms / 10564 ms | 5794 ms / 5799 ms |
+| Input kept from (max(FCP, earliest kept keystroke), space probe) | 7498 ms / 7504 ms | 2549 ms / 2560 ms |
+| **First typeable (kept and acted on)** (repeat visit) | n/a | 721 ms / 727 ms |
 | Gate: typing at first focus wiped (repeat visit) | 10/10 yes | 0/10 yes |
-| Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 6/10 yes |
+| Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 0/10 yes |
 | Wiped and the remainder translated (extra upstream request) (repeat visit) | 10/10 yes | 0/10 yes |
-| First focus (burst first keystroke) (repeat visit) | 676 ms / 687 ms | 1278 ms / 1287 ms |
-| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 5049 ms / 5093 ms | 10083 ms / 10173 ms |
+| Translation requests sent by the page (repeat visit) | 2 / 2 | 1 / 1 |
+| First focus (burst first keystroke) (repeat visit) | 656 ms / 658 ms | 721 ms / 727 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 4404 ms / 4421 ms | 2036 ms / 2049 ms |
 
 ##### Dropped-run penalty (secondary: retype model = settle, Clear, retype)
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| First typeable incl. the retype model | 9180 ms / 9245 ms | 2579 ms / 2600 ms |
-| of which harness wait (settle point - input kept from), dropped runs | 1587 ms / 1619 ms | n/a |
-| Harness settle point, dropped runs | 9119 ms / 9155 ms | n/a |
-| Clear + retype after settle, dropped runs | 77 ms / 90 ms | n/a |
-| First typeable incl. the retype model (repeat visit) | 3623 ms / 3673 ms | 8149 ms / 8205 ms |
-| Harness settle point, dropped runs (repeat visit) | 3553 ms / 3576 ms | 3093 ms / 3105 ms (n=6) |
-| Clear + retype after settle, dropped runs (repeat visit) | 82 ms / 97 ms | 5102 ms / 5122 ms (n=6) |
+| First typeable incl. the retype model | 9113 ms / 9145 ms | 2549 ms / 2559 ms |
+| of which harness wait (settle point - input kept from), dropped runs | 1560 ms / 1585 ms | n/a |
+| Harness settle point, dropped runs | 9057 ms / 9070 ms | n/a |
+| Clear + retype after settle, dropped runs | 58 ms / 84 ms | n/a |
+| First typeable incl. the retype model (repeat visit) | 3012 ms / 3021 ms | 721 ms / 727 ms |
+| Harness settle point, dropped runs (repeat visit) | 2954 ms / 2962 ms | n/a |
+| Clear + retype after settle, dropped runs (repeat visit) | 57 ms / 63 ms | n/a |
 
 ##### Page load, repeat visit (same context, warm cache)
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| TTFB (repeat) | 1150 ms / 1165 ms | 573 ms / 585 ms |
-| FCP (repeat) | 1191 ms / 1206 ms | 651 ms / 656 ms |
-| LCP (repeat) | 1241 ms / 1254 ms | 720 ms / 724 ms |
+| TTFB (repeat) | 581 ms / 586 ms | 575 ms / 579 ms |
+| FCP (repeat) | 615 ms / 621 ms | 651 ms / 656 ms |
+| LCP (repeat) | 660 ms / 665 ms | 715 ms / 721 ms |
 | TBT (FCP to quiet) (repeat) | n/a | n/a |
-| DOMContentLoaded (repeat) | 1240 ms / 1257 ms | 790 ms / 792 ms |
-| load event (repeat) | 1257 ms / 1266 ms | 790 ms / 793 ms |
+| DOMContentLoaded (repeat) | 670 ms / 676 ms | 785 ms / 788 ms |
+| load event (repeat) | 683 ms / 689 ms | 785 ms / 788 ms |
 | CLS during load (repeat) | n/a | n/a |
 | JS external transferred (repeat; 0 = cache hit) | 0 B / 0 B | 0 B / 0 B |
 | All transferred (repeat) | 16.9 KiB / 16.9 KiB | 37.1 KiB / 37.1 KiB |
@@ -315,11 +684,12 @@ iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrot
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Last key to first main char | 1295 ms / 1302 ms | 1253 ms / 1260 ms |
-| Last key to Copy enabled | 1606 ms / 1621 ms | 1473 ms / 1483 ms |
-| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 5447 ms / 5494 ms | 5376 ms / 5418 ms |
-| Request end minus last DOM change (> 0: response held open) | -29 ms / -22 ms | -24 ms / -16 ms |
-| Diagnostic: last key to Listen enabled (if the app has it) | 5447 ms / 5494 ms | 5376 ms / 5418 ms |
+| Last key to first main char | 1258 ms / 1266 ms | 1243 ms / 1258 ms |
+| Last key to Copy enabled | 1569 ms / 1586 ms | 1466 ms / 1481 ms |
+| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 5368 ms / 5396 ms | 5395 ms / 5417 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| Request end minus last DOM change (> 0: response held open) | -24 ms / -20 ms | -23 ms / -7 ms |
+| Diagnostic: last key to Listen enabled (if the app has it) | 5368 ms / 5396 ms | 5395 ms / 5417 ms |
 | JS loaded through done, gzip -9 | 285.3 KiB / 285.3 KiB | 42.8 KiB / 42.8 KiB |
 | JS loaded through done, raw | 907.4 KiB / 907.4 KiB | 105.5 KiB / 105.5 KiB |
 
@@ -348,9 +718,9 @@ iPhone 15, WebKit, Lighthouse mobile network via the throttle proxy; CPU unthrot
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Earliest kept keystroke | 7531 ms / 7543 ms | 2565 ms / 2593 ms |
-| Earliest keystroke shown (may be lost) | 2625 ms / 2643 ms | 2565 ms / 2593 ms |
-| Probe resolution (kept - last lost) | 103 ms / 113 ms | n/a |
+| Earliest kept keystroke | 7498 ms / 7504 ms | 2549 ms / 2560 ms |
+| Earliest keystroke shown (may be lost) | 2587 ms / 2600 ms | 2549 ms / 2560 ms |
+| Probe resolution (kept - last lost) | 83 ms / 90 ms | n/a |
 | Whitespace input reached upstream | 0/10 yes | 0/10 yes |
 
 #### pixel-chromium-4xcpu-slow4g
@@ -361,14 +731,14 @@ Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle pro
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| TTFB | 1140 ms / 1141 ms | 1137 ms / 1144 ms |
-| Document transfer (responseEnd - responseStart) | 90 ms / 90 ms | 199 ms / 200 ms |
+| TTFB | 1139 ms / 1140 ms | 1140 ms / 1143 ms |
+| Document transfer (responseEnd - responseStart) | 89 ms / 90 ms | 198 ms / 200 ms |
 | Document transfer expected on the link | 91 ms / 91 ms | 201 ms / 201 ms |
-| FCP | 3188 ms / 3200 ms | 3180 ms / 3200 ms |
-| LCP | 3188 ms / 3200 ms | 3180 ms / 3200 ms |
-| TBT (FCP to quiet) | 11 ms / 13 ms | 0 ms / 11 ms |
-| DOMContentLoaded | 3180 ms / 3192 ms | 5107 ms / 5131 ms |
-| load event | 5070 ms / 5077 ms | 5108 ms / 5133 ms |
+| FCP | 3198 ms / 3200 ms | 3164 ms / 3168 ms |
+| LCP | 3198 ms / 3200 ms | 3164 ms / 3168 ms |
+| TBT (FCP to quiet) | 21 ms / 23 ms | 0 ms / 2 ms |
+| DOMContentLoaded | 3192 ms / 3195 ms | 5106 ms / 5109 ms |
+| load event | 5072 ms / 5074 ms | 5107 ms / 5111 ms |
 | CLS during load | 0.000 / 0.000 | 0.000 / 0.000 |
 | **JS total gzip (external + inline)** | 285.3 KiB / 285.3 KiB | 42.8 KiB / 42.8 KiB |
 | JS total raw (external + inline) | 907.4 KiB / 907.4 KiB | 105.5 KiB / 105.5 KiB |
@@ -376,7 +746,7 @@ Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle pro
 | JS external transferred (incl. headers) | 904.3 KiB / 904.3 KiB | 111.3 KiB / 111.3 KiB |
 | JS external gzip -9 | 283.7 KiB / 283.7 KiB | 42.8 KiB / 42.8 KiB |
 | JS inline raw | 3687 B / 3687 B | 0 B / 0 B |
-| JS inline gzip -9 | 1645 B / 1645 B | 0 B / 0 B |
+| JS inline gzip -9 | 1644 B / 1645 B | 0 B / 0 B |
 | Inline data scripts raw (JSON) | 0 B / 0 B | 6317 B / 6317 B |
 | CSS external raw | 146.5 KiB / 146.5 KiB | 141.1 KiB / 141.1 KiB |
 | CSS external transferred (incl. headers) | 146.8 KiB / 146.8 KiB | 141.4 KiB / 141.4 KiB |
@@ -391,43 +761,45 @@ Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle pro
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| **First typeable (kept and acted on)** | n/a | 3154 ms / 3156 ms |
+| **First typeable (kept and acted on)** | n/a | 3144 ms / 3160 ms |
 | Gate: typing at first focus wiped | 10/10 yes | 0/10 yes |
 | Gate: typing at first focus ignored | 0/10 yes | 0/10 yes |
 | Wiped and the remainder translated (extra upstream request) | 0/10 yes | 0/10 yes |
-| First focus (burst first keystroke) | 3193 ms / 3217 ms | 1406 ms / 1416 ms |
-| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 11455 ms / 11509 ms | 6384 ms / 6401 ms |
-| Input kept from (max(FCP, earliest kept keystroke), space probe) | 8160 ms / 8162 ms | 3148 ms / 3172 ms |
-| **First typeable (kept and acted on)** (repeat visit) | n/a | 735 ms / 739 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) | 3208 ms / 3220 ms | 1403 ms / 1416 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 11557 ms / 11590 ms | 6382 ms / 6394 ms |
+| Input kept from (max(FCP, earliest kept keystroke), space probe) | 8174 ms / 8176 ms | 3144 ms / 3152 ms |
+| **First typeable (kept and acted on)** (repeat visit) | n/a | 735 ms / 738 ms |
 | Gate: typing at first focus wiped (repeat visit) | 10/10 yes | 0/10 yes |
 | Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 0/10 yes |
-| Wiped and the remainder translated (extra upstream request) (repeat visit) | 0/10 yes | 0/10 yes |
-| First focus (burst first keystroke) (repeat visit) | 665 ms / 674 ms | 735 ms / 739 ms |
-| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 4136 ms / 4201 ms | 2156 ms / 2177 ms |
+| Wiped and the remainder translated (extra upstream request) (repeat visit) | 1/10 yes | 0/10 yes |
+| Translation requests sent by the page (repeat visit) | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) (repeat visit) | 675 ms / 693 ms | 735 ms / 738 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 4278 ms / 4834 ms | 2138 ms / 2157 ms |
 
 ##### Dropped-run penalty (secondary: retype model = settle, Clear, retype)
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| First typeable incl. the retype model | 9789 ms / 9810 ms | 3154 ms / 3156 ms |
-| of which harness wait (settle point - input kept from), dropped runs | 1533 ms / 1538 ms | n/a |
-| Harness settle point, dropped runs | 9690 ms / 9705 ms | n/a |
-| Clear + retype after settle, dropped runs | 96 ms / 120 ms | n/a |
-| First typeable incl. the retype model (repeat visit) | 2533 ms / 2550 ms | 735 ms / 739 ms |
-| Harness settle point, dropped runs (repeat visit) | 2446 ms / 2460 ms | n/a |
-| Clear + retype after settle, dropped runs (repeat visit) | 91 ms / 92 ms | n/a |
+| First typeable incl. the retype model | 9795 ms / 9804 ms | 3144 ms / 3160 ms |
+| of which harness wait (settle point - input kept from), dropped runs | 1528 ms / 1534 ms | n/a |
+| Harness settle point, dropped runs | 9701 ms / 9704 ms | n/a |
+| Clear + retype after settle, dropped runs | 95 ms / 104 ms | n/a |
+| First typeable incl. the retype model (repeat visit) | 2568 ms / 3132 ms | 735 ms / 738 ms |
+| Harness settle point, dropped runs (repeat visit) | 2475 ms / 3040 ms | n/a |
+| Clear + retype after settle, dropped runs (repeat visit) | 93 ms / 98 ms | n/a |
 
 ##### Page load, repeat visit (same context, warm cache)
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| TTFB (repeat) | 581 ms / 582 ms | 574 ms / 577 ms |
-| FCP (repeat) | 620 ms / 620 ms | 616 ms / 632 ms |
-| LCP (repeat) | 652 ms / 664 ms | 712 ms / 728 ms |
+| TTFB (repeat) | 581 ms / 582 ms | 575 ms / 577 ms |
+| FCP (repeat) | 620 ms / 620 ms | 612 ms / 612 ms |
+| LCP (repeat) | 664 ms / 664 ms | 712 ms / 716 ms |
 | TBT (FCP to quiet) (repeat) | 0 ms / 0 ms | 0 ms / 0 ms |
-| DOMContentLoaded (repeat) | 672 ms / 673 ms | 794 ms / 799 ms |
-| load event (repeat) | 691 ms / 693 ms | 796 ms / 801 ms |
-| CLS during load (repeat) | 0.048 / 0.051 | 0.051 / 0.051 |
+| DOMContentLoaded (repeat) | 672 ms / 673 ms | 793 ms / 795 ms |
+| load event (repeat) | 694 ms / 695 ms | 794 ms / 796 ms |
+| CLS during load (repeat) | 0.051 / 0.061 | 0.051 / 0.051 |
 | JS external transferred (repeat; 0 = cache hit) | 0 B / 0 B | 0 B / 0 B |
 | All transferred (repeat) | 17.1 KiB / 17.1 KiB | 37.0 KiB / 37.0 KiB |
 
@@ -435,11 +807,12 @@ Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle pro
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Last key to first main char | 1262 ms / 1272 ms | 1252 ms / 1261 ms |
-| Last key to Copy enabled | 1559 ms / 1564 ms | 1458 ms / 1466 ms |
-| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 5287 ms / 5332 ms | 5261 ms / 5335 ms |
-| Request end minus last DOM change (> 0: response held open) | -27 ms / -23 ms | -28 ms / -20 ms |
-| Diagnostic: last key to Listen enabled (if the app has it) | 5287 ms / 5332 ms | 5261 ms / 5335 ms |
+| Last key to first main char | 1264 ms / 1266 ms | 1256 ms / 1265 ms |
+| Last key to Copy enabled | 1559 ms / 1561 ms | 1465 ms / 1470 ms |
+| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 5265 ms / 5274 ms | 5331 ms / 5340 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| Request end minus last DOM change (> 0: response held open) | -34 ms / -29 ms | -24 ms / -20 ms |
+| Diagnostic: last key to Listen enabled (if the app has it) | 5265 ms / 5274 ms | 5331 ms / 5340 ms |
 | JS loaded through done, gzip -9 | 285.3 KiB / 285.3 KiB | 42.8 KiB / 42.8 KiB |
 | JS loaded through done, raw | 907.4 KiB / 907.4 KiB | 105.5 KiB / 105.5 KiB |
 
@@ -448,7 +821,7 @@ Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle pro
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
 | visualViewport shrink + pan: final visual viewport offsetTop (scroll-to-caret model) | 0 px / 0 px | 0 px / 0 px |
-| visualViewport shrink + pan: layout-shift sum | 0.261 / 0.265 | 0.246 / 0.246 |
+| visualViewport shrink + pan: layout-shift sum | 0.258 / 0.265 | 0.246 / 0.246 |
 | visualViewport shrink + pan: main text dy | 58 px / 58 px | 58 px / 58 px |
 | visualViewport shrink + pan: source textarea dy | 413 px / 413 px | 413 px / 413 px |
 | visualViewport shrink + pan: main text visible | 10/10 yes | 10/10 yes |
@@ -468,9 +841,9 @@ Pixel 7, Chromium, 4x CPU (CDP) + Lighthouse mobile network via the throttle pro
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Earliest kept keystroke | 8160 ms / 8162 ms | 1399 ms / 1421 ms |
-| Earliest keystroke shown (may be lost) | 3197 ms / 3201 ms | 1399 ms / 1421 ms |
-| Probe resolution (kept - last lost) | 171 ms / 186 ms | n/a |
+| Earliest kept keystroke | 8174 ms / 8176 ms | 1396 ms / 1407 ms |
+| Earliest keystroke shown (may be lost) | 3204 ms / 3212 ms | 1396 ms / 1407 ms |
+| Probe resolution (kept - last lost) | 189 ms / 197 ms | n/a |
 | Whitespace input reached upstream | 0/10 yes | 0/10 yes |
 
 #### macbook-chromium
@@ -481,14 +854,14 @@ MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| TTFB | 3 ms / 3 ms | 2 ms / 2 ms |
-| Document transfer (responseEnd - responseStart) | 0 ms / 0 ms | 0 ms / 0 ms |
+| TTFB | 3 ms / 4 ms | 2 ms / 2 ms |
+| Document transfer (responseEnd - responseStart) | 0 ms / 0 ms | 0 ms / 1 ms |
 | Document transfer expected on the link | n/a | n/a |
-| FCP | 44 ms / 44 ms | 44 ms / 44 ms |
-| LCP | 44 ms / 44 ms | 44 ms / 44 ms |
+| FCP | 44 ms / 44 ms | 40 ms / 44 ms |
+| LCP | 44 ms / 44 ms | 40 ms / 44 ms |
 | TBT (FCP to quiet) | 0 ms / 0 ms | 0 ms / 0 ms |
-| DOMContentLoaded | 34 ms / 36 ms | 51 ms / 53 ms |
-| load event | 51 ms / 53 ms | 51 ms / 53 ms |
+| DOMContentLoaded | 35 ms / 36 ms | 49 ms / 51 ms |
+| load event | 53 ms / 55 ms | 49 ms / 51 ms |
 | CLS during load | 0.000 / 0.000 | 0.000 / 0.000 |
 | **JS total gzip (external + inline)** | 285.3 KiB / 285.3 KiB | 42.8 KiB / 42.8 KiB |
 | JS total raw (external + inline) | 907.4 KiB / 907.4 KiB | 105.5 KiB / 105.5 KiB |
@@ -496,7 +869,7 @@ MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
 | JS external transferred (incl. headers) | 904.3 KiB / 904.3 KiB | 111.3 KiB / 111.3 KiB |
 | JS external gzip -9 | 283.7 KiB / 283.7 KiB | 42.8 KiB / 42.8 KiB |
 | JS inline raw | 3687 B / 3687 B | 0 B / 0 B |
-| JS inline gzip -9 | 1645 B / 1647 B | 0 B / 0 B |
+| JS inline gzip -9 | 1644 B / 1644 B | 0 B / 0 B |
 | Inline data scripts raw (JSON) | 0 B / 0 B | 6317 B / 6317 B |
 | CSS external raw | 146.5 KiB / 146.5 KiB | 141.1 KiB / 141.1 KiB |
 | CSS external transferred (incl. headers) | 146.8 KiB / 146.8 KiB | 141.4 KiB / 141.4 KiB |
@@ -511,29 +884,31 @@ MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| **First typeable (kept and acted on)** | n/a | 48 ms / 54 ms |
+| **First typeable (kept and acted on)** | n/a | 49 ms / 50 ms |
 | Gate: typing at first focus wiped | 10/10 yes | 0/10 yes |
 | Gate: typing at first focus ignored | 0/10 yes | 0/10 yes |
 | Wiped and the remainder translated (extra upstream request) | 1/10 yes | 0/10 yes |
-| First focus (burst first keystroke) | 52 ms / 53 ms | 40 ms / 54 ms |
-| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 2044 ms / 2046 ms | 808 ms / 824 ms |
-| Input kept from (max(FCP, earliest kept keystroke), space probe) | 88 ms / 92 ms | 44 ms / 44 ms |
-| **First typeable (kept and acted on)** (repeat visit) | 41 ms / 42 ms | 26 ms / 28 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) | 55 ms / 56 ms | 45 ms / 50 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) | 1993 ms / 2010 ms | 789 ms / 791 ms |
+| Input kept from (max(FCP, earliest kept keystroke), space probe) | 90 ms / 93 ms | 44 ms / 44 ms |
+| **First typeable (kept and acted on)** (repeat visit) | 43 ms / 45 ms | 24 ms / 26 ms |
 | Gate: typing at first focus wiped (repeat visit) | 0/10 yes | 0/10 yes |
 | Gate: typing at first focus ignored (repeat visit) | 0/10 yes | 0/10 yes |
 | Wiped and the remainder translated (extra upstream request) (repeat visit) | 0/10 yes | 0/10 yes |
-| First focus (burst first keystroke) (repeat visit) | 41 ms / 42 ms | 26 ms / 27 ms |
-| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 831 ms / 836 ms | 777 ms / 793 ms |
+| Translation requests sent by the page (repeat visit) | 1 / 1 | 1 / 1 |
+| First focus (burst first keystroke) (repeat visit) | 43 ms / 45 ms | 24 ms / 26 ms |
+| Nav start to first main char, typing at first focus (dropped runs: after the retype) (repeat visit) | 813 ms / 829 ms | 758 ms / 759 ms |
 
 ##### Dropped-run penalty (secondary: retype model = settle, Clear, retype)
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| First typeable incl. the retype model | 1220 ms / 1222 ms | 48 ms / 54 ms |
-| of which harness wait (settle point - input kept from), dropped runs | 1046 ms / 1053 ms | n/a |
-| Harness settle point, dropped runs | 1134 ms / 1138 ms | n/a |
-| Clear + retype after settle, dropped runs | 84 ms / 90 ms | n/a |
-| First typeable incl. the retype model (repeat visit) | 41 ms / 42 ms | 26 ms / 28 ms |
+| First typeable incl. the retype model | 1193 ms / 1199 ms | 49 ms / 50 ms |
+| of which harness wait (settle point - input kept from), dropped runs | 1040 ms / 1044 ms | n/a |
+| Harness settle point, dropped runs | 1130 ms / 1135 ms | n/a |
+| Clear + retype after settle, dropped runs | 62 ms / 70 ms | n/a |
+| First typeable incl. the retype model (repeat visit) | 43 ms / 45 ms | 24 ms / 26 ms |
 | Harness settle point, dropped runs (repeat visit) | n/a | n/a |
 | Clear + retype after settle, dropped runs (repeat visit) | n/a | n/a |
 
@@ -541,12 +916,12 @@ MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| TTFB (repeat) | 3 ms / 4 ms | 1 ms / 2 ms |
-| FCP (repeat) | 20 ms / 24 ms | 24 ms / 28 ms |
-| LCP (repeat) | 20 ms / 24 ms | 24 ms / 28 ms |
+| TTFB (repeat) | 3 ms / 4 ms | 1 ms / 1 ms |
+| FCP (repeat) | 20 ms / 24 ms | 20 ms / 20 ms |
+| LCP (repeat) | 20 ms / 24 ms | 20 ms / 20 ms |
 | TBT (FCP to quiet) (repeat) | 0 ms / 0 ms | 0 ms / 0 ms |
-| DOMContentLoaded (repeat) | 10 ms / 10 ms | 20 ms / 24 ms |
-| load event (repeat) | 16 ms / 17 ms | 22 ms / 25 ms |
+| DOMContentLoaded (repeat) | 10 ms / 10 ms | 19 ms / 21 ms |
+| load event (repeat) | 17 ms / 18 ms | 19 ms / 21 ms |
 | CLS during load (repeat) | 0.000 / 0.000 | 0.000 / 0.000 |
 | JS external transferred (repeat; 0 = cache hit) | 0 B / 0 B | 0 B / 0 B |
 | All transferred (repeat) | 17.4 KiB / 17.4 KiB | 37.3 KiB / 37.3 KiB |
@@ -555,11 +930,12 @@ MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Last key to first main char | 708 ms / 716 ms | 689 ms / 706 ms |
-| Last key to Copy enabled | 1030 ms / 1039 ms | 911 ms / 916 ms |
-| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 4925 ms / 4937 ms | 4905 ms / 4932 ms |
-| Request end minus last DOM change (> 0: response held open) | -10 ms / -5 ms | -13 ms / -9 ms |
-| Diagnostic: last key to Listen enabled (if the app has it) | 4925 ms / 4937 ms | 4905 ms / 4932 ms |
+| Last key to first main char | 686 ms / 693 ms | 673 ms / 687 ms |
+| Last key to Copy enabled | 989 ms / 997 ms | 895 ms / 900 ms |
+| Last key to done (stream ended + Copy + DOM quiet 500 ms) | 4790 ms / 4812 ms | 4781 ms / 4917 ms |
+| Translation requests sent by the page | 1 / 1 | 1 / 1 |
+| Request end minus last DOM change (> 0: response held open) | -19 ms / -12 ms | -13 ms / -5 ms |
+| Diagnostic: last key to Listen enabled (if the app has it) | 4790 ms / 4812 ms | 4781 ms / 4917 ms |
 | JS loaded through done, gzip -9 | 285.3 KiB / 285.3 KiB | 42.8 KiB / 42.8 KiB |
 | JS loaded through done, raw | 907.4 KiB / 907.4 KiB | 105.5 KiB / 105.5 KiB |
 
@@ -567,22 +943,22 @@ MacBook 14" (1512x982 @2x), Chromium, unthrottled, direct connection
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Earliest kept keystroke | 88 ms / 92 ms | 37 ms / 39 ms |
-| Earliest keystroke shown (may be lost) | 38 ms / 39 ms | 37 ms / 39 ms |
-| Probe resolution (kept - last lost) | 50 ms / 53 ms | n/a |
+| Earliest kept keystroke | 90 ms / 93 ms | 35 ms / 38 ms |
+| Earliest keystroke shown (may be lost) | 39 ms / 40 ms | 35 ms / 38 ms |
+| Probe resolution (kept - last lost) | 51 ms / 54 ms | n/a |
 | Whitespace input reached upstream | 0/10 yes | 0/10 yes |
 
 #### Server TTFB (Node client, no browser)
 
 | Metric | ts (fake) median / p90 | go (fake) median / p90 |
 |---|---|---|
-| Cold (first request) | 93 ms / 96 ms | 2 ms / 5 ms |
-| Warm | 4 ms / 5 ms | 2 ms / 5 ms |
+| Cold (first request) | 97 ms / 99 ms | 1 ms / 1 ms |
+| Warm | 5 ms / 5 ms | 0 ms / 1 ms |
 
 - ts (fake): Local process restarted per sample; cold = first GET / after TCP readiness, warm = the second GET. Node client, new connection each.
 - go (fake): Local process restarted per sample; cold = first GET / after TCP readiness, warm = the second GET. Node client, new connection each.
 
 #### Measured on
 
-- ts (fake): 2026-11-04T04:15:23.479Z, commit e902c32961e9 (dirty), build 81ee355b8be5, harness 317267dd85bb, Apple M1 Max, 10 cores, 32 GiB, darwin 27.0.0 arm64, Playwright 1.64.1, webkit 27.2, chromium 156.0.8078.4
-- go (fake): 2026-11-04T05:23:29.482Z, commit 199273919d0e (dirty), build e5a14612dceb, harness 317267dd85bb, Apple M1 Max, 10 cores, 32 GiB, darwin 27.0.0 arm64, Playwright 1.64.1, webkit 27.2, chromium 156.0.8078.4
+- ts (fake): 2026-11-04T08:33:37.598Z, commit 0968bde39fcc (dirty), build 13539ce6e011, harness dd731a369455, Apple M1 Max, 10 cores, 32 GiB, darwin 27.0.0 arm64, Playwright 1.64.1, webkit 27.2, chromium 156.0.8078.4
+- go (fake): 2026-11-04T08:53:54.679Z, commit 0968bde39fcc (dirty), build 4b0f525d80ea, harness dd731a369455, Apple M1 Max, 10 cores, 32 GiB, darwin 27.0.0 arm64, Playwright 1.64.1, webkit 27.2, chromium 156.0.8078.4
