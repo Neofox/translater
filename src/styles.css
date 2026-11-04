@@ -812,6 +812,11 @@ textarea:focus-visible {
   animation-duration: 160ms;
   animation-timing-function: ease-out;
 }
+/* The transition overlay would otherwise swallow taps on the result while
+   it animates (about 250 ms with the root crossfade). */
+::view-transition {
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-settle,
   .animate-spin,
