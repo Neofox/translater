@@ -1259,9 +1259,12 @@ for (const posture of ['book', 'laptop'] as const) {
       else expect(resultPane.bottom).toBeLessThanOrEqual(sourcePane.top)
       const copy = await rect(copyButton(page))
       expect(copy.bottom).toBeLessThanOrEqual(visible)
-      // TS also asserts that Paste shares Copy's top in book posture. With
-      // real segments that fails in both apps: it is the separate known-bug
-      // test below.
+      if (posture === 'book')
+        expect(
+          Math.abs(
+            (await rect(page.getByTestId('paste-input'))).top - copy.top,
+          ),
+        ).toBeLessThanOrEqual(1)
       await keyboard(page, 736)
       await emulateFold(cdp, page, null)
       await expect(panels(page)).toHaveAttribute('data-layout', 'stack')
@@ -1270,18 +1273,15 @@ for (const posture of ['book', 'laptop'] as const) {
   }
 }
 
-// KNOWN BUG, both apps (the stylesheet is shared): under a real book
-// posture (CSS posture and segment queries matching, not only the JS
-// layout), Paste and Clear land on the same box under the editor and leave
-// the bottom dock that Copy uses. TS's fold test fakes only matchMedia, so
-// its stylesheet never sees the posture and the case passes there. Found by
-// Task 28; recorded, not fixed (a go.css fix would diverge from TS).
+// Found by Task 28: TS's fold test fakes only matchMedia, so its
+// stylesheet never saw the posture. Under a real book posture the folded
+// workspace container hid the narrow-pane dock and Paste and Clear landed on
+// one box under the editor (fixed in src/styles.css for both apps).
 test('real book posture keeps Paste and Clear apart on the result dock baseline @layout', async ({
   page,
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'posture emulation is Chromium-only')
-  test.fail(true, 'known in both apps: book posture source dock (Task 28)')
   await page.setViewportSize({ width: 736, height: 736 })
   await openApp(page)
   await fillSource(page, 'Keep this conversation while folding.')
