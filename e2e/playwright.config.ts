@@ -103,6 +103,13 @@ for (let i = 0; i < WORKERS; i++) {
   )
 }
 
+// Production smoke (tests/prod-smoke.spec.ts, @prod): PROD_URL points the
+// run at a deployment instead. Then no fake, no local app servers and no
+// isolation check start, only @prod tests run (one project, one worker, no
+// traces, which would record the bypass header), and every other run
+// excludes @prod.
+const PROD_URL = process.env.PROD_URL?.replace(/\/+$/, '')
+
 export default defineConfig({
   testDir: './tests',
   outputDir: '../test-results/e2e',
@@ -113,12 +120,17 @@ export default defineConfig({
   snapshotPathTemplate:
     '../test-results/visual-baseline/{projectName}/{arg}{ext}',
   updateSnapshots: APP === 'go' ? 'none' : 'missing',
-  globalSetup: './global-setup.ts',
+  globalSetup: PROD_URL ? undefined : './global-setup.ts',
   // The TS-vs-Go visual parity tests need the baselines `npm run e2e:visual`
-  // (e2e/visual/run.mjs) writes first; plain e2e runs skip them.
-  grepInvert: process.env.E2E_VISUAL ? undefined : /@visual/,
+  // (e2e/visual/run.mjs) writes first; plain e2e runs skip them. The billed
+  // @prod smoke runs only with PROD_URL.
+  grep: PROD_URL ? /@prod/ : undefined,
+  grepInvert: [
+    ...(process.env.E2E_VISUAL ? [] : [/@visual/]),
+    ...(PROD_URL ? [] : [/@prod/]),
+  ],
   fullyParallel: true,
-  workers: WORKERS,
+  workers: PROD_URL ? 1 : WORKERS,
   retries: 0,
   forbidOnly: Boolean(process.env.CI),
   timeout: 60_000,
@@ -128,29 +140,34 @@ export default defineConfig({
     ['html', { outputFolder: '../test-results/e2e-report', open: 'never' }],
   ],
   use: {
-    trace: 'retain-on-failure',
+    trace: PROD_URL ? 'off' : 'retain-on-failure',
     locale: 'en-US',
     hasTouch: true,
+    ...(PROD_URL && { baseURL: PROD_URL }),
   },
-  webServer: servers,
-  projects: (['chromium', 'webkit'] as const).flatMap((browserName) =>
-    viewports.map(({ label, width, height }) => ({
-      name: `${browserName}-${label}`,
-      use: {
-        browserName,
-        viewport: { width, height },
-        reducedMotion:
-          browserName === 'webkit' && label === 'portrait'
-            ? ('reduce' as const)
-            : ('no-preference' as const),
-        // Chromium grants both clipboard permissions. WebKit only knows
-        // `clipboard-read`; with it, writeText/readText work after a user
-        // gesture inside its own (non-system) pasteboard.
-        permissions:
-          browserName === 'chromium'
-            ? ['clipboard-read', 'clipboard-write']
-            : ['clipboard-read'],
-      },
-    })),
-  ),
+  webServer: PROD_URL ? undefined : servers,
+  projects: (['chromium', 'webkit'] as const)
+    .flatMap((browserName) =>
+      viewports.map(({ label, width, height }) => ({
+        name: `${browserName}-${label}`,
+        use: {
+          browserName,
+          viewport: { width, height },
+          reducedMotion:
+            browserName === 'webkit' && label === 'portrait'
+              ? ('reduce' as const)
+              : ('no-preference' as const),
+          // Chromium grants both clipboard permissions. WebKit only knows
+          // `clipboard-read`; with it, writeText/readText work after a user
+          // gesture inside its own (non-system) pasteboard.
+          permissions:
+            browserName === 'chromium'
+              ? ['clipboard-read', 'clipboard-write']
+              : ['clipboard-read'],
+        },
+      })),
+    )
+    // Each @prod test is billed: one project, so a run without --project
+    // still makes exactly one translation and one speech request.
+    .filter(({ name }) => !PROD_URL || name === 'chromium-macbook-14'),
 })
