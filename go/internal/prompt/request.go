@@ -1,7 +1,7 @@
 package prompt
 
 import (
-	"encoding/json/v2"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 
@@ -147,10 +147,19 @@ func BuildRequest(c *contract.Contract, in TranslateInput, cfg config.Translate)
 		return nil, fmt.Errorf("prompt: missing few-shot %q", fewshotName(in))
 	}
 	schemaName := in.Intent // "sentence" | "word", validated above
-	var schema map[string]any
-	if err := json.Unmarshal(c.Schemas[schemaName], &schema); err != nil {
-		return nil, fmt.Errorf("prompt: schema %s: %w", schemaName, err)
+	// The schema goes out as its original bytes: the model writes fields in
+	// schema key order, and decoding into the SDK's map[string]any field
+	// would re-encode it alphabetically (main after alternatives, the
+	// languages last), delaying main by seconds and changing the output.
+	schema := jsontext.Value(c.Schemas[schemaName])
+	if !schema.IsValid() {
+		return nil, fmt.Errorf("prompt: schema %s is not valid JSON", schemaName)
 	}
+	format := responses.ResponseFormatTextJSONSchemaConfigParam{
+		Name:   schemaName + "_translation",
+		Strict: openai.Bool(true),
+	}
+	format.SetExtraFields(map[string]any{"schema": schema})
 
 	reasoning := shared.ReasoningParam{Effort: shared.ReasoningEffort(cfg.Reasoning)}
 	if cfg.Reasoning != "none" {
@@ -177,11 +186,7 @@ func BuildRequest(c *contract.Contract, in TranslateInput, cfg config.Translate)
 			),
 		}},
 		Text: responses.ResponseTextConfigParam{Format: responses.ResponseFormatTextConfigUnionParam{
-			OfJSONSchema: &responses.ResponseFormatTextJSONSchemaConfigParam{
-				Name:   schemaName + "_translation",
-				Schema: schema,
-				Strict: openai.Bool(true),
-			},
+			OfJSONSchema: &format,
 		}},
 		Store:          openai.Bool(false),
 		ServiceTier:    responses.ResponseNewParamsServiceTier(cfg.ServiceTier),

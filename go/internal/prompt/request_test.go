@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"os"
 	"regexp"
@@ -72,6 +73,66 @@ func TestBuildRequestMatchesFixtures(t *testing.T) {
 			}
 			if d := cmp.Diff(f.Body, got); d != "" {
 				t.Errorf("body mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+// rawSchema returns the request's text.format.schema exactly as encoded,
+// compacted: unlike the parsed comparison above, it keeps key order.
+func rawSchema(t *testing.T, body []byte) string {
+	t.Helper()
+	var b struct {
+		Text struct {
+			Format struct {
+				Schema jsontext.Value `json:"schema"`
+			} `json:"format"`
+		} `json:"text"`
+	}
+	if err := json.Unmarshal(body, &b, json.RejectUnknownMembers(false)); err != nil {
+		t.Fatal(err)
+	}
+	v := b.Text.Format.Schema.Clone()
+	if err := v.Compact(); err != nil {
+		t.Fatal(err)
+	}
+	return string(v)
+}
+
+// The model writes fields in schema key order, so property order is part of
+// the contract: main must stream before the learner details (a map-ordered,
+// alphabetical schema put main after alternatives and the languages last).
+// The parsed comparison in TestBuildRequestMatchesFixtures cannot see order.
+func TestBuildRequestKeepsSchemaKeyOrder(t *testing.T) {
+	c := loadContract(t)
+	b, err := os.ReadFile(sharedDir + "fixtures/requests.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw []struct {
+		Name string         `json:"name"`
+		Body jsontext.Value `json:"body"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for i, f := range loadFixtures(t) {
+		t.Run(f.Name, func(t *testing.T) {
+			cfg := config.Translate{Model: f.Config.Model, Reasoning: f.Config.Reasoning, ServiceTier: f.Config.ServiceTier}
+			body, err := BuildRequest(c, f.Input, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := rawSchema(t, body)
+			if want := rawSchema(t, raw[i].Body); got != want {
+				t.Errorf("schema bytes differ from the captured TS request (key order?)\n got: %.200s\nwant: %.200s", got, want)
+			}
+			shared := jsontext.Value(slices.Clone(c.Schemas[f.Input.Intent]))
+			if err := shared.Compact(); err != nil {
+				t.Fatal(err)
+			}
+			if got != string(shared) {
+				t.Errorf("schema bytes differ from shared/translation/schemas/%s", f.Input.Intent)
 			}
 		})
 	}
