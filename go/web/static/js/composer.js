@@ -76,6 +76,17 @@ export function resolveTarget({ source, target, detected }) {
 }
 
 /**
+ * Text already in the field when the modules run was typed before they ran
+ * (a slow first load) only on a fresh navigation: reload and back/forward
+ * may restore an earlier value (form restoration), which must not start a
+ * paid run, and a bfcache restore does not run the modules again. Without a
+ * navigation entry this answers false, which keeps the text unrun.
+ */
+export function typedBeforeInit(value, defaultValue, navigationType) {
+  return navigationType === 'navigate' && value !== defaultValue && value.trim() !== ''
+}
+
+/**
  * Wire the textarea and source actions to `app`:
  *   app.inputChanged({ immediate }) — the text changed (abort + reschedule)
  *   app.run(trigger)                — start a run now
@@ -266,5 +277,5 @@ export function initComposer(app, ta) {
   }
   resize()
 
-  return { flush, clearTimer, schedule, replaceText, setText, clearInput, focus, resize }
+  return { flush, clearTimer, schedule, replaceText, setText, clearInput, focus, resize, changed }
 }

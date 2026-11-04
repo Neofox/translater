@@ -9,6 +9,7 @@ import {
   initComposer,
   resolveTarget,
   routingDetected,
+  typedBeforeInit,
 } from './composer.js'
 import { initContext } from './context.js'
 import { initCopy, requestKey } from './copy.js'
@@ -268,3 +269,7 @@ initContext(app, () => composer.resize(), (root) => prefs.applyStrings(root))
 updateCount()
 copy.updateActions()
 if (matchMedia('(pointer: fine)').matches) ta.focus()
+// Text typed before this module ran gets the debounced run its input events
+// would have scheduled (auto-swap, count and actions included).
+const navigation = performance.getEntriesByType('navigation')[0]
+if (typedBeforeInit(ta.value, ta.defaultValue, navigation?.type)) composer.changed()

@@ -8,6 +8,7 @@ import {
   detectLanguage,
   resolveTarget,
   routingDetected,
+  typedBeforeInit,
 } from './composer.js'
 import { requestKey } from './copy.js'
 
@@ -86,4 +87,19 @@ test('resolveTarget', () => {
   assert.equal(resolveTarget({ source: 'ko', target: 'ko', detected: null }), 'ko')
   assert.equal(resolveTarget({ source: 'auto', target: 'en', detected: 'en' }), 'ko')
   assert.equal(resolveTarget({ source: 'auto', target: 'ko', detected: null }), 'ko')
+})
+
+// Text in the field when the modules run: typed on a slow first load (run
+// it) versus restored by reload/back-forward form restoration (never a paid
+// run).
+test('typedBeforeInit runs only text typed on a fresh navigation', () => {
+  assert.equal(typedBeforeInit('hello', '', 'navigate'), true)
+  assert.equal(typedBeforeInit('hello', '', 'reload'), false)
+  assert.equal(typedBeforeInit('hello', '', 'back_forward'), false)
+  assert.equal(typedBeforeInit('hello', '', 'prerender'), false)
+  assert.equal(typedBeforeInit('hello', '', undefined), false)
+  assert.equal(typedBeforeInit('', '', 'navigate'), false)
+  assert.equal(typedBeforeInit('  \n', '', 'navigate'), false)
+  // Server-rendered text is not user input.
+  assert.equal(typedBeforeInit('hello', 'hello', 'navigate'), false)
 })
