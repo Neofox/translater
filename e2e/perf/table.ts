@@ -357,9 +357,24 @@ function keptFrom(probe: ProbeRun): number | null {
   return probe.kept === null ? null : Math.max(probe.fcp ?? 0, probe.kept)
 }
 
+/** Headline "first typeable (kept and acted on)": the burst typed at first
+ * focus counts only if it stayed in the field AND was translated; then it is
+ * max(FCP, earliest kept keystroke, earliest acted-on keystroke) of that same
+ * run (TypeableRun.firstTypeable). A dropped burst has no kept-and-acted
+ * moment (n/a); the gate rows beside it say why, and the retype model is only
+ * the secondary "dropped-run penalty". */
+function keptAndActed(t: TypeableRun): number | null {
+  return t.burstActed ? t.firstTypeable : null
+}
+
 const gateMetrics = (which: 'cold' | 'repeat'): Metric<Paired>[] => {
   const s = which === 'cold' ? '' : ' (repeat visit)'
   return [
+    {
+      label: `**First typeable (kept and acted on)**${s}`,
+      unit: 'ms',
+      get: (r) => keptAndActed(r.interact[which]),
+    },
     {
       label: `Gate: typing at first focus wiped${s}`,
       unit: 'flag',
@@ -385,7 +400,20 @@ const gateMetrics = (which: 'cold' | 'repeat'): Metric<Paired>[] => {
       get: (r) => r.interact[which].burstFirstKey,
     },
     {
-      label: `Secondary: first typeable incl. the retype model${s}`,
+      label: `Nav start to first main char, typing at first focus (dropped runs: after the retype)${s}`,
+      unit: 'ms',
+      get: (r) => r.interact[which].navToFirstChar,
+    },
+  ]
+}
+
+/** Secondary: a dropped burst handled by the retype model (settle point,
+ * Clear, retype a fresh sentence). Never the headline. */
+const penaltyMetrics = (which: 'cold' | 'repeat'): Metric<Paired>[] => {
+  const s = which === 'cold' ? '' : ' (repeat visit)'
+  return [
+    {
+      label: `First typeable incl. the retype model${s}`,
       unit: 'ms',
       get: (r) => r.interact[which].firstTypeable,
     },
@@ -415,11 +443,6 @@ const gateMetrics = (which: 'cold' | 'repeat'): Metric<Paired>[] => {
           ? null
           : t.retypeFirstKey - t.settledAt
       },
-    },
-    {
-      label: `Nav start to first main char, typing at first focus${s}`,
-      unit: 'ms',
-      get: (r) => r.interact[which].navToFirstChar,
     },
   ]
 }
@@ -485,15 +508,26 @@ const SECTIONS: Section[] = [
   },
   {
     title:
-      'Typing during load (headline: input kept from; gate: wiped/ignored, i.e. not acted on; secondary: first typeable incl. the retype model)',
+      'Typing during load (headline: first typeable, kept and acted on; gate: wiped/ignored, i.e. not acted on)',
     rows: rows(paired, [
+      ...gateMetrics('cold'),
       {
-        label: '**Input kept from** (max(FCP, earliest kept keystroke))',
+        label:
+          'Input kept from (max(FCP, earliest kept keystroke), space probe)',
         unit: 'ms',
         get: (r) => keptFrom(r.probe),
       },
-      ...gateMetrics('cold'),
-      ...gateMetrics('repeat').filter((m) => !m.label.startsWith('of which')),
+      ...gateMetrics('repeat'),
+    ]),
+  },
+  {
+    title:
+      'Dropped-run penalty (secondary: retype model = settle, Clear, retype)',
+    rows: rows(paired, [
+      ...penaltyMetrics('cold'),
+      ...penaltyMetrics('repeat').filter(
+        (m) => !m.label.startsWith('of which'),
+      ),
     ]),
   },
   {
