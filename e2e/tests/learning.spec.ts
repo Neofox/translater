@@ -88,8 +88,10 @@ async function openOverview(page: Page) {
   if (!(await isDesktop(page))) {
     // On the text itself: a short main line ends before the paragraph's
     // centre, and a tap past the end of the text does not inspect.
-    if (!(await panel(page).isVisible()))
+    if (!(await panel(page).isVisible())) {
+      await transitionsDone(page)
       await mainTranslation(page).click({ position: { x: 4, y: 8 } })
+    }
     await expect(panel(page)).toBeVisible()
   }
   const expanded = page.locator(
@@ -178,6 +180,23 @@ async function readingResult(page: Page, text = '오늘 도와줘서 고마워�
 }
 
 const settle = (page: Page) => page.waitForTimeout(450)
+
+/** Waits for finite animations, the completion View Transition included.
+ * While a View Transition runs, its overlay takes every pointer event (the
+ * target is <html>), so a tap measured and sent then is lost in both apps.
+ * Infinite pulses are skipped. */
+async function transitionsDone(page: Page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) =>
+          Number.isFinite(a.effect?.getComputedTiming().endTime ?? 0),
+        )
+        .map((a) => a.finished.catch(() => {})),
+    ),
+  )
+}
 
 test.beforeEach(async ({ page }) => {
   await openApp(page)
@@ -897,6 +916,9 @@ test('the word-details trigger ignores a drag and a long press @learning @word',
   await waitForDone(page)
   const trigger = page.getByTestId('word-details-trigger')
   await expect(trigger).toBeEnabled()
+  // The drag and long press must reach the trigger, not the overlay of the
+  // completion View Transition.
+  await transitionsDone(page)
   const box = (await trigger.boundingBox())!
   const x = box.x + 4
   const y = box.y + box.height / 2
@@ -920,6 +942,7 @@ test('the word-details trigger ignores a drag and a long press @learning @word',
 
 /** Client centre of the character at `index` of `needle` in the main text. */
 async function mainCharPoint(page: Page, needle: string, index = 0) {
+  await transitionsDone(page)
   return page.evaluate(
     ([text, offset]) => {
       const main = document.querySelector('[data-testid="main-translation"]')!
@@ -974,6 +997,7 @@ test('touch taps inspect the main text and source grammar @learning', async ({
   await fillSource(page, `How are you doing today ${nonce()}`)
   await waitForDone(page)
   await expect.poll(() => inspectables(page)).toEqual(['지내요'])
+  await transitionsDone(page)
   await mainTranslation(page).getByTestId('inspectable-phrase').tap()
   await expect(panel(page)).toBeVisible()
   await expect(page.getByTestId('selected-phrase')).toHaveText('어떻게 지내요')
