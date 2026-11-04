@@ -1,6 +1,6 @@
 # Go + htmx vs TypeScript: final performance comparison (Task 31)
 
-- Date: 2026-11-04. Status: **draft with fake and live runs.** The DevTools traces and the closing recommendation are placeholders (marked **PENDING**) for the controller.
+- Date: 2026-11-04. Status: **final**: fake runs, live runs, DevTools traces and recommendation. The recommendation is conditional on the Task 32 parity sign-off.
 - Apps: TS = TanStack Start (`npm run build`, Nitro Vercel preset); Go = `go build` of `go/`. Same harness, same machine (Apple M1 Max, Playwright 1.64.1, Chromium 156.0.8078.4, WebKit 27.2), same profiles as the stage-1 baseline ([`2026-11-02-baseline.md`](2026-11-02-baseline.md), which defines every metric).
 - **Fake runs** (local production builds against the fake OpenAI server, fixture `stream`), one app after the other with nothing else running:
   - `npx tsx e2e/perf/measure.ts --app ts --fake --runs 10 --out docs/superpowers/reports/data/2026-11-04-final-ts-fake.json`
@@ -209,32 +209,50 @@ The stylesheet is shared: Go compiles the TS app's `src/styles.css` (synced to `
 
 `make size` uses Go's gzip. The harness rows above use `gzip -9` from Node's zlib on the served bodies (Go 43,863 B JS, 28,839 B CSS; TS 292,139 B JS, 29,875 B CSS). That is the method the baseline used, so the TS/Go comparison uses the harness numbers. The original budget was 40 KB. The user ruled size a target that never outranks performance, usability or parity, and it was raised to 42 KB (inspection gestures) and 44 KB (measured Adjust menu). TS client JS: 285.3 KiB gzip locally in two chunks plus 1.6 KB inline, unchanged since the baseline; the deployed TS (`master`) is 303.9 KiB including third-party beacons. Go ships 6.7x less.
 
-## Chrome DevTools traces: **PENDING (controller)**
+## Chrome DevTools traces
 
-Settings for both production URLs: emulate 412x915 @2.625, Slow 4G, 4x CPU, cold-cache reload, page load only. Record TTFB, FCP, LCP with breakdown (TTFB / load delay / load time / render delay), CLS, critical-path latency, scripts, and DevTools insights. Also run one trace per app of "type one sentence, main visible" (1 billed translation each, 2 total). Summaries go to `data/2026-11-04-devtools-{ts,go}.json`.
+Chrome DevTools MCP, one isolated browser context per app, emulating 412x915 @2.625 (mobile, touch), Slow 4G and 4x CPU. Each trace is a cold-cache reload of the production URL, page load only. A single trace is one sample: the harness tables above (10 runs, throttle proxy) remain the measurement; the traces are a cross-check and a list of what DevTools flags. Summaries: [`devtools-ts`](data/2026-11-04-devtools-ts.json), [`devtools-go`](data/2026-11-04-devtools-go.json).
 
-| Metric (lab)                                       | TS (www.neofox.dev)                                  | Go (translater-go.vercel.app) |
-| -------------------------------------------------- | ---------------------------------------------------- | ----------------------------- |
-| TTFB                                               | _PENDING_ (baseline 337 ms)                          | _PENDING_                     |
-| FCP                                                | _PENDING_                                            | _PENDING_                     |
-| LCP (TTFB / load delay / load time / render delay) | _PENDING_ (baseline 1,729 ms, render delay 1,392 ms) | _PENDING_                     |
-| CLS                                                | _PENDING_                                            | _PENDING_                     |
-| Max critical-path latency                          | _PENDING_                                            | _PENDING_                     |
-| Scripts                                            | _PENDING_                                            | _PENDING_                     |
-| Insights                                           | _PENDING_                                            | _PENDING_                     |
-| Type one sentence, main visible                    | _PENDING_                                            | _PENDING_                     |
+| Metric (lab, one trace)            | TS (www.neofox.dev)                                                                                                         | Go (translater-go.vercel.app)                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| TTFB                               | 1,689 ms                                                                                                                    | 8 ms (26 ms on a second reload): not credible, see below                                            |
+| FCP                                | 3,388 ms                                                                                                                    | 1,852 ms (1,772 ms on the second reload)                                                            |
+| LCP (breakdown)                    | 3,388 ms (TTFB 1,689 + render delay 1,698; text, no load delay/time)                                                        | 1,849 ms (TTFB 8 + render delay 1,842; text)                                                        |
+| CLS                                | 0.00                                                                                                                        | 0.00                                                                                                |
+| DOMContentLoaded / load            | 3,376 / 6,908 ms                                                                                                            | 1,890 / 3,658 ms                                                                                    |
+| Render-blocking requests           | flagged, est. saving 0 ms                                                                                                   | `app.css` only (queued 606 ms, done 1,712 ms), est. saving 0 ms                                     |
+| Insights                           | DocumentLatency (est. FCP/LCP saving 1,588 ms), NetworkDependencyTree, ThirdParties, Cache 4.1 kB, LegacyJavaScript 10.4 kB | NetworkDependencyTree, ThirdParties (Vercel insights), Viewport (pre-navigation set, est. INP 0 ms) |
+| Type one sentence, last key → Copy | 4,294 ms (1 billed)                                                                                                         | **2,667 ms** (1 billed)                                                                             |
 
-## Recommendation: **PENDING (controller, after DevTools traces and Task 32)**
+- **Go TTFB in the trace is an emulation artefact.** DevTools' network throttling did not delay the Go document on two cold reloads (8 and 26 ms with 8,353 B transferred over emulated Slow 4G). The harness's proxy-throttled TTFB, 1,772 ms (Pixel), is the number to use. The Go FCP/LCP above is therefore optimistic by roughly that TTFB; corrected, it is about the harness's 2.9 s, still ahead of TS's 3.4 s in this trace and 4.9 s in the harness.
+- **TS:** DevTools' top finding is document latency (est. 1.6 s saving), the Cloudflare hop described under "Where the live difference comes from". It also flags 10.4 kB of legacy JavaScript (polyfills/transforms) and short cache lifetimes on 4.1 kB.
+- **Go:** the only render-blocking resource is the stylesheet, and DevTools estimates no saving from changing it. It raises no LegacyJavaScript or Cache findings: hashed assets are `immutable` for a year.
+- **Typing:** the same 50-character sentence (ending in `?`, so the 400 ms debounce applies) typed on the settled page under the same emulation. Copy (main string complete) enabled 4.3 s after the last key on TS and 2.7 s on Go, consistent with the harness's live Pixel medians (4,031 / 2,251 ms).
+- Billed: 2 translations (1 per app).
+
+## Recommendation
+
+**Replace the TS app with the Go app**, once the Task 32 parity sign-off passes.
+
+Speed to the main translation is the first priority, and Go leads on every measure of it in production:
+
+- **The translation itself:** from the last key, the first main character arrives 1.4-2.1 s earlier and Copy enables 1.4-2.1 s earlier. The p90 is 2.0-2.5 s against TS's 4.4-9.3 s.
+- **Page load:** FCP is 2.9 vs 6.1 s on iPhone and 2.9 vs 4.9 s on Pixel, with p90s of about 3.0 s against 9.6 and 15.3 s.
+- **Typing during load:** Go keeps and translates what is typed from first paint; TS wipes every cold burst and often bills its tail as an extra request.
+- **Locally (fake upstream, same hosting for both),** where hosting differences vanish, the apps are equal on translation latency and Go still wins on typing during load.
+- **Client:** Go ships 6.7x less JavaScript (42.8 vs 285.3 KiB gzip), so slow devices and links pay less. CSS is the same size (shared stylesheet).
+- **Billed requests:** 90 vs 102-104 per 30 interaction runs. Go sent no superseded requests in these scenarios.
+
+Maintainability is a closer call. Go has more hand-written code for the same UI (8,747 vs 11,258 lines in total, but 8,723 vs 7,760 without the shared stylesheet). Behaviours React libraries provided are ported by hand: listbox, floating panels, streaming JSON, learning ranges. In exchange the client is plain modules over server-rendered HTML with no build step beyond templ and Tailwind; the prompt contract is shared byte-for-byte and its golden tests now also check schema key order; and the Go server has no framework runtime to upgrade.
 
 Caveats to weigh:
 
-- The Go runtime is Beta on Vercel.
-- Go's Vercel function cannot cancel superseded requests, so every superseded run bills its full output (none occurred in these scenarios; TS paid for 14 fragments instead).
-- The Go function runs in `iad1`, TS in `icn1` (left as deployed); the live translation timings include that.
-- The live page-load advantage is partly hosting: TS sits behind Cloudflare with an extra TLS hop.
-- Parity exceptions from Task 32's sign-off.
-- The Safari modulepreload recovery note (Task 17 checkpoint).
-- The shared TS behaviours kept in both apps by user decision (Escape clears the source outside open panels; compact synonym focus).
+- **Hosting is part of the live gap.** TS sits behind Cloudflare with an extra TLS hop (TTFB 1.0-2.1 s by curl against 0.23-0.25 s for Go). Moving TS off Cloudflare would narrow the page-load gap, but not the early-typing loss or the bundle size. The translation gap is mostly not hosting: with identical upstream timing (fake), the apps tie.
+- **Regions:** Go runs in `iad1`, TS in `icn1` (left as deployed). Go wins live even so; pinning Go next to the OpenAI region actually used is worth a follow-up measurement, not a blocker.
+- **Cancellation:** on Vercel, Go cannot abort a superseded run at OpenAI, so each superseded run bills its full output. None occurred in these scenarios, while TS paid for 14 fragments. Real mid-stream edits would cost Go more per edit.
+- **Platform maturity:** the Go runtime is Beta on Vercel. Streaming was verified on the platform this time (`NT_SPIKE` probe, event spacing preserved).
+- **The fake runs could not catch the schema-order bug** (`56fd91b`); only the live run did. The byte-order test now guards that cause. A periodic billed live check is still worth keeping: `go run ./cmd/smoke` prints the time to the first main delta, which is how this bug shows (5.7 s before the fix, 2.7 s after).
+- **Accepted differences:** parity exceptions from Task 32's sign-off; the Safari modulepreload recovery note (Task 17 checkpoint); and the TS behaviours kept in both apps by user decision (Escape clears the source outside open panels; compact synonym focus).
 
 ## Full tables: live runs
 
