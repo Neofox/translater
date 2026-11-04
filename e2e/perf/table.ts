@@ -86,6 +86,9 @@ export type TypeableRun = {
    * counted (the burst's, or the retype's including the penalty). */
   navToFirstChar: number | null
   upstreamRequests: number | null
+  /** Translation requests the page sent in this scenario (browser side;
+   * the billed count in --live). Absent in files measured before it existed. */
+  translationRequests?: number | null
 }
 
 export type KeyboardRun = {
@@ -111,6 +114,8 @@ export type InteractRun = {
   keyToCopy: number | null
   keyToDone: number | null
   upstreamRequests: number | null
+  /** Translation requests the page sent for the settled-page translation. */
+  translationRequests?: number | null
   /** All JS the page loaded from navigation through the settled translation's
    * "done" (external bodies + the document's inline scripts). */
   /** Diagnostic: last key to the main Listen button enabling, if the app has
@@ -226,7 +231,7 @@ export function summarize(values: number[]): Summary {
 
 // ----- metrics -------------------------------------------------------------------
 
-type Unit = 'ms' | 'bytes' | 'score' | 'px' | 'flag'
+type Unit = 'ms' | 'bytes' | 'score' | 'px' | 'flag' | 'count'
 type Value = number | boolean | null
 
 type Metric<TRun> = {
@@ -388,11 +393,17 @@ const gateMetrics = (which: 'cold' | 'repeat'): Metric<Paired>[] => {
     {
       label: `Wiped and the remainder translated (extra upstream request)${s}`,
       unit: 'flag',
-      get: (r) =>
-        r.interact[which].upstreamRequests === null
-          ? null
-          : r.interact[which].dropped === 'wiped' &&
-            r.interact[which].upstreamRequests > 1,
+      get: (r) => {
+        const t = r.interact[which]
+        // Upstream count in --fake; the page's own count in --live.
+        const n = t.upstreamRequests ?? t.translationRequests ?? null
+        return n === null ? null : t.dropped === 'wiped' && n > 1
+      },
+    },
+    {
+      label: `Translation requests sent by the page${s}`,
+      unit: 'count',
+      get: (r) => r.interact[which].translationRequests ?? null,
     },
     {
       label: `First focus (burst first keystroke)${s}`,
@@ -563,6 +574,11 @@ const SECTIONS: Section[] = [
           get: (r) => r.keyToDone,
         },
         {
+          label: 'Translation requests sent by the page',
+          unit: 'count',
+          get: (r) => r.translationRequests ?? null,
+        },
+        {
           label: 'Request end minus last DOM change (> 0: response held open)',
           unit: 'ms',
           get: (r) => r.streamEndMinusLastDom,
@@ -639,6 +655,8 @@ function format(value: number | null, unit: Unit): string {
       return value.toFixed(3)
     case 'flag':
       return String(value)
+    case 'count':
+      return String(Math.round(value))
     case 'bytes':
       return value >= 10_000
         ? `${(value / 1024).toFixed(1)} KiB`

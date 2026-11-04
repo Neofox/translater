@@ -57,6 +57,7 @@ import {
 } from './page-scripts'
 import type { PageGlobals, Selectors } from './page-scripts'
 import { PROFILES, bytesPerSecond, profileDescription } from './profiles'
+import { isTranslationRequest } from './requests'
 import type { Profile } from './profiles'
 import { markdownTables } from './table'
 import type {
@@ -785,6 +786,23 @@ function trackRequests(page: Page): void {
   })
 }
 
+const translationCounts = new WeakMap<Page, { sent: number }>()
+
+function countTranslations(page: Page, origin: string): void {
+  const count = { sent: 0 }
+  translationCounts.set(page, count)
+  page.on('request', (r) => {
+    if (isTranslationRequest(r.method(), r.url(), origin, r.postData()))
+      count.sent++
+  })
+}
+
+function translationsSent(page: Page): number {
+  const count = translationCounts.get(page)
+  if (!count) throw new Error('countTranslations(page) first')
+  return count.sent
+}
+
 type Done = {
   /** Page time (performance.now()) of done. */
   done: number
@@ -895,6 +913,7 @@ async function typeAtFirstFocus(
   fake: Fake | null,
 ): Promise<TypeableRun> {
   const before = fake ? await fake.requests() : null
+  const sentBefore = translationsSent(page)
   await page.goto(url, { waitUntil: 'commit', timeout: 120_000 })
   const deadline = Date.now() + 120_000
   while (!(await page.evaluate(focusSource, S.source).catch(() => false))) {
@@ -929,6 +948,7 @@ async function typeAtFirstFocus(
     firstTypeable: null,
     navToFirstChar: null,
     upstreamRequests: null,
+    translationRequests: null,
   }
   let counted = burst
   if (!acted) {
@@ -956,6 +976,7 @@ async function typeAtFirstFocus(
     keystroke === null ? null : Math.max(fcp ?? 0, keystroke)
   result.navToFirstChar = counted?.first ?? null
   result.upstreamRequests = fake ? (await fake.requests()) - before! : null
+  result.translationRequests = translationsSent(page) - sentBefore
   return result
 }
 
@@ -965,6 +986,7 @@ async function settledTranslation(page: Page, fake: Fake | null) {
   await clearSource(page)
   const text = translationText()
   const before = fake ? await fake.requests() : null
+  const sentBefore = translationsSent(page)
   await page.evaluate(() => (window as unknown as PageGlobals).__trStart())
   const source = page.locator(S.source)
   await source.fill(text.slice(0, -TYPED_TAIL))
@@ -998,6 +1020,7 @@ async function settledTranslation(page: Page, fake: Fake | null) {
       done.lastDom === null ? null : done.streamEnd - done.lastDom,
     keyToListen: since(tr.listen),
     upstreamRequests,
+    translationRequests: translationsSent(page) - sentBefore,
   }
 }
 
@@ -1164,6 +1187,7 @@ async function interactRun(
     if (profile.keyboard) await page.addInitScript(installFakeVisualViewport)
     const collect = collector(page)
     trackRequests(page)
+    countTranslations(page, new URL(url).origin)
     const cold = await typeAtFirstFocus(page, url, fake)
     const translation = await settledTranslation(page, fake)
     const js = await jsThroughDone(collect.take().responses)
