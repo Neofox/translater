@@ -384,7 +384,115 @@ export const STATES: VisualState[] = [
       await restMouse(page)
     },
   },
+  {
+    // A finished result while a software keyboard (simulated visual
+    // viewport) covers half the phone: result first, focused editor and
+    // its actions above the keyboard.
+    name: 'layout-keyboard',
+    projects: /^(chromium|webkit)-(iphone-)?portrait$/,
+    async setup(page) {
+      await page.addInitScript(installFakeVisualViewport)
+      await openApp(page)
+      await fillSource(page, visualText('visual'))
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+      await page.evaluate(async () => {
+        document
+          .querySelector<HTMLTextAreaElement>('[data-testid="input-textarea"]')!
+          .focus()
+        ;(window as unknown as PageGlobals).__keyboard!.set(
+          Math.floor(innerHeight / 2),
+          0,
+        )
+        await new Promise(requestAnimationFrame)
+      })
+      await expect(page.locator('.app-shell')).toHaveAttribute(
+        'data-keyboard',
+        'true',
+      )
+    },
+  },
+  {
+    // Split panes with a long turn, wrapped over several lines but under
+    // the long-form limit (past it the alternatives go, and Go keeps that
+    // empty section mounted under a CSS rule, which the DOM snapshot
+    // reports): the source actions and Copy/Listen share the bottom dock.
+    name: 'layout-split-long',
+    projects: /-landscape$/,
+    async setup(page) {
+      await openApp(page)
+      await fillSource(
+        page,
+        `[fx:visual] Thanks again for helping me settle into Seoul, I still get nervous when conversations move quickly, so would you like to grab coffee and take a walk with me this weekend?`,
+      )
+      await waitForDone(page)
+      await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+      await expect(page.locator('.app-shell')).toHaveAttribute(
+        'data-layout',
+        'split',
+      )
+    },
+  },
+  {
+    // Laptop posture (Chromium's CDP posture and display-feature emulation,
+    // a horizontal fold across the middle of the project's viewport):
+    // result above the fold, editor below it.
+    name: 'layout-fold-laptop',
+    projects: /^chromium-(.+-)?portrait$/,
+    async setup(page) {
+      await fold(page, 'horizontal')
+      await expect(page.locator('.app-shell')).toHaveAttribute(
+        'data-layout',
+        'laptop',
+      )
+    },
+  },
+  {
+    // Book posture: a vertical fold, source and result on their own
+    // segments.
+    name: 'layout-fold-book',
+    projects: /^chromium-(.+-)?landscape$/,
+    async setup(page) {
+      await fold(page, 'vertical')
+      await expect(page.locator('.app-shell')).toHaveAttribute(
+        'data-layout',
+        'book',
+      )
+    },
+  },
 ]
+
+const HINGE = 20
+
+/** The visual fixture's result on a folded device: the posture override
+ * and a display feature splitting the viewport in two equal segments. */
+async function fold(
+  page: Page,
+  orientation: 'vertical' | 'horizontal',
+): Promise<void> {
+  await openApp(page)
+  await fillSource(page, visualText('visual'))
+  await waitForDone(page)
+  await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+  const { width, height } = page.viewportSize()!
+  const extent = orientation === 'vertical' ? width : height
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setDevicePostureOverride', {
+    posture: { type: 'folded' },
+  })
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width,
+    height,
+    deviceScaleFactor: 1,
+    mobile: false,
+    displayFeature: {
+      orientation,
+      offset: Math.floor((extent - HINGE) / 2),
+      maskLength: HINGE,
+    },
+  })
+  await page.mouse.move(0, 0)
+}
 
 /** The pointer leaves the control it last clicked, so no hover shows. */
 async function restMouse(page: Page): Promise<void> {

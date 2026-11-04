@@ -255,10 +255,12 @@ export function initComposer(app, ta) {
   }
   if (typeof ResizeObserver !== 'undefined' && ta.parentElement) {
     let width = ta.parentElement.clientWidth
+    let frame = 0
     new ResizeObserver(([entry]) => {
       if (entry && entry.contentRect.width !== width) {
         width = entry.contentRect.width
-        requestAnimationFrame(resize)
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(resize)
       }
     }).observe(ta.parentElement)
   }

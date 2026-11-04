@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { COMPACT_LAYOUT, decideLayout, initLayout, initialLayoutState } from './layout.js'
+import { COMPACT_LAYOUT, decideLayout, initFold, initLayout, initialLayoutState } from './layout.js'
 
 // Minimal DOM for initLayout: the panels' height follows the shell's
 // --app-height (minus a 64 px header), as base.css lays it out. (Tailwind
@@ -13,6 +13,7 @@ class FakeElement {
     this.style = {
       setProperty: (k, v) => this.props.set(k, v),
       getPropertyValue: (k) => this.props.get(k) ?? '',
+      removeProperty: (k) => this.props.delete(k),
     }
   }
   setAttribute(k, v) { this.attrs.set(k, v) }
@@ -37,6 +38,7 @@ test('measure writes --app-height before reading the panels height (useWorkspace
       innerWidth: 594, innerHeight: 736, visualViewport: viewport,
       matchMedia: () => ({ matches: false, addEventListener() {} }),
       addEventListener() {},
+      removeEventListener() {},
     }
     globalThis.document = Object.assign(new EventTarget(), { activeElement: null, body: {} })
     globalThis.HTMLElement = FakeElement
@@ -173,4 +175,70 @@ test('an unchanged layout keeps its identity', () => {
   const sim = simulate({ width: 1512, innerWidth: 1512, innerHeight: 982, visible: 982 })
   const before = sim.get().layout
   assert.equal(sim.step({ visible: 981 }).layout, before)
+})
+
+// useFoldLayout.test.tsx: in laptop posture the panels' top (below the
+// header) is written as --panels-top and tracked through resizes.
+function foldEnv() {
+  const env = { folded: true, top: 58, onChange: () => {}, onResize: () => {}, observed: [], windowListeners: new Map() }
+  const saved = ['window', 'ResizeObserver'].map((k) => [k, globalThis[k]])
+  globalThis.window = {
+    scrollY: 0,
+    addEventListener: (type, fn) => env.windowListeners.set(type, fn),
+    removeEventListener: (type, fn) => env.windowListeners.get(type) === fn && env.windowListeners.delete(type),
+  }
+  globalThis.ResizeObserver = class {
+    constructor(fn) { env.onResize = fn }
+    observe(el) { env.observed.push(el) }
+    disconnect() { env.observed = [] }
+  }
+  const media = {
+    get matches() { return env.folded },
+    addEventListener: (_, fn) => { env.onChange = fn },
+  }
+  const header = new FakeElement()
+  const shell = new FakeElement()
+  shell.querySelector = (selector) => (selector === 'header' ? header : null)
+  const panels = new FakeElement()
+  panels.closest = () => shell
+  panels.getBoundingClientRect = () => ({ top: env.top })
+  env.restore = () => { for (const [k, v] of saved) globalThis[k] = v }
+  return { env, media, panels, header }
+}
+
+test('accounts for the header above a horizontal fold and tracks layout changes', () => {
+  const { env, media, panels, header } = foldEnv()
+  try {
+    initFold(panels, media)
+    const top = () => panels.style.getPropertyValue('--panels-top')
+    assert.equal(top(), '58px')
+    assert.deepEqual(env.observed, [panels, header])
+    assert.ok(env.windowListeners.has('resize'))
+    env.top = 76
+    env.onResize()
+    assert.equal(top(), '76px')
+    env.folded = false
+    env.onChange()
+    assert.equal(top(), '')
+    assert.equal(env.observed.length, 0)
+    assert.ok(!env.windowListeners.has('resize'))
+    env.folded = true
+    env.top = 50
+    env.onChange()
+    assert.equal(top(), '50px')
+  } finally {
+    env.restore()
+  }
+})
+
+test('leaves the normal responsive layout alone when fold features are unavailable', () => {
+  const { env, media, panels } = foldEnv()
+  try {
+    env.folded = false
+    initFold(panels, media)
+    assert.equal(panels.style.getPropertyValue('--panels-top'), '')
+    assert.equal(env.observed.length, 0)
+  } finally {
+    env.restore()
+  }
 })

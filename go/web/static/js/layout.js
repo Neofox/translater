@@ -66,6 +66,33 @@ export function decideLayout(input, state) {
   return { layout: same ? state.layout : next, natural, appHeight: visible, appTop }
 }
 
+/**
+ * In laptop posture the first panel ends at the physical fold: write the
+ * panels' document top (below the measured header, never an assumed size)
+ * as --panels-top while `laptop` matches (useFoldLayout).
+ */
+export function initFold(panels, laptop) {
+  let observer
+  const measure = () =>
+    panels.style.setProperty('--panels-top', `${panels.getBoundingClientRect().top + window.scrollY}px`)
+  const sync = () => {
+    observer?.disconnect()
+    window.removeEventListener('resize', measure)
+    if (!laptop.matches) {
+      panels.style.removeProperty('--panels-top')
+      return
+    }
+    measure()
+    observer = new ResizeObserver(measure)
+    observer.observe(panels)
+    const header = panels.closest('.app-shell')?.querySelector('header')
+    if (header) observer.observe(header)
+    window.addEventListener('resize', measure)
+  }
+  sync()
+  laptop.addEventListener('change', sync)
+}
+
 const flag = (el, name, on) => (on ? el.setAttribute(name, 'true') : el.removeAttribute(name))
 
 /**
@@ -171,5 +198,6 @@ export function initLayout(panels) {
   book.addEventListener('change', measure)
   laptop.addEventListener('change', measure)
   measure()
+  initFold(panels, laptop)
   return { layout: () => state.layout }
 }
