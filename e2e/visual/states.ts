@@ -427,6 +427,34 @@ export const STATES: VisualState[] = [
     },
   },
   {
+    // A roomy keyboard (400 px left visible, not tight): the header stays
+    // and the editor keeps two lines with its sticky actions.
+    name: 'keyboard-open',
+    projects: /^(chromium|webkit)-(iphone-)?portrait$/,
+    async setup(page) {
+      await keyboardOver(page, () => 400)
+      await expect(page.locator('.app-shell')).not.toHaveAttribute('data-tight')
+    },
+  },
+  {
+    // A tight keyboard under a 47 px top inset: the header hides and the
+    // shell takes the inset as padding.
+    name: 'keyboard-tight',
+    projects: /^(chromium|webkit)-(iphone-)?(portrait|landscape)$/,
+    async setup(page) {
+      await keyboardOver(
+        page,
+        (height) => Math.min(300, Math.floor(height / 2)),
+        47,
+      )
+      await expect(page.locator('.app-shell')).toHaveAttribute(
+        'data-tight',
+        'true',
+      )
+      await expect(page.locator('.app-header')).toBeHidden()
+    },
+  },
+  {
     // Split panes with a long turn, wrapped over several lines but under
     // the long-form limit (past it the alternatives go, and Go keeps that
     // empty section mounted under a CSS rule, which the DOM snapshot
@@ -490,6 +518,10 @@ async function fold(
   await expect(page.getByTestId('alternative-item')).toHaveCount(2)
   const { width, height } = page.viewportSize()!
   const extent = orientation === 'vertical' ? width : height
+  // One session, left attached until the page closes: CDP overrides belong
+  // to their session, and detaching it drops the fold (checked in Task 28).
+  // Playwright's own screenshot also replaces the device metrics, which
+  // drops the display feature: see the Task 28 report.
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Emulation.setDevicePostureOverride', {
     posture: { type: 'folded' },
@@ -506,6 +538,37 @@ async function fold(
     },
   })
   await page.mouse.move(0, 0)
+}
+
+/** The visual fixture's result with the editor focused under a simulated
+ * software keyboard leaving `visible(innerHeight)` px, after an optional
+ * top safe-area inset on the shell. */
+async function keyboardOver(
+  page: Page,
+  visible: (height: number) => number,
+  safeTop = 0,
+): Promise<void> {
+  await page.addInitScript(installFakeVisualViewport)
+  await openApp(page)
+  await fillSource(page, visualText('visual'))
+  await waitForDone(page)
+  await expect(page.getByTestId('alternative-item')).toHaveCount(2)
+  await page.evaluate(
+    async ([top, height]) => {
+      const shell = document.querySelector<HTMLElement>('.app-shell')!
+      if (top) shell.style.setProperty('--safe-area-top', `${top}px`)
+      document
+        .querySelector<HTMLTextAreaElement>('[data-testid="input-textarea"]')!
+        .focus()
+      ;(window as unknown as PageGlobals).__keyboard!.set(height!, 0)
+      await new Promise(requestAnimationFrame)
+    },
+    [safeTop, visible(page.viewportSize()!.height)],
+  )
+  await expect(page.locator('.app-shell')).toHaveAttribute(
+    'data-keyboard',
+    'true',
+  )
 }
 
 /** The pointer leaves the control it last clicked, so no hover shows. */

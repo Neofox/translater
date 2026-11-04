@@ -32,6 +32,9 @@ export type PageGlobals = {
   __trStart: () => void
   __keyboard?: {
     set: (height: number | null, offsetTop: number | null) => void
+    /** Safari pans its visual viewport without resizing it: change only
+     * offsetTop and dispatch `scroll` alone. */
+    pan: (offsetTop: number) => void
   }
 }
 
@@ -160,6 +163,10 @@ export function installFakeVisualViewport(): void {
       height = h
       offsetTop = top
       fake.dispatchEvent(new Event('resize'))
+      fake.dispatchEvent(new Event('scroll'))
+    },
+    pan(top) {
+      offsetTop = top
       fake.dispatchEvent(new Event('scroll'))
     },
   }
