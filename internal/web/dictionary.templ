@@ -13,9 +13,9 @@ import (
 // strings. /translate re-renders WordMeta into #word-meta after every
 // completed posList item and top-level field (ValueEnd), so a section shows
 // once it is complete; while streaming, the first section not ready yet
-// shows its skeleton. Empty comments split text where React renders
-// adjacent text nodes, as React's own server markup does: text runs shape
-// (and the DOM snapshot reads) per node.
+// shows its skeleton. Empty comments keep "2.", "(noun)" and the character
+// line as separate text nodes: text runs shape per node, and merged runs
+// move glyphs by subpixels (the visual baselines show it).
 
 // SenseView is one posList[i].senses item.
 type SenseView struct {
