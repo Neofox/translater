@@ -2,12 +2,12 @@ name: Translation quality eval
 
 # Billed: about $1 per run (production model only). Runs when the model-facing
 # request or the eval changes, or on demand from the Actions tab. The request
-# body comes from the Go app (go/cmd/request), which the eval provider builds.
+# body comes from the Go app (cmd/request), which the eval provider builds.
 on:
   pull_request:
     paths:
-      - go/internal/prompt/**
-      - go/cmd/request/**
+      - internal/prompt/**
+      - cmd/request/**
       - shared/translation/**
       - evals/**
       - .github/workflows/translation-eval.yml
@@ -22,7 +22,7 @@ permissions:
   pull-requests: write
 
 env:
-  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}/go
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
 
 jobs:
   eval:
@@ -35,11 +35,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Go builds go/cmd/request (the production request body); mise reads
-      # the toolchain pinned in go/mise.toml.
+      # Go builds cmd/request (the production request body); mise reads
+      # the toolchain pinned in mise.toml.
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
-          working_directory: go
           cache: true
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -47,7 +46,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go/go.sum') }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: go-${{ runner.os }}-
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -62,7 +61,7 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .promptfoo-cache
-          key: promptfoo-${{ hashFiles('go/internal/prompt/**', 'shared/translation/**', 'evals/**') }}
+          key: promptfoo-${{ hashFiles('internal/prompt/**', 'shared/translation/**', 'evals/**') }}
           restore-keys: promptfoo-
 
       - uses: promptfoo/promptfoo-action@04839e664f52212b877170219dab0d7ad2bf6440 # promptfoo-action-v1.3.4

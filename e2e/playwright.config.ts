@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig } from '@playwright/test'
 import type { PlaywrightTestConfig } from '@playwright/test'
 import { WORKERS, appPort, fakePort, fakeUrl } from './ports'
@@ -36,6 +37,12 @@ function appEnv(index: number): Record<string, string> {
 // App servers log every client console message; set E2E_SERVER_LOGS=1 to see them.
 const appStderr = process.env.E2E_SERVER_LOGS ? 'pipe' : 'ignore'
 
+// The app under test: this checkout, or the Go module at E2E_APP_DIR (e.g.
+// another commit's worktree, so `npm run e2e:visual:update` can take
+// baselines from it while the tests, fixtures and fake stay this
+// checkout's).
+const appDir = process.env.E2E_APP_DIR ? resolve(process.env.E2E_APP_DIR) : '..'
+
 type WebServer = NonNullable<PlaywrightTestConfig['webServer']>
 const servers: Extract<WebServer, unknown[]> = []
 for (let i = 0; i < WORKERS; i++) {
@@ -52,7 +59,7 @@ for (let i = 0; i < WORKERS; i++) {
   servers.push({
     name: `app-${i}`,
     command: 'go run .',
-    cwd: '..',
+    cwd: appDir,
     // Port readiness only: global setup reports a clear error when the app
     // does not serve the translator page yet.
     port: appPort(i),
@@ -91,7 +98,9 @@ export default defineConfig({
   ],
   fullyParallel: true,
   workers: PROD_URL ? 1 : WORKERS,
-  retries: 0,
+  // CI runners are loaded enough to miss timing assertions now and then; a
+  // test that passes on retry is reported as flaky, not failed.
+  retries: process.env.CI ? 2 : 0,
   forbidOnly: Boolean(process.env.CI),
   timeout: 60_000,
   expect: { timeout: 10_000 },

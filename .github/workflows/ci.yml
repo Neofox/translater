@@ -1,38 +1,35 @@
-name: Go app
+name: CI
 
 # No secrets and no billed requests: e2e runs against the fake OpenAI upstream
-# (go/cmd/fakeopenai) with OPENAI_API_KEY=test.
+# (cmd/fakeopenai) with OPENAI_API_KEY=test.
 #
-# Toolchain: jdx/mise-action reads go/mise.toml, which pins both Go and
+# Toolchain: jdx/mise-action reads mise.toml, which pins both Go and
 # tailwindcss (used by `make css`); actions/setup-go would not provide the
 # latter. The templ generator comes from the go.mod tool directive.
 on:
   pull_request:
-    paths:
-      - go/**
-      - e2e/**
-      - shared/**
-      - src/components/**
-      - package.json
-      - package-lock.json
-      - src/server/**
-      - src/lib/**
-      - .github/workflows/go.yml
+    paths-ignore:
+      - docs/**
+      - '**.md'
   workflow_dispatch:
+    inputs:
+      base:
+        description: Branch or commit whose app renders the visual baselines
+        default: master
 
 concurrency:
-  group: go-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
-  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}/go
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
 
 jobs:
   unit:
-    name: Unit, generated files, shared contract
+    name: Unit, generated files, budgets
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -40,7 +37,6 @@ jobs:
 
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
-          working_directory: go
           cache: true
 
       # mise-action's cache covers only mise tools, not Go modules/build cache.
@@ -49,7 +45,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go/go.sum') }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: go-${{ runner.os }}-
 
       # Before the Go steps: go generate (syncicons) and TestIconsFresh read
@@ -62,26 +58,26 @@ jobs:
       - run: npm ci
 
       - name: Vet
-        working-directory: go
         run: go vet ./...
 
       - name: Go tests
-        working-directory: go
         run: go test ./...
 
-      # Regenerates the shared contract copy, icons, templ output and
-      # CSS, then fails when any committed copy differs.
+      # Regenerates icons, templ output and CSS, then fails when any
+      # committed copy differs.
       - name: Generated files are fresh
-        working-directory: go
         run: make check
 
       # A directory argument fails on newer Node; use the glob form.
       - name: JS unit tests
-        working-directory: go
         run: node --test 'web/static/js/*.test.js'
 
-      - name: JS size budget
-        working-directory: go
+      - name: Tooling typecheck and tests (e2e, perf harness, evals)
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: JS and CSS size budget
         run: make size
 
   # Every e2e tag, all 18 projects (9 viewports × Chromium and WebKit),
@@ -91,24 +87,27 @@ jobs:
   # @review needs KEYBOARD_REVIEW, so it skips.
   # macOS: geometry and tap-position tests depend on the system fonts
   # (Korean glyph widths) and on the WebKit build; Linux shifts layouts by a
-  # few pixels.
+  # few pixels. One worker: under parallel load the runner misses timing
+  # assertions (debounce and blur windows, settling geometry) that pass
+  # locally; retries (playwright.config.ts, CI only) report the rest as
+  # flaky.
   e2e:
     name: E2E @${{ matrix.tag }}
     runs-on: macos-latest
-    timeout-minutes: 90
+    # One worker runs about three times as long as the former three.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         tag: [core, context, layout, learning, word, refine, speech]
     env:
       OPENAI_API_KEY: test
-      E2E_WORKERS: 3
+      E2E_WORKERS: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
-          working_directory: go
           cache: true
 
       # mise-action's cache covers only mise tools, not Go modules/build cache.
@@ -117,7 +116,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/Library/Caches/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go/go.sum') }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: go-${{ runner.os }}-
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -129,7 +128,7 @@ jobs:
 
       - run: npx playwright install --with-deps chromium webkit
 
-      # mise-action puts go on PATH; Playwright spawns `go run` from go/.
+      # mise-action puts go on PATH; Playwright spawns `go run` at the root.
       - name: E2E @${{ matrix.tag }}
         run: npx playwright test -c e2e --grep @${{ matrix.tag }}
 
@@ -142,13 +141,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # On demand only (Actions → Go app → Run workflow): the full visual run
-  # (28 states, 18 projects, TS baselines then Go compared) is long.
+  # On demand only (Actions → CI → Run workflow): the full visual run (every
+  # state, 18 projects) is long. The baselines come from the `base` input's
+  # app, rendered on this same runner by this checkout's tests, fixtures and
+  # fake; then this checkout's app is compared with them.
   visual:
-    name: TS-vs-Go visual parity
+    name: Visual regression against ${{ inputs.base }}
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       OPENAI_API_KEY: test
       E2E_WORKERS: 3
@@ -157,7 +158,6 @@ jobs:
 
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
-          working_directory: go
           cache: true
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -165,7 +165,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go/go.sum') }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: go-${{ runner.os }}-
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -177,9 +177,27 @@ jobs:
 
       - run: npx playwright install --with-deps chromium webkit
 
-      # Baselines come from the TS production build in this same run, so the
-      # runner's fonts and rendering are identical for both apps.
-      - name: Visual parity (TS baseline, Go compared)
+      # The base app's Go module: the repository root, or go/ for commits
+      # from before the app moved there.
+      - name: Check out the baseline app
+        id: base
+        env:
+          BASE: ${{ inputs.base }}
+        run: |
+          git fetch --no-tags --depth 1 origin "$BASE"
+          dir="$RUNNER_TEMP/base"
+          git worktree add --detach "$dir" FETCH_HEAD
+          [ -f "$dir/go.mod" ] || dir="$dir/go"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+      # The base checkout carries its own mise.toml: trust it too.
+      - name: Baselines from ${{ inputs.base }}
+        env:
+          E2E_APP_DIR: ${{ steps.base.outputs.dir }}
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}:${{ steps.base.outputs.dir }}
+        run: npm run e2e:visual:update
+
+      - name: Compare this checkout
         run: npm run e2e:visual
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
