@@ -40,7 +40,7 @@ templ refineRow(v View) {
 				@icons.Icon("plus", 16, nil)
 			}
 			<div class="refine-custom-editor" hidden>
-				<input hidden value="" maxlength="200" disabled placeholder={ v.T("refinePlaceholder") } aria-label={ v.T("refinePlaceholder") } data-t-attr="placeholder:refinePlaceholder aria-label:refinePlaceholder" data-testid="refine-freeform" class="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"/>
+				<input hidden maxlength="200" disabled placeholder={ v.T("refinePlaceholder") } aria-label={ v.T("refinePlaceholder") } data-t-attr="placeholder:refinePlaceholder aria-label:refinePlaceholder" data-testid="refine-freeform" class="refine-freeform min-w-32 flex-1 bg-transparent px-2 py-1 text-xs text-ink placeholder:text-ink-dim focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"/>
 				@ui.Pill(ui.PillProps{Tone: "accent", Attrs: templ.Attributes{"data-testid": "refine-apply", "disabled": true, "data-t": "refineApply"}}) {
 					{ v.T("refineApply") }
 				}

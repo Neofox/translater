@@ -147,12 +147,10 @@ export function initRefine(app, form, restore, relabel) {
     editor.hidden = input.hidden = Boolean(custom) || !customOpen
     input.disabled = !ok || cap
     apply.disabled = !ok || cap || !input.value.trim()
-    // React reflects a controlled input's value into its attribute.
-    if (input.getAttribute('value') !== input.value) input.setAttribute('value', input.value)
-    // React's text nodes: label, ": ", message.
-    const message = error === null ? [] : [app.t('refineFailed'), ': ', error]
     notice.hidden = error === null
-    notice.replaceChildren(...message)
+    // Separate text nodes (label, ": ", message): one node would move glyphs
+    // by subpixels (the visual baselines show it).
+    notice.replaceChildren(...(error === null ? [] : [app.t('refineFailed'), ': ', error]))
     adjust.sync({ summary: summary(r, app.t), error, refinements: r, intent: live?.intent, hasError: row.hidden })
   }
 

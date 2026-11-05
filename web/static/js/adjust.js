@@ -81,7 +81,8 @@ export function initAdjust(app, ta, relabel) {
     chevron.toggleAttribute('hidden', iconOnly)
     chevron.classList.toggle('rotate-180', open)
     text.style.display = iconOnly ? 'none' : ''
-    // React's text nodes: the label, then " · summary".
+    // Separate text nodes, the label then " · summary": one node would move
+    // glyphs by subpixels (the visual baselines show it).
     if (text.textContent !== name) text.replaceChildren(app.t('adjust'), ...(summary ? [` · ${summary}`] : []))
     flag(content, 'data-overlay', floating)
     flag(content, 'data-open', showing)
