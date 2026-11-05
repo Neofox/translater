@@ -8,7 +8,8 @@ prompts:
 
 # Each provider is one variant. Only model, reasoning effort and service tier
 # (Fast costs 2x Standard) differ; prompts, schema and OpenAI options come from
-# src/server/translationRequest.ts. Calls go directly to OpenAI.
+# the Go app (go/cmd/request builds the production body). Calls go directly
+# to OpenAI.
 providers:
   # Production before the OpenAI switch (via Gateway, Standard tier).
   - id: file://translationProvider.ts

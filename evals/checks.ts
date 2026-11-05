@@ -1,9 +1,6 @@
-import {
-  isCharacterOrigin,
-  prepareLearningResult,
-} from '../src/lib/learningRanges.ts'
-import { learningSide } from '../src/lib/learningSide.ts'
-import { SentenceResult, WordResult } from '../src/server/schemas.ts'
+import { prepareLearning } from './goRequest.ts'
+import { isCharacterOrigin, learningSide, validateResult } from './results.ts'
+import type { SentenceResult, WordResult } from './results.ts'
 
 export type Vars = {
   text: string
@@ -48,11 +45,12 @@ export default function checks(
   } catch {
     return { pass: false, score: 0, reason: 'output is not JSON' }
   }
-  const schema = vars.intent === 'word' ? WordResult : SentenceResult
-  const parsed = schema.safeParse(value)
-  if (!parsed.success)
+  let result: SentenceResult | WordResult
+  try {
+    result = validateResult(vars.intent, value)
+  } catch {
     return { pass: false, score: 0, reason: 'schema validation failed' }
-  const result = parsed.data
+  }
 
   const expectedSource =
     vars.expectSource ?? (vars.source === 'auto' ? undefined : vars.source)
@@ -103,21 +101,22 @@ export default function checks(
     const side = learningSide(result.sourceLang, result.targetLang, uiLang)
     const learningText = side === 'source' ? source : result.main
     const counterpart = side === 'source' ? result.main : source
-    const prepared = prepareLearningResult(
+    // The app's own resolution (go/internal/learning.Prepare).
+    const prepared = prepareLearning({
       counterpart,
-      learningText,
-      result.learningPhrases,
+      primary: learningText,
+      phrases: result.learningPhrases,
+    })
+    check(prepared.ok, `learningPhrases do not quote the ${side} text`)
+    check(
+      prepared.ok && !prepared.partial,
+      'learningPhrases leave text uncovered',
     )
-    check(Boolean(prepared), `learningPhrases do not quote the ${side} text`)
-    check(prepared?.partial === false, 'learningPhrases leave text uncovered')
     const quoted = result.learningPhrases.reduce(
       (sum, p) => sum + p.grammarHighlights.length,
       0,
     )
-    const resolved = (prepared?.chunks ?? []).reduce(
-      (sum, c) => sum + (c.grammarHighlights?.length ?? 0),
-      0,
-    )
+    const resolved = prepared.grammarHighlights
     const notes = result.learningPhrases.flatMap((p) =>
       p.characters.map((note) => ({ note, text: p.text })),
     )

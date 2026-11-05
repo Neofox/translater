@@ -5,9 +5,11 @@ import {
 } from '../src/server/prompts.ts'
 import type { SentenceSystemContext } from '../src/server/prompts.ts'
 
-// Candidate sentence instructions for A/B evals. Same few-shots, live blocks,
-// schema and request options as production; only the system text differs.
-// The wording lives in shared/translation/prompts/variants/*.mustache.
+// The TS app's view of the eval prompt variants, for its fixture capture and
+// tests only (the evals build requests with go/cmd/request). Same few-shots,
+// live blocks, schema and request options as production; only the system
+// text differs. The wording lives in
+// shared/translation/prompts/variants/*.mustache.
 
 function lean(ctx: SentenceSystemContext, characters: boolean): string {
   return renderPrompt('variants/lean', {
