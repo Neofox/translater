@@ -185,8 +185,8 @@ func posTabClass(active bool) string {
 	return posTabOff
 }
 
-// variantAttrs mark a variant's blocks (data-pos, a Go-only hook ignored by
-// e2e/visual/dom.ts); inactive ones start hidden.
+// variantAttrs mark a variant's blocks (data-pos, dictionary.js's hook);
+// inactive ones start hidden.
 func variantAttrs(i int) templ.Attributes {
 	a := templ.Attributes{"data-pos": strconv.Itoa(i)}
 	if i != 0 {

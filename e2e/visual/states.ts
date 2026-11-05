@@ -96,7 +96,7 @@ export const STATES: VisualState[] = [
   },
   {
     // Settings popover open (bottom-end below its trigger) with focus on the
-    // dialog itself, as Floating UI leaves it. No request.
+    // dialog itself, as settings.js leaves it. No request.
     name: 'settings-open',
     async setup(page, fake) {
       await openApp(page)
