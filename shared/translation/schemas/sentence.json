@@ -174,7 +174,7 @@
         ],
         "additionalProperties": false
       },
-      "description": "0-6 alternative phrasings. Leave empty if the source is unambiguous."
+      "description": "2-4 alternative phrasings (2-6 when polishing), even for a short or unambiguous source. Empty only for long input: multiple lines, three or more sentences, or a paragraph."
     },
     "formalityNote": {
       "type": "string",
