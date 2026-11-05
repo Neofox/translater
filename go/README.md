@@ -64,12 +64,17 @@ error bodies) is logged or traced.
 
 Project `translater-go` (`prj_3IE6TKizvmwJgFxixcTJuWiMi4C6`, team
 `team_i7CNkt1Y5v3ESWvNols5IEhP`): Go framework preset (`vercel.json`), root
-directory `go/`. Generated files are committed, so the build is a plain
-`go build`; every asset is embedded in the binary.
+directory `go/`, function region `icn1` (Seoul). Generated files are
+committed, so the build is a plain `go build`; every asset is embedded in the
+binary. Domains: `www.neofox.dev` (`neofox.dev` redirects to it) and
+`translate.jers.dev`.
+
+The project is connected to `Neofox/translater`: a push to `master` deploys
+production and every other branch gets a preview. A manual deploy runs from
+the repository root (the project's root directory setting points at `go/`):
 
 ```sh
-cd go
-vercel link --project translater-go          # once; writes go/.vercel (ignored)
+vercel link --project translater-go          # once; writes .vercel (ignored)
 printf %s "$VALUE" | vercel env add NAME production   # per variable above
 vercel env ls production
 vercel deploy --prod
