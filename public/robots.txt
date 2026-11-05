@@ -1,4 +1,0 @@
-# Ask crawlers to stay away. This is honor-system — it keeps the site out of
-# Google/Bing/etc. but does not prevent access. For true privacy, add auth.
-User-agent: *
-Disallow: /

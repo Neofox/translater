@@ -9,8 +9,6 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -58,22 +56,15 @@ func analytics() Analytics {
 	}
 }
 
-// tsAllowlist reads SAFE_TRANSLATION_CONTEXT_KEYS from the TS source.
-func tsAllowlist(t *testing.T) []string {
-	t.Helper()
-	src, err := os.ReadFile("../../../src/server/telemetry.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	block := regexp.MustCompile(`(?s)SAFE_TRANSLATION_CONTEXT_KEYS = \{(.*?)\}`).FindSubmatch(src)
-	if block == nil {
-		t.Fatal("SAFE_TRANSLATION_CONTEXT_KEYS not found")
-	}
-	var keys []string
-	for _, m := range regexp.MustCompile(`(\w+): true`).FindAllSubmatch(block[1], -1) {
-		keys = append(keys, string(m[1]))
-	}
-	return keys
+// safeContextKeys is the runtime-context allowlist: the only metadata keys a
+// translation span may carry (no source text, context, refinements, prompts
+// or outputs). Adding a key is a privacy decision; update this list with it.
+var safeContextKeys = []string{
+	"intent", "mode", "sourceLanguage", "targetLanguage", "uiLanguage",
+	"hasContext", "refinementCount", "requestKind", "inputLengthBucket",
+	"isPolish", "promptVersion", "requestedModel", "reasoningEffort",
+	"serviceTier", "trigger", "analyticsSessionId", "clientRunId",
+	"supersedesRunId", "inputRevision",
 }
 
 func attrMap(s sdktrace.ReadOnlySpan) map[string]string {
@@ -121,11 +112,7 @@ func TestAttributeKeysExactlyAllowlist(t *testing.T) {
 		"langfuse.observation.type", "langfuse.trace.name", "gen_ai.request.model",
 		"gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens",
 	}
-	allow := tsAllowlist(t)
-	if len(allow) != 19 {
-		t.Fatalf("TS allowlist has %d keys, want 19: %v", len(allow), allow)
-	}
-	for _, k := range allow {
+	for _, k := range safeContextKeys {
 		want = append(want, "langfuse.observation.metadata."+k)
 	}
 	got := attrMap(s)
