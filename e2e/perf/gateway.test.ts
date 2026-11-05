@@ -3,7 +3,8 @@
 import { createServer, request } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, Server } from 'node:http'
-import { afterEach, describe, expect, it } from 'vitest'
+import assert from 'node:assert/strict'
+import { afterEach, describe, it } from 'node:test'
 import {
   GATEWAY_IDLE_TIMEOUT_MS,
   createGateway,
@@ -47,11 +48,12 @@ function get(
 
 describe('gateway', () => {
   it('recognises font requests by fetch destination or extension', () => {
-    expect(isFontRequest('/a.css', { 'sec-fetch-dest': 'font' })).toBe(true)
-    expect(isFontRequest('/static/x.woff2?v=1', {})).toBe(true)
-    expect(
+    assert.equal(isFontRequest('/a.css', { 'sec-fetch-dest': 'font' }), true)
+    assert.equal(isFontRequest('/static/x.woff2?v=1', {}), true)
+    assert.equal(
       isFontRequest('/assets/app.js', { 'sec-fetch-dest': 'script' }),
-    ).toBe(false)
+      false,
+    )
   })
 
   it('keeps idle browser connections open for longer than a measurement phase', () => {
@@ -59,9 +61,15 @@ describe('gateway', () => {
     // phases; the throttle proxy relays the close ~RTT/2 late, so WebKit
     // reused the dying connection and lost the request (no retry).
     const gateway = createGateway({ host: '127.0.0.1', port: 9 })
-    expect(GATEWAY_IDLE_TIMEOUT_MS).toBeGreaterThanOrEqual(5 * 60_000)
-    expect(gateway.keepAliveTimeout).toBe(GATEWAY_IDLE_TIMEOUT_MS)
-    expect(gateway.headersTimeout).toBeGreaterThan(gateway.keepAliveTimeout)
+    assert.ok(
+      GATEWAY_IDLE_TIMEOUT_MS >= 5 * 60_000,
+      `GATEWAY_IDLE_TIMEOUT_MS >= 5 * 60_000`,
+    )
+    assert.equal(gateway.keepAliveTimeout, GATEWAY_IDLE_TIMEOUT_MS)
+    assert.ok(
+      gateway.headersTimeout > gateway.keepAliveTimeout,
+      `gateway.headersTimeout > gateway.keepAliveTimeout`,
+    )
   })
 
   it('streams chunks as they come, answers fonts with 404 and propagates aborts', async () => {
@@ -85,7 +93,7 @@ describe('gateway', () => {
     )
 
     const font = await get(port, '/fonts/a.css', { 'sec-fetch-dest': 'font' })
-    expect(font.statusCode).toBe(404)
+    assert.equal(font.statusCode, 404)
     font.resume()
 
     const t0 = performance.now()
@@ -93,9 +101,9 @@ describe('gateway', () => {
     const first = await new Promise<number>((done) =>
       stream.once('data', () => done(performance.now() - t0)),
     )
-    expect(first).toBeLessThan(80)
+    assert.ok(first < 80, `first < 80`)
     stream.destroy()
     await new Promise((done) => setTimeout(done, 200))
-    expect(aborted).toBe(true)
+    assert.equal(aborted, true)
   })
 })

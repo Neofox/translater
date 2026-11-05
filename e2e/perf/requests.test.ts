@@ -1,37 +1,34 @@
-import { describe, expect, it } from 'vitest'
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
 import { isTranslationRequest } from './requests.ts'
 
 const origin = 'https://app.example'
 
 describe('isTranslationRequest', () => {
-  it('counts the TS server function and the Go form post that carry text', () => {
-    const ts =
-      '{"t":{"t":10,"i":0,"p":{"k":["data"],"v":[{"t":10,"i":1,"p":{"k":["text","source"]'
-    expect(
-      isTranslationRequest('POST', `${origin}/_serverFn/d178c6`, origin, ts),
-    ).toBe(true)
-    expect(
+  it('counts the form post that carries text', () => {
+    assert.equal(
       isTranslationRequest(
         'POST',
         `${origin}/translate`,
         origin,
         'run=1&text=Hello&source=auto',
       ),
-    ).toBe(true)
+      true,
+    )
   })
 
-  it('ignores the free warm-up calls, GETs and other origins', () => {
-    expect(
-      isTranslationRequest('POST', `${origin}/_serverFn/c8fd2d`, origin, ''),
-    ).toBe(false)
-    expect(isTranslationRequest('POST', `${origin}/warm`, origin, null)).toBe(
+  it('ignores the free warm-up call, GETs and other origins', () => {
+    assert.equal(
+      isTranslationRequest('POST', `${origin}/warm`, origin, null),
       false,
     )
-    expect(
+    assert.equal(
       isTranslationRequest('GET', `${origin}/translate`, origin, 'text=x'),
-    ).toBe(false)
-    expect(
+      false,
+    )
+    assert.equal(
       isTranslationRequest('POST', 'https://other.example/t', origin, 'text=x'),
-    ).toBe(false)
+      false,
+    )
   })
 })

@@ -1,15 +1,14 @@
 // Measurement harness for the stage 2 go/no-go decision (spec "Measurement
 // protocol"): page load (TTFB, FCP, LCP, TBT, JS/CSS bytes), first typeable,
-// translation latency and keyboard-open layout movement, for the TS app or
-// the Go app, measured identically.
+// translation latency and keyboard-open layout movement.
 //
-//   npx tsx e2e/perf/measure.ts --app ts --fake --runs 10 --out results.json
-//   npx tsx e2e/perf/measure.ts --app ts --live --url https://… \
+//   npx tsx e2e/perf/measure.ts --fake --runs 10 --out results.json
+//   npx tsx e2e/perf/measure.ts --live --url https://… \
 //       --i-understand-this-is-billed --runs 10 --out results.json
 //
-// --fake builds the app's PRODUCTION build and serves it locally against the
-// fake OpenAI server (go/cmd/fakeopenai): TS via e2e/perf/serve-ts.mjs, Go as
-// a `go build` binary. Every translation must reach the fake.
+// --fake builds the app with `go build` and serves it locally against the
+// fake OpenAI server (go/cmd/fakeopenai). Every translation must reach the
+// fake.
 // --live measures a deployed URL; translations are billed, so it refuses to
 // start without the explicit flag.
 //
@@ -24,7 +23,6 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  statSync,
   writeFileSync,
 } from 'node:fs'
 import { request as httpRequest } from 'node:http'
@@ -74,26 +72,23 @@ import type {
 const ROOT = resolve(import.meta.dirname, '../..')
 const GO_DIR = join(ROOT, 'go')
 const BIN_DIR = join(tmpdir(), 'neotranslate-perf')
-// Separate from the e2e suite's ports (ts 3101+, go 5101+, fake 7101+, each
-// plus E2E_PORT_OFFSET) so a
-// running parity suite is never measured or disturbed.
+// Separate from the e2e suite's ports (app 5101+, fake 7101+, each plus
+// E2E_PORT_OFFSET) so a running e2e suite is never measured or disturbed.
 const PORTS = {
   fake: 3951,
   gateway: 3955,
-  ts: 3150,
-  go: 3250,
+  app: 3250,
   proxy: 3960,
 } as const
 /** Nothing listens here: in --fake every non-loopback request (CDN fonts,
- * analytics) is sent to it and fails, identically for both apps. Same-origin
+ * analytics) is sent to it and fails. Same-origin
  * fonts are refused by e2e/perf/gateway.ts. */
 const BLACKHOLE_PROXY = 'http://127.0.0.1:9'
 const FIXTURE = 'stream'
 const S: Selectors = {
   source: '[data-testid="input-textarea"]',
   main: '[data-testid="main-translation"]',
-  // The class, not a test id: the deployed TS app (master) has no
-  // data-testid on its Copy button; both apps render `.copy-button` there.
+  // The class: older deployments had no data-testid on the Copy button.
   copy: '[data-testid="output-toolbar"] .copy-button',
   listen: '[data-testid="output-toolbar"] [data-testid="listen-button"]',
 }
@@ -105,7 +100,7 @@ const TYPE_DELAY_MS = 60
  * request started after the last keystroke has finished (none in flight, at
  * least one finished; tracked by Playwright outside the page), and no DOM
  * change for this long after the latest of those (see waitForDone). DOM quiet
- * alone is not enough: the TS app renders nothing for ~2.5 s while learner
+ * alone is not enough: an app may render nothing for seconds while learner
  * details stream after main. */
 const DONE_QUIET_MS = 500
 /** Keyboard pan margin below the caret line (browser scroll-into-view). */
@@ -115,7 +110,6 @@ const CARET_MARGIN_PX = 16
 
 const { values: args } = parseArgs({
   options: {
-    app: { type: 'string' },
     url: { type: 'string' },
     fake: { type: 'boolean', default: false },
     live: { type: 'boolean', default: false },
@@ -129,16 +123,15 @@ const { values: args } = parseArgs({
 
 function usage(message: string): never {
   console.error(
-    `${message}\n\nusage: npx tsx e2e/perf/measure.ts --app ts|go ` +
+    `${message}\n\nusage: npx tsx e2e/perf/measure.ts ` +
       '(--fake | --live --url <base> --i-understand-this-is-billed) ' +
       '[--runs 10] --out <results.json> [--profiles id,id] [--skip-build]',
   )
   process.exit(2)
 }
 
-const appArg = args.app
-if (appArg !== 'ts' && appArg !== 'go') usage('--app must be ts or go')
-const app: 'ts' | 'go' = appArg
+// Recorded in the results (table.ts still reads the TS-era reports).
+const app = 'go' as const
 if (args.fake === args.live) usage('choose exactly one of --fake or --live')
 const mode = args.fake ? 'fake' : 'live'
 const runs = Number(args.runs)
@@ -277,20 +270,13 @@ function timedGet(
 function assertTranslatorPage(body: string, url: string): void {
   if (!body.includes('data-testid="input-textarea"'))
     throw new Error(
-      `${app} app at ${url} does not serve the translator page ` +
+      `App at ${url} does not serve the translator page ` +
         '(no [data-testid="input-textarea"]); nothing to measure yet.',
     )
 }
 
 function sha256(data: Buffer | string): string {
   return createHash('sha256').update(data).digest('hex')
-}
-
-function filesUnder(dir: string): string[] {
-  return readdirSync(dir, { recursive: true, encoding: 'utf8' })
-    .map((name) => join(dir, name))
-    .filter((path) => statSync(path).isFile())
-    .sort()
 }
 
 // ----- fake mode servers -----------------------------------------------------------
@@ -300,7 +286,6 @@ type AppServer = { url: string; start: () => ReturnType<typeof start> }
 function appEnv(port: number): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    NODE_ENV: 'production',
     PORT: String(port),
     // Same isolation env as e2e/playwright.config.ts: the fake upstream and a
     // dummy key, telemetry off.
@@ -308,7 +293,6 @@ function appEnv(port: number): NodeJS.ProcessEnv {
     OPENAI_API_KEY: 'test',
     LANGFUSE_PUBLIC_KEY: '',
     LANGFUSE_SECRET_KEY: '',
-    AI_GATEWAY_API_KEY: '',
   }
 }
 
@@ -317,7 +301,7 @@ async function prepareFake(): Promise<{
   server: AppServer
   build: NonNullable<PerfFile['meta']['build']>
 }> {
-  for (const port of [PORTS.fake, PORTS[app]])
+  for (const port of [PORTS.fake, PORTS.app])
     if (await portOpen(port))
       throw new Error(
         `port ${port} is already in use; stop that server first (it could hold a real key)`,
@@ -330,45 +314,20 @@ async function prepareFake(): Promise<{
     stdio: 'inherit',
   })
   const skipped = args['skip-build']
-  let server: AppServer
-  let build: NonNullable<PerfFile['meta']['build']>
-  const port = PORTS[app]
+  const port = PORTS.app
   const url = `http://127.0.0.1:${port}`
-  if (app === 'ts') {
-    if (!skipped) {
-      console.log('building the TS app (npm run build)…')
-      execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit' })
-    }
-    const output = join(ROOT, '.vercel/output')
-    const hash = createHash('sha256')
-    for (const path of filesUnder(output))
-      hash.update(relative(output, path)).update(readFileSync(path))
-    build = {
-      skipped,
-      sha256: hash.digest('hex'),
-      assets: readdirSync(join(output, 'static/assets')).sort(),
-    }
-    server = {
-      url,
-      start: () =>
-        start(
-          process.execPath,
-          [join(ROOT, 'e2e/perf/serve-ts.mjs')],
-          appEnv(port),
-          ROOT,
-        ),
-    }
-  } else {
-    const appBin = join(BIN_DIR, 'app-go')
-    if (!skipped) {
-      console.log('building the Go app (go build)…')
-      execFileSync('go', ['build', '-o', appBin, '.'], {
-        cwd: GO_DIR,
-        stdio: 'inherit',
-      })
-    }
-    build = { skipped, sha256: sha256(readFileSync(appBin)), assets: [] }
-    server = { url, start: () => start(appBin, [], appEnv(port), GO_DIR) }
+  const appBin = join(BIN_DIR, 'app-go')
+  if (!skipped) {
+    console.log('building the app (go build)…')
+    execFileSync('go', ['build', '-o', appBin, '.'], {
+      cwd: GO_DIR,
+      stdio: 'inherit',
+    })
+  }
+  const build = { skipped, sha256: sha256(readFileSync(appBin)), assets: [] }
+  const server: AppServer = {
+    url,
+    start: () => start(appBin, [], appEnv(port), GO_DIR),
   }
   const fakeProc = start(
     fakeBin,
@@ -396,7 +355,7 @@ async function serverTtfbFake(server: AppServer, samples: number) {
     const proc = server.start()
     const port = Number(new URL(server.url).port)
     try {
-      await waitForPort(port, proc.child, `${app} app`)
+      await waitForPort(port, proc.child, 'app')
       const cold = await timedGet(`${server.url}/`)
       if (i === 0) assertTranslatorPage(cold.body, server.url)
       const warm = await timedGet(`${server.url}/`)
@@ -1090,8 +1049,8 @@ function snapshot(page: Page, band: { top: number; height: number } | null) {
 /** Overlays-content keyboard (iOS Safari, Android default): the layout
  * viewport keeps its size; the visual viewport shrinks in 50 px steps, 50 ms
  * apart, to half the window, with resize + scroll on every step (the
- * technique of tests/browser/mobile.browser.tsx). The browser's own
- * scroll-to-focused-field is imitated identically for every app: after each
+ * technique of the former browser tests). The browser's own
+ * scroll-to-focused-field is imitated: after each
  * step, if the caret line is not inside the visible band, the visual
  * viewport pans (offsetTop) so it is, with a 16 px margin:
  * offsetTop = clamp(caretBottom - visibleHeight + margin, 0,
@@ -1418,7 +1377,7 @@ async function measure(): Promise<void> {
     await waitForPort(
       Number(new URL(prepared.server.url).port),
       appProc.child,
-      `${app} app`,
+      'app',
     )
     gateway = await startGateway(new URL(prepared.server.url).host)
     url = `http://127.0.0.1:${PORTS.gateway}`
