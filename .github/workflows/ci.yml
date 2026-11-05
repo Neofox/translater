@@ -3,9 +3,8 @@ name: CI
 # No secrets and no billed requests: e2e runs against the fake OpenAI upstream
 # (cmd/fakeopenai) with OPENAI_API_KEY=test.
 #
-# Toolchain: jdx/mise-action reads mise.toml, which pins both Go and
-# tailwindcss (used by `make css`); actions/setup-go would not provide the
-# latter. The templ generator comes from the go.mod tool directive.
+# Toolchain: actions/setup-go reads go.mod; tailwindcss (`make css`) and
+# lucide-static come from npm ci, templ from the go.mod tool directive.
 on:
   pull_request:
     paths-ignore:
@@ -24,9 +23,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
-
 jobs:
   unit:
     name: Unit, generated files, budgets
@@ -35,18 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      # Go from go.mod's `go` line; setup-go caches modules and builds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          cache: true
-
-      # mise-action's cache covers only mise tools, not Go modules/build cache.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
-          restore-keys: go-${{ runner.os }}-
+          go-version-file: go.mod
 
       # Before the Go steps: go generate (syncicons) and TestIconsFresh read
       # node_modules/lucide-static.
@@ -106,18 +94,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      # Go from go.mod's `go` line; setup-go caches modules and builds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          cache: true
-
-      # mise-action's cache covers only mise tools, not Go modules/build cache.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/Library/Caches/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
-          restore-keys: go-${{ runner.os }}-
+          go-version-file: go.mod
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -128,7 +108,7 @@ jobs:
 
       - run: npx playwright install --with-deps chromium webkit
 
-      # mise-action puts go on PATH; Playwright spawns `go run` at the root.
+      # Playwright spawns `go run` at the root.
       - name: E2E @${{ matrix.tag }}
         run: npx playwright test -c e2e --grep @${{ matrix.tag }}
 
@@ -156,17 +136,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      # Go from go.mod's `go` line; setup-go caches modules and builds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          cache: true
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
-          restore-keys: go-${{ runner.os }}-
+          go-version-file: go.mod
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -190,11 +163,9 @@ jobs:
           [ -f "$dir/go.mod" ] || dir="$dir/go"
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
-      # The base checkout carries its own mise.toml: trust it too.
       - name: Baselines from ${{ inputs.base }}
         env:
           E2E_APP_DIR: ${{ steps.base.outputs.dir }}
-          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}:${{ steps.base.outputs.dir }}
         run: npm run e2e:visual:update
 
       - name: Compare this checkout

@@ -1,9 +1,9 @@
-# Build helpers. Tools come from mise (go, tailwindcss) and the go.mod tool
-# directive (templ). Generated files are committed; `make check` fails when
-# any is stale. `go generate` also needs node_modules (lucide-static for the
-# icons): run `npm ci` first.
+# Build helpers. Go comes from your own install (go.mod's `go` line is the
+# minimum), templ from the go.mod tool directive, and tailwindcss and
+# lucide-static (icons) from node_modules: run `npm ci` first. Generated
+# files are committed; `make check` fails when any is stale.
 
-TAILWIND := mise exec -- tailwindcss
+TAILWIND := node_modules/.bin/tailwindcss
 CSS_IN   := web/static/css/input.css
 CSS_OUT  := web/static/css/app.css
 # Script gzip target: 40 KB, raised to 42 KB with the inspection gestures
