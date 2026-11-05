@@ -14,7 +14,11 @@ import { autoUpdate, position } from './float.js'
  * the menu is at least 2 px wider than the buttons (with their column
  * gaps), the in-line label and its 14 px margin. */
 export function fit(width, widths, gap, label) {
-  const needed = widths.reduce((sum, w) => sum + w, 0) + Math.max(0, widths.length - 1) * gap + label + 14
+  const needed =
+    widths.reduce((sum, w) => sum + w, 0) +
+    Math.max(0, widths.length - 1) * gap +
+    label +
+    14
   return { iconOnly: width < 112, fits: needed > 0 && width >= needed + 2 }
 }
 
@@ -43,8 +47,11 @@ export function initAdjust(app, ta, relabel) {
   let measured = null
   let unfloat = null
 
-  const overlay = () => !beside && !(shell.hasAttribute('data-keyboard') && shell.hasAttribute('data-tight'))
-  const flag = (el, name, on) => (on ? el.setAttribute(name, 'true') : el.removeAttribute(name))
+  const overlay = () =>
+    !beside &&
+    !(shell.hasAttribute('data-keyboard') && shell.hasAttribute('data-tight'))
+  const flag = (el, name, on) =>
+    on ? el.setAttribute(name, 'true') : el.removeAttribute(name)
 
   function place() {
     position(trigger, content, {
@@ -59,7 +66,10 @@ export function initAdjust(app, ta, relabel) {
   /** Only the tight-keyboard editor reserves header space. */
   function reserve() {
     const on = open && !beside && !overlay()
-    header.style.setProperty('--adjust-panel-height', on ? `${content.getBoundingClientRect().height + 6}px` : '0px')
+    header.style.setProperty(
+      '--adjust-panel-height',
+      on ? `${content.getBoundingClientRect().height + 6}px` : '0px',
+    )
   }
 
   function render() {
@@ -82,7 +92,11 @@ export function initAdjust(app, ta, relabel) {
     text.style.display = iconOnly ? 'none' : ''
     // Separate text nodes, the label then " · summary": one node would move
     // glyphs by subpixels (the visual baselines show it).
-    if (text.textContent !== name) text.replaceChildren(app.t('adjust'), ...(summary ? [` · ${summary}`] : []))
+    if (text.textContent !== name)
+      text.replaceChildren(
+        app.t('adjust'),
+        ...(summary ? [` · ${summary}`] : []),
+      )
     flag(content, 'data-overlay', floating)
     flag(content, 'data-open', showing)
     flag(content, 'aria-hidden', !showing)
@@ -92,7 +106,9 @@ export function initAdjust(app, ta, relabel) {
       // useFloating's floatingStyles, applied whether or not it is open.
       style.position = 'fixed'
       style.left = style.top = '0px'
-    } else for (const key of ['position', 'left', 'top', 'transform', 'will-change']) style.removeProperty(key)
+    } else
+      for (const key of ['position', 'left', 'top', 'transform', 'will-change'])
+        style.removeProperty(key)
     if (open && floating) {
       place()
       unfloat ??= autoUpdate(trigger, content, place)
@@ -111,9 +127,15 @@ export function initAdjust(app, ta, relabel) {
    * the Custom editor. */
   function measure() {
     if (!menu.isConnected || row.hidden) return
-    if (shell.hasAttribute('data-short') && controls.querySelector('.refine-custom-editor:not([hidden])')) return
+    if (
+      shell.hasAttribute('data-short') &&
+      controls.querySelector('.refine-custom-editor:not([hidden])')
+    )
+      return
     // Hidden buttons are the custom variant TS does not render.
-    const buttons = [...controls.querySelectorAll(':scope > button')].filter((b) => !b.hidden)
+    const buttons = [...controls.querySelectorAll(':scope > button')].filter(
+      (b) => !b.hidden,
+    )
     const result = fit(
       menu.clientWidth,
       buttons.map((b) => b.getBoundingClientRect().width),
@@ -122,14 +144,17 @@ export function initAdjust(app, ta, relabel) {
     )
     // Focus stays visible: chips focused while they stop fitting open the
     // panel; a focused trigger that disappears hands focus to the chips.
-    const opens = !result.fits && !open && controls.contains(document.activeElement)
+    const opens =
+      !result.fits && !open && controls.contains(document.activeElement)
     if (opens) open = true
     const toChips = result.fits && !beside && document.activeElement === trigger
-    const changed = opens || result.fits !== beside || result.iconOnly !== iconOnly
+    const changed =
+      opens || result.fits !== beside || result.iconOnly !== iconOnly
     beside = result.fits
     iconOnly = result.iconOnly
     if (changed || toChips) render()
-    if (toChips) controls.querySelector(':scope > button')?.focus({ preventScroll: true })
+    if (toChips)
+      controls.querySelector(':scope > button')?.focus({ preventScroll: true })
   }
 
   const observer = new ResizeObserver(measure)
@@ -169,7 +194,11 @@ export function initAdjust(app, ta, relabel) {
   document.addEventListener('click', (event) => {
     const target = event.target
     if (!open || beside || !(target instanceof Node)) return
-    if (!menu.contains(target) || (target instanceof Element && target.closest('[hidden]'))) close()
+    if (
+      !menu.contains(target) ||
+      (target instanceof Element && target.closest('[hidden]'))
+    )
+      close()
   })
   // Keyboard and tight flags decide between the panel and the header editor.
   document.addEventListener('nt-layout', render)
@@ -198,7 +227,12 @@ export function initAdjust(app, ta, relabel) {
     error = next.error
     if (!ta.value.trim()) open = false
     render()
-    const key = JSON.stringify([app.prefs.uiLang, next.refinements, next.intent, next.hasError])
+    const key = JSON.stringify([
+      app.prefs.uiLang,
+      next.refinements,
+      next.intent,
+      next.hasError,
+    ])
     if (key !== measured) {
       measured = key
       measure()

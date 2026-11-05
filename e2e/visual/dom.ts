@@ -19,7 +19,14 @@ import type { Page } from '@playwright/test'
 
 export async function domSnapshot(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const SKIP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'NOSCRIPT'])
+    const SKIP = new Set([
+      'SCRIPT',
+      'STYLE',
+      'TEMPLATE',
+      'LINK',
+      'META',
+      'NOSCRIPT',
+    ])
     const IDREFS = new Set([
       'id',
       'aria-controls',
@@ -35,7 +42,10 @@ export async function domSnapshot(page: Page): Promise<string> {
     const value = (el: Element, name: string) => {
       if (IDREFS.has(name)) return '<ref>'
       const raw = el.getAttribute(name)!
-      const v = name === 'class' ? [...new Set(raw.split(/\s+/).filter(Boolean))].sort().join(' ') : raw
+      const v =
+        name === 'class'
+          ? [...new Set(raw.split(/\s+/).filter(Boolean))].sort().join(' ')
+          : raw
       return JSON.stringify(v)
     }
     const ownText = (el: Element) => {
@@ -56,7 +66,12 @@ export async function domSnapshot(page: Page): Promise<string> {
     }
     const lines: string[] = []
     const walk = (el: Element, depth: number) => {
-      if (SKIP.has(el.tagName) || el.hasAttribute('hidden') || el.hasAttribute('inert')) return
+      if (
+        SKIP.has(el.tagName) ||
+        el.hasAttribute('hidden') ||
+        el.hasAttribute('inert')
+      )
+        return
       if (el.hasAttribute('popover') && !el.matches(':popover-open')) return
       const parts = [el.tagName.toLowerCase()]
       for (const name of el.getAttributeNames().sort()) {
