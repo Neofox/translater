@@ -152,6 +152,56 @@ func TestOnlyPosTabsBlockIsMb4(t *testing.T) {
 	}
 }
 
+// skeletonsFor lists the skeleton blocks shown while POS tab `active` is
+// selected (dictionary.js shows the blocks of that variant and the shared
+// ones), by their label key.
+func skeletonsFor(meta *html.Node, active string) []string {
+	var out []string
+	for _, c := range elementChildren(meta) {
+		if pos := attrVal(c, "data-pos"); pos != "" && pos != active {
+			continue
+		}
+		if find(c, byClass("animate-pulse")) == nil {
+			continue
+		}
+		label := ""
+		if p := find(c, func(n *html.Node) bool { return attrVal(n, "data-t") != "" }); p != nil {
+			label = attrVal(p, "data-t")
+		}
+		out = append(out, label)
+	}
+	return out
+}
+
+// TestWordMetaSkeletonFollowsActiveTab: while streaming, each POS tab shows
+// the skeleton of its own first section not ready yet, not the first tab's.
+func TestWordMetaSkeletonFollowsActiveTab(t *testing.T) {
+	v := WordMetaView{Streaming: true, POS: []POSView{
+		{Pos: "interjection", Senses: []SenseView{{Definition: "thanks"}}},
+		// Completed with an empty first definition: its primary meaning is
+		// not ready.
+		{Pos: "noun", Senses: []SenseView{{Definition: ""}}},
+	}}
+	meta := find(renderMeta(t, v), byClass("word-source-meta"))
+	if got := strings.Join(skeletonsFor(meta, "0"), ","); got != "etymology" {
+		t.Errorf("tab 0 skeletons = %q, want etymology", got)
+	}
+	if got := strings.Join(skeletonsFor(meta, "1"), ","); got != "primaryMeaning" {
+		t.Errorf("tab 1 skeletons = %q, want primaryMeaning", got)
+	}
+	// Variants that agree share one unmarked skeleton (the common case).
+	v.POS[1].Senses[0].Definition = "gratitude"
+	meta = find(renderMeta(t, v), byClass("word-source-meta"))
+	for _, c := range elementChildren(meta) {
+		if find(c, byClass("animate-pulse")) != nil && attrVal(c, "data-pos") != "" {
+			t.Errorf("an agreed skeleton is marked data-pos=%s", attrVal(c, "data-pos"))
+		}
+	}
+	if got := strings.Join(skeletonsFor(meta, "1"), ","); got != "etymology" {
+		t.Errorf("agreed tab 1 skeletons = %q, want etymology", got)
+	}
+}
+
 func TestWordMetaPOSVariants(t *testing.T) {
 	pos := []POSView{
 		{Pos: "interjection", Senses: []SenseView{{Definition: "first"}, {Definition: "second", Examples: []string{"ex"}}}},

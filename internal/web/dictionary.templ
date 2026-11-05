@@ -13,7 +13,8 @@ import (
 // strings. /translate re-renders WordMeta into #word-meta after every
 // completed posList item and top-level field (ValueEnd), so a section shows
 // once it is complete; while streaming, the first section not ready yet
-// shows its skeleton. Empty comments keep "2.", "(noun)" and the character
+// for the active POS tab shows its skeleton. Empty comments keep "2.",
+// "(noun)" and the character
 // line as separate text nodes: text runs shape per node, and merged runs
 // move glyphs by subpixels (the visual baselines show it).
 
@@ -100,12 +101,17 @@ func (v WordMetaView) variants() []posVariant {
 	return out
 }
 
-// ready is WordSourceMeta's per-section readiness for the first POS.
+// ready is the per-section readiness with the first POS active; the
+// sections after the POS blocks do not depend on it.
 func (v WordMetaView) ready() map[string]bool {
-	first := v.variants()[0]
+	return v.readyFor(v.variants()[0])
+}
+
+// readyFor is the per-section readiness with POS variant pv active.
+func (v WordMetaView) readyFor(pv posVariant) map[string]bool {
 	return map[string]bool{
-		"primary":    first.ReadyPrimary,
-		"other":      first.ReadyOther,
+		"primary":    pv.ReadyPrimary,
+		"other":      pv.ReadyOther,
 		"etymology":  v.Etymology != "",
 		"notes":      v.Notes != "",
 		"grammar":    v.Grammar != "",
@@ -129,18 +135,32 @@ func (v WordMetaView) shown() bool {
 	return false
 }
 
-// streamingKey is the first section not ready yet while streaming.
-func (v WordMetaView) streamingKey() string {
+// streamingKeyFor is the first section not ready yet while streaming, with
+// POS variant pv active: each tab shows the skeleton of its own next section.
+func (v WordMetaView) streamingKeyFor(pv posVariant) string {
 	if !v.Streaming {
 		return ""
 	}
-	ready := v.ready()
+	ready := v.readyFor(pv)
 	for _, k := range metaSectionOrder {
 		if !ready[k] {
 			return k
 		}
 	}
 	return ""
+}
+
+// skeletonFor says where the skeleton of a section after the POS blocks
+// renders: once for every variant (shared, unmarked, the common case), or
+// marked for each variant whose next section it is.
+func (v WordMetaView) skeletonFor(key string) (shared bool, variants []int) {
+	all := v.variants()
+	for _, pv := range all {
+		if v.streamingKeyFor(pv) == key {
+			variants = append(variants, pv.Index)
+		}
+	}
+	return len(variants) == len(all), variants
 }
 
 // validNotes are the notes that are real character origins.
@@ -203,27 +223,19 @@ templ WordMeta(v WordMetaView) {
 			if v.ready()["etymology"] {
 				@textBlock(v, "etymology", v.Etymology)
 			}
-			if v.streamingKey() == "etymology" {
-				@skeletonBlock(v, "etymology")
-			}
+			@sectionSkeleton(v, "etymology")
 			if v.ready()["grammar"] {
 				@textBlock(v, "grammar", v.Grammar)
 			}
-			if v.streamingKey() == "grammar" {
-				@skeletonBlock(v, "grammar")
-			}
+			@sectionSkeleton(v, "grammar")
 			if v.ready()["characters"] {
 				@CharacterNotes(v.T, v.Characters)
 			}
-			if v.streamingKey() == "characters" {
-				@skeletonBlock(v, "characters")
-			}
+			@sectionSkeleton(v, "characters")
 			if v.ready()["notes"] {
 				@textBlock(v, "notes", v.Notes)
 			}
-			if v.streamingKey() == "notes" {
-				@skeletonBlock(v, "notes")
-			}
+			@sectionSkeleton(v, "notes")
 			if v.ready()["synonyms"] {
 				<div class="animate-settle">
 					<p class="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide" data-t="synonyms">{ v.T("synonyms") }</p>
@@ -234,20 +246,40 @@ templ WordMeta(v WordMetaView) {
 					</div>
 				</div>
 			}
-			if v.streamingKey() == "synonyms" {
-				<div class="mb-3">
-					<div class="animate-pulse space-y-2">
-						<div class="h-3 w-16 rounded bg-ink-dim/10"></div>
-						<div class="flex gap-1.5">
-							<div class="h-5 w-14 rounded-full bg-ink-dim/10"></div>
-							<div class="h-5 w-12 rounded-full bg-ink-dim/10"></div>
-							<div class="h-5 w-16 rounded-full bg-ink-dim/10"></div>
-						</div>
-					</div>
-				</div>
+			if shared, variants := v.skeletonFor("synonyms"); shared {
+				@synonymsSkeleton(nil)
+			} else {
+				for _, i := range variants {
+					@synonymsSkeleton(variantAttrs(i))
+				}
 			}
 		</div>
 	}
+}
+
+// sectionSkeleton is the skeleton of a section after the POS blocks, where
+// skeletonFor places it.
+templ sectionSkeleton(v WordMetaView, key string) {
+	if shared, variants := v.skeletonFor(key); shared {
+		@skeletonBlock(v, key)
+	} else {
+		for _, i := range variants {
+			@skeletonBlockAttrs(v, key, variantAttrs(i))
+		}
+	}
+}
+
+templ synonymsSkeleton(attrs templ.Attributes) {
+	<div class="mb-3" { attrs... }>
+		<div class="animate-pulse space-y-2">
+			<div class="h-3 w-16 rounded bg-ink-dim/10"></div>
+			<div class="flex gap-1.5">
+				<div class="h-5 w-14 rounded-full bg-ink-dim/10"></div>
+				<div class="h-5 w-12 rounded-full bg-ink-dim/10"></div>
+				<div class="h-5 w-16 rounded-full bg-ink-dim/10"></div>
+			</div>
+		</div>
+	</div>
 }
 
 // posBlocks are the blocks that follow the active POS: PosLabel,
@@ -281,7 +313,7 @@ templ posBlocks(v WordMetaView, pv posVariant) {
 			}
 		</div>
 	}
-	if v.streamingKey() == "primary" {
+	if v.streamingKeyFor(pv) == "primary" {
 		@skeletonBlockAttrs(v, "primaryMeaning", variantAttrs(pv.Index))
 	}
 	if pv.ReadyOther {
@@ -310,7 +342,7 @@ templ posBlocks(v WordMetaView, pv posVariant) {
 			</ol>
 		</div>
 	}
-	if v.streamingKey() == "other" {
+	if v.streamingKeyFor(pv) == "other" {
 		@skeletonBlockAttrs(v, "otherMeanings", variantAttrs(pv.Index))
 	}
 }
