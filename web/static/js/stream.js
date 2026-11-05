@@ -250,9 +250,11 @@ export function initStream(app, form) {
     renderState()
   }
 
-  /** Freeze an aborted run's main where it is: nothing more appears. */
+  /** Freeze an aborted run's main where it is: nothing more appears. Its
+   * completed alternative rows stay; the pending one's skeleton goes. */
   function stop() {
     interp.halt()
+    $('alternative-skeleton')?.remove()
     renderState()
   }
 

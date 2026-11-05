@@ -888,9 +888,10 @@ func altSteps(t *testing.T, raw string) []string {
 	return out
 }
 
-// TestAlternativeSkeletonThenRow: as SentenceView renders it, the newest
-// alternative stays a skeleton while the run streams; it settles into its
-// row when the next one starts, or before nt-done.
+// TestAlternativeSkeletonThenRow: the newest alternative shows as a
+// skeleton while it streams and becomes its row as soon as it completes, so
+// a run that stops later (an edit aborts it) already shows every completed
+// row.
 func TestAlternativeSkeletonThenRow(t *testing.T) {
 	doc := `{"sourceLang":"en","targetLang":"ko","main":"m","learningPhrases":[],"rationale":"r",` +
 		`"alternatives":[{"text":"one","note":"a"},{"text":"two","note":"b"}],"formalityNote":"fn"}`
@@ -914,10 +915,10 @@ func TestAlternativeSkeletonThenRow(t *testing.T) {
 		t.Fatal("end")
 	}
 	b.WriteString("event: " + evDone + "\ndata: {}\n\n")
-	if want := []string{"skeleton"}; !slices.Equal(probe, want) {
+	if want := []string{"skeleton", "row:one"}; !slices.Equal(probe, want) {
 		t.Errorf("after item 0 completed: %q, want %q", probe, want)
 	}
-	want := []string{"skeleton", "row:one", "skeleton", evTextDelta, "row:two", evDone}
+	want := []string{"skeleton", "row:one", "skeleton", "row:two", evTextDelta, evDone}
 	if got := altSteps(t, b.String()); !slices.Equal(got, want) {
 		t.Fatalf("steps %q, want %q", got, want)
 	}

@@ -250,6 +250,29 @@ test('editing mid-stream cancels upstream @core', async ({ page, fake }) => {
   expect(after.aborted).toBe(1)
 })
 
+test('a run stopped mid-alternatives keeps its completed rows and drops the skeleton @core', async ({
+  page,
+  fake,
+}) => {
+  // skeleton.json hangs inside alternatives[1].text.
+  await fillSource(page, sentence('skeleton'))
+  await expect(page.locator('.alternative-skeleton')).toHaveCount(1, {
+    timeout: 20_000,
+  })
+  await expect(page.getByTestId('alternative-item')).toHaveCount(1)
+  const before = await fake.stats()
+  // An edit stops the run at once; read the result before its debounced
+  // re-run replaces it.
+  await source(page).press('End')
+  await page.keyboard.type('x')
+  const shown = await page.evaluate(() => ({
+    skeletons: document.querySelectorAll('.alternative-skeleton').length,
+    rows: document.querySelectorAll('[data-testid="alternative-item"]').length,
+  }))
+  expect(shown).toEqual({ skeletons: 0, rows: 1 })
+  await stopStream(page, fake, before.aborted)
+})
+
 test('repeat is served from cache @core', async ({ page, fake }) => {
   const text = sentence('plain')
   const main = fixture('plain').result.main!

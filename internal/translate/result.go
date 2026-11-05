@@ -53,15 +53,12 @@ type processor struct {
 	closed map[string]bool   // top-level strings already closed (first one wins)
 	meta   *web.WordMetaView // word intent: the dictionary fields completed so far
 	seen   map[string]bool   // dictionary fields already taken (first one wins)
-	// Alternatives (none for a long-form sentence). SentenceView/WordView
-	// settle all but the newest one while the run streams: the newest,
-	// alternatives[altIndex], shows as #alternative-skeleton (altOpen) and
-	// its completed row waits in altRow until the next one starts or the
-	// run ends.
+	// Alternatives (none for a long-form sentence). The newest one,
+	// alternatives[altIndex], shows as #alternative-skeleton (altOpen) until
+	// it completes and its row replaces the skeleton.
 	hideAlts  bool
 	altIndex  int
 	altOpen   bool
-	altRow    string
 	altLabels [2]string // Copy, Listen
 	// Learning (sentence intent). Ranges need every phrase (ordered passes,
 	// overlap rejection), so they are one whole-array computation: Prepare
@@ -345,8 +342,10 @@ func (p *processor) isText(key string) bool {
 
 // alternative handles an event under alternatives[i]. The first event of a
 // new item settles the previous one and appends the skeleton; the item's
-// completion renders its row, held until settled. An element of the wrong
-// shape gets no row (its skeleton just goes); final validation reports it.
+// completion replaces the skeleton with its row at once, so a run that
+// stops later keeps every completed row. An element of the wrong shape gets
+// no row (its skeleton goes when the next item starts or the run ends);
+// final validation reports it.
 func (p *processor) alternative(ev jsonstream.Event) bool {
 	if p.hideAlts {
 		return true
@@ -374,17 +373,21 @@ func (p *processor) alternative(ev jsonstream.Event) bool {
 		return true
 	}
 	html, ok := p.render(web.AlternativeRow(i, p.word, alt.Text, alt.Note, alt.Register, p.altLabels[0], p.altLabels[1]))
-	p.altRow = html
-	return ok
+	return ok && p.replaceSkeleton(html)
 }
 
-// settleAlternative replaces the open skeleton with its completed row.
+// settleAlternative removes the open skeleton of an item that completed
+// without a row.
 func (p *processor) settleAlternative() bool {
 	if !p.altOpen {
 		return true
 	}
-	html := p.altRow
-	p.altOpen, p.altRow = false, ""
+	return p.replaceSkeleton("")
+}
+
+// replaceSkeleton swaps the open skeleton for html (a row, or nothing).
+func (p *processor) replaceSkeleton(html string) bool {
+	p.altOpen = false
 	return p.out.partial(`<hx-partial hx-target="#alternative-skeleton" hx-swap="outerHTML">` + html + `</hx-partial>`)
 }
 
