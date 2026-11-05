@@ -10,9 +10,10 @@ CSS_OUT  := web/static/css/app.css
 # and to 44 KB with the measured Adjust menu (a target, not a gate: never
 # cut a feature or parity to meet it).
 SIZE_MAX := 45056
-# Stylesheet gzip budget: the previous (TypeScript) app's compiled
-# stylesheet when the Go app replaced it (29524 B; app.css was then 29329 B).
-CSS_MAX  := 29524
+# Stylesheet gzip target: 29,000 B, the compiled app.css (28,898 B with the
+# Copy confirmation) rounded up to the next thousand. Like the script
+# target, raise it deliberately with the change that needs it.
+CSS_MAX  := 29000
 
 .PHONY: all generate icons templ css test size check
 
