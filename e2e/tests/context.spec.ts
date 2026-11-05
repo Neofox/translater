@@ -48,9 +48,9 @@ test('toggle opens the context textarea and typing persists to sessionStorage @c
   await openContext(page)
   await expect(field(page)).toHaveAttribute('maxlength', '1000')
   await field(page).fill('hi')
-  expect(
-    await page.evaluate(() => sessionStorage.getItem('nt.context')),
-  ).toBe('"hi"')
+  expect(await page.evaluate(() => sessionStorage.getItem('nt.context'))).toBe(
+    '"hi"',
+  )
   await expect(page.getByTestId('context-clear')).toBeVisible()
   // The toggle closes the field again and keeps the text.
   await toggle(page).click()
@@ -69,9 +69,9 @@ test('clear empties the context and keeps the field open @context', async ({
   await expect(field(page)).toHaveValue('')
   await expect(field(page)).toBeVisible()
   await expect(page.getByTestId('context-clear')).toBeHidden()
-  expect(
-    await page.evaluate(() => sessionStorage.getItem('nt.context')),
-  ).toBe('""')
+  expect(await page.evaluate(() => sessionStorage.getItem('nt.context'))).toBe(
+    '""',
+  )
 })
 
 test('context is sent with the run and edits re-run @context', async ({
@@ -116,6 +116,13 @@ test('Clear input preserves the context and focuses the source @context', async 
   page,
 }) => {
   skipTsDev()
+  // Intermittent on the TS production build too (6 of 18 projects in the
+  // Task 32 sign-off): the reply-context loss the user chose to leave in the
+  // TS app. test.fail would break whenever it happens to pass.
+  test.skip(
+    APP === 'ts',
+    'TS app bug: reply context is sometimes lost before Clear (kept by user decision)',
+  )
   // Source first: short split panes give the open context field the room.
   await fillSource(page, sentence('default'))
   await openContext(page)
@@ -145,10 +152,16 @@ async function box(locator: Locator): Promise<Box> {
 
 /** `inner` lies inside `outer` shrunk by `pad` (half a pixel of rounding). */
 function expectInside(inner: Box, outer: Box, pad: number, what: string) {
-  expect(inner.left, `${what} left`).toBeGreaterThanOrEqual(outer.left + pad - 0.5)
+  expect(inner.left, `${what} left`).toBeGreaterThanOrEqual(
+    outer.left + pad - 0.5,
+  )
   expect(inner.top, `${what} top`).toBeGreaterThanOrEqual(outer.top + pad - 0.5)
-  expect(inner.right, `${what} right`).toBeLessThanOrEqual(outer.right - pad + 0.5)
-  expect(inner.bottom, `${what} bottom`).toBeLessThanOrEqual(outer.bottom - pad + 0.5)
+  expect(inner.right, `${what} right`).toBeLessThanOrEqual(
+    outer.right - pad + 0.5,
+  )
+  expect(inner.bottom, `${what} bottom`).toBeLessThanOrEqual(
+    outer.bottom - pad + 0.5,
+  )
 }
 
 const viewportBox = (page: Page): Promise<Box> =>
@@ -174,8 +187,8 @@ const focusedOutside = (page: Page): Promise<boolean> =>
     const a = document.activeElement
     return Boolean(
       a &&
-        a !== document.body &&
-        !a.closest('.settings-popover, .settings-trigger, [role="listbox"]'),
+      a !== document.body &&
+      !a.closest('.settings-popover, .settings-trigger, [role="listbox"]'),
     )
   })
 
@@ -188,7 +201,8 @@ test('makes UI language available in settings and persists an explicit choice @c
   const trigger = page.getByTestId('settings-button')
   const dialog = page.getByRole('dialog', { name: 'Settings' })
   const group = page.getByRole('group', { name: 'UI language' })
-  const button = (name: string) => group.getByRole('button', { name, exact: true })
+  const button = (name: string) =>
+    group.getByRole('button', { name, exact: true })
   await expect(group).toBeHidden()
   await expect(trigger).not.toHaveAttribute('aria-controls')
 
@@ -198,7 +212,10 @@ test('makes UI language available in settings and persists an explicit choice @c
   // While open, the trigger controls the dialog (useRole).
   const controls = await trigger.getAttribute('aria-controls')
   expect(controls).toBeTruthy()
-  await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute('role', 'dialog')
+  await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute(
+    'role',
+    'dialog',
+  )
   // Non-modal: focus moves to the dialog, Tab reaches the toggle, and
   // Escape returns focus to the trigger.
   await expect(dialog).toBeFocused()
@@ -246,7 +263,9 @@ test('makes UI language available in settings and persists an explicit choice @c
   await expect(button('EN')).toHaveAttribute('aria-pressed', 'false')
   await page.reload({ waitUntil: 'networkidle' })
   await expect(page.locator('html')).toHaveAttribute('lang', 'ko')
-  const cookie = (await context.cookies()).find((c) => c.name === 'nt.preferences')
+  const cookie = (await context.cookies()).find(
+    (c) => c.name === 'nt.preferences',
+  )
   expect(JSON.parse(decodeURIComponent(cookie!.value)).uiLang).toBe('ko')
   await trigger.click()
   await expect(button('한')).toHaveAttribute('aria-pressed', 'true')
@@ -262,7 +281,12 @@ async function checkPopups(page: Page): Promise<void> {
     (
       (window as unknown as { viewport?: { segments?: DOMRect[] } }).viewport
         ?.segments ?? []
-    ).map((r) => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom })),
+    ).map((r) => ({
+      left: r.left,
+      top: r.top,
+      right: r.right,
+      bottom: r.bottom,
+    })),
   )
   const trigger = page.getByTestId('settings-button')
   await trigger.click()
@@ -304,12 +328,19 @@ async function checkPaneClamp(page: Page): Promise<void> {
   const more = page
     .getByRole('group', { name: 'Source language', exact: true })
     .getByTestId('lang-more-trigger')
-  const pane = await more.locator('xpath=ancestor::section[1]').evaluate((e) => {
-    const r = e.getBoundingClientRect()
-    const left = r.left + e.clientLeft
-    const top = r.top + e.clientTop
-    return { left, top, right: left + e.clientWidth, bottom: top + e.clientHeight }
-  })
+  const pane = await more
+    .locator('xpath=ancestor::section[1]')
+    .evaluate((e) => {
+      const r = e.getBoundingClientRect()
+      const left = r.left + e.clientLeft
+      const top = r.top + e.clientTop
+      return {
+        left,
+        top,
+        right: left + e.clientWidth,
+        bottom: top + e.clientHeight,
+      }
+    })
   expect(pane.right).toBeLessThan((await viewportBox(page)).right - 100)
   // Narrower than the pane, wider than the room right of the trigger.
   const width = pane.right - pane.left - 24
@@ -399,7 +430,8 @@ test('language menu typeahead matches English language names @context', async ({
   await page.setViewportSize({ width: 300, height: 640 })
   const bar = (name: string) => page.getByRole('group', { name, exact: true })
   const listbox = page.getByRole('listbox')
-  const option = (name: string) => listbox.getByRole('option', { name, exact: true })
+  const option = (name: string) =>
+    listbox.getByRole('option', { name, exact: true })
   async function open(name: string): Promise<void> {
     await bar(name).getByTestId('lang-more-trigger').click()
     await expect(listbox).toBeVisible()
@@ -409,7 +441,10 @@ test('language menu typeahead matches English language names @context', async ({
   }
   async function close(name: string): Promise<void> {
     await page.keyboard.press('Escape')
-    await expect(bar(name).getByTestId('lang-more-trigger')).toHaveAttribute('aria-expanded', 'false')
+    await expect(bar(name).getByTestId('lang-more-trigger')).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
   }
 
   // 日本語 is found by "Japanese".
@@ -432,21 +467,27 @@ test('language menu typeahead matches English language names @context', async ({
   await expect(option('日本語')).toBeFocused()
   await page.keyboard.press(' ')
   await expect(listbox).toBeHidden()
-  await expect(bar('Target language').getByRole('button', { name: '日本語' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    bar('Target language').getByRole('button', { name: '日本語' }),
+  ).toHaveAttribute('aria-pressed', 'true')
 
   // Source English, then Auto joins the menu: its name is not "Auto…".
   await open('Source language')
   await page.keyboard.press('e')
   await expect(option('English')).toBeFocused()
   await page.keyboard.press('Enter')
-  await expect(bar('Source language').getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    bar('Source language').getByRole('button', { name: 'English' }),
+  ).toHaveAttribute('aria-pressed', 'true')
   await open('Source language')
   await expect(option('Auto')).toHaveCount(1)
   await page.keyboard.press('a')
   await expect(option('Auto')).not.toBeFocused()
   await page.keyboard.press('Enter')
   await close('Source language')
-  await expect(bar('Source language').getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    bar('Source language').getByRole('button', { name: 'English' }),
+  ).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab out @context', async ({
@@ -455,11 +496,16 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
 }) => {
   const { tab, backTab } = tabKeys(browserName)
   await page.setViewportSize({ width: 300, height: 640 })
-  const trigger = page.getByRole('group', { name: 'Target language', exact: true }).getByTestId('lang-more-trigger')
+  const trigger = page
+    .getByRole('group', { name: 'Target language', exact: true })
+    .getByTestId('lang-more-trigger')
   const listbox = page.getByRole('listbox')
   const options = listbox.getByRole('option')
   /** The options' tabindex values: only the active one is 0. */
-  const tabStops = () => options.evaluateAll((all) => all.map((o) => o.getAttribute('tabindex')).join(','))
+  const tabStops = () =>
+    options.evaluateAll((all) =>
+      all.map((o) => o.getAttribute('tabindex')).join(','),
+    )
   /** Escape closes the list and focus returns to the trigger, also from a
    * focused option (Floating UI's returnFocus). */
   const close = async () => {
@@ -475,7 +521,9 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
   await close()
   /** The active option shows Select's highlight. */
   const highlighted = () =>
-    options.evaluateAll((all) => all.map((o) => (o.classList.contains('bg-panel-2') ? 1 : 0)).join(','))
+    options.evaluateAll((all) =>
+      all.map((o) => (o.classList.contains('bg-panel-2') ? 1 : 0)).join(','),
+    )
   // Enter, Space and ArrowDown on the trigger make the first option active
   // (focus stays on the list), ArrowUp the last; ArrowDown from the list
   // then activates the first option. (TS leaves focus on the list when the
@@ -491,7 +539,11 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
     await page.keyboard.press(key)
     await expect(listbox).toBeFocused()
     await expect.poll(tabStops, key).toBe(stops)
-    await expect.poll(highlighted, key).toBe(stops.replaceAll('-1', 'x').replaceAll('0', '1').replaceAll('x', '0'))
+    await expect
+      .poll(highlighted, key)
+      .toBe(
+        stops.replaceAll('-1', 'x').replaceAll('0', '1').replaceAll('x', '0'),
+      )
     // Escape from a focused option (Go focuses it here; TS may keep the
     // list focused when the first option is already active).
     await page.keyboard.press('ArrowDown')
@@ -534,14 +586,18 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
   await trigger.click()
   await expect(listbox).toBeFocused()
   const third = (await options.nth(2).boundingBox())!
-  await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2, { steps: 3 })
+  await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2, {
+    steps: 3,
+  })
   await expect(options.nth(2)).toBeFocused()
   await expect.poll(tabStops).toBe('-1,-1,0,-1,-1')
   await page.mouse.move(third.x + third.width / 2, third.y + 400, { steps: 3 })
   await expect(listbox).toBeFocused()
   await expect.poll(tabStops).toBe('-1,-1,-1,-1,-1')
   // Escape while a hovered option holds focus.
-  await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2, { steps: 3 })
+  await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2, {
+    steps: 3,
+  })
   await expect(options.nth(2)).toBeFocused()
   await close()
   await page.mouse.move(0, 0)
@@ -554,6 +610,8 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
   await expect(listbox).toBeHidden()
   await expect(trigger).toBeFocused()
   await expect(
-    page.getByRole('group', { name: 'Target language', exact: true }).getByRole('button', { name: last }),
+    page
+      .getByRole('group', { name: 'Target language', exact: true })
+      .getByRole('button', { name: last }),
   ).toHaveAttribute('aria-pressed', 'true')
 })

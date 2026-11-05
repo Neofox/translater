@@ -105,9 +105,12 @@ jobs:
   # @speech; a test carrying two tags runs in both jobs. @visual runs in the
   # visual job, @prod (billed) never runs here, and @review needs
   # KEYBOARD_REVIEW, so it skips.
+  # macOS, as the parity sign-off: geometry and tap-position tests depend on
+  # the system fonts (Korean glyph widths) and on the WebKit build, and the
+  # Linux ones shift layouts by a few pixels for both apps alike.
   e2e:
     name: E2E @${{ matrix.tag }} (${{ matrix.app }})
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -133,7 +136,7 @@ jobs:
         with:
           path: |
             ~/go/pkg/mod
-            ~/.cache/go-build
+            ~/Library/Caches/go-build
           key: go-${{ runner.os }}-${{ hashFiles('go/go.sum') }}
           restore-keys: go-${{ runner.os }}-
 
