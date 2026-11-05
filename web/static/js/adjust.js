@@ -68,9 +68,8 @@ export function initAdjust(app, ta, relabel) {
     const floating = overlay()
     const name = summary ? `${app.t('adjust')} · ${summary}` : app.t('adjust')
     flag(menu, 'data-inline', beside)
-    let cls = tones[+Boolean(summary || open)]
-    if (iconOnly) cls = cls.replace(/adjust-trigger $/, 'adjust-trigger adjust-trigger-compact')
-    trigger.className = cls
+    trigger.className = tones[+Boolean(summary || open)]
+    trigger.classList.toggle('adjust-trigger-compact', iconOnly)
     flag(trigger, 'data-active', summary)
     trigger.setAttribute('aria-expanded', open)
     trigger.setAttribute('aria-label', name)

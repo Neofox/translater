@@ -83,9 +83,9 @@ func adjustTemplate(v View) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Size: "md", Class: "adjust-trigger ", Attrs: templ.Attributes{
+		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Size: "md", Class: "adjust-trigger", Attrs: templ.Attributes{
 			"aria-expanded": "false", "aria-controls": "adjust-content", "data-testid": "adjust-button",
-			"aria-label": v.T("adjust"), "data-active-class": ui.PillClass("active", "md", "adjust-trigger "),
+			"aria-label": v.T("adjust"), "data-active-class": ui.PillClass("active", "md", "adjust-trigger"),
 		}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

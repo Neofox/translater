@@ -131,7 +131,7 @@ export function initStream(app, form) {
   // swaps the rows in, so follow them.
   new MutationObserver(() => {
     const has = details.querySelector('.alternative-item')
-    details.className = `result-details ${has ? 'has-alternatives' : ''}`
+    details.classList.toggle('has-alternatives', Boolean(has))
     details.querySelector('.detail-alternatives')?.toggleAttribute('hidden', !has)
   }).observe(details, { childList: true, subtree: true })
 
@@ -214,8 +214,7 @@ export function initStream(app, form) {
   function start(live) {
     interp.reset()
     main.lang = live.target
-    // The TSX template literal, spaces included (classList would drop them).
-    main.className = `result-main ${live.intent === 'word' ? 'result-word' : ''}`
+    main.classList.toggle('result-word', live.intent === 'word')
     // A word's main text is the word-details trigger's text
     // (InspectableTranslation's actionLabel branch); dictionary.js keeps
     // its state.

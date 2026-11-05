@@ -58,7 +58,7 @@ export function createReplayCache() {
   }
 }
 
-// Pill.tsx tone class strings: Listen is `active` while not idle.
+// ui.Pill tone class tokens (pill.templ): Listen is `active` while not idle.
 const NEUTRAL = 'border-border bg-panel hover:border-accent/60'
 const ACTIVE = 'border-accent/70 bg-accent-soft [&>svg]:text-accent'
 // ListenButton.tsx's error notice.

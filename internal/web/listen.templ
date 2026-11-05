@@ -32,7 +32,7 @@ func listenPill(label string, labelled bool) ui.PillProps {
 	if labelled {
 		// The page's own button follows UI-language switches (prefs.js).
 		attrs["data-t-attr"] = "aria-label:listen title:listen"
-		return ui.PillProps{Size: "md", Class: "listen-button  disabled:cursor-not-allowed disabled:opacity-50", Attrs: attrs}
+		return ui.PillProps{Size: "md", Class: "listen-button disabled:cursor-not-allowed disabled:opacity-50", Attrs: attrs}
 	}
 	return ui.PillProps{Class: "listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", Attrs: attrs}
 }

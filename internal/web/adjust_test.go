@@ -27,11 +27,10 @@ func TestAdjustMenuMarkup(t *testing.T) {
 	}
 	const pill = "ui-pill inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition text-ink "
 	const md = " gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11 "
-	// AdjustMenu's template literal keeps a trailing space when not compact.
-	if got, want := attrVal(trigger, "class"), pill+"border-border bg-panel hover:border-accent/60"+md+"adjust-trigger "; got != want {
+	if got, want := attrVal(trigger, "class"), pill+"border-border bg-panel hover:border-accent/60"+md+"adjust-trigger"; got != want {
 		t.Errorf("trigger class\n got %q\nwant %q", got, want)
 	}
-	if got, want := attrVal(trigger, "data-active-class"), pill+"border-accent/70 bg-accent-soft [&>svg]:text-accent"+md+"adjust-trigger "; got != want {
+	if got, want := attrVal(trigger, "data-active-class"), pill+"border-accent/70 bg-accent-soft [&>svg]:text-accent"+md+"adjust-trigger"; got != want {
 		t.Errorf("trigger active class\n got %q\nwant %q", got, want)
 	}
 	for key, want := range map[string]string{"aria-expanded": "false", "aria-controls": "adjust-content", "aria-label": "Adjust"} {

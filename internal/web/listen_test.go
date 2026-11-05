@@ -30,7 +30,7 @@ func TestListenButtonMarkup(t *testing.T) {
 		class    string
 		labelled bool
 	}{
-		{"main", main, neutral + "gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11 listen-button  disabled:cursor-not-allowed disabled:opacity-50", true},
+		{"main", main, neutral + "gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11 listen-button disabled:cursor-not-allowed disabled:opacity-50", true},
 		{"alternative", alt, neutral + "gap-1.5 px-2 py-1 text-xs min-h-11 min-w-11 listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {

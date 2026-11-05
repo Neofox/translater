@@ -9,22 +9,22 @@ package ui
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// Tag.tsx's tone map.
+// Tone class tokens.
 var tagTone = map[string]string{
 	"neutral": "bg-bg text-ink-dim",
 	"accent":  "bg-accent-soft text-ink",
 	"warm":    "bg-warm-soft text-ink",
 }
 
-// TagClass is Tag.tsx's className template literal (no className given).
+// TagClass is the chip's class for tone.
 func TagClass(tone string) string {
 	if tone == "" {
 		tone = "neutral"
 	}
-	return "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide " + tagTone[tone] + " "
+	return "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide " + tagTone[tone]
 }
 
-// Tag is the small uppercase chip (Tag.tsx).
+// Tag is the small uppercase chip.
 func Tag(tone string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

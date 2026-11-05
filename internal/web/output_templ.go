@@ -133,7 +133,7 @@ func outputPanel(v View) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button  disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+		templ_7745c5c3_Err = ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "copy-button disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
 			"aria-label": v.T("copy"), "title": v.T("copy"), "data-t-attr": "aria-label:copy title:copy",
 			"data-testid": "copy-button", "disabled": true,
 		}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
@@ -198,7 +198,7 @@ func outputPanel(v View) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Prefs.Target).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/output.templ`, Line: 52, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/output.templ`, Line: 52, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {

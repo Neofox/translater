@@ -219,8 +219,9 @@ function updateCount() {
   const show = length >= max * data.limits.inputWarnFraction
   const el = document.querySelector('.input-count')
   el.textContent = app.t(show ? 'charCount' : 'inputCount').replace('{count}', length).replace('{max}', max)
-  // InputPanel's template literal, spaces included.
-  el.className = `input-count ${show ? 'input-count-visible' : ''} ${length > max ? 'text-red-400' : 'text-ink-dim'}`
+  el.classList.toggle('input-count-visible', show)
+  el.classList.toggle('text-red-400', length > max)
+  el.classList.toggle('text-ink-dim', length <= max)
   if (show) el.setAttribute('aria-live', 'polite')
   else el.removeAttribute('aria-live')
 }

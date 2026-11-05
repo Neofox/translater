@@ -8,28 +8,31 @@ import (
 	"github.com/a-h/templ"
 )
 
-// A caller's type wins over the default type="button", and the markup
-// carries each attribute once (an HTML parser silently keeps only the first
-// of two).
+// A Pill is a type="button" carrying each attribute once (an HTML parser
+// silently keeps only the first of two), with single-spaced class tokens.
 func TestPillAttributesAreNotDuplicated(t *testing.T) {
-	render := func(attrs templ.Attributes) string {
+	render := func(p PillProps) string {
 		var b strings.Builder
-		if err := Pill(PillProps{Attrs: attrs}).Render(context.Background(), &b); err != nil {
+		if err := Pill(p).Render(context.Background(), &b); err != nil {
 			t.Fatal(err)
 		}
 		return b.String()
 	}
-	out := render(templ.Attributes{"type": "submit", "aria-label": "Go"})
-	if strings.Count(out, " type=") != 1 || !strings.Contains(out, `type="submit"`) {
-		t.Errorf("type override: %s", out)
+	out := render(PillProps{Tone: "primary", Class: "copy-button  extra ", Attrs: templ.Attributes{"aria-label": "Go"}})
+	if strings.Count(out, " type=") != 1 || !strings.Contains(out, `type="button"`) {
+		t.Errorf("type: %s", out)
 	}
-	if out := render(nil); strings.Count(out, " type=") != 1 || !strings.Contains(out, `type="button"`) {
-		t.Errorf("default type: %s", out)
+	if strings.Contains(out, `  `) || strings.Contains(out, ` "`) || !strings.Contains(out, ` copy-button extra"`) {
+		t.Errorf("class spacing: %s", out)
 	}
-	defer func() {
-		if recover() == nil {
-			t.Error("a class in Attrs must be rejected: pass it as PillProps.Class")
-		}
-	}()
-	render(templ.Attributes{"class": "x"})
+	for _, name := range []string{"class", "type"} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s in Attrs must be rejected", name)
+				}
+			}()
+			render(PillProps{Attrs: templ.Attributes{name: "x"}})
+		}()
+	}
 }

@@ -43,7 +43,7 @@ func TestRefineRowMarkup(t *testing.T) {
 	}
 	custom := find(row, byTestID("refine-custom"))
 	if custom == nil || !hasAttr(custom, "hidden") || attrVal(custom, "aria-pressed") != "true" ||
-		attrVal(custom, "class") != pill+"border-accent/70 bg-accent-soft [&>svg]:text-accent"+sm {
+		attrVal(custom, "class") != pill+"border-accent/70 bg-accent-soft [&>svg]:text-accent"+strings.TrimRight(sm, " ") {
 		t.Errorf("refine-custom %v", custom.Attr)
 	}
 	trigger := find(row, byTestID("refine-custom-trigger"))

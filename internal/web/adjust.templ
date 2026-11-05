@@ -17,9 +17,9 @@ import (
 templ adjustTemplate(v View) {
 	<template id="adjust-template">
 		<div class="adjust-menu">
-			@ui.Pill(ui.PillProps{Size: "md", Class: "adjust-trigger ", Attrs: templ.Attributes{
+			@ui.Pill(ui.PillProps{Size: "md", Class: "adjust-trigger", Attrs: templ.Attributes{
 				"aria-expanded": "false", "aria-controls": "adjust-content", "data-testid": "adjust-button",
-				"aria-label": v.T("adjust"), "data-active-class": ui.PillClass("active", "md", "adjust-trigger "),
+				"aria-label": v.T("adjust"), "data-active-class": ui.PillClass("active", "md", "adjust-trigger"),
 			}}) {
 				@icons.Icon("sliders-horizontal", 18, templ.Attributes{"hidden": true})
 				<span>{ v.T("adjust") }</span>
