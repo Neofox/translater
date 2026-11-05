@@ -17,8 +17,8 @@ func render(t *testing.T, c templ.Component) string {
 	return b.String()
 }
 
-// The React parity cases live in internal/web/ui (TestPrimitivesMatchReact);
-// these cover what they do not.
+// Alias classes merge with the caller's, aria-hidden yields to an accessible
+// role, and an unknown icon panics.
 func TestIcon(t *testing.T) {
 	got := render(t, Icon("loader-circle", 18, templ.Attributes{"class": "lucide animate-spin", "data-x": "1"}))
 	if !strings.Contains(got, `class="lucide lucide-loader-circle lucide-loader-2 animate-spin" aria-hidden="true" data-x="1">`) {

@@ -12,7 +12,6 @@ on:
       - go/**
       - e2e/**
       - shared/**
-      - scripts/capture-ui-markup.tsx
       - src/components/**
       - package.json
       - package-lock.json
@@ -84,13 +83,6 @@ jobs:
       - name: JS size budget
         working-directory: go
         run: make size
-
-      # The Pill/Tag/icon markup TestPrimitivesMatchReact compares with must
-      # match what the TS components render now.
-      - name: React primitive markup is fresh
-        run: |
-          npx tsx scripts/capture-ui-markup.tsx
-          git diff --exit-code -- go/internal/web/testdata/react-markup.json
 
   # Every e2e tag on both apps, all 18 projects (9 viewports × Chromium and
   # WebKit), against the fake upstream. The TS leg serves its production

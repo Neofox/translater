@@ -1,5 +1,5 @@
-// Package icons renders lucide icons exactly as lucide-react 1.61.0 does
-// (TestPrimitivesMatchReact). The SVG children come from lucide-static via
+// Package icons renders lucide icons with the markup lucide-react 1.61.0
+// produced. The SVG children come from lucide-static via
 // cmd/syncicons (icons_gen.go); names.txt lists the icons the UI uses.
 //
 // Hand-written: a templ component would need one template per icon; this is

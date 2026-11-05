@@ -4,7 +4,7 @@
 
 // Package ui holds the shared primitives of src/components/ui: Pill and Tag,
 
-// with byte-identical class strings (TestPrimitivesMatchReact).
+// with the same class strings.
 
 package ui
 

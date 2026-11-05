@@ -2,8 +2,7 @@
 # One icon per line: its lucide name, then the aliases lucide-react 1.61.0
 # adds as extra `lucide-<alias>` classes (from the icon module's `aliases`).
 # `go generate ./...` (cmd/syncicons) turns this into icons_gen.go from
-# lucide-static 1.61.0; TestPrimitivesMatchReact compares the result with
-# lucide-react's own markup, so a missing alias fails there.
+# lucide-static 1.61.0.
 arrow-right-left
 check
 chevron-down

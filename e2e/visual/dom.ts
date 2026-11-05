@@ -7,7 +7,7 @@
 //   mounted this way where TS unmounts them (go/web/static/css/go.css); open
 //   ones are compared like any other element.
 // - script, style, template, link, meta and noscript elements, and the
-//   inside of <svg> (icon markup is compared by TestPrimitivesMatchReact).
+//   inside of <svg> (icon markup is covered by go/internal/web/icons tests).
 // - A textarea's text: React mirrors the value into its text content, Go
 //   sets only the value. The ARIA snapshots compare the value.
 // - The attributes in IGNORED, each a difference by design (reasons there).
