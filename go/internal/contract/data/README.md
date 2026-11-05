@@ -18,17 +18,18 @@ and must produce **identical** OpenAI request bodies.
 | `limits.json` | Input limits (characters are UTF-16 code units, JS `length`). `maxLearningTranslationChars` mirrors the `maxLength` already in `schemas/sentence.json` and is used only by the TypeScript learning code. |
 | `preferences.json` | `nt.preferences` cookie: `cookie` (name), `version`, `maxAgeSeconds`, `maxCookieLength` (max raw length) and `rules` (each rule's `values`; rule order = cookie field order). Each rule's `storage`/`raw` belong to the TypeScript app's legacy localStorage migration only; the Go app ignores them. |
 | `meta.json` | `cacheVersion` (cache keys, `prompt_cache_key`) and `defaultModel` |
-| `fixtures/requests.json` | Golden request bodies: `[{ name, input, config, body }]` |
+| `fixtures/requests.json` | Golden request bodies: `[{ name, input, config, body }]`, written by the Go app's `BuildRequest` |
 | `fixtures/variants.json` | Same for eval variants, plus `variant` |
 
 ## Changing anything here
 
 - Fixtures are the safety net: never hand-edit them. A refactor must keep
-  `src/server/sharedPrompts.test.ts` (and the Go equivalent) green.
+  the Go prompt tests (`go test ./internal/prompt` in `go/`, which compare
+  the fixture bytes) green. The `input` objects keep an `analyticsTrigger`
+  field from the TypeScript capture; the Go app ignores it.
 - A deliberate change to prompt text, few-shots or schemas: edit the files,
-  bump `meta.json` `cacheVersion`, run `npm run shared:generate`, then
-  `npm run fixtures:capture` and review the fixture diff, then
-  `cd go && go generate ./...`.
+  bump `meta.json` `cacheVersion`, run `go test ./internal/prompt -update`
+  in `go/` and review the fixture diff, then `go generate ./...`.
 - After editing any file here run `npm run shared:generate` (TS views:
   `src/server/promptTemplates.generated.json`,
   `src/server/resultTypes.generated.ts`) and `go generate ./...` in `go/`.

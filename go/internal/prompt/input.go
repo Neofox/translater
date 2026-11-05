@@ -1,7 +1,8 @@
 // Package prompt turns a validated translation request into the exact OpenAI
-// Responses request body the TypeScript app sends (shared/translation/README.md
-// defines every flag, block and field; fixtures/requests.json proves equality)
-// and derives the translation cache keys.
+// Responses request body (shared/translation/README.md defines every flag,
+// block and field; `go test ./internal/prompt -update` writes the golden
+// bodies in shared/translation/fixtures) and derives the translation cache
+// keys.
 package prompt
 
 import (

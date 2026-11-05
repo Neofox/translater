@@ -12,7 +12,6 @@ on:
       - go/**
       - e2e/**
       - shared/**
-      - scripts/capture-request-fixtures.ts
       - scripts/capture-ui-markup.tsx
       - src/components/**
       - package.json
@@ -71,7 +70,7 @@ jobs:
         working-directory: go
         run: go test ./...
 
-      # Regenerates the shared contract copy, styles, icons, templ output and
+      # Regenerates the shared contract copy, icons, templ output and
       # CSS, then fails when any committed copy differs.
       - name: Generated files are fresh
         working-directory: go
@@ -85,9 +84,6 @@ jobs:
       - name: JS size budget
         working-directory: go
         run: make size
-
-      - name: Shared prompt and generated contract tests
-        run: npx vitest run src/server/sharedPrompts.test.ts src/server/sharedGenerated.test.ts
 
       # The Pill/Tag/icon markup TestPrimitivesMatchReact compares with must
       # match what the TS components render now.

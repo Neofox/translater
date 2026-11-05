@@ -20,9 +20,10 @@ import (
 const sharedDir = "../../../shared/translation/"
 
 type fixture struct {
-	Name   string         `json:"name"`
-	Input  TranslateInput `json:"input"`
-	Config struct {
+	Name    string         `json:"name"`
+	Variant string         `json:"variant"` // variants.json only
+	Input   TranslateInput `json:"input"`
+	Config  struct {
 		Model       string `json:"model"`
 		Reasoning   string `json:"reasoning"`
 		ServiceTier string `json:"serviceTier"`
@@ -39,9 +40,9 @@ func loadContract(t *testing.T) *contract.Contract {
 	return c
 }
 
-func loadFixtures(t *testing.T) []fixture {
+func loadFixtures(t *testing.T, file string) []fixture {
 	t.Helper()
-	b, err := os.ReadFile(sharedDir + "fixtures/requests.json")
+	b, err := os.ReadFile(sharedDir + "fixtures/" + file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,15 +56,22 @@ func loadFixtures(t *testing.T) []fixture {
 	return fs
 }
 
+// The golden bodies as JSON values, independent of the fixture writer's
+// formatting (TestFixturesFresh compares the bytes).
 func TestBuildRequestMatchesFixtures(t *testing.T) {
 	c := loadContract(t)
-	for _, f := range loadFixtures(t) {
+	fixtures := append(loadFixtures(t, "requests.json"), loadFixtures(t, "variants.json")...)
+	for _, f := range fixtures {
 		t.Run(f.Name, func(t *testing.T) {
 			if err := f.Input.Validate(c.Limits); err != nil {
 				t.Fatalf("fixture input invalid: %v", err)
 			}
 			cfg := config.Translate{Model: f.Config.Model, Reasoning: f.Config.Reasoning, ServiceTier: f.Config.ServiceTier}
-			b, err := BuildRequest(c, f.Input, cfg)
+			variant := f.Variant
+			if variant == "" {
+				variant = Production
+			}
+			b, err := BuildVariant(c, f.Input, cfg, variant)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -116,7 +124,7 @@ func TestBuildRequestKeepsSchemaKeyOrder(t *testing.T) {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		t.Fatal(err)
 	}
-	for i, f := range loadFixtures(t) {
+	for i, f := range loadFixtures(t, "requests.json") {
 		t.Run(f.Name, func(t *testing.T) {
 			cfg := config.Translate{Model: f.Config.Model, Reasoning: f.Config.Reasoning, ServiceTier: f.Config.ServiceTier}
 			body, err := BuildRequest(c, f.Input, cfg)
@@ -125,7 +133,7 @@ func TestBuildRequestKeepsSchemaKeyOrder(t *testing.T) {
 			}
 			got := rawSchema(t, body)
 			if want := rawSchema(t, raw[i].Body); got != want {
-				t.Errorf("schema bytes differ from the captured TS request (key order?)\n got: %.200s\nwant: %.200s", got, want)
+				t.Errorf("schema bytes differ from the golden request (key order?)\n got: %.200s\nwant: %.200s", got, want)
 			}
 			shared := jsontext.Value(slices.Clone(c.Schemas[f.Input.Intent]))
 			if err := shared.Compact(); err != nil {
@@ -227,5 +235,33 @@ func TestLanguageEnumsMatchContract(t *testing.T) {
 	}
 	if len(promptNames) != len(c.Languages) {
 		t.Errorf("promptNames has %d entries, contract %d", len(promptNames), len(c.Languages))
+	}
+}
+
+// Variants replace only the sentence system message; word intent and the
+// production name keep BuildRequest's body, and unknown names fail.
+func TestBuildVariant(t *testing.T) {
+	c := loadContract(t)
+	cfg := config.Translate{Model: "m", Reasoning: "none", ServiceTier: "fast"}
+	s := TranslateInput{Text: "hi", Source: "en", Target: "ko", Mode: "casual", Intent: "sentence", UILang: "en"}
+	w := s
+	w.Intent = "word"
+	for _, in := range []TranslateInput{s, w} {
+		prod, err := BuildRequest(c, in, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range Variants {
+			got, err := BuildVariant(c, in, cfg, v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if same := string(got) == string(prod); same != (v == Production || in.Intent == "word") {
+				t.Errorf("%s %s: same as production = %v", in.Intent, v, same)
+			}
+		}
+	}
+	if _, err := BuildVariant(c, s, cfg, "nope"); err == nil {
+		t.Error("unknown variant accepted")
 	}
 }

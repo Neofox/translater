@@ -3,6 +3,8 @@ package prompt
 import (
 	"encoding/json/jsontext"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/openai/openai-go/v3"
@@ -116,12 +118,40 @@ func user(parts ...responses.ResponseInputTextParam) responses.ResponseInputItem
 	}}
 }
 
-// BuildRequest returns the streaming POST /v1/responses body for in, equal
-// (as JSON values) to the TS app's body (README "Request body"; proven by
-// fixtures/requests.json). It validates in first. The body is built from
-// openai-go typed params; "stream" is an extra field because the SDK adds
-// it only inside NewStreaming, and the caller sends these bytes verbatim.
+// Production is the app's own prompt; Variants lists every prompt BuildVariant
+// accepts. The others are eval-only alternative sentence system messages
+// (shared/translation/prompts/variants): "lean", and "lean-nochars" with
+// leanCharacters false.
+const Production = "production"
+
+var Variants = []string{Production, "lean", "lean-nochars"}
+
+// systemMessage renders input[1]. A variant replaces only the sentence
+// system message: word intent ignores it, as the evals always have.
+func systemMessage(c *contract.Contract, in TranslateInput, view map[string]any, variant string) (string, error) {
+	switch {
+	case !slices.Contains(Variants, variant):
+		return "", fmt.Errorf("prompt: unknown variant %q", variant)
+	case variant == Production || in.Intent != "sentence":
+		return c.Render(in.Intent+"-system", view)
+	}
+	v := maps.Clone(view)
+	v["leanCharacters"] = variant == "lean"
+	return c.Render("variants/lean", v)
+}
+
+// BuildRequest returns the streaming POST /v1/responses body for in
+// (README "Request body"; fixtures/requests.json are the golden bodies).
+// It validates in first. The body is built from openai-go typed params;
+// "stream" is an extra field because the SDK adds it only inside
+// NewStreaming, and the caller sends these bytes verbatim.
 func BuildRequest(c *contract.Contract, in TranslateInput, cfg config.Translate) ([]byte, error) {
+	return BuildVariant(c, in, cfg, Production)
+}
+
+// BuildVariant is BuildRequest with an eval prompt variant (one of
+// Variants; fixtures/variants.json are its golden bodies).
+func BuildVariant(c *contract.Contract, in TranslateInput, cfg config.Translate, variant string) ([]byte, error) {
 	if err := in.Validate(c.Limits); err != nil {
 		return nil, err
 	}
@@ -134,7 +164,7 @@ func BuildRequest(c *contract.Contract, in TranslateInput, cfg config.Translate)
 	if err != nil {
 		return nil, err
 	}
-	system, err := render(in.Intent + "-system")
+	system, err := systemMessage(c, in, view, variant)
 	if err != nil {
 		return nil, err
 	}
