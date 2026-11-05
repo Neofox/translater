@@ -1,23 +1,14 @@
 import { defineConfig } from '@playwright/test'
 import type { PlaywrightTestConfig } from '@playwright/test'
-import {
-  APP,
-  TS_BUILD,
-  WORKERS,
-  appPort,
-  appUrl,
-  fakePort,
-  fakeUrl,
-} from './ports'
+import { WORKERS, appPort, fakePort, fakeUrl } from './ports'
 
-// Black-box parity suite: the same tests drive the TypeScript app (APP=ts,
-// default) and the Go app (APP=go) through URLs, data-testid/ARIA selectors
-// and the fake OpenAI server's /_stats. Nothing here may reach real OpenAI:
-// every app server gets OPENAI_BASE_URL pointed at its own fake and a dummy
-// key, and global-setup.ts refuses to run unless the fake sees the first
-// translation.
+// Black-box suite: the tests drive the app through URLs, data-testid/ARIA
+// selectors and the fake OpenAI server's /_stats. Nothing here may reach real
+// OpenAI: every app server gets OPENAI_BASE_URL pointed at its own fake and a
+// dummy key, and global-setup.ts refuses to run unless the fake sees the
+// first translation.
 
-// The nine profiles of vitest.browser.config.ts, in both engines.
+// Nine folded/unfolded phone, iPhone and MacBook profiles, in both engines.
 const viewports = [
   { label: 'portrait', width: 382, height: 580 },
   { label: 'landscape', width: 580, height: 382 },
@@ -30,17 +21,15 @@ const viewports = [
   { label: 'iphone-landscape', width: 844, height: 390 },
 ] as const
 
-// Environment for every app server. Explicit process env wins over the
-// .env/.env.local files Nitro's dev server loads (c12 only overrides keys it
-// sourced from dotenv itself), so the local OpenAI key is never used. Empty
-// Langfuse keys keep telemetry off.
+// Environment for every app server: the app reads only the process
+// environment, so the local OpenAI key is never used. Empty Langfuse keys
+// keep telemetry off.
 function appEnv(index: number): Record<string, string> {
   return {
     OPENAI_BASE_URL: `${fakeUrl(index)}/v1`,
     OPENAI_API_KEY: 'test',
     LANGFUSE_PUBLIC_KEY: '',
     LANGFUSE_SECRET_KEY: '',
-    AI_GATEWAY_API_KEY: '',
   }
 }
 
@@ -60,47 +49,18 @@ for (let i = 0; i < WORKERS; i++) {
     reuseExistingServer: false,
     timeout: 120_000,
   })
-  servers.push(
-    APP === 'ts' && TS_BUILD === 'prod'
-      ? {
-          // Web servers start one after another, so only the first builds;
-          // the others serve the finished .vercel/output.
-          name: `app-ts-prod-${i}`,
-          command:
-            i === 0
-              ? 'npm run build && node e2e/perf/serve-ts.mjs'
-              : 'node e2e/perf/serve-ts.mjs',
-          cwd: '..',
-          url: `${appUrl(i)}/`,
-          env: { ...appEnv(i), PORT: String(appPort(i)) },
-          stderr: appStderr,
-          reuseExistingServer: false,
-          timeout: i === 0 ? 600_000 : 60_000,
-        }
-      : APP === 'ts'
-        ? {
-            name: `app-ts-${i}`,
-            command: `npm run dev -- --port ${appPort(i)} --strictPort`,
-            cwd: '..',
-            url: `http://localhost:${appPort(i)}/`,
-            env: appEnv(i),
-            stderr: appStderr,
-            reuseExistingServer: false,
-            timeout: 180_000,
-          }
-        : {
-            name: `app-go-${i}`,
-            command: 'go run .',
-            cwd: '../go',
-            // Port readiness only: global setup reports a clear error when the
-            // Go app does not serve the translator page yet.
-            port: appPort(i),
-            env: { ...appEnv(i), PORT: String(appPort(i)) },
-            stderr: appStderr,
-            reuseExistingServer: false,
-            timeout: 180_000,
-          },
-  )
+  servers.push({
+    name: `app-${i}`,
+    command: 'go run .',
+    cwd: '../go',
+    // Port readiness only: global setup reports a clear error when the app
+    // does not serve the translator page yet.
+    port: appPort(i),
+    env: { ...appEnv(i), PORT: String(appPort(i)) },
+    stderr: appStderr,
+    reuseExistingServer: false,
+    timeout: 180_000,
+  })
 }
 
 // Production smoke (tests/prod-smoke.spec.ts, @prod): PROD_URL points the
@@ -113,17 +73,17 @@ const PROD_URL = process.env.PROD_URL?.replace(/\/+$/, '')
 export default defineConfig({
   testDir: './tests',
   outputDir: '../test-results/e2e',
-  // Visual parity baselines (tests/visual.spec.ts): one folder per project,
-  // shared by both apps. The TS run writes them (e2e:visual passes
-  // --update-snapshots=all); the Go run only compares, so a missing baseline
-  // fails instead of being written.
+  // Visual regression baselines (tests/visual.spec.ts): one folder per
+  // project, never committed (they depend on the machine's fonts). Only
+  // `npm run e2e:visual:update` writes them (--update-snapshots=all); every
+  // other run compares, so a missing baseline fails instead of being written.
   snapshotPathTemplate:
     '../test-results/visual-baseline/{projectName}/{arg}{ext}',
-  updateSnapshots: APP === 'go' ? 'none' : 'missing',
+  updateSnapshots: 'none',
   globalSetup: PROD_URL ? undefined : './global-setup.ts',
-  // The TS-vs-Go visual parity tests need the baselines `npm run e2e:visual`
-  // (e2e/visual/run.mjs) writes first; plain e2e runs skip them. The billed
-  // @prod smoke runs only with PROD_URL.
+  // The visual tests run only through `npm run e2e:visual[:update]`
+  // (e2e/visual/run.mjs sets E2E_VISUAL); plain e2e runs skip them. The
+  // billed @prod smoke runs only with PROD_URL.
   grep: PROD_URL ? /@prod/ : undefined,
   grepInvert: [
     ...(process.env.E2E_VISUAL ? [] : [/@visual/]),

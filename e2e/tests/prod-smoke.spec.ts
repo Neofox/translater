@@ -1,4 +1,4 @@
-// Billed production smoke for a deployed Go app (Task 30). It runs only with
+// Billed production smoke for a deployment (Task 30). It runs only with
 // PROD_URL (playwright.config.ts excludes @prod otherwise, and CI runs only
 // @core), talks to the real deployment (no fake upstream, no synthetic
 // audio) and makes exactly one translation and one speech request:

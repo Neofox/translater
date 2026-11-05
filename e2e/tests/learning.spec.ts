@@ -183,7 +183,7 @@ const settle = (page: Page) => page.waitForTimeout(450)
 
 /** Waits for finite animations, the completion View Transition included.
  * While a View Transition runs, its overlay takes every pointer event (the
- * target is <html>), so a tap measured and sent then is lost in both apps.
+ * target is <html>), so a tap measured and sent then is lost.
  * Infinite pulses are skipped. */
 async function transitionsDone(page: Page) {
   await page.evaluate(() =>
@@ -1085,7 +1085,7 @@ test('mobile text opens a full learning view without a Breakdown button @learnin
   await waitForDone(page)
   await expect(page.getByTestId('breakdown-button')).toHaveCount(0)
   // Marks the source and action nodes, so later reads can tell they stayed
-  // mounted (TS keeps them; neither app replaces them).
+  // mounted (the app never replaces them).
   const KEPT = [
     '[data-testid="input-textarea"]',
     '[data-testid="output-toolbar"] [data-testid="copy-button"]',

@@ -33,7 +33,6 @@ import {
 } from './helpers'
 import type { Fake, StringKey, UiLang } from './helpers'
 import type { Page } from '@playwright/test'
-import { APP } from '../ports'
 
 // A run that starts within this window after a paste / blur / Cmd+Enter was
 // not waiting for the 800ms debounce. Each timing test also checks the
@@ -97,7 +96,7 @@ test('swap button shows the busy spinner while streaming @core', async ({
   fake,
 }) => {
   const swap = page.locator('.swap-button')
-  // TS renders one of the two icons; Go keeps both and hides one.
+  // Both icons stay mounted; the idle one is hidden.
   const icon = (name: 'swap' | 'busy') =>
     swap.locator(
       name === 'busy' ? '.lucide-loader-circle' : '.lucide-arrow-right-left',
@@ -147,7 +146,6 @@ test('stale result disables copy @core', async ({ page, fake }) => {
   await expect(copyButton(page)).toBeEnabled()
 
   await recordResult(page)
-  const old = fixture('slow').result.main!
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
@@ -210,11 +208,6 @@ test('cmd+enter replaces the pending debounce @core', async ({
   page,
   fake,
 }) => {
-  test.fail(
-    APP === 'ts',
-    'TS app bug: the forced run leaves the 800ms debounce timer armed, which ' +
-      'then aborts the forced run and sends a second, paid request.',
-  )
   await typeSource(page, sentence('plain'))
   await page.keyboard.press('ControlOrMeta+Enter')
   await waitForStats(fake, (s) => s.requests >= 1, 5_000)
@@ -309,13 +302,6 @@ test('provider error is localized and not retried @core', async ({
 })
 
 test('error kinds are localized @core', async ({ page, fake }) => {
-  test.fail(
-    APP === 'ts',
-    'TS app bug: on the streaming path the AI SDK surfaces upstream HTTP ' +
-      'errors as NoOutputGeneratedError without a cause, so ' +
-      'classifyTranslationError returns "provider" and every kind shows ' +
-      '"Translation failed."',
-  )
   await expectLocalizedErrors(page, fake, [
     ['error-budget', 'providerBudgetUnavailable'],
     ['error-rate', 'providerRateLimited'],
@@ -452,12 +438,6 @@ test('IME composition is not interrupted @core', async ({
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'CDP IME emulation is Chromium-only')
-  test.fail(
-    APP === 'ts',
-    'TS app bug: every composition update changes the controlled value, so ' +
-      'the debounce fires a paid run on partial jamo while the user is ' +
-      'still composing.',
-  )
   const first = sentence('slow')
   await fillSource(page, first)
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
@@ -520,7 +500,6 @@ test('late events from a superseded run are ignored @core', async ({
         once: true,
       })
   })
-  const old = fixture('slow').result.main!
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
@@ -538,17 +517,11 @@ test('late events from a superseded run are ignored @core', async ({
   expect(start).toBeGreaterThanOrEqual(0)
   for (let i = 0; i < start; i++) {
     expect(log[i]!.copy).toBe(false)
-    if (APP === 'go') {
-      // Go freezes an aborted main.
-      if (i > 0)
-        expect(log[i]!.text!.length).toBeLessThanOrEqual(
-          log[i - 1]!.text!.length,
-        )
-    } else {
-      // TS reveals the already-received rest of the current interpolation
-      // burst on abort: growth is fine, but only with the old run's text.
-      expect(old.startsWith(log[i]!.text ?? '')).toBe(true)
-    }
+    // An aborted main freezes.
+    if (i > 0)
+      expect(log[i]!.text!.length).toBeLessThanOrEqual(
+        log[i - 1]!.text!.length,
+      )
   }
   for (const entry of log.slice(start)) {
     expect(second.startsWith(entry.text ?? '')).toBe(true)
@@ -561,7 +534,6 @@ test('stale events of a superseded run cannot touch the result @core', async ({
   page,
   fake,
 }) => {
-  test.skip(APP === 'ts', "Dispatches the Go app's nt-* DOM events directly")
   const runInput = page.locator('#translate-form [name="run"]')
   await fillSource(page, sentence('slow'))
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
@@ -652,8 +624,8 @@ test('long-form input hides alternatives @core', async ({ page, fake }) => {
   await waitForDone(page)
   await expect(page.locator('.alternative-item')).toHaveCount(0)
   await expect(page.locator('.detail-alternatives')).toBeHidden()
-  // TS unmounts the section; a mounted copy must sit under `hidden`, which
-  // the DOM snapshot treats as absent (not merely hidden by a CSS rule).
+  // The section stays mounted under `hidden`, which the DOM snapshot treats
+  // as absent (not merely hidden by a CSS rule).
   expect(
     await page.evaluate(
       () =>
@@ -765,10 +737,10 @@ test('streaming deltas stay urgent and only completion starts a result transitio
     }
   })
   // The first half needs motion allowed whatever the project emulates
-  // (webkit-portrait runs with reduced motion, where Go starts none).
+  // (webkit-portrait runs with reduced motion, where none starts).
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openApp(page)
-  // React's hydration may start one transition of its own; count from here.
+  // Count from here.
   await page.evaluate(() => {
     ;(window as unknown as { __transitions: number }).__transitions = 0
   })
@@ -786,13 +758,12 @@ test('streaming deltas stay urgent and only completion starts a result transitio
   await waitForDone(page)
   await expect.poll(transitions).toBe(supported ? 1 : 0)
 
-  // Reduced motion: Go starts no transition. React still starts one and
-  // base.css cancels its animation; neither animates.
+  // Reduced motion: no transition starts.
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await fillSource(page, sentence('plain'))
   await waitForMain(page, fixture('plain').result.main!)
   await waitForDone(page)
-  expect(await transitions()).toBe(supported ? (APP === 'ts' ? 2 : 1) : 0)
+  expect(await transitions()).toBe(supported ? 1 : 0)
 })
 
 test('input over the limit shows a local error without a request @core', async ({

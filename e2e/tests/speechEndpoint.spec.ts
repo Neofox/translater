@@ -1,10 +1,7 @@
-// Speech endpoint and fixtures (@speech, Task 22). The Listen UI arrives with
-// Task 23 (speech.spec.ts). Here the Go app's POST /speech is driven directly
-// against this worker's fake upstream; the TS app's speech is a server
-// function without a public route, and e2e/fakeUpstream.test.ts proves its
-// production path accepts the fake's WAV. Both apps translate the speech
-// fixtures that Task 23 pronounces.
-import { APP } from '../ports'
+// Speech endpoint and fixtures (@speech). The Listen UI is covered by
+// speech.spec.ts. Here POST /speech is driven directly against this worker's
+// fake upstream, and the speech fixtures that speech.spec.ts pronounces are
+// translated.
 import {
   expect,
   fillSource,
@@ -16,17 +13,10 @@ import {
   waitForMain,
 } from './helpers'
 
-const goOnly = () =>
-  test.skip(
-    APP === 'ts',
-    'TS speech is a server function without a /speech route',
-  )
-
 test('POST /speech streams the fake tone as 24 kHz PCM @speech', async ({
   request,
   fake,
 }) => {
-  goOnly()
   const res = await request.post('/speech', {
     multipart: { text: '  안녕하세요  ', language: 'ko', uiLang: 'en' },
   })
@@ -58,7 +48,6 @@ test('POST /speech errors are localized JSON without provider text @speech', asy
   request,
   fake,
 }) => {
-  goOnly()
   for (const [uiLang, message] of [
     ['en', 'Pronunciation failed. Please try again.'],
     ['ko', '발음을 재생하지 못했어요. 다시 시도해 주세요.'],

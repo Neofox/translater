@@ -1,6 +1,6 @@
-// Listen (@speech): ListenButton.tsx / useSpeech.ts on both apps. Main and
+// Listen (@speech): the Listen buttons and web/static/js/speech.js. Main and
 // alternative buttons share one page-wide voice; speech streams from the
-// worker's fake upstream (Go: POST /speech, TS: the speak server function)
+// worker's fake upstream (POST /speech)
 // and plays through synthetic Web Audio (syntheticAudio.ts), so the test
 // decides when an unlock resolves and when scheduled audio ends. Never a paid
 // call: the fake counts every upstream speech request.
@@ -135,7 +135,7 @@ test('listen stops explicitly, completes after audio ends, and replays without a
   await expectPlaying(listen)
   // Network done, scheduled audio still playing: Stop stays offered. (The
   // stopped first play may already have completed its download and been
-  // cached, as in TS: this play then made no request.)
+  // cached: this play then made no request.)
   await waitForStats(fake, (s) => s.active === 0)
   await expectPlaying(listen)
   await finishAudio(page)

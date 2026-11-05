@@ -132,8 +132,8 @@ export function sentence(name: string): string {
 }
 
 export async function openApp(page: Page): Promise<void> {
-  // Wait for hydration: text typed into the SSR textarea before React attaches
-  // is reset by the controlled component.
+  // Wait for the client modules, so typing starts from a fully wired page
+  // (early-typing.spec.ts covers text typed before they run).
   await page.goto('/', { waitUntil: 'networkidle' })
   await expect(source(page)).toBeVisible()
 }

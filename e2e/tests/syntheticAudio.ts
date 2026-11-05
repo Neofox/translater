@@ -2,7 +2,7 @@
 // The apps' real playback code decodes and schedules the PCM it receives;
 // the test decides when an unlock resolves and when scheduled audio ends.
 // Installed as an init script, so it replaces AudioContext before any page
-// script runs (both apps read it at tap time).
+// script runs (the app reads it at tap time).
 import type { Page } from '@playwright/test'
 
 export type AudioOptions = {

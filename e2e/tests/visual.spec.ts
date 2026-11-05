@@ -1,35 +1,24 @@
-// TS-vs-Go visual parity (@visual). Run through `npm run e2e:visual`: the
-// TS production build writes the baselines (--update-snapshots=all), then
-// the Go app must match them. Baselines live under
-// test-results/visual-baseline/<project>/ (playwright.config.ts), so both
-// apps share them and nothing is committed.
+// Visual regression (@visual). `npm run e2e:visual:update` writes the
+// baselines from the current checkout; `npm run e2e:visual` compares the app
+// with them. Baselines live under test-results/visual-baseline/<project>/
+// (playwright.config.ts) and are never committed: they depend on the
+// machine's fonts and browser builds.
 import type { CDPSession, Page } from '@playwright/test'
 import { expect, test } from './helpers'
 import { STATES, foldSession } from '../visual/states'
 import { domSnapshot } from '../visual/dom'
-import { APP } from '../ports'
 
-// Known Go-vs-TS differences, each owned by a later task and scoped to the
-// TS-only elements: the TS baseline run removes `tsHide` before capturing,
-// so the pixels, ARIA and DOM baselines lack exactly those elements and
-// everything else is compared strictly. They are removed, not hidden,
-// because base.css selects on presence (e.g. .app-settings:has(.adjust-menu)).
-// The Go run checks that nothing visible matches `tsHide`: once the owning
-// task renders the element, the gap entry must go. Never list a difference
-// without its owner. None remain: every state compares strictly.
-type Gap = { reason: string; tsHide: string; projects?: RegExp }
-const GO_GAPS: Record<string, Gap[]> = {}
-
-// Pixels that may differ per screenshot. Both apps render on the same
-// machine with the same fonts, so identical markup and CSS give identical
-// pixels; a ratio (0.001 = 221 px on a phone) let a missing label pass.
+// Pixels that may differ per screenshot. Baseline and comparison render on
+// the same machine with the same fonts, so identical markup and CSS give
+// identical pixels; a ratio (0.001 = 221 px on a phone) let a missing label
+// pass.
 const MAX_DIFF_PIXELS = 0
 
 // The scroll containers (result and reference panes).
 const SCROLLERS = '.result-scroll, .reference-scroll'
 
 // Pretendard loads from a CDN with `font-display: optional`, so whether it
-// renders depends on timing. Both apps render the system-font fallback.
+// renders depends on timing. Every capture renders the system-font fallback.
 const WEB_FONTS = /^https:\/\/cdn\.jsdelivr\.net\//
 
 /** Fonts ready, two frames painted and no finite animation or transition
@@ -100,29 +89,6 @@ for (const state of STATES) {
     await page.route(WEB_FONTS, (route) => route.abort())
     await state.setup(page, fake)
     await settle(page)
-    const gaps = (GO_GAPS[state.name] ?? []).filter(
-      (gap) => !gap.projects || gap.projects.test(testInfo.project.name),
-    )
-    for (const gap of gaps) {
-      if (APP === 'ts') {
-        const removed = await page.evaluate(
-          (selector) =>
-            [...document.querySelectorAll(selector)].map((e) => e.remove())
-              .length,
-          gap.tsHide,
-        )
-        expect(
-          removed,
-          `${APP} renders ${gap.tsHide} (${gap.reason})`,
-        ).toBeGreaterThan(0)
-      } else {
-        await expect(
-          page.locator(gap.tsHide).filter({ visible: true }),
-          `Go renders ${gap.tsHide} now: remove its GO_GAPS entry (${gap.reason})`,
-        ).toHaveCount(0)
-      }
-    }
-    if (gaps.length && APP === 'ts') await settle(page)
     const cdp = state.folded ? foldSession(page) : undefined
     if (state.folded) {
       // Folded states: CDP captures, with the posture checked before and
@@ -180,7 +146,7 @@ for (const state of STATES) {
     // toMatchAriaSnapshot matches the baseline as a template, so extra nodes
     // pass (children 'contain'; 'deep-equal' cannot work because the stored
     // template drops text already in a node's name). The whole tree must
-    // also be identical, so an element only Go renders fails too.
+    // also be identical, so an added element fails too.
     expect
       .soft(await page.locator('body').ariaSnapshot())
       .toMatchSnapshot(`${state.name}.aria-tree.txt`)

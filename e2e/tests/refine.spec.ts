@@ -31,7 +31,6 @@ import {
   waitForMain,
   waitForStats,
 } from './helpers'
-import { APP, TS_BUILD } from '../ports'
 
 const PLAIN = fixture('plain').result.main!
 const SOFTER = fixture('refine-softer').result.main!
@@ -133,14 +132,6 @@ async function translatePlain(page: Page): Promise<void> {
   await expect(chip(page, 'softer')).toBeEnabled()
 }
 
-/** The TS dev server loses the reply context (context.spec.ts). */
-function skipTsDev(): void {
-  test.skip(
-    APP === 'ts' && TS_BUILD === 'dev',
-    'TS dev server loses nt.context; use E2E_TS_BUILD=prod',
-  )
-}
-
 async function setContext(page: Page, text: string): Promise<void> {
   await page.getByTestId('context-toggle').click()
   await page.getByTestId('context-textarea').fill(text)
@@ -205,7 +196,7 @@ test('free-text Enter replaces the input with a truncated custom button and clic
   await openAdjust(page)
   await custom(page).click()
   await expect(custom(page)).toBeHidden()
-  // The custom button leaves the DOM: in TS a floating Adjust treats that
+  // The custom button leaves the DOM: a floating Adjust must not treat that
   // click as outside and collapses, and the wider editor stops fitting inline.
   await openAdjust(page, freeform(page))
   await expect(freeform(page)).toBeVisible()
@@ -274,7 +265,6 @@ for (const setting of ['tone', 'target', 'context'] as const) {
   test(`${setting} change disables chips until the new result @refine`, async ({
     page,
   }) => {
-    if (setting === 'context') skipTsDev()
     await translatePlain(page)
     // The open panel floats over the result's language bar.
     if (setting === 'target') await closeAdjust(page)
@@ -305,7 +295,7 @@ test('failed refine rolls back to the previous result with a compact notice @ref
 }) => {
   await translatePlain(page)
   const alternatives = await page.getByTestId('alternative-item').count()
-  // Phrase rows show in the reference pane (TS mounts them only there).
+  // Phrase rows show in the reference pane.
   const visibleRows = () =>
     page.getByTestId('learning-chunk').filter({ visible: true })
   const rows = await visibleRows().count()
@@ -395,7 +385,6 @@ test('a failed refine restores idle Listen and Copy on its rows @refine', async 
 })
 
 test('a non-refine error does not roll back @refine', async ({ page }) => {
-  skipTsDev()
   await translatePlain(page)
   await chip(page, 'softer').click()
   await waitForMain(page, SOFTER)
@@ -492,7 +481,7 @@ test('closes with Escape even when a touch activation leaves focus outside the m
   )
   await page.keyboard.press('Escape')
   await expect(openPanel(page)).toHaveCount(0)
-  // As in TS, that Escape then reaches the translator shortcut, which clears
+  // That Escape then reaches the translator shortcut, which clears
   // the source; the menu leaves with the sentence result.
   await expect(source(page)).toHaveValue('')
   await expect(trigger(page)).toHaveCount(0)
@@ -766,7 +755,6 @@ test('header custom adjustments keep keyboard focus and restore the source keybo
 test('adjustment width measurement reconnects after an error and same-sentence retry @refine', async ({
   page,
 }) => {
-  skipTsDev()
   await translatePlain(page)
   if (page.viewportSize()!.width >= 1100) {
     await makeRoom(page)

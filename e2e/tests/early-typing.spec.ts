@@ -1,13 +1,9 @@
-// Text typed before the client modules run (a slow first load). The Go
+// Text typed before the client modules run (a slow first load). The
 // textarea is plain server HTML, usable from first paint; app.js must give
 // text typed before it ran the debounced run that typing would have
 // scheduled. Text the browser restores on reload or back/forward (form
 // restoration) must never start a paid run.
-//
-// Go only: TS hydration resets the controlled textarea, so nothing typed
-// before hydration survives to be translated.
 import type { Page, Request, Route } from '@playwright/test'
-import { APP } from '../ports'
 import {
   expect,
   fixture,
@@ -18,8 +14,6 @@ import {
   waitForMain,
   waitForStats,
 } from './helpers'
-
-test.skip(APP === 'ts', 'TS hydration wipes text typed before it runs')
 
 const APP_MODULE = '**/static/js/app.*.js'
 

@@ -1,10 +1,8 @@
-// Run analytics form fields (Task 29). The Go client sends the same
-// telemetry-only fields as TS useTranslate (analyticsSessionId, the run it
-// supersedes, the input revision and the trigger); the server puts them in
-// Langfuse metadata only. TS sends them inside a server-function payload, so
-// this checks the Go form posts.
+// Run analytics form fields. The client sends telemetry-only fields
+// (analyticsSessionId, the run it supersedes, the input revision and the
+// trigger) with every POST /translate; the server puts them in Langfuse
+// metadata only.
 import type { Page, Request } from '@playwright/test'
-import { APP } from '../ports'
 import {
   expect,
   fillSource,
@@ -37,7 +35,6 @@ function recordRuns(page: Page): Record<string, string>[] {
 }
 
 test('runs send the analytics fields @core', async ({ page, fake }) => {
-  test.skip(APP === 'ts', 'TS sends them in a server-function payload')
   const runs = recordRuns(page)
   await openApp(page)
 

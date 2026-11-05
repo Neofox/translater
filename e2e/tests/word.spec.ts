@@ -105,7 +105,7 @@ test('dictionary streams POS, meanings and synonyms @word', async ({
   await waitForDone(page)
   const dictionary = await openDictionary(page)
   await expect(dictionary).toBeVisible()
-  // Go keeps the other POS tabs' blocks mounted but hidden.
+  // The other POS tabs' blocks stay mounted but hidden.
   const shown = (text: string) =>
     dictionary.getByText(text, { exact: true }).filter({ visible: true })
   await expect(
@@ -195,16 +195,15 @@ test('the chosen POS tab survives later dictionary updates @word', async ({
   ).toBeVisible()
 })
 
-// Compact layouts look up from the learning surface. TS then loses focus
-// (it focuses the source while the surface still makes it inert, a TS bug
-// Go does not replicate), so only the reference layouts check focus.
+// Compact layouts look up from the learning surface, so only the reference
+// layouts check focus.
 test('synonym starts a new lookup @word', async ({ page }) => {
   await fillSource(page, wordInput('word', 'thanks'))
   await waitForDone(page)
   const dictionary = await openDictionary(page)
   const synonym = (fixture('word').result.synonyms as string[])[0]!
-  // The app's own translation request (Go: form fields, TS: server
-  // function JSON), whatever the server cache holds. Warm-ups never carry
+  // The app's own translation request (form fields), whatever the server
+  // cache holds. Warm-ups never carry
   // the text.
   const encodings = [
     synonym,

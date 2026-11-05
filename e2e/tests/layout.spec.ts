@@ -162,9 +162,9 @@ for (const inset of [0, 12, 64]) {
     // The script-free (server-rendered) paint gets its own context. WebKit
     // keeps a failed <link rel=modulepreload> response in its memory cache
     // for the page's next documents, so a scripted load after an aborted
-    // one in the same page never fetches the modules. Both apps show it
+    // one in the same page never fetches the modules. The app shows it
     // through a plain proxy too (no interception); there it clears after
-    // two reloads for TS and three for Go.
+    // three reloads.
     const { viewport, hasTouch, locale, reducedMotion } = testInfo.project.use
     const options: BrowserContextOptions = {
       viewport,
@@ -442,7 +442,7 @@ test('workspace to Duo resizing preserves the source node cursor and applied con
 test('wide workspaces put excess space outside and align tone and mirrored actions @layout', async ({
   page,
 }) => {
-  test.skip(page.viewportSize()!.width !== 1512, 'macbook-14 only (as TS)')
+  test.skip(page.viewportSize()!.width !== 1512, 'macbook-14 only')
   await openApp(page)
   await fillSource(page, `${fixture('word').match} thanks`)
   await waitForDone(page)
@@ -483,7 +483,7 @@ test('Duo landscape uses source-side notes without changing pane order @layout',
   const input = await rect(page.locator('.input-panel'))
   const output = await rect(page.locator('.output-panel'))
   expect(input.right).toBeLessThanOrEqual(output.left + 1)
-  // Go parks the pane in a hidden dock instead of unmounting it: check
+  // The app parks the pane in a hidden dock instead of unmounting it: check
   // where it is and that it shows, not only that it exists.
   const reference = page.locator('.input-panel > .reference-panel')
   await expect(reference).toHaveCount(1)
@@ -1273,10 +1273,10 @@ for (const posture of ['book', 'laptop'] as const) {
   }
 }
 
-// Found by Task 28: TS's fold test fakes only matchMedia, so its
-// stylesheet never saw the posture. Under a real book posture the folded
-// workspace container hid the narrow-pane dock and Paste and Clear landed on
-// one box under the editor (fixed in src/styles.css for both apps).
+// Found by Task 28: a fold test that fakes only matchMedia never shows the
+// stylesheet the posture. Under a real book posture the folded workspace
+// container hid the narrow-pane dock and Paste and Clear landed on one box
+// under the editor (fixed in web/static/css/base.css).
 test('real book posture keeps Paste and Clear apart on the result dock baseline @layout', async ({
   page,
   browserName,
@@ -1631,8 +1631,7 @@ test('stream completion keeps Copy, language controls and existing alternatives 
   await fillSource(page, withFixture('Thanks for helping me today.', 'anchor'))
   // The fixture's last delta is the closing brace alone, one delay after
   // the rest: the whole result shows while the run is still streaming.
-  // Go swaps the last alternative in only when the stream ends (allowed
-  // difference, Task 16), so the anchored row is the first, finished one.
+  // The last alternative swaps in only when the stream ends (Task 16), so the anchored row is the first, finished one.
   const handle = await page.waitForFunction(
     () => {
       const toolbar = document.querySelector('[data-testid="output-toolbar"]')!
@@ -1815,7 +1814,7 @@ test('portrait keeps alternatives readable with an expanded multiline source @la
     1,
   )
   await expect(page.locator('.output-panel .detail-learning')).toHaveCount(0)
-  // Go keeps these mounted and hidden (allowed difference); TS unmounts them.
+  // These stay mounted and hidden.
   await expect(page.locator('.learning-panel')).toBeHidden()
   await expect(page.locator('.reference-panel')).toBeHidden()
   await expect(
@@ -1873,7 +1872,7 @@ test('wide result languages cannot overlap the reserved main actions near the br
 test('technical translation description has a quieter measure and clear spacing @layout', async ({
   page,
 }) => {
-  test.skip(page.viewportSize()!.width !== 1512, 'macbook-14 only (as TS)')
+  test.skip(page.viewportSize()!.width !== 1512, 'macbook-14 only')
   await openApp(page)
   await fillSource(
     page,
@@ -1943,8 +1942,8 @@ test('aligned workspace keeps matching action boxes and usage with its translati
     await actions.evaluate((e) => Boolean(e.closest('.result-scroll'))),
   ).toBe(false)
   await expect(page.locator('.reference-panel .detail-why')).toHaveCount(0)
-  // Go keeps the reference pane mounted in a hidden dock: only a visible
-  // one counts as TS's mounted pane.
+  // The reference pane stays mounted in a hidden dock: only a visible one
+  // counts.
   if (await page.locator('.reference-panel').isVisible()) {
     await expect(
       page.locator('.reference-panel .word-source-meta'),
