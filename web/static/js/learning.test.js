@@ -1,6 +1,30 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { activate, mainSegments, mirrorSegments, reconcile, selectChunk } from './learning.js'
+import { activate, forSource, mainSegments, mirrorSegments, reconcile, selectChunk } from './learning.js'
+
+test('learning follows a source edited only in its surrounding whitespace', () => {
+  const chunk = { s: 0, e: 2, src: [[3, 5]], g: [[1, 2]] }
+  const source = { side: 'source', chunks: [chunk] }
+  const target = { side: 'target', chunks: [chunk] }
+  // Unchanged: the same object.
+  assert.equal(forSource(source, 'ab cd', 'ab cd'), source)
+  // Another text: none.
+  assert.equal(forSource(source, 'ab cd', 'ab ce'), null)
+  assert.equal(forSource(source, 'ab cd', ' '), null)
+  // A trailing space keeps the offsets.
+  assert.deepEqual(forSource(source, 'ab cd', 'ab cd \n'), source)
+  // Leading whitespace shifts the source offsets only: the primary range
+  // and grammar when learning the source, the counterparts when learning
+  // the translation.
+  assert.deepEqual(forSource(source, ' ab cd', '\n  ab cd'), {
+    side: 'source',
+    chunks: [{ s: 2, e: 4, src: [[3, 5]], g: [[3, 4]] }],
+  })
+  assert.deepEqual(forSource(target, '  ab cd', 'ab cd'), {
+    side: 'target',
+    chunks: [{ s: 0, e: 2, src: [[1, 3]], g: [[1, 2]] }],
+  })
+})
 
 const closed = { identity: 'a:true', open: false, activation: 0, chunk: null }
 

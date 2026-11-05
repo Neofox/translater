@@ -41,6 +41,31 @@ export function selectChunk(state, chunk) {
   return { ...state, open: true, chunk }
 }
 
+const leading = (text) => text.length - text.trimStart().length
+
+/** A sentence's learning `ranges` for the current source `value`, when
+ * they were computed on `input`: the same object while the text is
+ * unchanged, null when the trimmed text differs. An edit of the surrounding
+ * whitespace only keeps them, with the source offsets (UTF-16 into the raw
+ * text) moved by the change in leading whitespace: the primary range and
+ * grammar when learning the source, the counterparts when learning the
+ * translation. */
+export function forSource(ranges, input, value) {
+  if (value === input) return ranges
+  const text = value.trim()
+  if (!text || text !== input.trim()) return null
+  const delta = leading(value) - leading(input)
+  if (!delta) return ranges
+  const move = (pairs) => pairs.map(([s, e]) => [s + delta, e + delta])
+  const source = ranges.side === 'source'
+  return {
+    ...ranges,
+    chunks: ranges.chunks.map((c) =>
+      source ? { ...c, s: c.s + delta, e: c.e + delta, g: move(c.g) } : { ...c, src: move(c.src) },
+    ),
+  }
+}
+
 // Pieces of [from, to) with each range clipped to it and a range starting
 // before the end of the previous one skipped (the TS renderers' rule).
 function plain(out, from, to, ranges, kind) {
@@ -123,12 +148,18 @@ export function initLearning(app) {
     const live = app.live
     return Boolean(live?.done && !app.pending && !live.error && live.raw && live.key === app.currentKey())
   }
-  /** The current sentence's learning, while the source is exactly the text
-   * its ranges were computed on. */
+  /** The current sentence's learning, while the source is the text its
+   * ranges were computed on, up to surrounding whitespace (forSource). The
+   * moved ranges are kept per source value, so an unchanged edit gives the
+   * same object. */
+  let moved = { ranges: null, value: null, result: null }
   const learning = () => {
     const live = app.live
     const ranges = live?.learning
-    return ranges && live.intent === 'sentence' && canOpen() && ta.value === live.input ? ranges : null
+    if (!ranges || live.intent !== 'sentence' || !canOpen()) return null
+    if (moved.ranges !== ranges || moved.value !== ta.value)
+      moved = { ranges, value: ta.value, result: forSource(ranges, live.input, ta.value) }
+    return moved.result
   }
   const layout = () => app.layout.layout()
   const rows = () => [...sentence.querySelectorAll('[data-testid="learning-chunk"]')]

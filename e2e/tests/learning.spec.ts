@@ -169,6 +169,39 @@ async function editor(page: Page): Promise<Editor> {
   })
 }
 
+test('a whitespace-only source edit keeps learning in place @learning', async ({
+  page,
+}) => {
+  // Learning the original source: its ranges are offsets into the raw text.
+  const input = await readKorean(
+    page,
+    'learn-reading',
+    '오늘 도와줘서 고마워요.',
+  )
+  const underlines = ['줘서', '고마워요']
+  await expect(page.getByTestId('source-grammar')).toHaveText(underlines)
+  // Read synchronously after each edit, before the debounced re-run.
+  const edit = (at: 'start' | 'end') =>
+    source(page).evaluate((el, end) => {
+      const ta = el as HTMLTextAreaElement
+      const i = end ? ta.value.length : 0
+      ta.focus()
+      ta.setSelectionRange(i, i)
+      document.execCommand('insertText', false, ' ')
+      return {
+        rows: !document.getElementById('learning-sentence')!.hidden,
+        grammar: [
+          ...document.querySelectorAll('[data-testid="source-grammar"]'),
+        ].map((g) => g.textContent),
+      }
+    }, at === 'end')
+  // A trailing space, then a leading one that shifts every source offset:
+  // the trimmed text is unchanged, so the breakdown and the underlines stay.
+  expect(await edit('end')).toEqual({ rows: true, grammar: underlines })
+  expect(await edit('start')).toEqual({ rows: true, grammar: underlines })
+  expect(await mirrorText(page)).toBe(` ${input} `)
+})
+
 /** The learn-reading result with the editor unfocused, like a page the
  * reader comes back to (fill focuses it). */
 async function readingResult(page: Page, text = '오늘 도와줘서 고마워요.') {
