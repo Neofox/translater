@@ -4,7 +4,7 @@
 //
 // Not compared:
 // - [hidden], [inert] and closed [popover] subtrees. The app keeps some
-//   elements mounted this way (web/static/css/go.css); open ones are
+//   elements mounted this way (hidden until shown); open ones are
 //   compared like any other element.
 // - script, style, template, link, meta and noscript elements, and the
 //   inside of <svg> (icon markup is covered by internal/web/icons tests).

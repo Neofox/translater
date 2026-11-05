@@ -2428,8 +2428,8 @@ textarea:focus-visible {
   width: 85%;
 }
 
-/* SSR cannot know the viewport. Keep the first paint responsive until the
-   measured layout takes over, without changing React's hydration snapshot. */
+/* The server cannot know the viewport. Keep the first paint responsive until
+   layout.js measures and removes data-layout-pending. */
 @container workspace (min-width: 1100px) or ((min-width: 560px) and (width > 100dvh)) {
   .translator-panels[data-layout-pending] {
     --startup-gutter: 16px;
@@ -2753,7 +2753,7 @@ textarea:focus-visible {
 }
 
 /* Use one set of source actions at both sizes, without reparenting or remounts.
-   This query also applies before hydration and matches the 600px result pane. */
+   This query also applies before layout.js runs and matches the 600px result pane. */
 @container workspace (min-width: 1202px) {
   .translator-panels:is([data-layout='workspace'], [data-layout-pending])
     .composer {
@@ -3303,4 +3303,13 @@ textarea:focus-visible {
   .translator-panels[data-keyboard][data-layout='stack'] .source-input-area {
     background: transparent;
   }
+}
+
+/* float.js places the native popovers at fixed coordinates, so drop the UA
+   centring. */
+.settings-popover[popover],
+[role='listbox'][popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
 }

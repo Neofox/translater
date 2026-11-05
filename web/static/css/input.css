@@ -1,14 +1,13 @@
-/* Tailwind v4 entry for the Go app (`make css` → app.css). base.css holds
-   the theme and component rules, pretendard.css the pinned font faces and
-   go.css a few more rules. Only templ files and client modules are scanned,
-   so every class string lives in a .templ or .js file. */
+/* Tailwind v4 entry (`make css` → app.css). base.css holds the theme and
+   component rules, pretendard.css the pinned font faces. Only templ files
+   and client modules are scanned, so every class string lives in a .templ
+   or .js file. */
 @import './pretendard.css';
 @import 'tailwindcss' source(none);
 @source '../../../internal/web/**/*.templ';
 @source '../js/**/*.js';
 @source not '../js/**/*.test.js';
-/* A style value in float.js/adjust.js (useFloating's translate and its
-   will-change), never a class; the TS stylesheet has no such utility. */
+/* `transform` is a style property float.js and adjust.js write, never a
+   class: keep the scanner from emitting an unused utility for it. */
 @source not inline('transform');
 @import './base.css';
-@import './go.css';
