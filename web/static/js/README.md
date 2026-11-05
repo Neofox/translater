@@ -3,7 +3,7 @@
 Plain ES modules, no framework or bundler. `app.js` is the entry and imports
 the others by unhashed path; the page's import map points those paths at the
 hashed, minified files `internal/web/static.go` serves. Tests:
-`node --test 'web/static/js/*.test.js'` (from `go/`).
+`node --test 'web/static/js/*.test.js'`.
 
 | Module        | Role                                                                                   |
 | ------------- | -------------------------------------------------------------------------------------- |
@@ -26,18 +26,16 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 
 ## Language detection
 
-`detectLanguage` keeps the TS app's CJK script counting but does not ship
-`tinyld/light` (33 KB gzip, over the 10 KB allowance): any Latin-script text is
-`en` until the model's `nt-source-lang` event corrects the Auto label. These
-`src/lib/detectLanguage.test.ts` cases are therefore dropped:
-
-- "distinguishes French from English" (`Bonjour, comment ça va aujourd'hui ?` → `fr`)
-- "distinguishes Spanish from English" (`Hola, ¿cómo estás hoy? …` → `es`)
+`detectLanguage` counts CJK scripts but does not ship a Latin-language
+detector such as `tinyld/light` (33 KB gzip, over the 10 KB allowance): any
+Latin-script text is `en` until the model's `nt-source-lang` event corrects
+the Auto label. French (`Bonjour, comment ça va aujourd'hui ?`) and Spanish
+(`Hola, ¿cómo estás hoy? …`) are therefore not told apart from English.
 
 Consequence: under Auto source with target English, Latin-script input in
 another language (French, Spanish, …) is translated to Korean (the client
-sees `en` = target and flips), where the TS app would keep English. This is
-accepted: the real use is EN↔KO. The model's `nt-source-lang` then only
+sees `en` = target and flips), where a full detector would keep English. This
+is accepted: the real use is EN↔KO. The model's `nt-source-lang` then only
 relabels the Auto chip; a result's routing stays pinned to its run while the
 text is unchanged (`routingDetected`), so its Copy/Listen stay usable and no
 second request is made.

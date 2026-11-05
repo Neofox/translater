@@ -1,6 +1,6 @@
 // Stage-0 spike routes (NT_SPIKE=1 only): incremental SSE (GET and POST),
 // request cancellation propagation and instance reuse on Vercel's Go
-// runtime, plus the htmx 4 streaming protocol. go/cmd/spikecheck drives them.
+// runtime, plus the htmx 4 streaming protocol. cmd/spikecheck drives them.
 package main
 
 import (
