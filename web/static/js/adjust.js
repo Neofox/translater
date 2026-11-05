@@ -1,12 +1,11 @@
-// Adjust (AdjustMenu.tsx): the header disclosure around the single
-// RefineRow. Its chips sit beside Tone when their measured width fits;
-// otherwise a trigger opens them in a panel placed under it (float.js),
-// clear of Copy/Listen. With a tight software keyboard the open Custom
-// editor takes over the header itself (base.css), which then reserves the
-// panel's height (--adjust-panel-height).
+// Adjust: the header disclosure around the single refine row (refine.js).
+// Its chips sit beside Tone when their measured width fits; otherwise a
+// trigger opens them in a panel placed under it (float.js), clear of
+// Copy/Listen. With a tight software keyboard the open Custom editor takes
+// over the header itself (base.css), which then reserves the panel's height
+// (--adjust-panel-height).
 //
-// Hand-written: the width rule, dismissal and focus moves are app rules
-// ported from the TS component.
+// Hand-written: the width rule, dismissal and focus moves are app rules.
 
 import { autoUpdate, position } from './float.js'
 
@@ -103,7 +102,7 @@ export function initAdjust(app, ta, relabel) {
     content.inert = !showing
     const style = content.style
     if (floating) {
-      // useFloating's floatingStyles, applied whether or not it is open.
+      // Fixed at the origin until place() moves it, whether or not it is open.
       style.position = 'fixed'
       style.left = style.top = '0px'
     } else
@@ -123,7 +122,7 @@ export function initAdjust(app, ta, relabel) {
   }
 
   /** Chips beside Tone when they fit. Keeps the last decision while the row
-   * is hidden (an error: TS unmounts RefineRow) or a short window shows only
+   * is hidden (after an error) or a short window shows only
    * the Custom editor. */
   function measure() {
     if (!menu.isConnected || row.hidden) return
@@ -132,7 +131,7 @@ export function initAdjust(app, ta, relabel) {
       controls.querySelector('.refine-custom-editor:not([hidden])')
     )
       return
-    // Hidden buttons are the custom variant TS does not render.
+    // Hidden buttons are the inactive custom variant and take no width.
     const buttons = [...controls.querySelectorAll(':scope > button')].filter(
       (b) => !b.hidden,
     )
@@ -190,7 +189,7 @@ export function initAdjust(app, ta, relabel) {
     trigger.focus({ preventScroll: true })
   })
   // After the click's own action (bubble phase), so a reflow cannot swallow
-  // Copy. A control the click hid counts as outside: TS unmounts it.
+  // Copy. A control the click hid counts as outside the menu.
   document.addEventListener('click', (event) => {
     const target = event.target
     if (!open || beside || !(target instanceof Node)) return
@@ -203,8 +202,8 @@ export function initAdjust(app, ta, relabel) {
   // Keyboard and tight flags decide between the panel and the header editor.
   document.addEventListener('nt-layout', render)
 
-  /** Insert or remove the menu (TS mounts it for a sentence result only);
-   * removal forgets its state, as an unmount does. */
+  /** Insert or remove the menu (present for a sentence result only);
+   * removal forgets its open/inline state. */
   function show(on) {
     if (on === menu.isConnected) return
     if (on) {
@@ -220,7 +219,7 @@ export function initAdjust(app, ta, relabel) {
     header.style.removeProperty('--adjust-panel-height')
   }
 
-  /** After RefineRow updated: the summary of active adjustments, a refine
+  /** After the refine row updated: the summary of active adjustments, a refine
    * error message (or null), and what the width depends on. */
   function sync(next) {
     summary = next.summary
@@ -239,7 +238,8 @@ export function initAdjust(app, ta, relabel) {
     }
   }
 
-  /** RefineRow's Close: a panel closes with it; focus returns to the source. */
+  /** The Custom editor's Close: a panel closes with it; focus returns to
+   * the source. */
   function closeCustom() {
     if (!beside) open = false
     render()

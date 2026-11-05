@@ -53,8 +53,7 @@ type Prepared struct {
 // counterpart quotations (sourceTexts) in counterpart. It reports false when
 // no phrase resolves.
 //
-// It is a port of prepareLearningResult in src/lib/learningRanges.ts,
-// hand-written because no library resolves model quotations into
+// It is hand-written because no library resolves model quotations into
 // grapheme-safe, order-disambiguated ranges; graphemes come from
 // rivo/uniseg. The model never counts offsets: every range is found from an
 // exact quotation, and ambiguous or invalid quotations stay unmarked.

@@ -263,8 +263,7 @@ func (p *processor) handle(ev jsonstream.Event) bool {
 // prepare starts learning.Prepare once main and learningPhrases have both
 // closed. The side follows the model-reported languages, falling back to
 // the request's (learningSide). Target ranges are computed on the main text
-// as the page displays it: trimmed, the nt-main-ready value (TS trimMain in
-// useTranslate.ts trims the closed main the same way).
+// as the page displays it: trimmed, the nt-main-ready value.
 func (p *processor) prepare() {
 	if p.learn != nil || !p.mainDone || !p.hasPhrase {
 		return

@@ -9,8 +9,8 @@ import (
 
 // Offsets sent to the browser are UTF-16 code units: the units of the
 // textarea's selection, Range.toString().length and JS string slicing. The
-// helpers here work on []uint16 so every comparison in Prepare is the one the
-// TS port makes on JS strings.
+// helpers here work on []uint16 so every comparison in Prepare matches the
+// same comparison on a JS string.
 
 // encode returns the UTF-16 code units of s.
 func encode(s string) []uint16 { return utf16.Encode([]rune(s)) }
@@ -50,11 +50,12 @@ func lastIndexOf(h, needle []uint16, from int) int {
 }
 
 // boundaries is the set of UTF-16 offsets at extended grapheme cluster
-// boundaries of s, including 0 and its length (Intl.Segmenter granularity
-// "grapheme" in the TS app). Known divergence: uniseg v0.4.7 implements
+// boundaries of s, including 0 and its length (as Intl.Segmenter with
+// granularity "grapheme" finds them). Known divergence: uniseg v0.4.7 implements
 // Unicode 15.0, without the Indic conjunct rule (GB9c) that current browsers
 // apply, so Indic conjuncts such as क्ष split here but not in the browser.
-// Outside the app's language set; the TS parity corpus has no Indic text.
+// Outside the app's language set; the frozen regression corpus
+// (testdata/corpus.json) has no Indic text.
 func boundaries(s string) map[int]bool {
 	points := map[int]bool{0: true}
 	offset := 0

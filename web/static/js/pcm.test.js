@@ -1,4 +1,4 @@
-// Ports of src/lib/pcmPlayer.test.ts. Web Audio does not run in Node: this
+// PcmPlayer tests. Web Audio does not run in Node: this
 // boundary records sample buffers and scheduling while the real decoder and
 // completion logic run.
 import { test } from 'node:test'

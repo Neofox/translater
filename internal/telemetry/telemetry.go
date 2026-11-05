@@ -1,5 +1,5 @@
 // Package telemetry sends optional, content-free Langfuse generation traces
-// over OTLP/HTTP, the Go port of src/server/telemetry.ts.
+// over OTLP/HTTP.
 //
 // It is built on the official OpenTelemetry Go SDK (sdktrace) and its
 // otlptracehttp exporter; only the attribute mapping is app-specific.
@@ -8,15 +8,15 @@
 // LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are non-blank. Each translation
 // that reaches OpenAI becomes one "translation" generation span whose
 // attributes are exactly: the generation markers, the requested model, the
-// reported token usage and the SAFE_TRANSLATION_CONTEXT_KEYS allowlist
-// (RuntimeContext). Source text, context, refinements, prompts, outputs, raw
-// bodies, provider errors and provider metadata never reach a span: a failure
-// is recorded as its classified llm.Kind only.
+// reported token usage and the RuntimeContext allowlist. Source text,
+// context, refinements, prompts, outputs, raw bodies, provider errors and
+// provider metadata never reach a span: a failure is recorded as its
+// classified llm.Kind only.
 //
-// Spans are exported synchronously when they end (sdktrace.WithSyncer, the TS
-// exportMode:'immediate'), because a Vercel Go function has no waitUntil; the
-// handler ends the span after nt-done has been flushed. Initialisation and
-// export failures are never fatal and are warned once, without the error
+// Spans are exported synchronously when they end (sdktrace.WithSyncer),
+// because a Vercel Go function has no waitUntil; the handler ends the span
+// after nt-done has been flushed. Initialisation and export failures are
+// never fatal and are warned once, without the error
 // text (an OTLP error can carry the receiver's response body).
 package telemetry
 
@@ -123,9 +123,8 @@ func (q *quietExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOn
 	return nil
 }
 
-// RuntimeContext is the safe allowlist of translationRuntimeContext
-// (SAFE_TRANSLATION_CONTEXT_KEYS): enumerations, counts, buckets and
-// client-generated ids only.
+// RuntimeContext is the safe allowlist of per-run span attributes:
+// enumerations, counts, buckets and client-generated ids only.
 type RuntimeContext struct {
 	Intent             string
 	Mode               string
@@ -149,7 +148,7 @@ type RuntimeContext struct {
 }
 
 // Analytics are the validated client analytics form fields. Absent fields
-// keep the TS defaults ("" ids, revision -1, trigger "debounce").
+// keep the defaults ("" ids, revision -1, trigger "debounce").
 type Analytics struct {
 	SessionID       string
 	RunID           string
@@ -158,7 +157,8 @@ type Analytics struct {
 	Trigger         string
 }
 
-// NewRuntimeContext ports translationRuntimeContext.
+// NewRuntimeContext derives a run's safe span attributes from its request,
+// config and client analytics.
 func NewRuntimeContext(in prompt.TranslateInput, cfg config.Translate, promptVersion string, a Analytics) RuntimeContext {
 	kind := "initial"
 	switch {
@@ -190,7 +190,7 @@ func NewRuntimeContext(in prompt.TranslateInput, cfg config.Translate, promptVer
 	}
 }
 
-// LengthBucket is characterCountBucket (translationDimensions.ts).
+// LengthBucket is the coarse input-length bucket reported instead of a length.
 func LengthBucket(n int) string {
 	switch {
 	case n == 0:
@@ -207,8 +207,8 @@ func LengthBucket(n int) string {
 	return "2001+"
 }
 
-// utf16Len is JS String.prototype.length (TS data.text.length, measured on
-// the text as posted).
+// utf16Len is JS String.prototype.length (UTF-16 code units) of the text as
+// posted.
 func utf16Len(s string) int {
 	n := 0
 	for _, r := range s {

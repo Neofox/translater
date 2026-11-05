@@ -63,9 +63,9 @@ func elementChildren(n *html.Node) []*html.Node {
 	return out
 }
 
-// The server paints TS's COMPACT_LAYOUT (TranslatorWorkspace.tsx before
-// the first measure): layout.js replaces it, CSS container queries choose
-// the startup arrangement until then.
+// The server paints the compact stacked layout: layout.js replaces it after
+// the first measure, and CSS container queries choose the startup
+// arrangement until then.
 func TestFirstPaintIsTheCompactLayout(t *testing.T) {
 	doc := renderPage(t)
 	shell := find(doc, byClass("app-shell"))
@@ -97,7 +97,7 @@ func TestFirstPaintIsTheCompactLayout(t *testing.T) {
 	}
 }
 
-// ContextField.tsx: the toggle in composer-meta and the field template.
+// Reply context: the toggle in composer-meta and the field template.
 func TestContextToggleAndField(t *testing.T) {
 	doc := renderPage(t)
 	meta := find(doc, byClass("composer-meta"))
@@ -129,7 +129,7 @@ func TestContextToggleAndField(t *testing.T) {
 		t.Error("toggle labels")
 	}
 
-	// Closed, TS renders no composer-context, and base.css selects on its
+	// Closed, the page has no composer-context, and base.css selects on its
 	// presence: the field is a template context.js inserts.
 	field := find(doc, byClass("composer-field"))
 	if find(field, byClass("composer-context")) != nil {

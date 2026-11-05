@@ -1,6 +1,6 @@
-// Word dictionary (WordSourceMeta.tsx state) and the word parts of the
-// reference pane (its placement, and InspectableTranslation's word trigger
-// state; learning.js handles activation).
+// Word dictionary state and the word parts of the reference pane (its
+// placement, and the state of the main text's word-details trigger;
+// learning.js handles activation).
 //
 // Hand-written: the active POS tab is client state the server cannot know.
 // The server renders one block variant per POS into #word-meta (inactive
@@ -9,7 +9,7 @@
 
 import { SEPARATE } from './learning.js'
 
-// PosTabs' class strings (go/internal/web/dictionary.templ).
+// PosTabs' class strings (internal/web/dictionary.templ).
 const TAB_ON = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-accent/60 bg-accent-soft text-ink'
 const TAB_OFF = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-border bg-panel text-ink-soft hover:text-ink'
 // The POS tabs are the first block's buttons (only PosTabs has mb-4, see
@@ -17,7 +17,7 @@ const TAB_OFF = 'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transi
 const TABS = '.word-source-meta > .mb-4 > button'
 
 /** The active tab after a swap: it persists within a run, and resets on a
- * new run or when it is past the POS list (WordSourceMeta's effect). */
+ * new run or when it is past the POS list. */
 export function nextActive(state, run, count) {
   if (state.run !== run || state.active >= Math.max(count, 1)) return { run, active: 0 }
   return state
@@ -74,16 +74,17 @@ export function initDictionary(app, composer) {
       shownRun = live?.run
       meta.replaceChildren()
     }
-    // A stopped run keeps what it received; TS drops the skeleton once
-    // nothing streams, and renders nothing when nothing was received.
+    // A stopped run keeps what it received: the skeleton goes once nothing
+    // streams, and the box goes when nothing was received.
     if (live && !app.streaming()) {
       for (const pulse of meta.querySelectorAll('.animate-pulse')) pulse.closest('.word-source-meta > *')?.remove()
       const box = meta.querySelector('.word-source-meta')
       if (box && !box.children.length) box.remove()
     }
-    // TS mounts the pane only for a word or a sentence with learning, and
-    // not under an open learning surface; base.css selects on its presence,
-    // so it waits in a hidden dock otherwise. learning.js writes its heading.
+    // The pane is in the input panel only for a word or a sentence with
+    // learning, and not under an open learning surface; base.css selects on
+    // its presence, so it waits in a hidden dock otherwise. learning.js
+    // writes its heading.
     const home = (word || app.learning.ready()) && separate && !app.learning.panelOpen() ? inputPanel : dock
     if (panel.parentElement !== home) home.append(panel)
 

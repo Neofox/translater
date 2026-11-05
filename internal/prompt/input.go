@@ -18,7 +18,7 @@ import (
 )
 
 // TranslateInput is one translation request. Text and PreviousMain are used
-// verbatim; Context is trimmed (JS semantics) where the TS app trims it.
+// verbatim; Context is trimmed (JS semantics) by the prompt and cache key.
 type TranslateInput struct {
 	Text         string   `json:"text"`
 	Source       string   `json:"source"`
@@ -65,9 +65,9 @@ func (e *FieldError) Error() string {
 
 func (e *FieldError) Unwrap() error { return ErrInvalidInput }
 
-// Validate applies the limits and enumerations of the TS zod schema
-// (src/server/translateTypes.ts). Lengths are UTF-16 code units, as zod
-// counts them, so "non-empty" means length ≥ 1 (whitespace counts).
+// Validate applies the shared limits and enumerations. Lengths are UTF-16
+// code units, as the browser's textarea counts them, so "non-empty" means
+// length ≥ 1 (whitespace counts).
 func (in TranslateInput) Validate(l contract.Limits) error {
 	bad := func(field, reason string) error { return &FieldError{Field: field, Reason: reason} }
 	switch {
@@ -117,7 +117,7 @@ func JSTrim(s string) string {
 	})
 }
 
-// blockTag ports prompts.ts BLOCK_TAG,
+// blockTag is the block-tag pattern of the original TypeScript prompts,
 // /<(\s*\/?\s*(?:source|context|adjustments)\b[^<>]*)>/gi, with JavaScript
 // semantics spelled out because RE2 differs: JS \s also covers \v, NBSP,
 // the Zs spaces, LS/PS and the BOM; JS /i without /u does not fold
@@ -143,8 +143,8 @@ var blockTag = func() *regexp.Regexp {
 func LiveText(s string) string { return blockTag.ReplaceAllString(s, "‹${1}›") }
 
 // LiveInput is the second text part of the final user message: the optional
-// context and adjustments blocks followed by the source block
-// (prompts.ts userBlocks + sourceBlock). Word intent passes only context.
+// context and adjustments blocks followed by the source block. Word intent
+// passes only context.
 func LiveInput(in TranslateInput) string {
 	var b strings.Builder
 	if ctx := JSTrim(in.Context); ctx != "" {

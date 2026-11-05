@@ -9,15 +9,15 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-// Ports of the src/lib/learningRanges.test.ts cases that call
-// prepareLearningResult, under the same names.
+// Prepare cases: phrase, counterpart and grammar ranges, ambiguity and
+// partial coverage.
 
 const (
 	thanksSource = "Thanks for helping me today."
 	thanksTarget = "오늘 도와줘서 고마워요."
 )
 
-// withFact fills the shared learner facts of the TS `fact` fixture.
+// withFact fills the learner facts the cases share.
 func withFact(p Phrase) Phrase {
 	p.Gloss = or(p.Gloss, "for helping me")
 	p.BaseForm = "도와주다"
@@ -129,7 +129,7 @@ func TestPrepare(t *testing.T) {
 		if h := got.Chunks[0].GrammarHighlights; len(h) != 0 {
 			t.Errorf("highlights = %v, want none", h)
 		}
-		// Whitespace-only grammar counts as absent (TS `grammar.trim()`).
+		// Whitespace-only grammar counts as absent.
 		p.Grammar = " \n"
 		if h := mustPrepare(t, "today", "오늘", []Phrase{p}).Chunks[0].GrammarHighlights; len(h) != 0 {
 			t.Errorf("blank grammar highlights = %v, want none", h)

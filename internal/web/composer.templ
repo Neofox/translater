@@ -5,7 +5,8 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// inputPanel is InputPanel.tsx. The textarea belongs to no form and sits
+// inputPanel is the source pane: language bar, editor, actions and reply
+// context. The textarea belongs to no form and sits
 // outside every swap target: runs copy its exact value into
 // #translate-form, so streaming and preference swaps never touch it.
 templ inputPanel(v View) {

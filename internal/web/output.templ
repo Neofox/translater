@@ -5,7 +5,7 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// outputPanel is OutputPanel.tsx. stream.js fills the result regions from
+// outputPanel is the result pane. stream.js fills the result regions from
 // the nt-* events; #result-details receives the server's partials
 // (ResultSkeleton, AlternativeRow). Copy/Listen are disabled until the
 // current run allows them (copy.js); speech.js plays Listen.
@@ -13,7 +13,7 @@ templ outputPanel(v View) {
 	<section class="output-panel" aria-label={ v.T("translation") } data-t-attr="aria-label:translation" aria-busy="false">
 		<div class="target-toolbar" data-testid="target-toolbar">
 			<button type="button" class="swap-button" aria-label={ v.T("swapLanguages") } data-t-attr="aria-label:swapLanguages">
-				// OutputPanel renders one of the two icons; app.setSwapBusy
+				// One of the two icons shows at a time; app.setSwapBusy
 				// flips their hidden attributes.
 				@icons.Icon("arrow-right-left", 18, templ.Attributes{"data-icon": "swap"})
 				@icons.Icon("loader-circle", 18, templ.Attributes{"class": "animate-spin", "data-icon": "busy", "hidden": true})
@@ -41,7 +41,7 @@ templ outputPanel(v View) {
 				// The hint (input errors) or errorEnvHint (server errors).
 				<p id="result-error-hint" class="mt-2 text-ink-dim" hidden></p>
 				// Server errors only. stream.js adds the label as a bare text
-				// node (as in TS) when it shows the error.
+				// node, no wrapper, when it shows the error.
 				<div class="state-actions" hidden>
 					@ui.Pill(ui.PillProps{Tone: "accent", Size: "md", Class: "retry-button"}) {
 						@icons.Icon("rotate-ccw", 18, nil)

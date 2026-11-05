@@ -1,13 +1,12 @@
-// Word results (@word): WordView.tsx alternatives with register tags, the
-// word-details trigger as main text, and the dictionary (WordSourceMeta.tsx,
-// CharacterNotes.tsx) in the reference pane of workspace/split/book layouts.
-// Compact layouts show the dictionary only in the learning surface
-// (LearningPanel.tsx), which opens from the trigger of a finished result, so
-// the tests that read the dictionary while it streams skip there.
+// Word results (@word): word alternatives with register tags, the
+// word-details trigger as main text, and the word dictionary (with its
+// character notes) in the reference pane of workspace/split/book layouts.
+// Compact layouts show the dictionary only in the mobile learning surface,
+// which opens from the trigger of a finished result, so the tests that read
+// the dictionary while it streams skip there.
 //
-// Activation (OutputPanel.tsx's word onInspect, ReferencePanel.tsx): the
-// desktop workspace focuses the reference heading on every activation; every
-// other layout, split and book included (`desktop` is the workspace only),
+// Activation of the word-details trigger: the desktop workspace focuses the
+// reference heading on every activation; every other layout, split and book included (`desktop` is the workspace only),
 // opens the learning surface over an inert background.
 import type { Page } from '@playwright/test'
 import {
@@ -33,7 +32,7 @@ function wordInput(name: string, head: string): string {
 
 const meta = (page: Page) => page.locator('.reference-panel .word-source-meta')
 
-/** The layout shows the reference pane (ReferencePanel.tsx). */
+/** The layout shows the reference pane. */
 async function separateReference(page: Page): Promise<boolean> {
   const layout = await page
     .locator('.translator-panels')
@@ -48,7 +47,7 @@ async function skipWithoutReference(page: Page): Promise<void> {
   )
 }
 
-/** The desktop workspace (`desktop` in useWorkspaceLayout.ts). */
+/** The desktop workspace (`desktop` in layout.js). */
 async function isDesktop(page: Page): Promise<boolean> {
   return (
     (await page.locator('.translator-panels').getAttribute('data-desktop')) ===

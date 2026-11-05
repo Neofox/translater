@@ -32,7 +32,7 @@ let composer, stream, copy, prefs, dictionary, speech
 let modelDetected = null
 // Input for which the done-time safety net already flipped the target.
 let flipGuard = null
-// Run analytics (useTranslate.ts), sent to Langfuse only: a per-page id
+// Run analytics, sent to Langfuse only: a per-page id
 // (memory only, never a durable user id), the input revision, and the run a
 // new run replaces. Never part of the request key.
 const analyticsSessionId = crypto.randomUUID()
@@ -146,7 +146,7 @@ const app = {
       text: trimmed, input: text, intent, source, target,
       raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
       sourceLang: null, headword: '', rationale: '', formality: '',
-      // Set from the model's targetLang (nt-target-lang), as TS does.
+      // Set from the model's targetLang (nt-target-lang), not the selection.
       mode, targetLang: null, register: '',
     }
     app.live = live
@@ -173,8 +173,8 @@ const app = {
     htmx.trigger(form, 'nt-run')
   },
 
-  /** The model named the output language of the current run: OutputPanel's
-   * register label needs a reported Korean sentence. */
+  /** The model named the output language of the current run: the output
+   * panel's register label needs a reported Korean sentence. */
   targetReported(live) {
     live.register = live.intent === 'sentence' && live.targetLang === 'ko' ? REGISTER[live.mode] : ''
   },
@@ -228,7 +228,7 @@ function updateCount() {
   else el.removeAttribute('aria-live')
 }
 
-// Swap languages (OutputPanel.tsx): a finished result becomes the new input.
+// Swap languages (output panel): a finished result becomes the new input.
 document.querySelector('.swap-button')?.addEventListener('click', () => {
   const { source, target } = app.prefs
   const from = source === 'auto' ? (app.detected() ?? 'en') : source
@@ -244,7 +244,7 @@ document.querySelector('.swap-button')?.addEventListener('click', () => {
   }
 })
 
-// Retry a failed run with the current input (TS run(undefined, 'force')).
+// Retry a failed run with the current input at once (trigger 'force').
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element && event.target.closest('.retry-button'))) return
   composer.clearTimer()
@@ -262,7 +262,7 @@ composer = initComposer(app, ta)
 app.refine = initRefine(app, form, stream.restore, (root) => prefs.applyStrings(root))
 app.learning = initLearning(app)
 dictionary = initDictionary(app, composer)
-// InputPanel re-sizes the editor whenever the layout changes.
+// The source editor re-sizes whenever the layout changes.
 document.addEventListener('nt-layout', () => {
   composer.resize()
   app.learning.sync()

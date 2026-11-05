@@ -19,7 +19,7 @@ func TestCharacterLabelKey(t *testing.T) {
 		"勉強する": "kanji",
 		"学校":   "hanzi",
 		"abc":  "characters",
-		// Hangul wins over kana, kana over Han (the TS check order).
+		// Hangul wins over kana, kana over Han (the check order).
 		"学校학": "hanja",
 		"学す":  "kanji",
 	} {

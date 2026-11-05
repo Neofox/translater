@@ -7,10 +7,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-// AdjustMenu.tsx at rest: the collapsed trigger (a md Pill with its label
-// and chevron; the icon-only SlidersHorizontal variant stays mounted hidden)
-// and the closed group around RefineRow. adjust.js swaps the tone class and
-// the icons as the measured width changes.
+// The Adjust menu at rest: the collapsed trigger (a md Pill with its label
+// and chevron; the icon-only sliders-horizontal variant stays mounted
+// hidden) and the closed group around the refine row. adjust.js swaps the
+// tone class and the icons as the measured width changes.
 func TestAdjustMenuMarkup(t *testing.T) {
 	doc := renderPage(t)
 	tpl := find(doc, func(n *html.Node) bool { return n.Data == "template" && attrVal(n, "id") == "adjust-template" })

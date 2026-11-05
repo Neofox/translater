@@ -9,9 +9,9 @@ package web
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// Header (TranslatorWorkspace.tsx app-header): brand, Tone (ModeToggle.tsx),
-// Adjust (refine.templ) and the Settings trigger (SettingsMenu.tsx). Labels carry data-t keys so
-// prefs.js relabels them on a UI-language switch without a swap.
+// Header (app-header): brand, the Tone toggle, Adjust (refine.templ) and the
+// Settings trigger. Labels carry data-t keys so prefs.js relabels them on a
+// UI-language switch without a swap.
 func header(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

@@ -5,8 +5,8 @@ import "testing"
 // TestTargetLangEvent: the model-reported targetLang reaches the page as
 // nt-target-lang when its value closes, right after nt-source-lang and before
 // any main text, live and on a cache replay. The page uses it for the main
-// text's lang, the register label and the Listen language (OutputPanel.tsx's
-// live.partial.targetLang), falling back to the request target until then.
+// text's lang, the register label and the Listen language, falling back to
+// the request target until then.
 func TestTargetLangEvent(t *testing.T) {
 	e := newEnv(t, fixturesDir, nil)
 	for _, attempt := range []string{"live", "cached"} {

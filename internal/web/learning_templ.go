@@ -20,7 +20,7 @@ import (
 // learning.Prepare resolved, in primary-text order.
 type LearningRowsView struct {
 	Run      string
-	Language string // lang of the analysed text (LearningContext's language)
+	Language string // lang of the analysed text
 	Chunks   []learning.Chunk
 	Partial  bool
 	T        func(string) string
@@ -31,7 +31,7 @@ type learningFact struct {
 	label, value, lang string
 }
 
-// facts are LearningInspector.tsx's FACTS in order, non-blank only (JS
+// facts are a phrase's learner facts in display order, non-blank only (JS
 // trim), with baseForm in the analysed language.
 func (v LearningRowsView) facts(c learning.Chunk) []learningFact {
 	all := []learningFact{
@@ -63,9 +63,8 @@ func chunkGloss(c learning.Chunk) string {
 // punctuation-only rows are skipped (learning.js reads it back).
 func phraseID(run string, i int) string { return "lp-" + run + "-" + strconv.Itoa(i) }
 
-// LearningRows is the content of LearningInspector.tsx's whole-sentence
-// section (#learning-sentence in the reference pane). TS mounts only the
-// expanded row's details; here every row's details wait `hidden` and
+// LearningRows is the whole-sentence phrase breakdown (#learning-sentence
+// in the reference pane). Every row's details wait `hidden` and
 // learning.js shows the selected one.
 func LearningRows(v LearningRowsView) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -97,7 +96,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Text + " " + chunkGloss(c)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 66, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 65, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 				if templ_7745c5c3_Err != nil {
@@ -110,7 +109,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(phraseID(v.Run, i)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 66, Col: 127}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 65, Col: 127}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 				if templ_7745c5c3_Err != nil {
@@ -123,7 +122,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Language).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 67, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 66, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -136,7 +135,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(c.Text)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 67, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 66, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -149,7 +148,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(chunkGloss(c))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 67, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 66, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -162,7 +161,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(phraseID(v.Run, i)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 69, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 68, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -175,7 +174,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Text).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 69, Col: 91}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 68, Col: 91}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -193,7 +192,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(v.T(f.label))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 73, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 72, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -211,7 +210,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.lang).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 76, Col: 24}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 75, Col: 24}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 						if templ_7745c5c3_Err != nil {
@@ -229,7 +228,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(f.value)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 78, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 77, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
@@ -266,7 +265,7 @@ func LearningRows(v LearningRowsView) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(v.T("learningPartial"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 89, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/learning.templ`, Line: 88, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {

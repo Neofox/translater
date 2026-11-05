@@ -5,9 +5,8 @@ import (
 	"errors"
 )
 
-// Hand-written because the check is a few lines and must match the TS
-// validator (pcmFromWav in src/server/speech.server.ts) exactly; WAV libraries
-// decode to samples and reject OpenAI's streaming placeholder sizes.
+// Hand-written because the check is a few lines; WAV libraries decode to
+// samples and reject OpenAI's streaming placeholder sizes.
 
 const (
 	// MaxAudioBytes bounds the PCM payload (8 MiB).

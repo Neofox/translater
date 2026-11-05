@@ -61,7 +61,7 @@ test('selecting a row opens learning on that phrase; collapsing keeps it open (u
 
 const seg = (from, to, kind) => ({ from, to, kind })
 
-// InspectableTranslation.tsx: grammar annotations become inspectable
+// Main text: grammar annotations become inspectable
 // phrases; a later range starting before the end of the previous one is
 // skipped (start < cursor), never split or merged.
 test('main segments mark grammar annotations and skip overlaps', () => {
@@ -84,7 +84,7 @@ test('empty text has no segments', () => {
   assert.deepEqual(mirrorSegments(0, [], []), [])
 })
 
-// SourceHighlight.tsx: highlighted spans sorted by start (overlaps skipped),
+// Source mirror: highlighted spans sorted by start (overlaps skipped),
 // grammar annotations only in the text between them.
 test('mirror segments mark spans and underline grammar outside them', () => {
   assert.deepEqual(mirrorSegments(14, [[3, 7]], [[5, 7], [10, 14]]), [

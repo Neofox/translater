@@ -14,9 +14,9 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// learningPanel is LearningPanel.tsx, the mobile reading surface. TS mounts
-// it only while open; here it waits `hidden` at the end of .output-panel,
-// and learning.js sets data-expanded only while it is open (base.css hides
+// learningPanel is the mobile learning reading surface. It waits `hidden`
+// at the end of .output-panel, and learning.js sets data-expanded only
+// while it is open (base.css hides
 // the source and header when any .learning-panel[data-expanded] exists).
 // learning.js moves #learning-inspector into the body while it is open and
 // writes the heading.

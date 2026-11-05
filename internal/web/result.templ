@@ -8,15 +8,15 @@ import (
 )
 
 // Result fragments streamed by /translate as <hx-partial> swaps. Markup,
-// class strings and data-testids follow the TS components (SentenceView /
-// WordView ResultSection, AlternativeItem, Pill, Tag) so the carried-over CSS
-// styles them identically. templ escapes all model text.
+// class strings and data-testids are those of the original TypeScript
+// components (result sections, alternative items, Pill, Tag) so the
+// carried-over CSS styles them identically. templ escapes all model text.
 
 // ResultSkeleton is the content of #result-details at the start of a run:
 // the always-open alternatives section with an empty #alternatives list that
 // AlternativeRow partials are appended to. The section stays mounted while
-// empty (TS unmounts it, and never mounts it for long-form input) under
-// `hidden`, which stream.js lifts once it holds an alternative item.
+// empty (including for long-form input, which never gets an alternative)
+// under `hidden`, which stream.js lifts once it holds an alternative item.
 templ ResultSkeleton(title string) {
 	<section class="result-section detail-alternatives" aria-labelledby="alternatives-title" hidden>
 		<h3 id="alternatives-title" class="result-section-title"><span>{ title }</span></h3>
@@ -26,9 +26,9 @@ templ ResultSkeleton(title string) {
 	</section>
 }
 
-// AlternativeSkeleton is AlternativeItemSkeleton.tsx: the newest
-// alternative while the run streams, with real, disabled Copy and Listen.
-// The id (Go only) lets the settled AlternativeRow replace it.
+// AlternativeSkeleton is the newest alternative while the run streams,
+// with real, disabled Copy and Listen. The id lets the settled
+// AlternativeRow replace it.
 templ AlternativeSkeleton(copyLabel, listenLabel string) {
 	<li id="alternative-skeleton" class="alternative-item alternative-skeleton" aria-hidden="true">
 		<div class="alternative-actions inline-flex items-center">
@@ -44,11 +44,12 @@ templ AlternativeSkeleton(copyLabel, listenLabel string) {
 	</li>
 }
 
-// AlternativeRow is one completed alternative (AlternativeItem.tsx). Word
-// rows always use the wrapper with register tags: WordView passes children
-// (an array, truthy even when empty). Copy and Listen (ListenButton.tsx,
-// compact) render disabled; the client enables them once the whole current
-// result has completed; speech.js plays Listen, like the main one.
+// AlternativeRow is one completed alternative. Word rows always use the
+// wrapper with register tags, even with no registers (kept from the
+// original TypeScript app, where an empty tag list still counted as
+// present). Copy and Listen (compact) render disabled; the client enables
+// them once the whole current result has completed; speech.js plays
+// Listen, like the main one.
 templ AlternativeRow(index int, word bool, text, note string, registers []string, copyLabel, listenLabel string) {
 	<li data-testid="alternative-item" class="alternative-item detail-enter group flow-root rounded-lg border border-border bg-panel px-3 py-2" style={ templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms") }>
 		if text != "" {

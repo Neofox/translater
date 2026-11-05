@@ -1,9 +1,8 @@
-// Learning: LearningContext/useLearning state over the initial translation
-// response, LearningInspector.tsx's rows, InspectableTranslation.tsx's
-// main-text phrases, SourceHighlight.tsx's mirror under the source, the
-// word-details activation, LearningPanel.tsx (the mobile surface),
-// ReferencePanel.tsx's heading and the `inert` background of
-// InputPanel/OutputPanel.
+// Learning: phrase-inspection state over the initial translation response,
+// the learning inspector rows, the main-text phrases, the highlight mirror
+// under the source, the word-details activation, the mobile learning
+// surface, the reference pane's heading and the `inert` background of the
+// input and output panels.
 //
 // Hand-written: this is the app's own learning state machine over
 // server-rendered markup (no library models it). The server sends a
@@ -16,17 +15,16 @@
 
 import { initMainTaps, initSourceTaps } from './inspect.js'
 
-/** Layouts with a reference pane beside the source (TranslatorWorkspace). */
+/** Layouts with a reference pane beside the source. */
 export const SEPARATE = ['workspace', 'split', 'book']
 
 /** The state resets whenever its identity (the run, whether its result can
- * open, and whether its learning still matches the source) changes:
- * LearningContext's wordIdentity effect and useLearning's identity. */
+ * open, and whether its learning still matches the source) changes. */
 export function reconcile(state, identity) {
   return state.identity === identity ? state : { ...state, identity, open: false, chunk: null }
 }
 
-/** A trigger activation (OutputPanel's word onInspect): it closes an open
+/** A word-details trigger activation: it closes an open
  * surface where there is no reference pane, otherwise it opens and counts,
  * so the reference heading takes focus on every activation. */
 export function activate(state, { canOpen, separate }) {
@@ -35,7 +33,7 @@ export function activate(state, { canOpen, separate }) {
   return { ...state, open: true, activation: state.activation + 1 }
 }
 
-/** A row click (useLearning's selectChunk): learning opens on that phrase,
+/** A row click: learning opens on that phrase,
  * or stays open with none expanded when the row collapses. */
 export function selectChunk(state, chunk) {
   return { ...state, open: true, chunk }
@@ -67,7 +65,7 @@ export function forSource(ranges, input, value) {
 }
 
 // Pieces of [from, to) with each range clipped to it and a range starting
-// before the end of the previous one skipped (the TS renderers' rule).
+// before the end of the previous one skipped (overlaps never nest).
 function plain(out, from, to, ranges, kind) {
   let cursor = from
   for (const [s, e] of ranges) {
@@ -81,7 +79,7 @@ function plain(out, from, to, ranges, kind) {
   if (to > cursor) out.push({ from: cursor, to, kind: 'text' })
 }
 
-/** Main text pieces (InspectableTranslation's renderText): grammar
+/** Main text pieces: grammar
  * `highlights` as 'phrase', the `selected` chunk as one 'selected' piece. */
 export function mainSegments(length, highlights, selected) {
   const out = []
@@ -95,7 +93,7 @@ export function mainSegments(length, highlights, selected) {
   return out
 }
 
-/** Source mirror pieces (SourceHighlight's renderPlain): highlighted
+/** Source mirror pieces: highlighted
  * `spans` as 'mark' in start order, `grammar` between them as 'grammar'. */
 export function mirrorSegments(length, spans, grammar) {
   const out = []
@@ -139,11 +137,11 @@ export function initLearning(app) {
   let mirror = null
   let mirrored = ''
   let scrolledTo = null
-  // The editor state when learning opened from a source grammar tap
-  // (LearningContext's sourceFocus), restored when the surface closes.
+  // The editor state when learning opened from a source grammar tap,
+  // restored when the surface closes.
   let saved = null
 
-  /** The current, finished, error-free result (LearningContext's canOpen). */
+  /** The current, finished, error-free result: learning can open. */
   const canOpen = () => {
     const live = app.live
     return Boolean(live?.done && !app.pending && !live.error && live.raw && live.key === app.currentKey())
@@ -177,8 +175,9 @@ export function initLearning(app) {
     } else {
       delete panel.dataset.expanded
       home.append(inspector)
-      // LearningPanel's close effect: the exact editor state when opened from
-      // the source and the result is unchanged, else the trigger or the main
+      // Closing the mobile surface restores the exact editor state when
+      // opened from the source and the result is unchanged, else the trigger
+      // or the main
       // text (a disabled trigger keeps focus where it is).
       const source = saved
       saved = null
@@ -219,7 +218,7 @@ export function initLearning(app) {
     decorated = ''
   }
 
-  /** Mirror styles and scroll follow the textarea (SourceHighlight). */
+  /** Mirror styles and scroll follow the textarea. */
   function syncMirror() {
     if (!mirror) return
     const style = getComputedStyle(ta)
@@ -282,7 +281,7 @@ export function initLearning(app) {
     if (top < 0 || top > scroll.clientHeight - row.offsetHeight) scroll.scrollTop += top
   }
 
-  /** InspectableTranslation's sentence state: target-side grammar phrases
+  /** The main text's sentence state: target-side grammar phrases
    * and the selected chunk, `data-inspectable` and, on mobile, the
    * whole-text button semantics. Words keep their trigger (dictionary.js). */
   function renderMain(ranges, desktop) {
@@ -316,7 +315,7 @@ export function initLearning(app) {
     if (state.open && !desktop) {
       if (!shown) setOpen(true)
     } else if (shown) setOpen(false)
-    // LearningPanel's heading names the selected phrase.
+    // The mobile surface's heading names the selected phrase.
     const row = rows().find((r) => ranges && indexOf(r) === state.chunk)
     title.textContent = app.t('learn') + (row ? ` · ${row.firstElementChild.textContent}` : '')
     heading.textContent = wordOpen
@@ -326,11 +325,11 @@ export function initLearning(app) {
     else delete reference.dataset.wordActive
     const trigger = main.querySelector('.word-details-trigger')
     trigger?.setAttribute('aria-expanded', String(SEPARATE.includes(mode) || state.open))
-    // LearningInspector renders only the section of the result's intent.
+    // The inspector shows only the section of the result's intent.
     meta.hidden = !word
     renderRows(ranges)
     renderMain(ranges, desktop)
-    // InputPanel: source grammar before any selection when learning the
+    // Source mirror: grammar before any selection when learning the
     // original source; the selected chunk itself there, or its counterpart
     // quotations when learning the translation.
     const selected = ranges && state.chunk !== null ? ranges.chunks[state.chunk] : null
@@ -347,7 +346,7 @@ export function initLearning(app) {
     app.updateActions()
   }
 
-  /** LearningContext's openAt: learning opens on the phrase containing
+  /** Learning opens on the phrase containing
    * `offset` (none for the overview). A source grammar tap keeps the exact
    * editor state for the close. */
   function openAt(offset, origin) {
@@ -361,19 +360,19 @@ export function initLearning(app) {
     app.updateActions()
   }
 
-  /** The word trigger's activation (OutputPanel's word onInspect). */
+  /** The word trigger's activation. */
   function activateWord() {
     const { mode, desktop } = layout()
     state = activate(state, { canOpen: canOpen(), separate: SEPARATE.includes(mode) })
     app.updateActions()
-    // ReferencePanel's effect: the heading takes focus on every activation.
+    // The reference heading takes focus on every activation.
     if (desktop && state.open) {
       heading.focus({ preventScroll: true })
       home.scrollTo({ top: 0 })
     }
   }
 
-  /** A main text tap at `offset` (OutputPanel's sentence onInspect). When
+  /** A main text tap at `offset` on a sentence result. When
    * learning the original source, the tapped translation maps to the phrase
    * whose counterpart quotation contains it, else to the overview. */
   function inspectMain(offset) {
@@ -388,7 +387,7 @@ export function initLearning(app) {
 
   initMainTaps({
     key: () => state.identity,
-    // InspectableTranslation's chunks: the prepared target-side highlights.
+    // The main text's chunks: the prepared target-side highlights.
     hits: () => {
       const ranges = learning()
       return ranges && ranges.side !== 'source' ? ranges.chunks.flatMap((c) => c.g) : []

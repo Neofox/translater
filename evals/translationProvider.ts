@@ -81,7 +81,8 @@ async function writeCached(key: string, value: object) {
 
 // The cache key hashes everything model-facing: prompt, schema, model,
 // reasoning, tier and repeat index, so prompt edits never reuse stale
-// outputs. Its shape is the one the TS provider hashed (the AI SDK call:
+// outputs. Its shape is the one the earlier TypeScript provider hashed (the
+// AI SDK call:
 // instructions, messages and OpenAI provider options, and the schema as
 // zod's toJSONSchema rendered it, which differs from the file only in
 // $schema), rebuilt from the Go body so earlier cached translations still

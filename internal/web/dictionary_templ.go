@@ -17,10 +17,11 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// Dictionary content of a word result: WordSourceMeta.tsx and
-// CharacterNotes.tsx, in the same JSX render order with the same class
-// strings. /translate re-renders WordMeta into #word-meta after every
-// completed posList item and top-level field (ValueEnd), so a section shows
+// Dictionary content of a word result: the word dictionary and its character
+// notes, in the render order and with the class strings of the original
+// TypeScript components, which the visual baselines were taken from.
+// /translate re-renders WordMeta into #word-meta after every completed
+// posList item and top-level field (ValueEnd), so a section shows
 // once it is complete; while streaming, the first section not ready yet
 // for the active POS tab shows its skeleton. Empty comments keep "2.",
 // "(noun)" and the character
@@ -53,9 +54,8 @@ type WordMetaView struct {
 	Synonyms   []string
 }
 
-// CharacterLabelKey is the STRINGS key naming a word's characters
-// (CharacterNotes.tsx characterLabelKey): Hangul → hanja, kana → kanji,
-// Han → hanzi.
+// CharacterLabelKey is the STRINGS key naming a word's characters, checked
+// in this order: Hangul → hanja, kana → kanji, Han → hanzi.
 func CharacterLabelKey(word string) string {
 	has := func(lo, hi rune) bool {
 		return strings.ContainsFunc(word, func(r rune) bool { return r >= lo && r <= hi })
@@ -71,11 +71,10 @@ func CharacterLabelKey(word string) string {
 	return "characters"
 }
 
-// posVariant is what WordSourceMeta renders for one active POS index. The
+// posVariant is what the dictionary renders for one active POS index. The
 // server cannot know the client's active tab, so it renders one variant
 // per POS; all but the first are mounted `hidden` and dictionary.js shows
-// the active one (the variants are direct children of .word-source-meta,
-// like TS's blocks).
+// the active one (the variants are direct children of .word-source-meta).
 type posVariant struct {
 	Index        int
 	Pos          *POSView
@@ -131,7 +130,8 @@ func (v WordMetaView) readyFor(pv posVariant) map[string]bool {
 
 var metaSectionOrder = []string{"primary", "other", "etymology", "grammar", "notes", "characters", "synonyms"}
 
-// shown: TS returns null when nothing is known and nothing streams.
+// shown is false when nothing is known and nothing streams: the dictionary
+// then renders nothing.
 func (v WordMetaView) shown() bool {
 	if v.Streaming || len(v.POS) > 0 {
 		return true
@@ -215,7 +215,7 @@ func variantAttrs(i int) templ.Attributes {
 	return a
 }
 
-// WordMeta is WordSourceMeta.tsx for the result received so far.
+// WordMeta is the word dictionary for the result received so far.
 func WordMeta(v WordMetaView) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -1003,8 +1003,8 @@ func skeletonBlockAttrs(v WordMetaView, key string, attrs templ.Attributes) temp
 	})
 }
 
-// CharacterNotes is CharacterNotes.tsx: only notes that validate as real
-// character origins, labelled by the first one's script.
+// CharacterNotes lists character origins: only notes that validate as
+// real character origins, labelled by the first one's script.
 func CharacterNotes(t func(string) string, characters []learning.CharacterNote) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

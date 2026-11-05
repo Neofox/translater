@@ -1,6 +1,6 @@
-// Result view transition: OutputPanel's <ViewTransition default=
-// "result-transition"> around the result, started only for the completion
-// or error update (useTranslate's startTransition). Hand-written: a thin
+// Result view transition: the "result-transition" view transition around
+// the result, started only for the completion or error update (run start and
+// token deltas stay immediate). Hand-written: a thin
 // wrapper over document.startViewTransition; base.css styles the
 // result-transition pseudo-elements.
 

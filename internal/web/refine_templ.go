@@ -14,15 +14,15 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// refineChips are REFINEMENT_CHIPS (src/lib/refinements.ts): id and label
-// key. The model-facing instructions live in refine.js.
+// refineChips are the preset refinements: id and label key. The
+// model-facing instructions live in refine.js.
 var refineChips = []struct{ ID, Key string }{
 	{"softer", "refineSofter"}, {"direct", "refineMoreDirect"},
 	{"shorter", "refineShorter"}, {"playful", "refineMorePlayful"},
 }
 
-// refineRow is RefineRow.tsx. Both custom variants stay mounted: the active
-// custom button, or the trigger with its editor (TS renders one of them);
+// refineRow is the refine chips and custom adjustment. Both custom variants
+// stay mounted: the active custom button, or the trigger with its editor;
 // refine.js shows one and keeps every control's state.
 func refineRow(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {

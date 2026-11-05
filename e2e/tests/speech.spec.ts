@@ -457,7 +457,7 @@ test('sends the result language @speech', async ({ page, fake }) => {
   )
 })
 
-// OutputPanel.tsx: the model-reported targetLang, not the selected target,
+// The model-reported targetLang, not the selected target,
 // sets the main text's lang, the register label (Korean sentences only) and
 // the Listen language. target-lang.json reports French with Korean selected.
 test('the reported target language drives lang, register label and Listen @speech', async ({

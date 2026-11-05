@@ -1,7 +1,7 @@
-// Reply context (@context): ContextField.tsx's toggle and field, kept in
+// Reply context (@context): the context toggle and field, kept in
 // sessionStorage for the tab and sent with every run. Also the header's
-// Settings popover and the More… language menus (SettingsMenu.tsx,
-// Select.tsx and their floatingPanelBoundary placement).
+// Settings popover and the More… language listboxes, with their popup
+// placement inside segmented layouts (float.js).
 import type { Locator, Page } from '@playwright/test'
 import {
   expect,
@@ -187,7 +187,7 @@ test('makes UI language available in settings and persists an explicit choice @c
   await trigger.click()
   await expect(group).toBeVisible()
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  // While open, the trigger controls the dialog (useRole).
+  // While open, the trigger controls the dialog via aria-controls.
   const controls = await trigger.getAttribute('aria-controls')
   expect(controls).toBeTruthy()
   await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute(
@@ -298,7 +298,7 @@ async function checkPopups(page: Page): Promise<void> {
 }
 
 /** A listbox wider than the room right of its trigger must stay inside the
- * pane's padding box (Floating UI's clipping rect for the boundary) minus
+ * pane's padding box (the clipping rect of the boundary pane) minus
  * 8 px: flip tries the end alignment, shift clamps. Clipped by the
  * viewport alone it would overhang the pane. The
  * source pane is the left one in split and book layouts. */
@@ -485,7 +485,7 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
       all.map((o) => o.getAttribute('tabindex')).join(','),
     )
   /** Escape closes the list and focus returns to the trigger, also from a
-   * focused option (Floating UI's returnFocus). */
+   * focused option. */
   const close = async () => {
     await page.keyboard.press('Escape')
     await expect(trigger).toHaveAttribute('aria-expanded', 'false')

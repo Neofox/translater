@@ -5,8 +5,8 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// settingsTrigger is SettingsMenu.tsx's Pill. settings.js mirrors the open
-// state in aria-expanded and, while open, aria-controls (useRole).
+// settingsTrigger is the header Settings Pill. settings.js mirrors the open
+// state in aria-expanded and, while open, aria-controls.
 templ settingsTrigger(v View) {
 	@ui.Pill(ui.PillProps{Size: "md", Class: "settings-trigger", Attrs: templ.Attributes{
 		"aria-label": v.T("settings"), "data-t-attr": "aria-label:settings", "data-testid": "settings-button",
@@ -16,8 +16,8 @@ templ settingsTrigger(v View) {
 	}
 }
 
-// uiLangClass is UiLangToggle.tsx's button class; the state tokens come last
-// so prefs.js can swap them without reordering the string.
+// uiLangClass is the UI-language toggle's button class; the state tokens
+// come last so prefs.js can swap them without reordering the string.
 func uiLangClass(pressed bool) string {
 	if pressed {
 		return "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition bg-accent text-bg shadow-sm"
@@ -25,15 +25,14 @@ func uiLangClass(pressed bool) string {
 	return "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition text-ink-soft hover:text-ink"
 }
 
-// uiLangs is UI_LANGS with UiLangToggle's labels, in its order (prefs.js maps
-// a button to its language by this index).
+// uiLangs are the UI languages with their toggle labels, in button order
+// (prefs.js maps a button to its language by this index).
 var uiLangs = []struct{ Code, Label string }{{"en", "EN"}, {"ko", "한"}}
 
-// settingsPopover is SettingsMenu's floating dialog. It is the last element
-// of <body> (FloatingPortal appends there), opens with the native popover
-// API and is placed by settings.js. tabindex -1 is Floating UI's focusable
-// floating element. The "UI language" label stays English in both UI
-// languages (UiLangToggle.tsx).
+// settingsPopover is the Settings floating dialog. It is the last element
+// of <body>, opens with the native popover API and is placed by
+// settings.js. tabindex -1 makes the floating element focusable. The
+// "UI language" label stays English in both UI languages.
 templ settingsPopover(v View) {
 	<div id="settings-popover" popover class="settings-popover" role="dialog" tabindex="-1" aria-label={ v.T("settings") } data-t-attr="aria-label:settings">
 		<h2 data-t="settings">{ v.T("settings") }</h2>

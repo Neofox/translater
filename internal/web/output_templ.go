@@ -14,7 +14,7 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// outputPanel is OutputPanel.tsx. stream.js fills the result regions from
+// outputPanel is the result pane. stream.js fills the result regions from
 // the nt-* events; #result-details receives the server's partials
 // (ResultSkeleton, AlternativeRow). Copy/Listen are disabled until the
 // current run allows them (copy.js); speech.js plays Listen.

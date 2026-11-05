@@ -414,8 +414,7 @@ func (w *cutOff) Write(b []byte) (int, error) {
 func (w *cutOff) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 // The PCM length is declared up front, so a body cut short is a read error
-// for the client, never a shorter clip it could cache as complete (TS's
-// stream ends with an explicit done chunk instead).
+// for the client, never a shorter clip it could cache as complete.
 func TestTruncatedAudioIsAReadError(t *testing.T) {
 	r := newRig(t, nil, 90*time.Second)
 	res, body := r.post(t, context.Background(), "[fx:speech-big]", "en", "en")

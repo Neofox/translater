@@ -8,8 +8,9 @@ import (
 	"golang.org/x/net/html"
 )
 
-// ListenButton.tsx at rest: a disabled neutral Pill inside its relative
-// wrapper, Volume2 shown, Loader2 and Square mounted hidden for speech.js.
+// The Listen button at rest: a disabled neutral Pill inside its relative
+// wrapper, volume-2 shown, loader-circle and square mounted hidden for
+// speech.js.
 // The main toolbar's is labelled (md); alternative rows use the compact sm
 // icon-action variant.
 func TestListenButtonMarkup(t *testing.T) {

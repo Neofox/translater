@@ -29,8 +29,7 @@ var modes = []struct{ Value, Key string }{
 	{"friends", "modeFriends"}, {"casual", "modeCasual"}, {"professional", "modeProfessional"},
 }
 
-// fixedChips are always shown; one more "recent" chip follows
-// (LanguageChipBar.tsx).
+// fixedChips are always shown; one more "recent" chip follows.
 var fixedChips = map[string][]string{"source": {"auto", "en", "ko"}, "target": {"en", "ko"}}
 
 type chip struct {

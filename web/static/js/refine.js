@@ -1,9 +1,9 @@
-// Refinements: RefineRow.tsx's chips and custom adjustment, with
-// TranslatorContext's refine state (caps, previousMain, the snapshot stack
-// that rolls a failed refine back), inside the Adjust menu (adjust.js).
+// Refinements: the refine row's chips and custom adjustment, with the refine
+// state (caps, previousMain, the snapshot stack that rolls a failed refine
+// back), inside the Adjust menu (adjust.js).
 //
-// Hand-written: these are app rules ported from the TS components; the
-// markup is server-rendered once (refine.templ) and only updated here.
+// Hand-written: these are app rules; the markup is server-rendered once
+// (refine.templ) and only updated here.
 
 import { initAdjust } from './adjust.js'
 import { showCopied } from './copy.js'
@@ -12,7 +12,7 @@ export const MAX_UNDO = 10
 const MAX_REFINEMENTS = 3
 const MAX_CHARS = 200
 
-/** REFINEMENT_CHIPS: chip id → model-facing instruction (fixed English). */
+/** Refine chips: chip id → model-facing instruction (fixed English). */
 export const CHIPS = {
   softer: 'make it softer',
   direct: 'make it more direct',
@@ -29,7 +29,7 @@ const isCustom = (r) => !Object.values(CHIPS).includes(r)
 
 export const customLabel = (text) => (text.length > 20 ? `${text.slice(0, 20)}…` : text)
 
-/** AdjustMenu's summary of the active adjustments. */
+/** The Adjust trigger's summary of the active adjustments. */
 export function summary(refinements, t) {
   const id = (r) => Object.keys(CHIPS).find((k) => CHIPS[k] === r)
   return refinements.map((r) => (id(r) ? t(LABELS[id(r)]) : customLabel(r))).join(' · ')
@@ -46,7 +46,7 @@ export function add(state, instruction, main, snap) {
   return { refinements: [...r, text], previousMain: main, stack: push(state.stack, snap) }
 }
 
-/** RefineRow's submitFreeform guard: a non-blank draft, below the cap,
+/** The Custom editor's submit guard: a non-blank draft, below the cap,
  * with no custom adjustment active yet. */
 export const canSubmit = (refinements, draft) =>
   Boolean(draft.trim()) && refinements.length < MAX_REFINEMENTS && !refinements.some(isCustom)
@@ -86,14 +86,14 @@ export function initRefine(app, form, restore, relabel) {
   const details = $('result-details')
   const rows = $('learning-sentence')
   // Pill tones: the rendered class string, then data-active-class.
-  // RefineRow's label: a bare text node after the Plus icon.
+  // The Custom trigger's label: a bare text node after the Plus icon.
   const customLabelText = document.createTextNode('')
   customTrigger.append(customLabelText)
   const tones = new Map([...chips, customTrigger].map((b) => [b, [b.className, b.dataset.activeClass]]))
   let state = empty()
   let customOpen = false
   let error = null
-  // A refine run is pending (TS refineInFlightRef); cleared by any finished
+  // A refine run is pending; cleared by any finished
   // run, the rollback and input edits.
   let inFlight = false
   let seen = null
@@ -110,7 +110,7 @@ export function initRefine(app, form, restore, relabel) {
   function sync() {
     const live = app.live
     const show = live?.intent === 'sentence' && !live.error?.input
-    // TS unmounts the menu: RefineRow's draft and editor go with it.
+    // Removing the menu discards the Custom draft and closes its editor.
     if (!show && menu.isConnected) {
       customOpen = false
       input.value = ''
@@ -125,7 +125,7 @@ export function initRefine(app, form, restore, relabel) {
     const r = state.refinements
     const cap = r.length >= MAX_REFINEMENTS
     const custom = r.find(isCustom)
-    // RefineRow renders nothing while the result shows an error.
+    // The row is hidden while the result shows an error.
     row.hidden = Boolean(live?.error)
     for (const chip of chips) {
       const on = r.includes(CHIPS[chip.dataset.testid.slice(12)])
@@ -195,8 +195,7 @@ export function initRefine(app, form, restore, relabel) {
       if (customOpen) requestAnimationFrame(() => input.focus())
     } else if (id === 'refine-apply') submit()
     else if (id === 'refine-close') {
-      // AdjustMenu's onCloseCustom: the draft stays, focus returns to the
-      // source.
+      // Close: the draft stays, focus returns to the source.
       customOpen = false
       sync()
       adjust.closeCustom()
@@ -221,8 +220,8 @@ export function initRefine(app, form, restore, relabel) {
     state = { refinements: snap.refinements, previousMain: snap.previousMain, stack: state.stack.slice(0, -1) }
     inFlight = false
     error = message
-    // RefineRow stays mounted (TS restores in the same commit as the
-    // error): an open custom editor stays open with its draft.
+    // The row stays visible (the rollback and the error notice show
+    // together): an open custom editor stays open with its draft.
     rows.replaceChildren(...snap.rows)
     // A Copy clicked before the refine was cloned while it said Copied.
     for (const node of snap.details)

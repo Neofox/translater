@@ -1,6 +1,6 @@
-// Fixed-position popups: the Floating UI subset the TS app uses (placement
-// bottom-start/end, offset, flip, shift, size, autoUpdate) plus
-// floatingPanelBoundary.ts and AdjustMenu's primary-actions clearance.
+// Fixed-position popups: the Floating UI subset the app needs (placement
+// bottom-start/end, offset, flip, shift, size, autoUpdate) plus the
+// per-layout pane boundary and the Adjust panel's primary-actions clearance.
 //
 // Hand-written: the spec rules out Floating UI, and CSS anchor positioning
 // cannot express the pane-bounded shift or the clearance rule.
@@ -80,10 +80,10 @@ function viewportRect() {
 
 /** Place `floating` (fixed) next to `reference` and return compute()'s
  * result. `boundary` (an element) narrows the viewport; `clearance` is an
- * element the box must not overlap (AdjustMenu); `maxHeight` caps the
- * box at the available height (Floating UI's size middleware).
- * `translate` writes useFloating's floatingStyles (left/top 0 and a
- * translate) instead of left/top. */
+ * element the box must not overlap (Copy/Listen, for the Adjust panel);
+ * `maxHeight` caps the box at the available height (Floating UI's size
+ * middleware). `translate` writes left/top 0 and a translate instead of
+ * left/top. */
 export function position(reference, floating, { boundary, clearance, maxHeight, translate, ...options }) {
   let clip = viewportRect()
   if (boundary) {
@@ -171,7 +171,7 @@ export function autoUpdate(reference, floating, update) {
   }
 }
 
-/** floatingPanelBoundary.ts: only segmented layouts keep a popup inside its
+/** Popup boundary: only segmented layouts keep a popup inside its
  * pane; elsewhere (a short composer) a menu may extend over the result.
  * Padding is 8 px plus the safe-area inset on each side. */
 export function panelBoundary(reference) {
@@ -193,8 +193,7 @@ export const leftFocus = new WeakSet()
  * delegated on document: focus leaving the trigger for anything but its
  * popup (Shift+Tab past it, focusing another control), or Tab leaving the
  * popup, hides it and leaves focus where it went. Focus moved out of the
- * popup any other way (a script) keeps it open, as the portal's
- * insideReactTree check does. */
+ * popup any other way (a script) keeps it open, as in Floating UI. */
 export function closeOnFocusOut() {
   let tabbed = false
   document.addEventListener('keydown', (event) => (tabbed = event.key === 'Tab'), true)

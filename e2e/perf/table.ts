@@ -1,5 +1,6 @@
 // Results format of e2e/perf/measure.ts and the markdown table writer used by
-// the baseline (Task 5) and the TS vs Go comparison (Task 13).
+// the baseline (Task 5) and the comparison of the earlier TypeScript build
+// with Go (Task 13).
 //
 //   npx tsx e2e/perf/table.ts ts.json [go.json ...] [--allow-mismatch]
 //
@@ -184,7 +185,8 @@ export type PerfFile = {
     harness: string
     build: {
       skipped: boolean
-      /** sha256 over the served build (TS: .vercel/output; Go: binary). */
+      /** sha256 over the served build (Go: binary; reports of the earlier
+       * TypeScript build: .vercel/output). */
       sha256: string
       assets: string[]
     } | null

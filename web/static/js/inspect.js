@@ -1,6 +1,6 @@
-// Inspection gestures: phrasePointer.ts (isInspectTap, textOffsetAtPoint),
-// InspectableTranslation.tsx's pointer handlers on the main text and
-// SourceHighlight.tsx's grammar hit-testing on the source editor.
+// Inspection gestures: tap classification (isInspectTap, textOffsetAtPoint),
+// the pointer handlers on the main text and the grammar hit-testing of the
+// source highlight mirror under the source editor.
 //
 // Hand-written: no library implements these selection-safe tap rules or the
 // hit-testing of an inert mirror under a native textarea. A short stationary
@@ -34,9 +34,8 @@ const point = (event) => ({ x: event.clientX, y: event.clientY, time: performanc
 const pageSelection = () => window.getSelection()?.toString() ?? ''
 const MAIN = '[data-testid="main-translation"]'
 
-/** Main text taps (InspectableTranslation). `key()` names the current result
- * state: a timer from another state never fires (TS resets on text,
- * disabled and resetKey). The main text is interactive while it carries
+/** Main text taps. `key()` names the current result state: a timer from
+ * another state never fires. The main text is interactive while it carries
  * `data-inspectable`; its `role=button` form inspects anywhere, otherwise a
  * tap must land inside one of the `hits()` grammar ranges ([start, end]
  * UTF-16 offsets) when there are any. */
@@ -93,7 +92,7 @@ export function initMainTaps({ key, hits, onInspect }) {
   })
 }
 
-/** Source grammar taps (SourceHighlight). `mirror()` returns the inert
+/** Source grammar taps on the textarea. `mirror()` returns the inert
  * mirror while learning the original source, `key()` the result state the
  * tap belongs to; `onInspect(offset)` receives the grammar span's start. */
 export function initSourceTaps(ta, { mirror, key, onInspect }) {

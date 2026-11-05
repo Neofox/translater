@@ -1,6 +1,6 @@
 // Listen: one page-wide voice for the main and alternative Listen buttons,
 // streamed from POST /speech through pcm.js, with a replay cache of
-// completed audio. Port of src/hooks/useSpeech.ts and ListenButton.tsx.
+// completed audio.
 //
 // Hand-written: the gesture-bound audio unlock, the single playback owner
 // and the cache bounds are app policy; the rest is fetch and Web Audio.
@@ -61,7 +61,7 @@ export function createReplayCache() {
 // ui.Pill tone class tokens (pill.templ): Listen is `active` while not idle.
 const NEUTRAL = 'border-border bg-panel hover:border-accent/60'
 const ACTIVE = 'border-accent/70 bg-accent-soft [&>svg]:text-accent'
-// ListenButton.tsx's error notice.
+// A Listen button's error notice.
 const ERROR_CLASS =
   'absolute right-0 top-full z-20 mt-1 max-w-[calc(100vw-2rem)] truncate whitespace-nowrap rounded-md border border-border bg-panel px-2 py-1 text-xs text-ink shadow-sm'
 const SELECTOR = '[data-testid="listen-button"]'
@@ -118,8 +118,8 @@ export function initSpeech(app, codes) {
   let owner = null
   let errorIds = 0
 
-  /** The text and language a Listen button pronounces (OutputPanel's
-   * speech options): the current main, or its alternative row's text. */
+  /** The text and language a Listen button pronounces: the current main,
+   * or its alternative row's text. */
   function speechOf(button) {
     const live = app.live
     const row = button.closest('[data-testid="alternative-item"]')
@@ -187,7 +187,7 @@ export function initSpeech(app, codes) {
     setError(current.button, null)
   }
 
-  /** The result or its settings changed (useSpeech's reset effect). */
+  /** The result or its settings changed: stop and clear every notice. */
   function reset() {
     stop()
     for (const button of document.querySelectorAll(SELECTOR)) setError(button, null)

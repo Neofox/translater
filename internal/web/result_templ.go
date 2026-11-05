@@ -17,15 +17,15 @@ import (
 )
 
 // Result fragments streamed by /translate as <hx-partial> swaps. Markup,
-// class strings and data-testids follow the TS components (SentenceView /
-// WordView ResultSection, AlternativeItem, Pill, Tag) so the carried-over CSS
-// styles them identically. templ escapes all model text.
+// class strings and data-testids are those of the original TypeScript
+// components (result sections, alternative items, Pill, Tag) so the
+// carried-over CSS styles them identically. templ escapes all model text.
 
 // ResultSkeleton is the content of #result-details at the start of a run:
 // the always-open alternatives section with an empty #alternatives list that
 // AlternativeRow partials are appended to. The section stays mounted while
-// empty (TS unmounts it, and never mounts it for long-form input) under
-// `hidden`, which stream.js lifts once it holds an alternative item.
+// empty (including for long-form input, which never gets an alternative)
+// under `hidden`, which stream.js lifts once it holds an alternative item.
 func ResultSkeleton(title string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -64,9 +64,9 @@ func ResultSkeleton(title string) templ.Component {
 	})
 }
 
-// AlternativeSkeleton is AlternativeItemSkeleton.tsx: the newest
-// alternative while the run streams, with real, disabled Copy and Listen.
-// The id (Go only) lets the settled AlternativeRow replace it.
+// AlternativeSkeleton is the newest alternative while the run streams,
+// with real, disabled Copy and Listen. The id lets the settled
+// AlternativeRow replace it.
 func AlternativeSkeleton(copyLabel, listenLabel string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -124,11 +124,12 @@ func AlternativeSkeleton(copyLabel, listenLabel string) templ.Component {
 	})
 }
 
-// AlternativeRow is one completed alternative (AlternativeItem.tsx). Word
-// rows always use the wrapper with register tags: WordView passes children
-// (an array, truthy even when empty). Copy and Listen (ListenButton.tsx,
-// compact) render disabled; the client enables them once the whole current
-// result has completed; speech.js plays Listen, like the main one.
+// AlternativeRow is one completed alternative. Word rows always use the
+// wrapper with register tags, even with no registers (kept from the
+// original TypeScript app, where an empty tag list still counted as
+// present). Copy and Listen (compact) render disabled; the client enables
+// them once the whole current result has completed; speech.js plays
+// Listen, like the main one.
 func AlternativeRow(index int, word bool, text, note string, registers []string, copyLabel, listenLabel string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -153,7 +154,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 53, Col: 215}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 54, Col: 215}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -209,7 +210,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 66, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 67, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -235,7 +236,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(r)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 69, Col: 9}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 70, Col: 9}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -260,7 +261,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 74, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 75, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -279,7 +280,7 @@ func AlternativeRow(index int, word bool, text, note string, registers []string,
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 77, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/result.templ`, Line: 78, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {

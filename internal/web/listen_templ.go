@@ -14,10 +14,10 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// listenButton is ListenButton.tsx, idle and disabled until the whole current
+// listenButton is a Listen control, idle and disabled until the whole current
 // result completes (copy.js). speech.js drives it: the Pill tone (neutral or
 // active), labels, aria-pressed/aria-busy, the error notice after the Pill
-// and the icon. ListenButton renders one of its three icons; speech.js flips
+// and the icon. One of its three icons shows at a time; speech.js flips
 // their hidden attributes (keyed by data-icon). The labelled variant is the
 // main toolbar's; alternatives use the compact icon-only one.
 func listenButton(label string, labelled bool) templ.Component {

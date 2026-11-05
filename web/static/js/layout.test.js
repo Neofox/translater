@@ -56,8 +56,9 @@ test('measure writes --app-height before reading the panels height (useWorkspace
 })
 
 // A window whose measurements a test changes step by step, threading the
-// layout state like layout.js's measure() does (cases from
-// src/hooks/useWorkspaceLayout.test.tsx; jsdom's window is 1024 × 768).
+// layout state like layout.js's measure() does. The default 1024 × 768
+// window is the jsdom window the cases first ran in, in the original
+// TypeScript app.
 function simulate({ width, innerWidth = 1024, innerHeight = 768, visible, sideInsets = 0, touch = false }) {
   const env = { width, innerWidth, innerHeight, visible, offsetTop: 0, scale: 1, sideInsets, editing: false, touch, posture: null }
   let state = initialLayoutState(innerWidth, innerHeight)
@@ -177,7 +178,7 @@ test('an unchanged layout keeps its identity', () => {
   assert.equal(sim.step({ visible: 981 }).layout, before)
 })
 
-// useFoldLayout.test.tsx: in laptop posture the panels' top (below the
+// initFold: in laptop posture the panels' top (below the
 // header) is written as --panels-top and tracked through resizes.
 function foldEnv() {
   const env = { folded: true, top: 58, onChange: () => {}, onResize: () => {}, observed: [], windowListeners: new Map() }

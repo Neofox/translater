@@ -2,7 +2,8 @@ package learning
 
 import "testing"
 
-// Port of src/lib/learningSide.test.ts.
+// TestSide: the source is analysed only when translating into the UI
+// language from another language.
 func TestSide(t *testing.T) {
 	for _, tc := range []struct{ source, target, uiLang, want string }{
 		{"ko", "en", "en", "source"},

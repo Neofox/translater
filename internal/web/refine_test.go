@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// RefineRow.tsx at rest inside AdjustMenu's content: the page renders it once
+// The refine row at rest inside the Adjust menu: the page renders it once
 // in a <template> (refine.js inserts the menu for a sentence result), with
 // every control disabled until a current result completes.
 func TestRefineRowMarkup(t *testing.T) {

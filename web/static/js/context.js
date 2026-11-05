@@ -1,10 +1,10 @@
-// Reply context: ContextField.tsx plus TranslatorContext's tab-scoped
-// `context` (useSessionState('nt.context'), stored as JSON).
+// Reply context: the "Replying to…" field and its toggle, with a tab-scoped
+// value in sessionStorage ('nt.context', stored as JSON).
 //
 // Hand-written: one textarea, its toggle and sessionStorage. Handlers are
 // delegated on document, keyed on data-testid. The field comes from
-// template#context-field: like TS, it is in the composer only while open
-// (base.css selects on its presence); the same node keeps the draft.
+// template#context-field: it is in the composer only while open (base.css
+// selects on its presence); the same node keeps the draft.
 
 const KEY = 'nt.context'
 const $ = (selector) => document.querySelector(selector)
@@ -29,7 +29,7 @@ export function initContext(app, resized, relabel) {
     toggle.setAttribute('aria-expanded', on)
     resized()
   }
-  // A non-blank context opens the field and tints the toggle (TS's effect).
+  // A non-blank context opens the field and tints the toggle.
   const sync = () => {
     const blank = !field.value.trim()
     clear.hidden = !field.value
@@ -63,7 +63,7 @@ export function initContext(app, resized, relabel) {
   })
   document.addEventListener('input', (event) => event.target === field && edited())
   // The keyboard leaves no room for both fields: focusing the source closes
-  // the context (InputPanel's onFocus).
+  // the context.
   document.addEventListener('focusin', (event) => {
     if (id(event, 'input-textarea') && $('[data-keyboard]')) open(false)
   })

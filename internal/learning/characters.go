@@ -1,5 +1,5 @@
 // Package learning holds learner-content rules shared by the result
-// templates: ports of src/lib/learningRanges.ts.
+// templates: learning side, phrase/grammar ranges and character notes.
 package learning
 
 import "unicode"

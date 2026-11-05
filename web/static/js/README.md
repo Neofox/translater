@@ -9,12 +9,12 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | ------------- | -------------------------------------------------------------------------------------- |
 | `app.js`      | State, routing (auto target), runs of `#translate-form`                                 |
 | `composer.js` | Debounce/IME/paste/blur/shortcut scheduling, `detectIntent`, `detectLanguage`, `resolveTarget`, warm-up, editor auto-grow (`resize`) |
-| `layout.js`   | `decideLayout` (port of `useWorkspaceLayout`), `data-layout`/flags, `--app-height`/`--app-top`/`--workspace-height`, `.output-panel` order, `nt-layout` |
+| `layout.js`   | `decideLayout` (pane arrangement and keyboard state), `data-layout`/flags, `--app-height`/`--app-top`/`--workspace-height`, `.output-panel` order, `nt-layout` |
 | `context.js`  | Reply context toggle and field (`template#context-field`), `nt.context` sessionStorage, run `context` |
 | `stream.js`   | `nt-*` event handling (current run only), grapheme interpolator, error view             |
 | `copy.js`     | `requestKey`, Copy/Listen enabling, Copy actions                                         |
 | `dictionary.js` | Word dictionary POS tabs (active variant across `#word-meta` swaps), synonym lookup, reference pane placement, word-details trigger state |
-| `pcm.js`      | `PcmPlayer`: little-endian PCM16 scheduled on Web Audio (port of `pcmPlayer.ts`)          |
+| `pcm.js`      | `PcmPlayer`: little-endian PCM16 scheduled on Web Audio                                    |
 | `speech.js`   | Listen buttons: gesture-bound audio unlock, single page-wide voice, `/speech` stream, replay cache |
 | `prefs.js`    | `nt.preferences` cookie, Tone, UI language, chip bars, More listbox (fill, placement)    |
 | `listbox.js`  | More listbox keyboard, roving focus, hover focus and typeahead (useListNavigation, useTypeahead) |
@@ -22,7 +22,7 @@ hashed, minified files `internal/web/static.go` serves. Tests:
 | `refine.js`   | Refine chips and custom adjustment, caps, `previousMain`, rollback stack of a failed refine |
 | `adjust.js`   | Adjust menu (`template#adjust-template`): measured in-row chips or trigger, summary, floating panel clear of Copy/Listen, outside/Escape dismissal, `--adjust-panel-height` |
 | `float.js`    | Fixed popup placement (offset/flip/shift/size, Adjust clearance), `autoUpdate`, `panelBoundary`, `closeOnFocusOut` |
-| `inspect.js`  | Selection-safe main text and source grammar taps (`isInspectTap`, `textOffsetAtPoint`, 400 ms grace; port of `phrasePointer.ts`, `InspectableTranslation.tsx`, `SourceHighlight.tsx`) |
+| `inspect.js`  | Selection-safe main text and source grammar taps (`isInspectTap`, `textOffsetAtPoint`, 400 ms grace; main-text taps and hit-testing of the source highlight mirror) |
 
 ## Language detection
 

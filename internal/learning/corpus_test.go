@@ -12,8 +12,8 @@ import (
 )
 
 // corpusCase is one entry of testdata/corpus.json: frozen regression data,
-// generated once from the TS implementation (prepareLearningResult) that
-// Prepare replaced. Never regenerate it; add cases to ranges_test.go.
+// generated once from the original TypeScript implementation that Prepare
+// replaced. Never regenerate it; add cases to ranges_test.go.
 type corpusCase struct {
 	Counterpart string      `json:"counterpart"`
 	Primary     string      `json:"primary"`

@@ -14,7 +14,7 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// LanguageBar is LanguageChipBar.tsx: every chip renders (CSS container
+// LanguageBar is a language chip bar: every chip renders (CSS container
 // queries hide inactive chips on narrow bars) plus the More… trigger. The
 // listbox is empty until opened (prefs.js fills it), so only one set of
 // options ever exists in the DOM. POST /prefs re-renders both bars.
@@ -223,8 +223,7 @@ func LanguageBar(v View, kind string) templ.Component {
 	})
 }
 
-// langOption is the template prefs.js clones for each listbox option
-// (Select.tsx option markup).
+// langOption is the template prefs.js clones for each listbox option.
 func langOption() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

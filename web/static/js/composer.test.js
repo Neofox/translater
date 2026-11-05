@@ -12,7 +12,6 @@ import {
 } from './composer.js'
 import { requestKey } from './copy.js'
 
-// Cases from src/hooks/useTranslate.test.tsx.
 test('debounceFor shortens only for sentence-final punctuation or emoji', () => {
   assert.equal(debounceFor('내일 봐요?', full), fast)
   assert.equal(debounceFor('He said "fine."', full), fast)
@@ -39,9 +38,8 @@ test('detectIntent', () => {
   assert.equal(detectIntent('thanks [fx:word]abcde'), 'word')
 })
 
-// Cases from src/lib/detectLanguage.test.ts. Dropped (tinyld not shipped,
-// see README.md): "distinguishes French from English" and "distinguishes
-// Spanish from English"; Latin text is 'en' until the model reports.
+// No French/Spanish-vs-English cases: the tinyld detector is not shipped
+// (see README.md), so Latin text is 'en' until the model reports.
 test('detectLanguage', () => {
   assert.equal(detectLanguage('안녕하세요, 오늘 뭐 해요?'), 'ko')
   assert.equal(detectLanguage('図書館に行く'), 'ja')
@@ -78,7 +76,6 @@ test('the model report does not re-route the current result', () => {
   assert.equal(routingDetected({ source: 'ko', text, live, model }), null)
 })
 
-// Cases from src/lib/resolveTranslationTarget.test.ts.
 test('resolveTarget', () => {
   const text = '[신한카드]온라인명세서로 1년간 면제된 SMS이용료200원 서비스가 종료됩니다(기간만료:05월)'
   const detected = detectLanguage(text)

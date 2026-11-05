@@ -1,4 +1,4 @@
-// Workspace layout: a port of src/hooks/useWorkspaceLayout.ts.
+// Workspace layout: the pane arrangement, keyboard state and viewport sizes.
 //
 // Hand-written: the mode/keyboard rules are app policy, measured from the
 // visual viewport. The server paints COMPACT_LAYOUT with data-layout-pending
@@ -69,7 +69,7 @@ export function decideLayout(input, state) {
 /**
  * In laptop posture the first panel ends at the physical fold: write the
  * panels' document top (below the measured header, never an assumed size)
- * as --panels-top while `laptop` matches (useFoldLayout).
+ * as --panels-top while `laptop` matches.
  */
 export function initFold(panels, laptop) {
   let observer
@@ -162,8 +162,8 @@ export function initLayout(panels) {
         },
         state,
       )
-      // Like useWorkspaceLayout: the panels' height follows --app-height,
-      // so read it only after writing the new value.
+      // The panels' height follows --app-height, so read it only after
+      // writing the new value.
       shell.style.setProperty('--app-height', `${result.appHeight}px`)
       shell.style.setProperty('--app-top', `${result.appTop}px`)
       panels.style.setProperty('--workspace-height', `${panels.clientHeight || result.appHeight}px`)

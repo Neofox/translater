@@ -47,11 +47,12 @@ var runID = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 // version 1-8 and variant digits, or the nil and max UUIDs.
 var uuid = regexp.MustCompile(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$`)
 
-// triggers are TranslationTrigger (useTranslate.ts); the default is debounce.
+// triggers are the run triggers the page reports (app.js run analytics); the
+// default is debounce.
 var triggers = []string{"debounce", "paste", "enter", "blur", "force", "refinement"}
 
-// errorKeys maps each failure kind to its STRINGS entry, as
-// publicTranslationError (src/server/translationError.ts) does.
+// errorKeys maps each failure kind to the STRINGS entry of its public,
+// localized error message.
 var errorKeys = map[llm.Kind]string{
 	llm.KindConfiguration:      "providerConfigurationFailed",
 	llm.KindAuthentication:     "providerAuthenticationFailed",
@@ -70,8 +71,7 @@ type Server struct {
 	schemas map[string]*jsonschema.Schema
 	cache   *lru.Cache[string, string]
 	// cfgErr is an invalid TRANSLATE_* setting: every run then ends with a
-	// configuration error, as the TS app does per request; the page still
-	// works.
+	// configuration error; the page still works.
 	cfgErr error
 	// tracer is nil (no-op) unless Langfuse is configured.
 	tracer *telemetry.Tracer
@@ -233,8 +233,8 @@ var errBadForm = errors.New("invalid translation input: malformed form")
 //
 // `text` is the exact textarea value (raw), which learning ranges refer to.
 // Form encoding may turn its LF into CRLF (textarea.value never has a CR),
-// so CRLF becomes LF. The prompt text is raw trimmed with JS semantics, as
-// the TS client trims before it sends.
+// so CRLF becomes LF. The prompt text is raw trimmed with JS
+// String.prototype.trim semantics.
 func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.TranslateInput, string, telemetry.Analytics, error) {
 	var none telemetry.Analytics
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
@@ -291,11 +291,11 @@ func (s *Server) parse(w http.ResponseWriter, r *http.Request) (string, prompt.T
 	return run, in, raw, analytics, nil
 }
 
-// parseAnalytics validates the optional analytics fields (useTranslate.ts).
-// They reach telemetry only, never the prompt or the cache key. Absent
-// fields keep the TS defaults. The run id doubles as the analytics run id
-// (TS analyticsRunId) only when it is a UUID; any other accepted run id is
-// reported as "".
+// parseAnalytics validates the optional analytics fields the page sends
+// with each run (app.js). They reach telemetry only, never the prompt or the
+// cache key. Absent fields keep the defaults ("" ids, revision -1, trigger
+// "debounce"). The run id doubles as the analytics run id only when it is a
+// UUID; any other accepted run id is reported as "".
 func parseAnalytics(form url.Values, run string) (telemetry.Analytics, error) {
 	bad := func(field, reason string) error { return &prompt.FieldError{Field: field, Reason: reason} }
 	a := telemetry.Analytics{

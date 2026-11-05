@@ -1,6 +1,7 @@
 // Package prefs reads and writes the shared nt.preferences cookie. The format
-// is byte-compatible with the TypeScript app (src/lib/preferences.ts): a
-// version-1 JSON object in the rule order of shared/translation/preferences.json,
+// is byte-identical to what prefs.js writes (and to cookies the original
+// TypeScript app wrote, so existing ones stay readable): a version-1 JSON
+// object in the rule order of shared/translation/preferences.json,
 // encodeURIComponent-escaped. Never put source text or generated content here.
 package prefs
 

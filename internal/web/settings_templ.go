@@ -14,8 +14,8 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// settingsTrigger is SettingsMenu.tsx's Pill. settings.js mirrors the open
-// state in aria-expanded and, while open, aria-controls (useRole).
+// settingsTrigger is the header Settings Pill. settings.js mirrors the open
+// state in aria-expanded and, while open, aria-controls.
 func settingsTrigger(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -62,8 +62,8 @@ func settingsTrigger(v View) templ.Component {
 	})
 }
 
-// uiLangClass is UiLangToggle.tsx's button class; the state tokens come last
-// so prefs.js can swap them without reordering the string.
+// uiLangClass is the UI-language toggle's button class; the state tokens
+// come last so prefs.js can swap them without reordering the string.
 func uiLangClass(pressed bool) string {
 	if pressed {
 		return "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition bg-accent text-bg shadow-sm"
@@ -71,15 +71,14 @@ func uiLangClass(pressed bool) string {
 	return "cursor-pointer rounded px-2 py-0.5 font-semibold tracking-wide transition text-ink-soft hover:text-ink"
 }
 
-// uiLangs is UI_LANGS with UiLangToggle's labels, in its order (prefs.js maps
-// a button to its language by this index).
+// uiLangs are the UI languages with their toggle labels, in button order
+// (prefs.js maps a button to its language by this index).
 var uiLangs = []struct{ Code, Label string }{{"en", "EN"}, {"ko", "한"}}
 
-// settingsPopover is SettingsMenu's floating dialog. It is the last element
-// of <body> (FloatingPortal appends there), opens with the native popover
-// API and is placed by settings.js. tabindex -1 is Floating UI's focusable
-// floating element. The "UI language" label stays English in both UI
-// languages (UiLangToggle.tsx).
+// settingsPopover is the Settings floating dialog. It is the last element
+// of <body>, opens with the native popover API and is placed by
+// settings.js. tabindex -1 makes the floating element focusable. The
+// "UI language" label stays English in both UI languages.
 func settingsPopover(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -104,7 +103,7 @@ func settingsPopover(v View) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.T("settings")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 38, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 37, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -117,7 +116,7 @@ func settingsPopover(v View) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(v.T("settings"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 39, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 38, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -139,7 +138,7 @@ func settingsPopover(v View) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(boolString(v.Prefs.UILang == l.Code)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 42, Col: 77}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 41, Col: 77}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 				if templ_7745c5c3_Err != nil {
@@ -184,7 +183,7 @@ func settingsPopover(v View) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(l.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 42, Col: 137}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/settings.templ`, Line: 41, Col: 137}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {

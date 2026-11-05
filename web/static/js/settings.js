@@ -1,10 +1,10 @@
-// Settings popover (SettingsMenu.tsx): a non-modal dialog below its trigger
-// (bottom-end, offset 8, flip and shift inside panelBoundary).
+// Settings popover: a non-modal dialog below its trigger (bottom-end,
+// offset 8, flip and shift inside panelBoundary).
 //
 // Hand-written: the native popover attribute already gives the toggle,
-// Escape and outside-press dismissal; this adds what Floating UI did on top:
-// fixed placement while open, focus moving in and back (float.js closes it
-// when focus leaves) and the trigger's aria-controls (useRole). prefs.js mirrors aria-expanded for every popover.
+// Escape and outside-press dismissal; this adds fixed placement while open,
+// focus moving in and back (float.js closes it when focus leaves) and the
+// trigger's aria-controls. prefs.js mirrors aria-expanded for every popover.
 
 import { autoUpdate, leftFocus, panelBoundary, position } from './float.js'
 
@@ -12,8 +12,8 @@ export function initSettings() {
   const popup = document.getElementById('settings-popover')
   const trigger = document.querySelector('[data-testid="settings-button"]')
   // An empty span after the trigger owns the popup, so the accessibility
-  // tree lists the dialog right after its trigger (FloatingPortal does the
-  // same); fixed, it takes no room in the header.
+  // tree lists the dialog right after its trigger; fixed, it takes no room
+  // in the header.
   const owner = document.createElement('span')
   owner.setAttribute('aria-owns', popup.id)
   owner.style.position = 'fixed'

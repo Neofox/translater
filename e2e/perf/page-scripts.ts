@@ -131,9 +131,8 @@ export function installInputTracker(s: Selectors): void {
 }
 
 /** Replaces window.visualViewport with an EventTarget that mirrors the real
- * one until the harness overrides height/offsetTop: the technique of
- * tests/browser/mobile.browser.tsx (stubbed visualViewport, stepped with
- * resize/scroll events) applied to a real page. */
+ * one until the harness overrides height/offsetTop, so a test can step it
+ * with resize/scroll events as a software keyboard would. */
 export function installFakeVisualViewport(): void {
   const real = window.visualViewport
   if (!real) return

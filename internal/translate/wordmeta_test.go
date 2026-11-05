@@ -21,7 +21,7 @@ func TestWordMetaReplayedFromCache(t *testing.T) {
 
 // A word run reports its headword once, before the main text (schema
 // order), live and from the cache; a sentence run never does. The page
-// names the reference heading after it (ReferencePanel.tsx).
+// names the reference pane's heading after it.
 func TestWordHeadwordEvent(t *testing.T) {
 	e := newEnv(t, fixturesDir, nil)
 	for _, run := range []string{"run-1", "run-2"} {

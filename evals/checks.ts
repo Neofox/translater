@@ -73,7 +73,7 @@ export default function checks(
     if (longInput)
       check(result.alternatives.length === 0, 'long input has alternatives')
     check(
-      // The app trims newlines wrapped around main (useTranslate trimMain).
+      // The app trims newlines wrapped around main before it shows it.
       source.trim().split('\n').length ===
         result.main.trim().split('\n').length,
       'line breaks not preserved',

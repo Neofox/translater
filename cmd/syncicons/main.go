@@ -5,8 +5,8 @@
 // and `make check` fails when it is stale.
 //
 // Hand-written: lucide ships no Go package, and the conversion is a JSON
-// walk that keeps each node's attribute order (lucide-react renders the
-// attributes in that order).
+// walk that keeps each node's attribute order (the order lucide-react
+// renders, which the icon markup reproduces).
 package main
 
 import (

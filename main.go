@@ -42,8 +42,8 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 		return nil, err
 	}
 	// An invalid TRANSLATE_* setting must not take the page down: runs end
-	// with the localized configuration error instead (as in the TS app and
-	// for a missing OPENAI_API_KEY). The message names the variable only.
+	// with the localized configuration error instead (as for a missing
+	// OPENAI_API_KEY). The message names the variable only.
 	// Langfuse traces are on only when both keys are set; never fatal.
 	opts := []translate.Option{translate.WithTracer(telemetry.Setup(getenv))}
 	cfg, err := config.LoadTranslate(getenv)

@@ -22,8 +22,9 @@ func sp(s string) *string { return &s }
 
 var saved = Preferences{Source: "ko", Target: "fr", Mode: "professional", UILang: "ko", RecentSource: sp("zh"), RecentTarget: sp("fr")}
 
-// Produced by the TS writer (encodePreferencesCookie) for `saved`, computed by
-// hand from src/lib/preferences.ts: encodeURIComponent(JSON.stringify({version:1,
+// The browser-side encoding of `saved` (as written by prefs.js and, before it,
+// the original TypeScript app), computed by hand:
+// encodeURIComponent(JSON.stringify({version:1,
 // source,target,mode,uiLang,recentSource,recentTarget})).
 const tsValue = "%7B%22version%22%3A1%2C%22source%22%3A%22ko%22%2C%22target%22%3A%22fr%22%2C%22mode%22%3A%22professional%22%2C%22uiLang%22%3A%22ko%22%2C%22recentSource%22%3A%22zh%22%2C%22recentTarget%22%3A%22fr%22%7D"
 const tsHeader = "nt.preferences=" + tsValue + "; Path=/; Max-Age=31536000; SameSite=Lax; Secure"

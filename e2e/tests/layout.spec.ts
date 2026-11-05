@@ -1,6 +1,6 @@
 // Workspace layout (@layout): the measured layout, its server-rendered first
-// paint and the panel order. Ports of tests/browser/mobile.browser.tsx and
-// useWorkspaceLayout.test.tsx cases that need a real browser.
+// paint and the panel order: the layout cases that need a real browser
+// (layout.test.js covers decideLayout in Node).
 import type {
   BrowserContextOptions,
   CDPSession,
@@ -286,7 +286,7 @@ test('desktop source and reference share the left pane while alternatives stay r
   }
 })
 
-// ----- Ports of tests/browser/mobile.browser.tsx layout cases ---------------
+// ----- Mobile layout cases ---------------------------------------------------
 
 type Rect = {
   left: number
@@ -305,7 +305,7 @@ async function rect(target: Locator): Promise<Rect> {
   })
 }
 
-/** Inside the layout viewport (assertWithinViewport). */
+/** Inside the layout viewport. */
 async function expectInViewport(target: Locator): Promise<void> {
   const [box, [vw, vh]] = await Promise.all([
     rect(target),
@@ -330,7 +330,7 @@ async function hits(target: Locator, dy = -1): Promise<boolean> {
   }, dy)
 }
 
-/** Safe-area insets set on the shell (as the TS tests do), then re-measured. */
+/** Safe-area insets set on the shell, then re-measured. */
 async function safeArea(
   page: Page,
   insets: Partial<Record<'top' | 'left' | 'right' | 'bottom', number>>,
@@ -661,8 +661,8 @@ test('Return adds a line even with a pending translation @layout', async ({
 })
 
 // ----- Folded phones: viewport and software-keyboard changes ----------------
-// Ports of the TS "folded" cases, which change the viewport and a stubbed
-// visualViewport (no posture). Posture itself is emulated further below.
+// These change the viewport and a stubbed visualViewport (no posture).
+// Posture itself is emulated further below.
 
 for (const withKeyboard of [false, true]) {
   test(`folded translation keeps the editor expanded without a collapse control (keyboard ${withKeyboard}) @layout`, async ({
@@ -995,15 +995,13 @@ test('laptop posture puts the result above the fold below the measured header @l
   })
 })
 
-// ----- Keyboard and safe-area parity (Task 28) --------------------------------
-// Ports of tests/browser/mobile.browser.tsx keyboard, safe-area and
-// streaming-stability cases, plus the AGENTS.md keyboard rules that no TS
-// test names (tight keyboard, entry scroll reset, two editable lines, short
-// stacked target row). TS stubs a visualViewport and injects result states
-// into a fixture; here the stub is installFakeVisualViewport (`set` fires
-// resize and scroll, `pan` scroll only, as Safari does) and the states come
-// from slow fake-upstream fixtures, snapshotted inside the page at the
-// moment each state appears.
+// ----- Keyboard and safe area (Task 28) ---------------------------------------
+// Keyboard, safe-area and streaming-stability cases, plus the AGENTS.md
+// keyboard rules (tight keyboard, entry scroll reset, two editable lines,
+// short stacked target row). The visualViewport stub is
+// installFakeVisualViewport (`set` fires resize and scroll, `pan` scroll
+// only, as Safari does) and the result states come from slow fake-upstream
+// fixtures, snapshotted inside the page at the moment each state appears.
 
 /** Tests that set their own viewport run on one project per engine: the
  * project only chooses the starting size, which they replace. */
@@ -1138,8 +1136,7 @@ for (const c of SAFARI_KEYBOARD) {
       await keyboard(page, step, 0)
       await expect.poll(appHeight).toBe(step)
       await expect(panels(page)).toHaveAttribute('data-layout', expected)
-      // useWorkspaceLayout's keyboard threshold, from the pre-keyboard
-      // height.
+      // layout.js's keyboard threshold, from the pre-keyboard height.
       if (height - step > Math.max(100, height * 0.2))
         await expect(shell(page)).toHaveAttribute('data-keyboard', 'true')
       else await expect(shell(page)).not.toHaveAttribute('data-keyboard')
@@ -1215,9 +1212,8 @@ for (const c of SAFARI_KEYBOARD) {
   })
 }
 
-// TS fakes the posture media queries; here Chromium's CDP posture and a
-// display feature fold the 736 × 736 viewport through its middle, so the
-// segments are real. WebKit has no posture emulation.
+// Chromium's CDP posture and a display feature fold the 736 × 736 viewport
+// through its middle, so the segments are real. WebKit has no posture emulation.
 for (const posture of ['book', 'laptop'] as const) {
   for (const withKeyboard of [false, true]) {
     test(`fold posture ${posture} preserves the turn and reachable controls (keyboard ${withKeyboard}) @layout`, async ({
@@ -1306,9 +1302,8 @@ test('long results keep the main line, editor and caret inside the visible band 
   page,
 }) => {
   // The perf harness's keyboard invariant (layoutSnapshot): 50 px steps down
-  // to half the height, then a Safari pan to 12.5 %. The TS test of a
-  // similar name (0.85/0.70/0.55, offsetTop 12) is ported in
-  // learning.spec.ts.
+  // to half the height, then a Safari pan to 12.5 %. learning.spec.ts has a
+  // similarly named test with 0.85/0.70/0.55 steps and offsetTop 12.
   await withFakeViewport(page)
   await openApp(page)
   await safeArea(page, { bottom: 20 })

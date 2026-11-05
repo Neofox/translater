@@ -1,9 +1,9 @@
-// The More… language listboxes' keyboard and pointer behaviour: Select.tsx
-// with Floating UI's useListNavigation (loop, roving tabindex, focus on
-// hover) and useTypeahead (matching each option's searchLabel).
+// The More… language listboxes' keyboard and pointer behaviour, as Floating
+// UI's useListNavigation (loop, roving tabindex, focus on hover) and
+// useTypeahead (matching each option's searchLabel) provide it.
 //
 // Hand-written: the spec rules out Floating UI; this is its observable
-// behaviour for one plain list, checked against the TS app. prefs.js fills,
+// behaviour for one plain list. prefs.js fills,
 // places and selects; float.js closes a list that focus leaves.
 
 const RESET_MS = 750
@@ -58,7 +58,7 @@ export function initListbox(searchLabel) {
   const selectedIndex = (list) => items(list).findIndex((o) => o.getAttribute('aria-selected') === 'true')
 
   /** The active option (-1: none, the list itself holds focus) gets the
-   * only tabindex 0 and Select's active background (bg-panel-2); typeahead
+   * only tabindex 0 and the active option background (bg-panel-2); typeahead
    * starts after it while nobody types. */
   function activate(list, index, now) {
     for (const [i, o] of items(list).entries()) {
@@ -117,7 +117,8 @@ export function initListbox(searchLabel) {
       activate(list, next, event.timeStamp)
       return focusItem(list, next)
     }
-    // Space on an option selects it (Select's own item handler runs first).
+    // Space on an option selects it (the button's own activation), never
+    // typeahead.
     if (event.key === ' ' && i >= 0) return
     if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
     const labels = all.map(searchLabel)

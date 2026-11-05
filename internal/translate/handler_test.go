@@ -949,7 +949,7 @@ func TestAlternativeSkeletonThenRow(t *testing.T) {
 	}
 }
 
-// TestLongFormNoAlternatives: long-form input (src/lib/longForm.ts) hides
+// TestLongFormNoAlternatives: long-form input (prompt.IsLongForm) hides
 // the alternatives, live and on a cache replay; word results keep theirs.
 func TestLongFormNoAlternatives(t *testing.T) {
 	e := newEnv(t, fixturesDir, nil)

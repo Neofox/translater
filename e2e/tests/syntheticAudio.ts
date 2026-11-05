@@ -1,6 +1,5 @@
-// Deterministic Web Audio for e2e (port of tests/browser/syntheticAudio.ts).
-// The apps' real playback code decodes and schedules the PCM it receives;
-// the test decides when an unlock resolves and when scheduled audio ends.
+// Deterministic Web Audio for e2e. The app's real playback code decodes and
+// schedules the PCM it receives; the test decides when an unlock resolves and when scheduled audio ends.
 // Installed as an init script, so it replaces AudioContext before any page
 // script runs (the app reads it at tap time).
 import type { Page } from '@playwright/test'

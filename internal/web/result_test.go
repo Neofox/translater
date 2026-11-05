@@ -7,11 +7,10 @@ import (
 	"testing"
 )
 
-// SentenceView/WordView unmount the alternatives section until a row
-// exists, and long-form input never gets one. Go keeps the section mounted
-// for the streamed rows, so it starts under `hidden` (absent from the
-// accessibility tree and the DOM snapshot); stream.js lifts it once an
-// alternative item arrives.
+// The alternatives section must not show until a row exists, and
+// long-form input never gets one. It stays mounted for the streamed rows,
+// so it starts under `hidden` (absent from the accessibility tree and the
+// DOM snapshot); stream.js lifts it once an alternative item arrives.
 func TestResultSkeletonStartsHidden(t *testing.T) {
 	var b bytes.Buffer
 	if err := ResultSkeleton("Alternatives").Render(context.Background(), &b); err != nil {

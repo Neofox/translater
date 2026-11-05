@@ -1,14 +1,13 @@
-// Learning in the initial response (@learning): LearningInspector.tsx's
-// whole-message rows, InspectableTranslation.tsx's grammar phrases and
-// selected mark, SourceHighlight.tsx's source mirror. Ports of
-// tests/browser/learning.browser.tsx.
+// Learning in the initial response (@learning): the learning inspector's
+// whole-message rows, the main text's grammar phrases and selected mark,
+// and the source highlight mirror under the editor.
 //
 // The rows show in the reference pane of the desktop workspace once the
 // result is done; every other layout shows them in the learning surface,
-// which a tap on the main text opens (openOverview, as in the TS test).
+// which a tap on the main text opens (openOverview).
 //
-// Inspection gestures (phrasePointer.ts, InspectableTranslation.tsx,
-// SourceHighlight.tsx): a short stationary tap inspects after a 400 ms
+// Inspection gestures (inspect.js, on the main text and the source
+// editor's grammar underlines): a short stationary tap inspects after a 400 ms
 // selection grace period; drag, long press and double-click keep native
 // selection and editing.
 import type { Page } from '@playwright/test'
@@ -36,7 +35,7 @@ import {
 const rows = (page: Page) => page.getByTestId('learning-chunk')
 const mirror = (page: Page) => page.getByTestId('source-highlight')
 
-/** The desktop workspace (`desktop` in useWorkspaceLayout.ts). */
+/** The desktop workspace (`desktop` in layout.js). */
 async function isDesktop(page: Page): Promise<boolean> {
   return (
     (await page.locator('.translator-panels').getAttribute('data-desktop')) ===
@@ -81,7 +80,7 @@ const panel = (page: Page) => page.getByTestId('learning-panel')
 const visibleDetails = (page: Page) =>
   page.locator('.phrase-detail').filter({ visible: true })
 
-/** The whole-message rows (TS openOverview): compact layouts open the
+/** The whole-message rows: compact layouts open the
  * learning surface with a tap on the main text, then any phrase the tap
  * selected collapses. */
 async function openOverview(page: Page) {
@@ -109,8 +108,7 @@ async function closeLearning(page: Page) {
   await expect(panel(page)).toBeHidden()
 }
 
-/** Centre of the `nth` source grammar underline, relative to the textarea
- * (sourceGrammarPosition in the TS test). */
+/** Centre of the `nth` source grammar underline, relative to the textarea. */
 async function grammarPosition(page: Page, nth = 0) {
   return page.evaluate((index) => {
     const grammar = document.querySelectorAll('[data-testid="source-grammar"]')[
@@ -1073,7 +1071,7 @@ test('mobile translation taps after an emoji map through counterpart quotations 
   }
 })
 
-// The mobile learning surface (LearningPanel.tsx): a full-size reading view
+// The mobile learning surface: a full-size reading view
 // with Close/Escape over the original Copy/Listen dock. The background is
 // inert, the reference pane hidden, and closing restores focus.
 
@@ -1087,7 +1085,7 @@ async function backgroundInert(page: Page): Promise<boolean[]> {
   )
 }
 
-/** The control lies inside the window (visibleRect in the TS test). */
+/** The control lies inside the window. */
 async function inViewport(page: Page, testid: string) {
   const box = await page.evaluate((id) => {
     const el =
@@ -1389,7 +1387,7 @@ test('context and learner details remain usable without a popup @learning @word'
   page,
 }) => {
   // The context field before the source, so no context edit re-runs a
-  // result while its trigger is tapped (the TS test's result never re-runs).
+  // result while its trigger is tapped.
   await page.getByTestId('context-toggle').click()
   await page
     .getByTestId('context-textarea')

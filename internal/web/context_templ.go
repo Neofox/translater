@@ -15,7 +15,7 @@ import (
 	"strconv"
 )
 
-// contextToggle is ContextField.tsx's ContextToggle. Its tone follows the
+// contextToggle is the reply-context toggle. Its tone follows the
 // sessionStorage context (client-only): context.js swaps the class between
 // the rendered neutral string and data-active-class, both from ui.PillClass.
 func contextToggle(v View) templ.Component {
@@ -95,12 +95,12 @@ func contextToggle(v View) templ.Component {
 	})
 }
 
-// contextField is InputPanel's composer-context with ContextTextarea, as a
-// template. TS mounts it only while open, and base.css selects on its
+// contextField is the composer-context with its textarea, as a template. It
+// is in the composer only while open, and base.css selects on its
 // presence (.composer:has(.composer-context)), so even a hidden copy would
 // change the composer grid. context.js clones it once and inserts/removes
 // that node, which keeps the draft. The clear button stays mounted with
-// `hidden` (TS unmounts it while the context is empty).
+// `hidden` while the context is empty.
 func contextField(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

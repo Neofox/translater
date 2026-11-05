@@ -176,9 +176,10 @@ func TestFixturesFresh(t *testing.T) {
 }
 
 // fixtureEntry is one fixture: { name, variant?, input, config, body }.
-// The input keeps the field order and defaults of the TS zod schema the
-// first fixtures were captured with, analyticsTrigger included, so the files
-// stay byte-identical; the Go app ignores analyticsTrigger.
+// The input keeps the field order and defaults of the original TypeScript
+// app's input schema, which the first fixtures were captured with,
+// analyticsTrigger included, so the files stay byte-identical; the Go app
+// ignores analyticsTrigger.
 func fixtureEntry(fc fixtureCase, body []byte) (*jsNode, error) {
 	b, err := parseJS(body)
 	if err != nil {

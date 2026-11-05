@@ -1,4 +1,4 @@
-# Lucide icons the UI uses: every lucide-react import in src/components.
+# Lucide icons the UI uses: every icon the templates render via icons.Icon.
 # One icon per line: its lucide name, then the aliases lucide-react 1.61.0
 # adds as extra `lucide-<alias>` classes (from the icon module's `aliases`).
 # `go generate ./...` (cmd/syncicons) turns this into icons_gen.go from

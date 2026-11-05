@@ -14,15 +14,15 @@ import (
 	"neotranslate/internal/web/ui"
 )
 
-// adjustTemplate is AdjustMenu.tsx around the single RefineRow, as a
-// template: TS mounts the menu only for a sentence result, and base.css
+// adjustTemplate is the header Adjust menu around the single refine row, as
+// a template: the menu exists only for a sentence result, and base.css
 // selects on its presence (.app-settings:has(.adjust-menu)). adjust.js
 // clones it once and inserts or removes that node, so drafts survive, and
 // measures whether the chips fit in the header or float under the trigger.
 //
 // The trigger's label and aria-label carry the active summary, so they have
-// no data-t hooks: adjust.js writes them. Both icons stay mounted (TS
-// renders one): SlidersHorizontal for the icon-only trigger, else ChevronDown.
+// no data-t hooks: adjust.js writes them. Both icons stay mounted and only
+// one shows: sliders-horizontal for the icon-only trigger, else chevron-down.
 func adjustTemplate(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

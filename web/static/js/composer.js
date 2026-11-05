@@ -1,9 +1,8 @@
 // Source editor: run scheduling, routing helpers and keyboard shortcuts.
 //
-// Hand-written: debounce/IME/paste/blur scheduling is app policy (ports of
-// src/hooks/useTranslate.ts and useTranslatorShortcuts.ts), and the routing
-// helpers are ports of src/lib/{detectIntent,detectLanguage,
-// resolveTranslationTarget}.ts. Latin-script language identification is left
+// Hand-written: debounce/IME/paste/blur scheduling, the keyboard shortcuts
+// and the routing helpers (detectIntent, detectLanguage, the translation
+// target) are app policy. Latin-script language identification is left
 // to the model (nt-source-lang): tinyld/light is 33 KB gzip, over the 10 KB
 // allowance, so detectLanguage returns 'en' for any Latin text.
 
@@ -109,7 +108,7 @@ export function initComposer(app, ta) {
       immediate = false
       return
     }
-    // Only a paste skips the debounce (TS queueImmediate('paste')).
+    // Only a paste skips the debounce (replaceText with `now`).
     const trigger = immediate ? 'paste' : 'debounce'
     const delay = immediate ? 0 : debounceFor(text, DEBOUNCE_MS)
     immediate = false
@@ -173,7 +172,7 @@ export function initComposer(app, ta) {
   }
 
   /** A lookup (synonym): the same textarea gets `text` and a debounced
-   * run, like typing it (TS lookupWord). */
+   * run, like typing it. */
   function setText(text, { focus: andFocus = false } = {}) {
     if (ta.value !== text) replaceText(text, false)
     if (andFocus) focus()
@@ -261,7 +260,7 @@ export function initComposer(app, ta) {
   document.addEventListener('focusin', warm)
   document.addEventListener('visibilitychange', warm)
 
-  // Auto-grow between the CSS min and max heights (InputPanel.tsx).
+  // Auto-grow between the CSS min and max heights.
   function resize() {
     ta.style.height = '0px'
     const style = getComputedStyle(ta)

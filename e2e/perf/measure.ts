@@ -129,7 +129,8 @@ function usage(message: string): never {
   process.exit(2)
 }
 
-// Recorded in the results (table.ts still reads the TS-era reports).
+// Recorded in the results (table.ts still reads reports of the earlier
+// TypeScript build, which carry another app value).
 const app = 'go' as const
 if (args.fake === args.live) usage('choose exactly one of --fake or --live')
 const mode = args.fake ? 'fake' : 'live'

@@ -1,7 +1,7 @@
 // Package fakeopenai is a fake OpenAI Responses API server for tests: it
 // replays canned fixtures as a streamed `POST /v1/responses` and answers
 // `POST /v1/audio/speech` with a deterministic WAV (speech.go), so browser
-// and unit tests (TypeScript app and Go app alike) never make paid calls.
+// and unit tests never make paid calls.
 //
 // Hand-written because no maintained library fakes the Responses streaming
 // protocol; the SSE writer is stdlib. Event shapes follow the OpenAI

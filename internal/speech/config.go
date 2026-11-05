@@ -1,7 +1,7 @@
 // Package speech serves POST /speech: one OpenAI text-to-speech request per
-// Listen tap, returned as validated mono PCM16. It ports
-// src/server/speech.server.ts. Speech never logs and never registers
-// telemetry: input text, provider errors and audio stay out of every log.
+// Listen tap, returned as validated mono PCM16. Speech never logs and never
+// registers telemetry: input text, provider errors and audio stay out of
+// every log.
 package speech
 
 import (

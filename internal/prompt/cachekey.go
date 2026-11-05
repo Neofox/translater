@@ -6,12 +6,11 @@ import (
 	"strings"
 )
 
-// CacheKey identifies a translation result in the server LRU. Same fields
-// and semantics as cacheKeyFor (src/server/cacheKey.ts): text and context
-// trimmed, refinements trimmed and ignored for word intent, previousMain
-// only when it anchors at least one refinement. configLabel is
+// CacheKey identifies a translation result in the server LRU: text and
+// context trimmed, refinements trimmed and ignored for word intent,
+// previousMain only when it anchors at least one refinement. configLabel is
 // config.Translate.Label() (model, reasoning, tier). A JSON array keeps
-// field boundaries unforgeable; bytes need not equal the TS key.
+// field boundaries unforgeable.
 func CacheKey(in TranslateInput, cacheVersion, configLabel string) string {
 	isWord := in.Intent == "word"
 	refinements := []string{}

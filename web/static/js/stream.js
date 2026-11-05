@@ -1,6 +1,6 @@
 // Result rendering from the /translate event stream.
 //
-// Hand-written: the nt-* events are this app's own protocol (go/internal/
+// Hand-written: the nt-* events are this app's own protocol (internal/
 // translate/events.go). htmx's hx-sse extension parses the stream and
 // dispatches each named event on the form; partials (alternative rows) are
 // swapped by htmx itself. Model text is always written with textContent.
@@ -31,8 +31,8 @@ export function graphemeEnds(text, from) {
 }
 
 /**
- * Interpolate provider bursts on grapheme boundaries for at most `burstMs`
- * (useStreamingText.ts). `write(shown)` receives every displayed prefix.
+ * Interpolate provider bursts on grapheme boundaries for at most `burstMs`.
+ * `write(shown)` receives every displayed prefix.
  * Display only: callers keep the real text for Copy and readiness.
  */
 export function createInterpolator(write, {
@@ -126,9 +126,9 @@ export function initStream(app, form) {
   const panel = document.querySelector('.output-panel')
   const status = $('result-status')
 
-  // SentenceView/WordView mark result-details while alternative rows exist
-  // and mount the section only then (the server sends it hidden); htmx
-  // swaps the rows in, so follow them.
+  // result-details is marked while alternative rows exist, and the section
+  // shows only then (the server sends it hidden); htmx swaps the rows in,
+  // so follow them.
   new MutationObserver(() => {
     const has = details.querySelector('.alternative-item')
     details.classList.toggle('has-alternatives', Boolean(has))
@@ -139,7 +139,7 @@ export function initStream(app, form) {
     mainText.data = text
   }, { immediate: reduced })
 
-  // OutputPanel's placeholder for a run with no main text to show.
+  // The placeholder for a run with no main text to show.
   const dots = document.createElement('span')
   dots.className = 'text-ink-dim'
   dots.textContent = '…'
@@ -215,9 +215,8 @@ export function initStream(app, form) {
     interp.reset()
     main.lang = live.target
     main.classList.toggle('result-word', live.intent === 'word')
-    // A word's main text is the word-details trigger's text
-    // (InspectableTranslation's actionLabel branch); dictionary.js keeps
-    // its state.
+    // A word's main text is the word-details trigger's text; dictionary.js
+    // keeps its state.
     if (live.intent === 'word') {
       const trigger = document.createElement('button')
       trigger.type = 'button'
@@ -384,7 +383,8 @@ export function initStream(app, form) {
   // A stream that ends without nt-done or nt-error failed mid-way.
   form.addEventListener('htmx:finally:request', failed)
 
-  // Reveal the whole main text on interaction (useStreamingText).
+  // Reveal the whole main text on result focus, a pointer on the main text,
+  // or a return to the visible tab.
   const reveal = () => {
     if (app.live?.mainReady || app.live?.done) return
     interp.flush()

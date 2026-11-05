@@ -1,8 +1,7 @@
 // Copy and Listen enabling plus the Copy actions.
 //
-// Hand-written: which result may be copied is app policy (ports of
-// src/lib/translationRequestKey.ts and src/lib/liveResult.ts); the clipboard
-// is the platform API.
+// Hand-written: which result may be copied is app policy (the request key
+// and main-readiness rules); the clipboard is the platform API.
 
 /** Page-memory identity of the request settings that produced a result. */
 export function requestKey({ text, source, target, mode, context, refinements, uiLang }) {

@@ -45,8 +45,8 @@ func findAll(n *html.Node, ok func(*html.Node) bool) []*html.Node {
 	return out
 }
 
-// LearningRows reproduces LearningInspector.tsx's whole-sentence list:
-// one row button per chunk (text → gloss), facts in FACTS order with only
+// LearningRows renders the whole-sentence phrase list:
+// one row button per chunk (text → gloss), facts in display order with only
 // non-blank values, character notes, and the partial-coverage status.
 // Every row's details wait hidden; punctuation-only chunks get no row but
 // keep the indices of the others.
@@ -89,7 +89,7 @@ func TestLearningRows(t *testing.T) {
 			t.Errorf("row %d button: %v", i, button.Attr)
 		}
 		spans := elementChildren(button)
-		if textOf(button) != want.text+"→"+want.gloss { // React renders no whitespace between them
+		if textOf(button) != want.text+"→"+want.gloss { // no whitespace between the spans
 			t.Errorf("row %d button text %q", i, textOf(button))
 		}
 		if len(spans) != 3 || attrVal(spans[0], "lang") != "ko" || hasAttr(spans[0], "class") || textOf(spans[0]) != want.text ||
@@ -137,7 +137,7 @@ func TestLearningRowsComplete(t *testing.T) {
 	}
 }
 
-// The reference pane holds both LearningInspector sections: the sentence
+// The reference pane holds both learning sections: the sentence
 // one before the word one, hidden until learning.js shows a breakdown.
 func TestReferencePaneSections(t *testing.T) {
 	doc := renderPage(t)

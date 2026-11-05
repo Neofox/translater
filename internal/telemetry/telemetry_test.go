@@ -184,7 +184,7 @@ func TestRuntimeContext(t *testing.T) {
 			t.Errorf("LengthBucket(%d) = %q, want %q", n, got, want)
 		}
 	}
-	// TS data.text.length: UTF-16 units of the text as posted ("😀" counts
+	// The bucket counts UTF-16 units of the text as posted ("😀" counts
 	// 2), surrounding whitespace included.
 	in.Text = strings.Repeat("😀", 12)
 	if rc := NewRuntimeContext(in, testCfg, "v", Analytics{}); rc.InputLengthBucket != "1-24" {

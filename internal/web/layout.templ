@@ -1,9 +1,9 @@
 package web
 
-// Page is the whole translator document (__root.tsx + TranslatorWorkspace).
-// The panels keep TS's server-rendered layout attributes for good: CSS
-// container queries choose the desktop workspace or the compact stack
-// (measured layouts, folds and keyboards are stage 7).
+// Page is the whole translator document: head, header and workspace panels.
+// The panels start with server-rendered layout attributes
+// (data-layout-pending): CSS container queries choose the desktop workspace
+// or the compact stack (measured layouts, folds and keyboards are stage 7).
 templ Page(v View) {
 	<!DOCTYPE html>
 	<html lang={ v.Prefs.UILang } class="dark">
@@ -26,7 +26,7 @@ templ Page(v View) {
 			<script defer src={ v.Asset("vendor/htmx.min.js") }></script>
 			<script defer src={ v.Asset("vendor/hx-sse.min.js") }></script>
 			<script type="module" src={ v.Asset("js/app.js") }></script>
-			// Vercel Web Analytics (TS <Analytics/>, production script). Only a
+			// Vercel Web Analytics (production script). Only a
 			// Vercel deployment serves the path, so it is rendered only there.
 			if v.VercelAnalytics {
 				<script defer src="/_vercel/insights/script.js"></script>
@@ -48,7 +48,7 @@ templ Page(v View) {
 			@prefsForm(v)
 			@langOption()
 			@jsonScript(`type="application/json" id="nt-data"`, v.Data)
-			// Last, like the TS FloatingPortal.
+			// Last in <body>, where the original app's floating portal put it.
 			@settingsPopover(v)
 		</body>
 	</html>

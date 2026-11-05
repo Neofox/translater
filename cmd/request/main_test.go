@@ -36,8 +36,9 @@ func TestBuildBodyMatchesFixtures(t *testing.T) {
 		for _, f := range fixtures {
 			n++
 			t.Run(f.Name, func(t *testing.T) {
-				// The fixtures carry the TS-era analyticsTrigger, which the
-				// command (strict about unknown fields) does not accept.
+				// The fixtures carry the analyticsTrigger field of the original
+				// TypeScript app, which the command (strict about unknown
+				// fields) does not accept.
 				var input map[string]any
 				if err := json.Unmarshal(f.Input, &input); err != nil {
 					t.Fatal(err)

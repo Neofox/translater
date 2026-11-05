@@ -1,11 +1,9 @@
-// Refinements (@refine): RefineRow.tsx's chips and custom adjustment, and
-// TranslatorContext's refine rules (ports of RefineRow.test.tsx and
-// TranslatorContext.test.tsx): immediate re-runs carrying the previous main,
-// toggling back through the server LRU, caps, stale settings and the rollback
-// of a failed refine. AdjustMenu.tsx's header placement (ports of
-// AdjustMenu.test.tsx and the Adjust tests of learning.browser.tsx and
-// mobile.browser.tsx): measured in-line chips, the floating panel clear of
-// Copy/Listen, dismissal and the tight-keyboard Custom editor.
+// Refinements (@refine): the refine chips and custom adjustment, and the
+// refine rules: immediate re-runs carrying the previous main, toggling back
+// through the server LRU, caps, stale settings and the rollback of a failed
+// refine. The Adjust menu's header placement: measured in-line chips, the
+// floating panel clear of Copy/Listen, dismissal and the tight-keyboard
+// Custom editor.
 import type { Locator, Page } from '@playwright/test'
 import { installFakeVisualViewport } from '../perf/page-scripts'
 import type { PageGlobals } from '../perf/page-scripts'
@@ -419,7 +417,7 @@ test('editing the input clears refinements @refine', async ({ page, fake }) => {
   expect(userText((await fake.bodies()).at(-1)!)).not.toContain('<adjustments>')
 })
 
-// ----- Adjust menu (AdjustMenu.tsx) -----------------------------------------
+// ----- Adjust menu -----------------------------------------------------------
 
 test('shows active adjustments while collapsed and retains a custom draft through collapse @refine', async ({
   page,

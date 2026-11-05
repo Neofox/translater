@@ -9,10 +9,10 @@ package web
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// Page is the whole translator document (__root.tsx + TranslatorWorkspace).
-// The panels keep TS's server-rendered layout attributes for good: CSS
-// container queries choose the desktop workspace or the compact stack
-// (measured layouts, folds and keyboards are stage 7).
+// Page is the whole translator document: head, header and workspace panels.
+// The panels start with server-rendered layout attributes
+// (data-layout-pending): CSS container queries choose the desktop workspace
+// or the compact stack (measured layouts, folds and keyboards are stage 7).
 func Page(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

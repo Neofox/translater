@@ -2,7 +2,8 @@ package prompt
 
 import "testing"
 
-// Ported from src/server/cacheKey.test.ts.
+// Which request fields distinguish cache entries, and which normalizations
+// make two requests share one.
 
 const (
 	testVersion = "v-test"

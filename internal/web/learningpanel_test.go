@@ -7,8 +7,8 @@ import (
 	"golang.org/x/net/html"
 )
 
-// The learning surface (LearningPanel.tsx) waits mounted and hidden at the
-// end of .output-panel. TS unmounts it; base.css selects on
+// The mobile learning surface waits mounted and hidden at the end of
+// .output-panel. base.css selects on
 // .learning-panel[data-expanded], so the hidden copy carries no
 // data-expanded (learning.js sets both when it opens).
 func TestLearningPanelShell(t *testing.T) {

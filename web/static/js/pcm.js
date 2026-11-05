@@ -1,4 +1,4 @@
-// Web Audio player for the /speech PCM stream: a port of src/lib/pcmPlayer.ts.
+// Web Audio player for the /speech PCM stream.
 //
 // Hand-written: /speech answers audio/L16 but sends LITTLE-endian PCM16
 // (RFC 2586 L16 is big-endian), so no generic L16 decoder applies; the rest

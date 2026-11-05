@@ -1,9 +1,10 @@
 // Preferences: the nt.preferences cookie, header controls, language chip bars
 // and their More listbox, the Settings popover and UI-language labels.
 //
-// Hand-written: the cookie format is shared with the TS app (src/lib/
-// preferences.ts) and the controls are a few native buttons. Popups use the
-// native `popover` attribute, placed by float.js.
+// Hand-written: the cookie format (shared with internal/prefs) stays
+// byte-compatible with cookies the original TypeScript app wrote, and the
+// controls are a few native buttons. Popups use the native `popover`
+// attribute, placed by float.js.
 
 import { autoUpdate, closeOnFocusOut, leftFocus, panelBoundary, position } from './float.js'
 import { initListbox } from './listbox.js'
@@ -25,7 +26,7 @@ export function writePrefsCookie(prefs, rules) {
 }
 
 const UI_LANGS = ['en', 'ko']
-/** UiLangToggle's idle and pressed class tokens. */
+/** The UI-language buttons' idle and pressed class tokens. */
 const UI_LANG_TOKENS = [['text-ink-soft', 'hover:text-ink'], ['bg-accent', 'text-bg', 'shadow-sm']]
 const uiLangButtons = () => [...document.querySelectorAll('[aria-label="UI language"] button')]
 
@@ -48,7 +49,7 @@ export function initPrefs(app, data) {
   }
 
   /** A Tone button's mode: the narrow-screen select's option at the same
-   * index (ModeToggle.tsx renders no value attribute on the buttons). */
+   * index (the buttons carry no value attribute). */
   const modeOf = (button) =>
     document.querySelectorAll('.mode-select option')[[...button.parentElement.children].indexOf(button)]?.value
 
@@ -59,7 +60,8 @@ export function initPrefs(app, data) {
       b.setAttribute('aria-pressed', String(modeOf(b) === p.mode))
     const select = document.querySelector('.mode-select')
     if (select) select.value = p.mode
-    // UiLangToggle's state tokens end its class string (settings.templ).
+    // The UI-language buttons' state tokens end their class string
+    // (settings.templ).
     for (const [i, b] of uiLangButtons().entries()) {
       const on = UI_LANGS[i] === p.uiLang
       b.setAttribute('aria-pressed', String(on))
@@ -143,13 +145,13 @@ export function initPrefs(app, data) {
       return false
     }
   }
-  // Keyboard, hover and typeahead (Select's searchLabel is the English
+  // Keyboard, hover and typeahead (an option's search label is its English
   // name); a list or Settings closes when focus leaves it.
   const opened = initListbox((option) => data.languages.find((l) => l.code === option.dataset.value)?.promptName ?? '')
   closeOnFocusOut()
 
   /** The options a bar's More listbox offers: every language not shown as a
-   * visible chip (Select.tsx options). */
+   * visible chip. */
   function fillMenu(menu) {
     const kind = menu.dataset.kind
     const bar = document.getElementById(`${kind}-bar`)
@@ -200,7 +202,7 @@ export function initPrefs(app, data) {
     const left = leftFocus.delete(menu)
     if (!left && (inside || document.activeElement === document.body)) trigger?.focus({ preventScroll: true })
   }, true)
-  // Select.tsx's placement: bottom-start, offset 6, flip and shift inside
+  // Listbox placement: bottom-start, offset 6, flip and shift inside
   // panelBoundary, at most 320 px high and at least as wide as the trigger.
   let unfollow = null
   document.addEventListener('toggle', (event) => {

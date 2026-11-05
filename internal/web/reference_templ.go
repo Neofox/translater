@@ -9,15 +9,15 @@ package web
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// referencePanel is ReferencePanel.tsx with LearningInspector's
+// referencePanel is the reference pane with its dictionary and learning
 // sections (Task 15 renders the word path; Task 17 adds activation, the
-// headword heading and the learning surface). TS mounts the pane inside
+// headword heading and the learning surface). The pane belongs inside
 // .input-panel, after the composer, only for a word result in a
 // workspace/split/book layout; base.css selects on its presence there
 // (.input-panel:has(> .reference-panel)), so otherwise it waits in this
 // hidden dock and dictionary.js moves it. #word-meta receives the server's
-// WordMeta partials and #learning-sentence a sentence's LearningRows; TS
-// renders only the section of the result's intent, so learning.js keeps the
+// WordMeta partials and #learning-sentence a sentence's LearningRows; only
+// the section of the result's intent shows, so learning.js keeps the
 // other one hidden. learning.js writes the heading text.
 func referencePanel(v View) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
