@@ -211,13 +211,19 @@ export function initComposer(app, ta) {
     changed()
   }
 
-  // Escape closes an open popover first; it clears the text only otherwise.
+  // Escape closes an open popover first; it clears the text only otherwise,
+  // and only from the source itself or the page (focus on body): Escape on
+  // any other control (a menu trigger, the learning surface) never clears.
   const popoverOpen = () => {
     try {
       return Boolean(document.querySelector(':popover-open'))
     } catch {
       return false
     }
+  }
+  const clearsFromHere = () => {
+    const active = document.activeElement
+    return !active || active === ta || active === document.body || active === document.documentElement
   }
 
   window.addEventListener('keydown', (event) => {
@@ -236,7 +242,7 @@ export function initComposer(app, ta) {
       event.preventDefault()
       ta.focus()
       ta.select()
-    } else if (event.key === 'Escape' && ta.value && !popoverOpen()) {
+    } else if (event.key === 'Escape' && ta.value && !popoverOpen() && clearsFromHere()) {
       event.preventDefault()
       clearInput()
       ta.focus()

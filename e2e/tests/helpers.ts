@@ -229,7 +229,7 @@ export async function setUiLang(page: Page, lang: UiLang): Promise<void> {
   await expect(
     group.getByRole('button', { name: lang === 'ko' ? '한' : 'EN' }),
   ).toHaveAttribute('aria-pressed', 'true')
-  // Toggle closed; Escape would also clear the source text.
+  // Toggle closed.
   await settings.click()
   await expect(group).toBeHidden()
 }

@@ -1142,11 +1142,15 @@ test('mobile text opens a full learning view without a Breakdown button @learnin
       .locator('.learning-panel-body')
       .evaluate((el) => getComputedStyle(el).overflowY),
   ).toMatch(/auto|scroll/)
-  // Escape inside the surface closes it, like Close, and focus returns to
-  // the main text. (WebKit leaves a tapped row unfocused, and an Escape
-  // from the page clears the source in both apps.)
-  await rows(page).nth(1).focus()
+  // Escape while the surface is open closes it, like Close, and focus
+  // returns to the main text. It never clears the source, even when focus
+  // is on the page itself (WebKit leaves a tapped row unfocused).
+  const text = await source(page).inputValue()
+  await page.evaluate(() =>
+    (document.activeElement as HTMLElement | null)?.blur(),
+  )
   await page.keyboard.press('Escape')
+  await expect(source(page)).toHaveValue(text)
   await expect(panel(page)).toBeHidden()
   await expect(mainTranslation(page)).toBeVisible()
   await expect(mainTranslation(page)).toBeFocused()

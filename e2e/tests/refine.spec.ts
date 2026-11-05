@@ -475,16 +475,38 @@ test('closes with Escape even when a touch activation leaves focus outside the m
   page,
 }) => {
   await translatePlain(page)
+  const text = await source(page).inputValue()
   await expect(openPanel(page)).toHaveCount(1)
   await page.evaluate(() =>
     (document.activeElement as HTMLElement | null)?.blur(),
   )
   await page.keyboard.press('Escape')
   await expect(openPanel(page)).toHaveCount(0)
-  // That Escape then reaches the translator shortcut, which clears
-  // the source; the menu leaves with the sentence result.
+  // That Escape only closes the menu: focus returns to its trigger, and
+  // the source and its result stay.
+  await expect(trigger(page)).toBeFocused()
+  await expect(source(page)).toHaveValue(text)
+  expect(await mainText(page)).toBe(PLAIN)
+})
+
+test('Escape clears the source only from the source or the page itself @refine', async ({
+  page,
+}) => {
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, PLAIN)
+  await waitForDone(page)
+  const text = await source(page).inputValue()
+  // Focus on another control (Settings, closed): kept.
+  await page.getByTestId('settings-button').focus()
+  await page.keyboard.press('Escape')
+  await expect(source(page)).toHaveValue(text)
+  // Focus on the page itself: cleared.
+  await page.evaluate(() =>
+    (document.activeElement as HTMLElement | null)?.blur(),
+  )
+  await page.keyboard.press('Escape')
   await expect(source(page)).toHaveValue('')
-  await expect(trigger(page)).toHaveCount(0)
+  await expect(source(page)).toBeFocused()
 })
 
 test('adjustments stay with tone in the header and expose chips when there is room @refine', async ({

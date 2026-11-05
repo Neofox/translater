@@ -394,7 +394,9 @@ export function initLearning(app) {
       event.preventDefault()
       return inspectMain(0)
     }
-    if (event.key !== 'Escape' || !shown || !target?.closest('.output-panel')) return
+    // Escape while the surface is open closes it, wherever focus is (a tap
+    // may leave it on the page), and never reaches the composer's clear.
+    if (event.key !== 'Escape' || !shown) return
     event.stopPropagation()
     close()
   })
