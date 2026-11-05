@@ -15,8 +15,7 @@ import (
 	"neotranslate/internal/contract"
 )
 
-// shared/translation is the source of truth; the contract package embeds a
-// generated copy, which its own tests keep in sync.
+// shared/translation is the source of truth; the contract package embeds it.
 const sharedDir = "../../shared/translation/"
 
 type fixture struct {
