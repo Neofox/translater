@@ -1,29 +1,26 @@
-# Upload application source only; rebuild artifacts on Vercel.
+# Upload only what the Go build needs: the module (go.mod, *.go, cmd/,
+# internal/, web/) and the embedded contract (shared/translation). The npm
+# tooling (e2e suite, evals) never runs on Vercel; without package.json the
+# deployment cannot mistake the repository for a Node project.
 node_modules
+package.json
+package-lock.json
 .DS_Store
-dist
-dist-ssr
 *.local
 .env
-.nitro
-.tanstack
-.wrangler
-.output
-.vercel
-.vinxi
-__unconfig*
-todos.json
 .env*
+.vercel
 test-results/
-.vitest/
-tests/browser/__screenshots__/
-tests/browser/__traces__/
+.promptfoo-cache/
+e2e/
+evals/
+docs/
+.github/
 
 # Local agent and review artifacts
 .claude/
 .agents/
 .superpowers/
 .codegraph/
-.cta.json
-docs/
-tests/
+.headroom/
+.serena/

@@ -7,7 +7,7 @@
 //       --i-understand-this-is-billed --runs 10 --out results.json
 //
 // --fake builds the app with `go build` and serves it locally against the
-// fake OpenAI server (go/cmd/fakeopenai). Every translation must reach the
+// fake OpenAI server (cmd/fakeopenai). Every translation must reach the
 // fake.
 // --live measures a deployed URL; translations are billed, so it refuses to
 // start without the explicit flag.
@@ -70,7 +70,6 @@ import type {
 } from './table'
 
 const ROOT = resolve(import.meta.dirname, '../..')
-const GO_DIR = join(ROOT, 'go')
 const BIN_DIR = join(tmpdir(), 'neotranslate-perf')
 // Separate from the e2e suite's ports (app 5101+, fake 7101+, each plus
 // E2E_PORT_OFFSET) so a running e2e suite is never measured or disturbed.
@@ -310,7 +309,7 @@ async function prepareFake(): Promise<{
   const fakeBin = join(BIN_DIR, 'fakeopenai')
   console.log('building the fake OpenAI server…')
   execFileSync('go', ['build', '-o', fakeBin, './cmd/fakeopenai'], {
-    cwd: GO_DIR,
+    cwd: ROOT,
     stdio: 'inherit',
   })
   const skipped = args['skip-build']
@@ -320,14 +319,14 @@ async function prepareFake(): Promise<{
   if (!skipped) {
     console.log('building the app (go build)…')
     execFileSync('go', ['build', '-o', appBin, '.'], {
-      cwd: GO_DIR,
+      cwd: ROOT,
       stdio: 'inherit',
     })
   }
   const build = { skipped, sha256: sha256(readFileSync(appBin)), assets: [] }
   const server: AppServer = {
     url,
-    start: () => start(appBin, [], appEnv(port), GO_DIR),
+    start: () => start(appBin, [], appEnv(port), ROOT),
   }
   const fakeProc = start(
     fakeBin,
@@ -338,7 +337,7 @@ async function prepareFake(): Promise<{
       join(ROOT, 'e2e/fixtures/results'),
     ],
     process.env,
-    GO_DIR,
+    ROOT,
   )
   await waitForPort(PORTS.fake, fakeProc.child, 'fake OpenAI server')
   const fake = new Fake(`http://127.0.0.1:${PORTS.fake}`)

@@ -2,13 +2,12 @@ package-lock.json
 .superpowers/
 
 # Pinned generated font-face declarations
-go/web/static/css/pretendard.css
+web/static/css/pretendard.css
 
-# Shared translation contract (byte-exact data, golden request bodies) and
-# its generated copy: never reformat
+# Shared translation contract (byte-exact data, golden request bodies):
+# never reformat
 shared/
-go/internal/contract/data/
 docs/superpowers/reports/data/
 
 # Frozen learning regression corpus
-go/internal/learning/testdata/
+internal/learning/testdata/

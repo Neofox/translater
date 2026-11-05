@@ -5,15 +5,15 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // The evals measure the production request, which the Go app builds:
-// go/cmd/request prints the exact Responses body for one translation, and
+// cmd/request prints the exact Responses body for one translation, and
 // with -prepare resolves learning phrases with the app's learning.Prepare.
 // The command is built once per process and spawned per call.
 
-const GO_MODULE = join(dirname(fileURLToPath(import.meta.url)), '..', 'go')
+const GO_MODULE = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 let binary: string | undefined
 
-/** Path of the built go/cmd/request (synchronous, so checks can use it). */
+/** Path of the built cmd/request (synchronous, so checks can use it). */
 function requestBinary(): string {
   if (!binary) {
     const dir = mkdtempSync(join(tmpdir(), 'neotranslate-request-'))

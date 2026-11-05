@@ -28,7 +28,7 @@ type CallContext = {
   bustCache?: boolean
 }
 
-// The request body go/cmd/request prints (the fields read here).
+// The request body cmd/request prints (the fields read here).
 type InputText = { type: 'input_text'; text: string }
 type RequestBody = {
   model: string
@@ -195,7 +195,7 @@ async function openAIError(response: Response): Promise<Error> {
 
 // Runs the production translation request for one promptfoo test case. Only
 // the model, reasoning effort, service tier and prompt variant differ. The
-// body comes from the Go app (go/cmd/request); this posts it to the OpenAI
+// body comes from the Go app (cmd/request); this posts it to the OpenAI
 // Responses API as the app does (streaming, no retry).
 export default class TranslationProvider {
   config: Config

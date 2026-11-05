@@ -41,8 +41,8 @@ const servers: Extract<WebServer, unknown[]> = []
 for (let i = 0; i < WORKERS; i++) {
   servers.push({
     name: `fake-openai-${i}`,
-    command: `go run ./cmd/fakeopenai -addr 127.0.0.1:${fakePort(i)} -fixtures ../e2e/fixtures/results`,
-    cwd: '../go',
+    command: `go run ./cmd/fakeopenai -addr 127.0.0.1:${fakePort(i)} -fixtures e2e/fixtures/results`,
+    cwd: '..',
     url: `${fakeUrl(i)}/_stats`,
     // Never attach to a server started elsewhere: it could be a dev server
     // holding a real key.
@@ -52,7 +52,7 @@ for (let i = 0; i < WORKERS; i++) {
   servers.push({
     name: `app-${i}`,
     command: 'go run .',
-    cwd: '../go',
+    cwd: '..',
     // Port readiness only: global setup reports a clear error when the app
     // does not serve the translator page yet.
     port: appPort(i),

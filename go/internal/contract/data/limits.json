@@ -1,8 +1,0 @@
-{
-  "maxInputChars": 4000,
-  "inputWarnFraction": 0.8,
-  "maxContextChars": 1000,
-  "maxRefinements": 3,
-  "maxRefinementChars": 200,
-  "maxLearningTranslationChars": 16000
-}

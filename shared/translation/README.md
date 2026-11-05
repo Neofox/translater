@@ -2,10 +2,10 @@
 
 The language-neutral translation contract. Everything the model sees (prompt
 wording, few-shots, result schemas) plus UI strings, languages, limits,
-preference rules and golden request bodies. The TypeScript app
-(`src/server/prompts.ts`, `schemas.ts`, `src/lib/*`) and the Go app
-(`go/internal/contract/data/`, a `go generate` copy) both consume these files
-and must produce **identical** OpenAI request bodies.
+preference rules and golden request bodies. The Go app embeds these files
+(`embed.go`, decoded by `internal/contract`); the eval provider validates
+results against `schemas/`. The rules below are language-neutral, so another
+implementation could produce **identical** OpenAI request bodies.
 
 | Path | Contents |
 | --- | --- |
@@ -15,8 +15,8 @@ and must produce **identical** OpenAI request bodies.
 | `schemas/sentence.json`, `schemas/word.json` | Strict result JSON Schemas, sent verbatim as `text.format.schema`. Descriptions are prompt text. |
 | `i18n/strings.json` | UI strings, `{ en: {...}, ko: {...} }`, same keys in both |
 | `languages.json` | `[{ code, label, promptName }]`; `promptName` is used in prompts |
-| `limits.json` | Input limits (characters are UTF-16 code units, JS `length`). `maxLearningTranslationChars` mirrors the `maxLength` already in `schemas/sentence.json` and is used only by the TypeScript learning code. |
-| `preferences.json` | `nt.preferences` cookie: `cookie` (name), `version`, `maxAgeSeconds`, `maxCookieLength` (max raw length) and `rules` (each rule's `values`; rule order = cookie field order). Each rule's `storage`/`raw` belong to the TypeScript app's legacy localStorage migration only; the Go app ignores them. |
+| `limits.json` | Input limits (characters are UTF-16 code units, JS `length`). `maxLearningTranslationChars` mirrors the `maxLength` already in `schemas/sentence.json`. |
+| `preferences.json` | `nt.preferences` cookie: `cookie` (name), `version`, `maxAgeSeconds`, `maxCookieLength` (max raw length) and `rules` (each rule's `values`; rule order = cookie field order). Each rule's `storage`/`raw` served the former TypeScript app's localStorage migration; the app ignores them. |
 | `meta.json` | `cacheVersion` (cache keys, `prompt_cache_key`) and `defaultModel` |
 | `fixtures/requests.json` | Golden request bodies: `[{ name, input, config, body }]`, written by the Go app's `BuildRequest` |
 | `fixtures/variants.json` | Same for eval variants, plus `variant` |
@@ -24,27 +24,27 @@ and must produce **identical** OpenAI request bodies.
 ## Changing anything here
 
 - Fixtures are the safety net: never hand-edit them. A refactor must keep
-  the Go prompt tests (`go test ./internal/prompt` in `go/`, which compare
-  the fixture bytes) green. The `input` objects keep an `analyticsTrigger`
-  field from the TypeScript capture; the Go app ignores it.
+  the prompt tests (`go test ./internal/prompt`, which compare the fixture
+  bytes) green. The `input` objects keep an `analyticsTrigger` field from an
+  earlier capture; the app ignores it.
 - A deliberate change to prompt text, few-shots or schemas: edit the files,
   bump `meta.json` `cacheVersion`, run `go test ./internal/prompt -update`
-  in `go/` and review the fixture diff, then `go generate ./...`.
-- After editing any file here run `npm run shared:generate` (TS views:
-  `src/server/promptTemplates.generated.json`,
-  `src/server/resultTypes.generated.ts`) and `go generate ./...` in `go/`.
-  Tests fail while either copy is stale.
+  and review the fixture diff.
+- The app embeds these files at build time (`embed.go`): there is no copy
+  to regenerate. A new top-level file the app loads must be added to the
+  `//go:embed` list.
 - Keep JSON files formatted exactly as `JSON.stringify(value, null, 2)` plus a
   final newline (two-space indent, non-ASCII characters literal, no
-  `\uXXXX` except where JSON requires it). A test enforces this for few-shots.
+  `\uXXXX` except where JSON requires it). A test
+  (`internal/contract`) enforces the layout for few-shots.
 
 ## Rendering
 
-Both apps use a maintained Mustache implementation (JS `mustache` 4.2.0,
-Go `github.com/cbroglie/mustache`) with these rules:
+The app uses a maintained Mustache implementation
+(`github.com/cbroglie/mustache`) with these rules:
 
-1. **No HTML escaping.** `{{name}}` inserts the value verbatim (JS:
-   `{ escape: s => s }`; Go: disable escaping / use the unescaped renderer).
+1. **No HTML escaping.** `{{name}}` inserts the value verbatim
+   (`internal/contract` rewrites every `{{x}}` to `{{{x}}}` before parsing).
    Templates never use `{{{ }}}` or `{{& }}`.
 2. **Partials** are the other templates, by name. A template's name is its path
    below `prompts/` without `.mustache`, `/`-separated (`sentence-system`,
@@ -145,8 +145,7 @@ a Go map/struct: that sorts keys and HTML-escapes `<>&`.
 
 ## Live text (code, not templates)
 
-Implemented identically in each app (`prompts.ts`: `liveText`, `userBlocks`,
-`sourceBlock`):
+Implemented in code (`internal/prompt`):
 
 - `liveText(s)`: replace every match of
   `<(\s*\/?\s*(?:source|context|adjustments)\b[^<>]*)>` (case-insensitive,

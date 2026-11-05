@@ -101,7 +101,7 @@ export default function checks(
     const side = learningSide(result.sourceLang, result.targetLang, uiLang)
     const learningText = side === 'source' ? source : result.main
     const counterpart = side === 'source' ? result.main : source
-    // The app's own resolution (go/internal/learning.Prepare).
+    // The app's own resolution (internal/learning.Prepare).
     const prepared = prepareLearning({
       counterpart,
       primary: learningText,
