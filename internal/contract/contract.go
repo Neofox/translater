@@ -50,8 +50,7 @@ type PrefRule struct {
 	Values []*string
 }
 
-// PrefRules is preferences.json. Fields are in cookie field order. The
-// TypeScript-only legacy keys (storage, raw) are ignored.
+// PrefRules is preferences.json. Fields are in cookie field order.
 type PrefRules struct {
 	Cookie          string
 	Version         int

@@ -16,7 +16,7 @@ implementation could produce **identical** OpenAI request bodies.
 | `i18n/strings.json` | UI strings, `{ en: {...}, ko: {...} }`, same keys in both |
 | `languages.json` | `[{ code, label, promptName }]`; `promptName` is used in prompts |
 | `limits.json` | Input limits (characters are UTF-16 code units, JS `length`). `maxLearningTranslationChars` mirrors the `maxLength` already in `schemas/sentence.json`. |
-| `preferences.json` | `nt.preferences` cookie: `cookie` (name), `version`, `maxAgeSeconds`, `maxCookieLength` (max raw length) and `rules` (each rule's `values`; rule order = cookie field order). Each rule's `storage`/`raw` served the former TypeScript app's localStorage migration; the app ignores them. |
+| `preferences.json` | `nt.preferences` cookie: `cookie` (name), `version`, `maxAgeSeconds`, `maxCookieLength` (max raw length) and `rules` (each rule's `values`; rule order = cookie field order). |
 | `meta.json` | `cacheVersion` (cache keys, `prompt_cache_key`) and `defaultModel` |
 | `fixtures/requests.json` | Golden request bodies: `[{ name, input, config, body }]`, written by the Go app's `BuildRequest` |
 | `fixtures/variants.json` | Same for eval variants, plus `variant` |
