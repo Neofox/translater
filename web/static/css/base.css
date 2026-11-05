@@ -189,23 +189,6 @@ textarea:focus-visible {
   font-weight: 650;
   box-shadow: inset 0 0 0 1px var(--color-accent-line);
 }
-.app-footer {
-  display: none;
-  flex-shrink: 0;
-  gap: 20px;
-  padding: 5px 20px calc(5px + var(--safe-area-bottom));
-  color: var(--color-ink-dim);
-  font-size: 10px;
-}
-.app-footer kbd {
-  color: var(--color-ink-soft);
-  font-family: var(--font-mono);
-}
-@media (min-width: 1100px) and (min-height: 800px) {
-  .app-footer {
-    display: flex;
-  }
-}
 @media (max-width: 559px) {
   .app-header {
     min-height: 60px;
@@ -445,14 +428,6 @@ textarea:focus-visible {
   flex-shrink: 0;
   min-width: 0;
 }
-.stream-state {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-accent);
-  font-size: 11px;
-}
 .result-scroll {
   flex: 1;
   min-height: 0;
@@ -592,9 +567,6 @@ textarea:focus-visible {
   font-size: 16px;
   font-weight: 650;
 }
-.detail-learning > .result-section-title {
-  color: var(--color-warm);
-}
 .alternative-list {
   padding: 0;
   margin: 0;
@@ -608,9 +580,6 @@ textarea:focus-visible {
 }
 .alternative-item > p + p {
   margin-top: 4px;
-}
-.detail-word-meta:empty {
-  display: none;
 }
 .word-source-meta button {
   min-height: 44px;
@@ -742,10 +711,6 @@ textarea:focus-visible {
 }
 .app-shell[data-layout='book'] .mode-select {
   display: block;
-}
-.app-shell[data-layout='book'] .app-footer,
-.app-shell[data-layout='laptop'] .app-footer {
-  display: none;
 }
 @media (device-posture: folded) and (horizontal-viewport-segments: 2) {
   .translator-panels[data-layout='book'] {
@@ -1123,9 +1088,6 @@ textarea:focus-visible {
   line-height: 1.5;
   color: var(--color-ink-soft);
 }
-.detail-about > .result-section-title {
-  color: var(--color-warm);
-}
 
 .translator-panels[data-tight] .primary-result-actions .copy-button {
   min-height: 44px;
@@ -1375,63 +1337,8 @@ textarea:focus-visible {
   padding-block: 6px;
   font-size: 14px;
 }
-.translator-panels[data-layout='stack']:has(
-    .input-panel[data-source-compact]
-  )[data-result-first],
 .translator-panels[data-keyboard][data-layout='stack'][data-result-first] {
   grid-template-rows: minmax(0, 1fr) auto;
-}
-.translator-panels[data-layout='stack'][data-result-first]
-  .input-panel[data-source-compact] {
-  padding: 8px calc(12px + var(--safe-area-right))
-    max(12px, var(--safe-area-bottom)) calc(12px + var(--safe-area-left));
-  border-top: 0;
-}
-.input-panel[data-source-compact] .composer {
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'input actions';
-  gap: 4px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 18px;
-  padding: 4px;
-  background: var(--color-panel);
-}
-.input-panel[data-source-compact] .composer-header,
-.input-panel[data-source-compact] .composer-context,
-.input-panel[data-source-compact] .composer-meta {
-  display: none;
-}
-.input-panel[data-source-compact] .translation-input {
-  min-height: 44px;
-  max-height: 44px;
-  padding: 8px;
-  background: transparent;
-  font-size: 16px;
-}
-.input-panel[data-source-compact] .composer-actions {
-  display: flex;
-  grid-area: actions;
-  gap: 0;
-  position: static;
-  padding: 0;
-  background: transparent;
-  border: 0;
-}
-.source-expand-button,
-.input-panel[data-source-compact] .paste-button,
-.input-panel[data-source-compact] .clear-button {
-  width: 44px;
-  min-width: 44px;
-  padding: 0;
-}
-.input-panel[data-source-compact] .paste-button span,
-.input-panel[data-source-compact] .clear-button span {
-  display: none;
-}
-.input-panel[data-source-compact] .clear-button,
-.input-panel[data-source-compact] .source-expand-button {
-  border-color: transparent;
-  background: transparent;
 }
 .app-shell[data-keyboard][data-tight] {
   padding-top: max(12px, calc(var(--safe-area-top) - var(--app-top, 0px)));
@@ -1448,16 +1355,6 @@ textarea:focus-visible {
   padding: 4px;
   background: var(--color-panel);
 }
-.translator-panels[data-keyboard] .input-panel[data-source-compact] {
-  padding-bottom: 12px;
-}
-.translator-panels[data-keyboard][data-layout='stack']
-  .input-panel[data-source-compact]
-  .composer {
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'input actions';
-  gap: 4px;
-}
 .translator-panels[data-keyboard][data-layout='stack']
   .composer:has(.composer-context:focus-within)
   .translation-input {
@@ -1467,10 +1364,6 @@ textarea:focus-visible {
 .translator-panels:not([data-desktop]) .result-scroll {
   padding-inline: calc(var(--panel-gutter) + var(--safe-area-left))
     calc(var(--panel-gutter) + var(--safe-area-right));
-}
-.input-panel[data-source-compact] .source-expand-button[data-context] {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
 }
 
 /* Option 1: source and reference notes beside translation and alternatives. */
@@ -1670,10 +1563,6 @@ textarea:focus-visible {
   color: var(--color-accent);
   background: var(--color-accent-soft);
   border-color: var(--color-accent-line);
-}
-.input-panel[data-source-compact] .translation-input {
-  line-height: 44px;
-  padding-block: 0;
 }
 
 /* Expanded reply context must not consume the whole reference pane. The
@@ -2052,18 +1941,6 @@ textarea:focus-visible {
 .word-details-trigger:disabled {
   cursor: text;
 }
-.learning-entry {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 8px;
-  margin-block: 4px 20px;
-}
-.learning-entry .ui-pill {
-  flex: 0 0 auto;
-  min-height: 44px;
-}
 .result-content .detail-alternatives {
   border-top: 0;
 }
@@ -2167,10 +2044,6 @@ textarea:focus-visible {
 .learning-chunks button > :not(:first-child) {
   color: var(--color-ink-soft);
 }
-.learning-order {
-  color: var(--color-ink-soft);
-  margin-block: 16px;
-}
 .learning-phrase {
   color: var(--color-warm);
   font-size: 22px;
@@ -2186,8 +2059,7 @@ textarea:focus-visible {
   gap: 12px;
   margin-bottom: 12px;
 }
-.learning-facts dt,
-.learning-subheading {
+.learning-facts dt {
   color: var(--color-ink-dim);
   font-size: 12px;
   font-weight: 600;
@@ -2197,18 +2069,8 @@ textarea:focus-visible {
   color: var(--color-ink-soft);
   font-size: 15px;
 }
-.learning-back {
-  margin-top: 4px;
-}
 .learning-inspector .ui-pill {
   min-height: 44px;
-}
-.learning-sentences {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  font-size: 13px;
 }
 .learning-panel {
   flex: 0 1 auto;
@@ -2266,36 +2128,6 @@ textarea:focus-visible {
 }
 .translator-panels[data-tight] .learning-panel {
   display: none;
-}
-.input-panel[data-source-compact] .composer,
-.translator-panels[data-keyboard][data-layout='stack']
-  .input-panel[data-source-compact]
-  .composer {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'input' 'actions';
-}
-.input-panel[data-source-compact] .composer-actions {
-  gap: 6px;
-  padding: 0 4px 4px;
-}
-.input-panel[data-source-compact] .paste-button,
-.input-panel[data-source-compact] .clear-button {
-  width: auto;
-  flex-direction: row;
-  min-height: 44px;
-  padding-inline: 10px;
-  gap: 6px;
-  font-size: 14px;
-}
-.input-panel[data-source-compact] .paste-button span,
-.input-panel[data-source-compact] .clear-button span {
-  display: inline;
-}
-.input-panel[data-source-compact] .source-expand-button {
-  margin-left: auto;
-}
-.input-panel[data-source-compact] .source-input-area {
-  background: transparent;
 }
 .translator-panels:is(
     [data-layout='workspace'],
@@ -2577,11 +2409,6 @@ textarea:focus-visible {
   top: 0;
 }
 
-.translator-panels[data-tight] .learning-panel[data-tight-inline] {
-  display: flex;
-  max-height: none;
-  margin-top: 12px;
-}
 .tight-learning-slot {
   scroll-margin-top: 60px;
 }
@@ -3205,19 +3032,6 @@ textarea:focus-visible {
   .translator-panels[data-keyboard]:not([data-desktop]) .translation-input {
     min-height: 76px;
     max-height: max(76px, calc(var(--app-height, 100dvh) * 0.35));
-  }
-  .translator-panels:not([data-desktop])
-    .input-panel[data-source-compact]
-    .translation-input {
-    min-height: 44px;
-    max-height: 44px;
-    font-size: 18px;
-  }
-  .translator-panels:not([data-desktop])
-    .input-panel[data-source-compact]
-    .composer {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'input' 'actions';
   }
   .translator-panels[data-keyboard][data-layout='stack'] .input-panel {
     max-height: calc(var(--app-height, 100dvh) * 0.6);
