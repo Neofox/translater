@@ -118,9 +118,11 @@ const app = {
     app.updateActions()
   },
 
-  /** Tone, languages or UI language changed: abort and re-run debounced. */
+  /** Tone, languages or UI language changed: abort and re-run debounced. A
+   * shown error follows the UI language at once. */
   settingsChanged() {
     app.abort()
+    stream.renderError()
     speech.reset()
     app.autoSwap()
     updateCount()
@@ -150,10 +152,10 @@ const app = {
     app.live = live
     if (trimmed.length > data.limits.maxInputChars) {
       stream.start(live)
-      stream.showError(
-        app.t('inputTooLong'),
-        app.t('inputTooLongHint').replace('{max}', data.limits.maxInputChars).replace('{count}', trimmed.length),
-      )
+      stream.showError({
+        key: 'inputTooLong',
+        hint: { key: 'inputTooLongHint', vars: { max: data.limits.maxInputChars, count: trimmed.length } },
+      })
       return
     }
     // The server trims the prompt text; learning ranges use the raw value.

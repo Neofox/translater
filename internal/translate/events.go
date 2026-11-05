@@ -65,9 +65,12 @@ type (
 		Src [][2]int `json:"src"`
 		G   [][2]int `json:"g"`
 	}
+	// Key names the message's STRINGS entry, so the page can show it again
+	// in another UI language.
 	errorPayload struct {
 		Run     string `json:"run"`
 		Kind    string `json:"kind"`
+		Key     string `json:"key"`
 		Message string `json:"message"`
 	}
 )

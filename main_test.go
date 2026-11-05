@@ -60,7 +60,7 @@ func TestInvalidConfigServesPageAndConfigurationError(t *testing.T) {
 		if !strings.HasPrefix(res.Header.Get("Content-Type"), "text/event-stream") {
 			t.Fatalf("%s: content type %q", ui, res.Header.Get("Content-Type"))
 		}
-		wantEvent := `event: nt-error` + "\n" + `data: {"run":"r1","kind":"configuration","message":"` + want + `"}`
+		wantEvent := `event: nt-error` + "\n" + `data: {"run":"r1","kind":"configuration","key":"providerConfigurationFailed","message":"` + want + `"}`
 		if !strings.Contains(string(body), wantEvent) || strings.Contains(string(body), "nt-done") {
 			t.Errorf("%s: stream = %s", ui, body)
 		}

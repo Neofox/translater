@@ -258,26 +258,40 @@ export function initStream(app, form) {
     renderState()
   }
 
-  /** Show the current run's error. An input error brings its own hint; a
-   * server error (no hint) shows errorEnvHint and Retry, inside the result
-   * transition. */
-  function showError(message, inputHint) {
+  /** Write the error box from the current run's error in the current UI
+   * language: its texts are kept as STRINGS keys, so a UI language switch
+   * relabels a shown error at once. */
+  function renderError() {
+    const error = app.live?.error
+    if (!error) return
+    const format = ({ key, vars = {} }) =>
+      Object.entries(vars).reduce((text, [name, value]) => text.replace(`{${name}}`, value), app.t(key))
+    errorBox.querySelector('.state-title').textContent = app.t('translationFailedTitle')
+    // A key the page has no string for keeps the server's text.
+    const body = error.key ? app.t(error.key) : error.message
+    errorBox.querySelector('.state-body').textContent = body === error.key ? (error.message ?? body) : body
+    hint.textContent = format(error.hint ?? { key: 'errorEnvHint' })
+    retryLabel.data = app.t('retry')
+  }
+
+  /** Show the current run's error: `key` names its message (`message` is
+   * the text when no key is known). An input error brings its own `hint`
+   * ({ key, vars }); a server error (no hint) shows errorEnvHint and Retry,
+   * inside the result transition. */
+  function showError({ key, message, hint: inputHint }) {
     const live = app.live
     const server = inputHint === undefined
     // A failed refinement rolls back instead (refine.js).
-    if (server && app.refineFailed?.(message)) return
-    // TS keeps no live result for an input error.
-    live.error = { message, input: !server }
+    if (server && app.refineFailed?.(key ? app.t(key) : message)) return
+    // An input error keeps no live result.
+    live.error = { key, message, hint: inputHint, input: !server }
     const show = () => {
       if (app.live !== live) return
       interp.reset()
       details.replaceChildren()
-      errorBox.querySelector('.state-title').textContent = app.t('translationFailedTitle')
-      errorBox.querySelector('.state-body').textContent = message
-      hint.textContent = server ? app.t('errorEnvHint') : inputHint
+      renderError()
       hint.hidden = false
       actions.hidden = !server
-      retryLabel.data = app.t('retry')
       renderState()
     }
     if (server) transition(scroll, show)
@@ -332,7 +346,7 @@ export function initStream(app, form) {
     },
     'nt-error'(live, d) {
       app.pending = false
-      showError(d.message)
+      showError({ key: d.key, message: d.message })
     },
   }
   for (const [name, handle] of Object.entries(handlers)) {
@@ -360,7 +374,7 @@ export function initStream(app, form) {
     const live = app.live
     if (!live || live.run !== run || live.aborted || live.done || live.error) return
     app.pending = false
-    showError(app.t('translationFailed'))
+    showError({ key: 'translationFailed' })
   }
   form.addEventListener('htmx:response:error', failed)
   form.addEventListener('htmx:error', (event) => {
@@ -381,5 +395,5 @@ export function initStream(app, form) {
     if (!document.hidden) reveal()
   })
 
-  return { start, clear, stop, restore, showError, renderState, renderExplanation }
+  return { start, clear, stop, restore, showError, renderError, renderState, renderExplanation }
 }

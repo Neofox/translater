@@ -789,6 +789,53 @@ test('streaming deltas stay urgent and only completion starts a result transitio
   expect(await transitions()).toBe(supported ? 1 : 0)
 })
 
+/** Switch the UI language to Korean and read the result error at once,
+ * before the debounced re-run of the current text can replace it. */
+async function errorTextAfterKorean(page: Page): Promise<string> {
+  await page.getByTestId('settings-button').click()
+  const group = page.getByRole('group', { name: 'UI language' })
+  await expect(group).toBeVisible()
+  const text = await group.evaluate((el) => {
+    ;(el.querySelectorAll('button')[1] as HTMLButtonElement).click()
+    return document.getElementById('result-error')!.innerText
+  })
+  await page.getByTestId('settings-button').click()
+  return text
+}
+
+test('a shown error follows a UI language switch at once @core', async ({
+  page,
+}) => {
+  await fillSource(
+    page,
+    `Please translate this sentence ${fixture('error-provider').match} ${nonce()}`,
+  )
+  const alert = translationResult(page).getByRole('alert')
+  await expect(alert).toContainText(STRINGS.en.translationFailed)
+  const server = await errorTextAfterKorean(page)
+  for (const key of [
+    'translationFailedTitle',
+    'translationFailed',
+    'errorEnvHint',
+    'retry',
+  ] as const)
+    expect(server).toContain(STRINGS.ko[key])
+
+  // A local input error keeps its counts.
+  await page.getByTestId('clear-input').click()
+  await setUiLang(page, 'en')
+  const text = 'How are you doing today? '.repeat(161).trim()
+  await fillSource(page, text)
+  await expect(alert).toContainText(STRINGS.en.inputTooLong)
+  const input = await errorTextAfterKorean(page)
+  expect(input).toContain(STRINGS.ko.inputTooLong)
+  expect(input).toContain(
+    STRINGS.ko.inputTooLongHint
+      .replace('{max}', '4000')
+      .replace('{count}', String(text.length)),
+  )
+})
+
 test('input over the limit shows a local error without a request @core', async ({
   page,
   fake,

@@ -26,6 +26,9 @@ var clientStrings = []string{
 	"streaming", "polishing", "emptyMain", "inputCount", "charCount", "whyWording", "usage",
 	"translationFailedTitle", "translationFailed", "inputTooLong", "inputTooLongHint",
 	"errorEnvHint", "retry",
+	// nt-error keys (translate.errorKeys): a shown error follows the UI language.
+	"providerConfigurationFailed", "providerAuthenticationFailed", "providerBudgetUnavailable",
+	"providerRateLimited", "providerModelInvalid", "providerStructuredOutputInvalid",
 	"contextToggle", "contextShort", "contextPlaceholder", "contextClear",
 	"notes", "learn", "wordDetails", "breakdown", "closeLearning", "pos", "primaryMeaning", "otherMeanings", "etymology",
 	"grammar", "synonyms", "hanja", "kanji", "hanzi", "characters",

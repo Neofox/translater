@@ -178,7 +178,7 @@ func (s *Server) HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	}()
 	fail := func(kind llm.Kind) {
 		outcome = kind
-		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
+		out.event(evError, errorPayload{Run: run, Kind: string(kind), Key: errorKeys[kind], Message: s.c.T(in.UILang, errorKeys[kind])})
 	}
 	for delta, err := range s.llm.StreamText(ctx, body, &usage) {
 		if err != nil {
@@ -220,7 +220,7 @@ func (s *Server) failStream(w http.ResponseWriter, run string, in prompt.Transla
 	w.WriteHeader(http.StatusOK)
 	out := newSSEWriter(w)
 	if newProcessor(out, s.c, run, in, raw).start() {
-		out.event(evError, errorPayload{Run: run, Kind: string(kind), Message: s.c.T(in.UILang, errorKeys[kind])})
+		out.event(evError, errorPayload{Run: run, Kind: string(kind), Key: errorKeys[kind], Message: s.c.T(in.UILang, errorKeys[kind])})
 	}
 }
 

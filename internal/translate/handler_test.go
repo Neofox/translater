@@ -477,6 +477,10 @@ func TestErrorLocalized(t *testing.T) {
 	if got["kind"] != "budget" || got["message"] != e.c.T("ko", "providerBudgetUnavailable") || got["run"] != "run-1" {
 		t.Errorf("error = %v", got)
 	}
+	// The key lets the page relabel the message for another UI language.
+	if got["key"] != "providerBudgetUnavailable" {
+		t.Errorf("error key = %v", got["key"])
+	}
 	if strings.Contains(raw, "quota") {
 		t.Error("provider text leaked")
 	}
