@@ -10,24 +10,19 @@ CSS_OUT  := web/static/css/app.css
 # and to 44 KB with the measured Adjust menu (a target, not a gate: never
 # cut a feature or parity to meet it).
 SIZE_MAX := 45056
-# The TS app's stylesheet, compiled from src/styles.css with the same
-# Tailwind CLI, as the CSS budget. Run from src/ so automatic source
-# detection scans only the TS sources: from the repository root it also
-# picks up go/, e2e/ and fixture strings (+721 B gzip).
-TS_CSS   := $(or $(TMPDIR),/tmp)/neotranslate-ts-styles.css
+# Stylesheet gzip budget: the TS app's compiled stylesheet when the Go app
+# replaced it (29524 B; app.css was then 29329 B).
+CSS_MAX  := 29524
 
-.PHONY: all generate styles icons templ css test size check
+.PHONY: all generate icons templ css test size check
 
 all: generate size
 
-# Shared contract copy, styles (syncstyles) and icons (syncicons), then
-# templ output and the Tailwind build.
+# Shared contract copy (syncshared) and icons (syncicons), then templ
+# output and the Tailwind build.
 generate:
 	go generate ./...
 	$(MAKE) templ css
-
-styles:
-	go generate ./web/
 
 icons:
 	go generate ./internal/web/icons/
@@ -44,10 +39,9 @@ test:
 	node --test 'web/static/js/*.test.js'
 
 # Gzip bytes of every script GET / loads (htmx and hx-sse included), and of
-# the stylesheet (at most the TS app's, compiled now).
+# the stylesheet.
 size:
-	$(TAILWIND) --cwd ../src --input styles.css --output $(TS_CSS) --minify
-	go run ./cmd/assetsize -max $(SIZE_MAX) -css-ref $(TS_CSS)
+	go run ./cmd/assetsize -max $(SIZE_MAX) -css-max $(CSS_MAX)
 
 # Regenerate everything and fail when the committed copies changed.
 check: generate

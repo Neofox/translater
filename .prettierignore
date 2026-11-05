@@ -5,6 +5,7 @@ yarn.lock
 
 # Pinned generated font-face declarations
 src/styles/pretendard.css
+go/web/static/css/pretendard.css
 
 # Shared translation contract (byte-exact data, golden request bodies) and
 # its generated views: never reformat

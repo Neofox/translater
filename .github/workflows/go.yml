@@ -15,8 +15,6 @@ on:
       - scripts/capture-request-fixtures.ts
       - scripts/capture-ui-markup.tsx
       - src/components/**
-      - src/styles.css
-      - src/styles/**
       - package.json
       - package-lock.json
       - src/server/**

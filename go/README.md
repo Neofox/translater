@@ -17,7 +17,7 @@ tool directive. `go generate` needs the repository's `node_modules`
 
 ```sh
 cd go
-make generate        # shared contract copy, styles, icons, templ, CSS
+make generate        # shared contract copy, icons, templ, CSS
 OPENAI_API_KEY=… go run .          # http://localhost:3000 (PORT overrides)
 make test            # go vet, go test, node --test for the client modules
 make size            # gzip budget of the page's scripts and stylesheet

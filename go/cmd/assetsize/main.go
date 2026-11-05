@@ -1,8 +1,7 @@
 // Command assetsize prints the gzip size of every script GET / loads (htmx,
 // hx-sse and the application modules, exactly as /static/ serves them) and
 // of the stylesheet, and exits non-zero when the scripts exceed -max bytes
-// or the stylesheet is larger than the TS app's (-css-ref, measured now
-// rather than kept as a constant). `make size` runs it.
+// or the stylesheet exceeds -css-max bytes. `make size` runs it.
 package main
 
 import (
@@ -18,14 +17,10 @@ import (
 
 func main() {
 	max := flag.Int("max", 40960, "gzip byte budget for all page scripts")
-	cssRef := flag.String("css-ref", "", "the TS app's compiled stylesheet: its gzip size is the stylesheet budget")
+	cssMax := flag.Int("css-max", 0, "gzip byte budget for the stylesheet")
 	flag.Parse()
-	if *cssRef == "" {
-		fail("-css-ref is required")
-	}
-	ref, err := os.ReadFile(*cssRef)
-	if err != nil {
-		fail(err)
+	if *cssMax <= 0 {
+		fail("-css-max is required")
 	}
 	static, err := web.NewStatic(assets.FS)
 	if err != nil {
@@ -42,15 +37,15 @@ func main() {
 	if css == nil {
 		fail("css/app.css is not served")
 	}
-	cssSize, cssMax := gzipSize(css.Body), gzipSize(ref)
-	fmt.Printf("%7d raw %6d gzip  %s (budget: the TS stylesheet, %d raw %d gzip)\n", len(css.Body), cssSize, css.Name, len(ref), cssMax)
+	cssSize := gzipSize(css.Body)
+	fmt.Printf("%7d raw %6d gzip  %s (budget %d)\n", len(css.Body), cssSize, css.Name, *cssMax)
 	failed := false
 	if total > *max {
 		fmt.Fprintf(os.Stderr, "assetsize: scripts %d bytes over budget\n", total-*max)
 		failed = true
 	}
-	if cssSize > cssMax {
-		fmt.Fprintf(os.Stderr, "assetsize: stylesheet %d bytes over budget\n", cssSize-cssMax)
+	if cssSize > *cssMax {
+		fmt.Fprintf(os.Stderr, "assetsize: stylesheet %d bytes over budget\n", cssSize-*cssMax)
 		failed = true
 	}
 	if failed {
