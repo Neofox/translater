@@ -67,8 +67,5 @@ func newMux(getenv func(string) string) (*http.ServeMux, error) {
 	// configuration error; it never takes the page down.
 	mux.Handle("POST /speech", speech.NewHandler(client, getenv, speech.Timeout))
 	mux.Handle("GET /static/", static)
-	if getenv("NT_SPIKE") == "1" {
-		registerSpike(mux, static.URL)
-	}
 	return mux, nil
 }
