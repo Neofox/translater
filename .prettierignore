@@ -15,5 +15,5 @@ src/server/promptTemplates.generated.json
 src/server/resultTypes.generated.ts
 docs/superpowers/reports/data/
 
-# Generated parity corpus (scripts/learning-corpus.ts)
+# Frozen learning regression corpus
 go/internal/learning/testdata/

@@ -11,57 +11,58 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-// tsCase is one entry of testdata/ts-corpus.json, generated from the TS
-// implementation by scripts/learning-corpus.ts.
-type tsCase struct {
-	Counterpart string   `json:"counterpart"`
-	Primary     string   `json:"primary"`
-	Phrases     []Phrase `json:"phrases"`
-	Want        *tsWant  `json:"want"`
+// corpusCase is one entry of testdata/corpus.json: frozen regression data,
+// generated once from the TS implementation (prepareLearningResult) that
+// Prepare replaced. Never regenerate it; add cases to ranges_test.go.
+type corpusCase struct {
+	Counterpart string      `json:"counterpart"`
+	Primary     string      `json:"primary"`
+	Phrases     []Phrase    `json:"phrases"`
+	Want        *corpusWant `json:"want"`
 }
 
-type tsWant struct {
-	Partial bool      `json:"partial"`
-	Chunks  []tsChunk `json:"chunks"`
+type corpusWant struct {
+	Partial bool          `json:"partial"`
+	Chunks  []corpusChunk `json:"chunks"`
 }
 
-type tsChunk struct {
-	Start             int      `json:"start"`
-	End               int      `json:"end"`
-	Text              string   `json:"text"`
-	GrammarHighlights []tsSpan `json:"grammarHighlights"`
-	SourceSpans       []tsSpan `json:"sourceSpans"`
-	Characters        []string `json:"characters"`
+type corpusChunk struct {
+	Start             int          `json:"start"`
+	End               int          `json:"end"`
+	Text              string       `json:"text"`
+	GrammarHighlights []corpusSpan `json:"grammarHighlights"`
+	SourceSpans       []corpusSpan `json:"sourceSpans"`
+	Characters        []string     `json:"characters"`
 }
 
-type tsSpan struct {
+type corpusSpan struct {
 	Start int    `json:"start"`
 	End   int    `json:"end"`
 	Text  string `json:"text,omitempty"`
 }
 
-func loadCorpus(t testing.TB) []tsCase {
+func loadCorpus(t testing.TB) []corpusCase {
 	t.Helper()
-	raw, err := os.ReadFile("testdata/ts-corpus.json")
+	raw, err := os.ReadFile("testdata/corpus.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []tsCase
+	var cases []corpusCase
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
 	}
 	return cases
 }
 
-func toTS(p Prepared) *tsWant {
-	w := &tsWant{Partial: p.Partial, Chunks: []tsChunk{}}
+func toCorpus(p Prepared) *corpusWant {
+	w := &corpusWant{Partial: p.Partial, Chunks: []corpusChunk{}}
 	for _, c := range p.Chunks {
-		tc := tsChunk{Start: c.Start, End: c.End, Text: c.Text, GrammarHighlights: []tsSpan{}, SourceSpans: []tsSpan{}, Characters: []string{}}
+		tc := corpusChunk{Start: c.Start, End: c.End, Text: c.Text, GrammarHighlights: []corpusSpan{}, SourceSpans: []corpusSpan{}, Characters: []string{}}
 		for _, h := range c.GrammarHighlights {
-			tc.GrammarHighlights = append(tc.GrammarHighlights, tsSpan{Start: h.Start, End: h.End})
+			tc.GrammarHighlights = append(tc.GrammarHighlights, corpusSpan{Start: h.Start, End: h.End})
 		}
 		for _, s := range c.SourceSpans {
-			tc.SourceSpans = append(tc.SourceSpans, tsSpan{s.Start, s.End, s.Text})
+			tc.SourceSpans = append(tc.SourceSpans, corpusSpan{s.Start, s.End, s.Text})
 		}
 		for _, n := range c.Characters {
 			tc.Characters = append(tc.Characters, n.Word)
@@ -71,23 +72,23 @@ func toTS(p Prepared) *tsWant {
 	return w
 }
 
-// TestPrepareMatchesTS compares Prepare with prepareLearningResult on a
+// TestPrepareCorpus compares Prepare with the frozen corpus results: a
 // seeded corpus of mixed scripts, emoji sequences, combining marks and
-// grapheme-splitting quotes (regenerate: npx tsx scripts/learning-corpus.ts).
-func TestPrepareMatchesTS(t *testing.T) {
+// grapheme-splitting quotes.
+func TestPrepareCorpus(t *testing.T) {
 	cases := loadCorpus(t)
 	if len(cases) < 500 {
 		t.Fatalf("corpus has %d cases", len(cases))
 	}
 	resolved := 0
 	for i, c := range cases {
-		var got *tsWant
+		var got *corpusWant
 		if p, ok := Prepare(c.Counterpart, c.Primary, c.Phrases); ok {
-			got = toTS(p)
+			got = toCorpus(p)
 			resolved++
 		}
 		if diff := cmp.Diff(c.Want, got, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("case %d (primary %q, counterpart %q) (-ts +go):\n%s", i, c.Primary, c.Counterpart, diff)
+			t.Errorf("case %d (primary %q, counterpart %q) (-corpus +go):\n%s", i, c.Primary, c.Counterpart, diff)
 		}
 	}
 	if resolved < 100 {
@@ -97,7 +98,7 @@ func TestPrepareMatchesTS(t *testing.T) {
 
 // FuzzPrepare checks Prepare's invariants on arbitrary input: chunks are
 // sorted, disjoint, exact quotations on grapheme boundaries, and every
-// highlight lies inside its chunk. Seeded with the TS corpus.
+// highlight lies inside its chunk. Seeded with the corpus.
 func FuzzPrepare(f *testing.F) {
 	for _, c := range loadCorpus(f) {
 		for _, p := range c.Phrases {
