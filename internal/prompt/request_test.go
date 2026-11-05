@@ -139,7 +139,11 @@ func TestBuildRequestKeepsSchemaKeyOrder(t *testing.T) {
 			if err := shared.Compact(); err != nil {
 				t.Fatal(err)
 			}
-			if got != string(shared) {
+			want := string(shared)
+			if f.Input.Intent == "sentence" && !IsLongForm(f.Input.Text) {
+				want = strings.Replace(want, `"alternatives":{`, `"alternatives":{"minItems":2,`, 1)
+			}
+			if got != want {
 				t.Errorf("schema bytes differ from shared/translation/schemas/%s", f.Input.Intent)
 			}
 		})
@@ -263,5 +267,38 @@ func TestBuildVariant(t *testing.T) {
 	}
 	if _, err := BuildVariant(c, s, cfg, "nope"); err == nil {
 		t.Error("unknown variant accepted")
+	}
+}
+
+// Short sentences require two alternatives in the response format itself;
+// long-form input (whose alternatives the result hides) does not.
+func TestSchemaRequiresAlternativesForShortSentences(t *testing.T) {
+	c := loadContract(t)
+	cfg := config.Translate{Model: "gpt-6.1-terra", Reasoning: "none", ServiceTier: "fast"}
+	for _, tc := range []struct {
+		name, text string
+		want       any
+	}{
+		{"thanks", "고마워!", float64(2)},
+		{"greeting", "hey how are you?", float64(2)},
+		{"multiline", "first line\nsecond line", nil},
+		{"three sentences", "One. Two. Three.", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := TranslateInput{Text: tc.text, Source: "auto", Target: "en", Mode: "casual", Intent: "sentence", UILang: "en"}
+			body, err := BuildRequest(c, in, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var schema struct {
+				Properties map[string]map[string]any `json:"properties"`
+			}
+			if err := json.Unmarshal([]byte(rawSchema(t, body)), &schema); err != nil {
+				t.Fatal(err)
+			}
+			if got := schema.Properties["alternatives"]["minItems"]; got != tc.want {
+				t.Errorf("alternatives.minItems = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

@@ -222,6 +222,7 @@
                 "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
               },
               "alternatives": {
+                "minItems": 2,
                 "maxItems": 6,
                 "type": "array",
                 "items": {
@@ -500,6 +501,7 @@
                 "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
               },
               "alternatives": {
+                "minItems": 2,
                 "maxItems": 6,
                 "type": "array",
                 "items": {
@@ -778,6 +780,7 @@
                 "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
               },
               "alternatives": {
+                "minItems": 2,
                 "maxItems": 6,
                 "type": "array",
                 "items": {
@@ -1056,6 +1059,7 @@
                 "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
               },
               "alternatives": {
+                "minItems": 2,
                 "maxItems": 6,
                 "type": "array",
                 "items": {
@@ -1334,6 +1338,7 @@
                 "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
               },
               "alternatives": {
+                "minItems": 2,
                 "maxItems": 6,
                 "type": "array",
                 "items": {
@@ -1612,6 +1617,7 @@
                 "description": "One sentence in the metadata language (see prompt) explaining the chosen translation: highlight wordplay, idioms, slang origins, cultural connotations, or nuance a literal translation would miss. Avoid generic tone descriptions."
               },
               "alternatives": {
+                "minItems": 2,
                 "maxItems": 6,
                 "type": "array",
                 "items": {

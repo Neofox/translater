@@ -4,6 +4,7 @@ import (
 	"encoding/json/jsontext"
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -177,13 +178,9 @@ func BuildVariant(c *contract.Contract, in TranslateInput, cfg config.Translate,
 		return nil, fmt.Errorf("prompt: missing few-shot %q", fewshotName(in))
 	}
 	schemaName := in.Intent // "sentence" | "word", validated above
-	// The schema goes out as its original bytes: the model writes fields in
-	// schema key order, and decoding into the SDK's map[string]any field
-	// would re-encode it alphabetically (main after alternatives, the
-	// languages last), delaying main by seconds and changing the output.
-	schema := jsontext.Value(c.Schemas[schemaName])
-	if !schema.IsValid() {
-		return nil, fmt.Errorf("prompt: schema %s is not valid JSON", schemaName)
+	schema, err := requestSchema(c, in)
+	if err != nil {
+		return nil, err
 	}
 	format := responses.ResponseFormatTextJSONSchemaConfigParam{
 		Name:   schemaName + "_translation",
@@ -230,4 +227,32 @@ func BuildVariant(c *contract.Contract, in TranslateInput, cfg config.Translate,
 	}
 	params.SetExtraFields(map[string]any{"stream": true})
 	return params.MarshalJSON()
+}
+
+// alternativesProperty is the alternatives property of the sentence schema.
+var alternativesProperty = regexp.MustCompile(`"alternatives"\s*:\s*\{`)
+
+// requestSchema returns the response schema sent for in. The schema goes
+// out as its original bytes: the model writes fields in schema key order,
+// and decoding into the SDK's map[string]any field would re-encode it
+// alphabetically (main after alternatives, the languages last), delaying
+// main by seconds and changing the output.
+//
+// A sentence that is not long-form also requires two alternatives: with
+// the prompt alone, short plain sentences ("고마워!") still came back with
+// none. Long-form input keeps the shared schema, whose alternatives may be
+// empty; its result hides them anyway (IsLongForm), so none are generated.
+func requestSchema(c *contract.Contract, in TranslateInput) (jsontext.Value, error) {
+	schema := c.Schemas[in.Intent]
+	if in.Intent == "sentence" && !IsLongForm(in.Text) {
+		if n := len(alternativesProperty.FindAllIndex(schema, -1)); n != 1 {
+			return nil, fmt.Errorf("prompt: sentence schema has %d alternatives properties, want 1", n)
+		}
+		schema = alternativesProperty.ReplaceAll(schema, []byte(`"alternatives": {"minItems": 2,`))
+	}
+	v := jsontext.Value(schema)
+	if !v.IsValid() {
+		return nil, fmt.Errorf("prompt: schema %s is not valid JSON", in.Intent)
+	}
+	return v, nil
 }
