@@ -116,15 +116,38 @@ export function position(reference, floating, { boundary, clearance, maxHeight, 
     // The new height moves a box placed above; keep the chosen side.
     result = run({ placement: result.placement, flip: false })
   }
-  if (translate) {
-    style.left = style.top = '0px'
-    style.transform = `translate(${result.x}px, ${result.y}px)`
-    if (window.devicePixelRatio >= 1.5) style.willChange = 'transform'
-  } else {
-    style.left = `${result.x}px`
-    style.top = `${result.y}px`
+  const write = (x, y) => {
+    if (translate) {
+      style.left = style.top = '0px'
+      style.transform = `translate(${x}px, ${y}px)`
+      if (window.devicePixelRatio >= 1.5) style.willChange = 'transform'
+    } else {
+      style.left = `${x}px`
+      style.top = `${y}px`
+    }
+  }
+  write(result.x, result.y)
+  // Coordinates are the viewport's. A fixed box outside the top layer is
+  // placed in its containing block instead, which an ancestor's transform,
+  // filter or containment moves off the viewport origin: correct by the
+  // measured difference (an open popover is in the top layer).
+  if (!isOpenPopover(floating)) {
+    const placed = floating.getBoundingClientRect()
+    const dx = placed.left - result.x
+    const dy = placed.top - result.y
+    const dpr = window.devicePixelRatio || 1
+    const round = (v) => Math.round(v * dpr) / dpr
+    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) write(round(result.x - dx), round(result.y - dy))
   }
   return result
+}
+
+function isOpenPopover(el) {
+  try {
+    return el.matches(':popover-open')
+  } catch {
+    return false
+  }
 }
 
 /** Re-run `update` while either element resizes or anything scrolls or

@@ -585,6 +585,44 @@ test('adjustments stay with tone in the header and expose chips when there is ro
   }
 })
 
+/** The open panel sits under its trigger (bottom-start, offset 12),
+ * shifted inside the viewport and left of Copy/Listen when it would cover
+ * them: never offset by the header's own left edge, which the centred shell
+ * moves right on wide screens. */
+async function expectUnderTrigger(page: Page, width: number): Promise<void> {
+  const panel = await box(openPanel(page))
+  const anchor = await box(trigger(page))
+  const primary = await box(page.locator('.primary-result-actions'))
+  let x = Math.max(16, Math.min(anchor.x, width - 16 - panel.width))
+  if (panel.y < primary.y + primary.height && panel.y + panel.height > primary.y)
+    x = Math.max(16, Math.min(x, primary.x - panel.width - 12))
+  expect(Math.abs(panel.x - x), `panel x at ${width}px`).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(panel.y - (anchor.y + anchor.height + 12)),
+    `panel y at ${width}px`,
+  ).toBeLessThanOrEqual(1)
+}
+
+test('the Adjust panel stays under its trigger when the header contains fixed boxes @refine', async ({
+  page,
+}) => {
+  test.skip(page.viewportSize()!.width < 1100, 'desktop workspace only')
+  await page.setViewportSize({ width: 2048, height: 1117 })
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, PLAIN)
+  await waitForDone(page)
+  // Layout containment makes the header the containing block of the fixed
+  // panel (as engines that apply it with container-type do): the panel's
+  // coordinates then start at the header's left edge, 256 px in.
+  await page.locator('.app-header').evaluate((el: HTMLElement) => {
+    el.style.contain = 'layout'
+  })
+  expect((await box(page.locator('.app-header'))).x).toBe(256)
+  await trigger(page).click()
+  await expect(chip(page, 'softer')).toBeVisible()
+  await expectUnderTrigger(page, 2048)
+})
+
 test('desktop Adjust overlays without growing the header or covering primary actions @refine', async ({
   page,
 }) => {
@@ -617,6 +655,7 @@ test('desktop Adjust overlays without growing the header or covering primary act
       expect(await hits(action)).toBe(true)
     }
     const primary = await box(page.locator('.primary-result-actions'))
+    await expectUnderTrigger(page, width)
     const overlaps =
       panel.x < primary.x + primary.width &&
       primary.x < panel.x + panel.width &&
