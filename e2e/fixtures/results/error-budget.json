@@ -1,0 +1,16 @@
+{
+  "match": "[fx:error-budget]",
+  "intent": "sentence",
+  "result": null,
+  "error": {
+    "status": 429,
+    "body": {
+      "error": {
+        "message": "You exceeded your current quota, please check your plan and billing details.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+      }
+    }
+  }
+}

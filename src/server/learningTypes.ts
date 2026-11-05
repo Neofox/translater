@@ -1,52 +1,45 @@
 import { z } from 'zod'
-import { MAX_CONTEXT_CHARS, MAX_INPUT_CHARS } from '../lib/limits'
+import {
+  MAX_CONTEXT_CHARS,
+  MAX_INPUT_CHARS,
+  MAX_LEARNING_TRANSLATION_CHARS,
+} from '../lib/limits'
+import type {
+  CharacterBreakdownData,
+  LearningPhraseData,
+} from './resultTypes.generated'
 
-export const MAX_LEARNING_TRANSLATION_CHARS = 16_000
-export const CharacterBreakdown = z.object({
-  word: z
-    .string()
-    .describe(
-      'The exact CJK word in the analysed language: Hangul, Japanese or Hanzi.',
-    ),
-  chars: z
-    .array(
-      z.object({
-        char: z.string().describe('One hanja, kanji or hanzi character.'),
-        meaning: z.string().describe('Short meaning in the metadata language.'),
-      }),
-    )
-    .max(10),
+// Client-safe: this module reaches the browser through src/lib/learningRanges.
+// Never value-import ./schemas here; the strict result validators (and the
+// shared JSON Schemas with their prompt-text descriptions) are server-only.
+
+export { MAX_LEARNING_TRANSLATION_CHARS }
+export type { CharacterBreakdownData, LearningPhraseData }
+
+// Page-memory compatibility only: older gloss-only results may lack every
+// detail field; unknown keys are stripped. Same fields and bounds as the
+// learning phrase in shared/translation/schemas/sentence.json, without its
+// descriptions (schemas.test.ts keeps the field set in sync). The strict
+// generated schema still requires every field.
+const LegacyCharacter = z.object({
+  word: z.string(),
+  chars: z.array(z.object({ char: z.string(), meaning: z.string() })).max(10),
 })
-export type CharacterBreakdownData = z.infer<typeof CharacterBreakdown>
-export const LearningPhrase = z.object({
+export const LegacyLearningPhrase = z.object({
   text: z.string().min(1).max(MAX_LEARNING_TRANSLATION_CHARS),
   gloss: z.string().max(600),
   sourceTexts: z.array(z.string().min(1).max(4000)).max(8),
-  baseForm: z.string().max(600),
-  literalMeaning: z.string().max(600),
-  naturalMeaning: z.string().max(600),
-  grammar: z.string().max(1000),
-  omissions: z.string().max(600),
-  usageNote: z
-    .string()
-    .max(1000)
-    .describe(
-      'Useful vocabulary, idiom, register or cultural nuance belonging to this phrase. Empty when redundant.',
-    ),
-  characters: z
-    .array(CharacterBreakdown)
-    .max(3)
-    .describe(
-      'Useful CJK character origins belonging to this exact phrase. Skip native words and loanwords; [] when inapplicable.',
-    ),
-  grammarHighlights: z
-    .array(z.string().min(1).max(4000))
-    .max(4)
-    .describe(
-      'Exact short quotations from this phrase worth underlining for grammar: an ending, particle, conjugation or meaningful grammatical construction. Usually zero or one; use [] for ordinary vocabulary. Never underline every word or quote a whole phrase just to mark it as clickable.',
-    ),
+  baseForm: z.string().max(600).optional(),
+  literalMeaning: z.string().max(600).optional(),
+  naturalMeaning: z.string().max(600).optional(),
+  grammar: z.string().max(1000).optional(),
+  omissions: z.string().max(600).optional(),
+  usageNote: z.string().max(1000).optional(),
+  characters: z.array(LegacyCharacter).max(3).optional(),
+  grammarHighlights: z.array(z.string().min(1).max(4000)).max(4).optional(),
 })
-export const LearningPhrases = z.array(LearningPhrase).max(64)
+export type LegacyLearningPhraseData = z.infer<typeof LegacyLearningPhrase>
+export const LegacyLearningPhrases = z.array(LegacyLearningPhrase).max(64)
 export const LearningInput = z
   .object({
     text: z.string().min(1).max(MAX_INPUT_CHARS),

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { SentenceResult, WordResult } from './schemas'
+import sentencePolishKo from '../../shared/translation/fewshots/sentence-polish-ko.json'
+import sentenceReadingEn from '../../shared/translation/fewshots/sentence-reading-en.json'
+import sentenceTranslateEn from '../../shared/translation/fewshots/sentence-translate-en.json'
+import sentenceTranslateKo from '../../shared/translation/fewshots/sentence-translate-ko.json'
+import {
+  LearningPhrases,
+  SENTENCE_RESULT_SCHEMA,
+  SentenceResult,
+  WORD_RESULT_SCHEMA,
+} from './schemas'
+import { LegacyLearningPhrase, LegacyLearningPhrases } from './learningTypes'
 
 const characterEntry = (char: string) => ({
   word: char,
@@ -57,10 +67,10 @@ describe('SentenceResult', () => {
     ).toBe(false)
   })
   it('keeps all learner notes in phrase or dictionary details, with no global tips object', () => {
-    expect(SentenceResult.shape).not.toHaveProperty('learningTips')
-    expect(WordResult.shape).not.toHaveProperty('learningTips')
-    expect(WordResult.shape).toHaveProperty('grammar')
-    expect(WordResult.shape).toHaveProperty('characters')
+    expect(SENTENCE_RESULT_SCHEMA.properties).not.toHaveProperty('learningTips')
+    expect(WORD_RESULT_SCHEMA.properties).not.toHaveProperty('learningTips')
+    expect(WORD_RESULT_SCHEMA.properties).toHaveProperty('grammar')
+    expect(WORD_RESULT_SCHEMA.properties).toHaveProperty('characters')
   })
   it('accepts a fully populated strict payload', () => {
     const result = SentenceResult.parse(validResult)
@@ -94,5 +104,51 @@ describe('SentenceResult', () => {
     expect(() =>
       SentenceResult.parse({ ...validResult, sourceLang: 'auto' }),
     ).toThrow()
+  })
+
+  it('rejects keys the strict request schema does not allow', () => {
+    expect(() =>
+      SentenceResult.parse({ ...validResult, learningTips: [] }),
+    ).toThrow()
+  })
+})
+
+describe('LegacyLearningPhrases', () => {
+  it('reads gloss-only page-memory phrases, ignoring unknown keys', () => {
+    const parsed = LegacyLearningPhrases.safeParse([
+      { text: 'School life', gloss: 'life', sourceTexts: [], start: 0 },
+    ])
+    expect(parsed.success).toBe(true)
+  })
+
+  it('still rejects phrases without the original required fields', () => {
+    expect(
+      LegacyLearningPhrases.safeParse([{ text: 'School life', gloss: 'x' }])
+        .success,
+    ).toBe(false)
+  })
+
+  it('has the same fields as the shared phrase schema', () => {
+    const shared = SENTENCE_RESULT_SCHEMA.properties.learningPhrases.items
+    expect(Object.keys(LegacyLearningPhrase.shape).sort()).toEqual(
+      Object.keys(shared.properties).sort(),
+    )
+    expect([...shared.required].sort()).toEqual(
+      Object.keys(LegacyLearningPhrase.shape).sort(),
+    )
+  })
+
+  it('keeps every strict phrase unchanged', () => {
+    const phrases = [
+      ...validResult.learningPhrases,
+      ...[
+        sentencePolishKo,
+        sentenceReadingEn,
+        sentenceTranslateEn,
+        sentenceTranslateKo,
+      ].flatMap((shot) => shot.assistant.learningPhrases),
+    ]
+    expect(LearningPhrases.parse(phrases)).toEqual(phrases)
+    expect(LegacyLearningPhrases.parse(phrases)).toEqual(phrases)
   })
 })

@@ -1,0 +1,66 @@
+{
+  "match": "[fx:grow]",
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 40,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.\n오늘 도와줘서 고마워요.",
+    "learningPhrases": [
+      {
+        "text": "오늘",
+        "gloss": "today",
+        "sourceTexts": [
+          "today"
+        ],
+        "baseForm": "오늘",
+        "literalMeaning": "",
+        "naturalMeaning": "today",
+        "grammar": "",
+        "omissions": "",
+        "usageNote": "",
+        "characters": [],
+        "grammarHighlights": []
+      },
+      {
+        "text": "도와줘서",
+        "gloss": "for helping me",
+        "sourceTexts": [
+          "helping me"
+        ],
+        "baseForm": "도와주다",
+        "literalMeaning": "because you helped",
+        "naturalMeaning": "for helping me",
+        "grammar": "-어서 gives the reason for thanks.",
+        "omissions": "The participants are understood.",
+        "usageNote": "도와주다 means to help someone.",
+        "characters": [],
+        "grammarHighlights": [
+          "줘서"
+        ]
+      },
+      {
+        "text": "고마워요",
+        "gloss": "thanks",
+        "sourceTexts": [
+          "Thanks"
+        ],
+        "baseForm": "고맙다",
+        "literalMeaning": "to be grateful",
+        "naturalMeaning": "thanks",
+        "grammar": "The polite ending makes this suitable for a friendly colleague.",
+        "omissions": "",
+        "usageNote": "",
+        "characters": [],
+        "grammarHighlights": [
+          "고마워요"
+        ]
+      }
+    ],
+    "rationale": "A longer explanation that wraps on a phone. A longer explanation that wraps on a phone. A longer explanation that wraps on a phone. A longer explanation that wraps on a phone. A longer explanation that wraps on a phone. A longer explanation that wraps on a phone. ",
+    "alternatives": [],
+    "formalityNote": ""
+  },
+  "error": null
+}

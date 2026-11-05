@@ -1,0 +1,54 @@
+{
+  "match": "[fx:stream]",
+  "intent": "sentence",
+  "chunk": 6,
+  "delayMs": 30,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "요즘 일이 많아서 정신이 없었는데, 이번 주말에는 같이 커피 한잔해요.",
+    "learningPhrases": [
+      {
+        "text": "이번 주말에는",
+        "gloss": "this weekend",
+        "sourceTexts": [
+          "this weekend"
+        ],
+        "baseForm": "",
+        "literalMeaning": "",
+        "naturalMeaning": "",
+        "grammar": "",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "커피 한잔해요",
+        "gloss": "let's have a coffee",
+        "sourceTexts": [
+          "have a coffee"
+        ],
+        "baseForm": "한잔하다",
+        "literalMeaning": "",
+        "naturalMeaning": "",
+        "grammar": "한잔해요 is the polite suggestion form of 한잔하다.",
+        "omissions": "",
+        "grammarHighlights": [
+          "한잔해요"
+        ],
+        "usageNote": "",
+        "characters": []
+      }
+    ],
+    "rationale": "A relaxed 해요체 invitation; 한잔하다 is the usual way to suggest a coffee or a drink together.",
+    "alternatives": [
+      {
+        "text": "요즘 바빴는데, 주말에 커피 한잔할래요?",
+        "note": "Turns the suggestion into a softer question with -ㄹ래요."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

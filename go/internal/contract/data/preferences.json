@@ -1,0 +1,71 @@
+{
+  "cookie": "nt.preferences",
+  "version": 1,
+  "maxAgeSeconds": 31536000,
+  "maxCookieLength": 1024,
+  "rules": {
+    "source": {
+      "storage": "nt.source",
+      "values": [
+        "auto",
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh"
+      ]
+    },
+    "target": {
+      "storage": "nt.target",
+      "values": [
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh"
+      ]
+    },
+    "mode": {
+      "storage": "nt.mode",
+      "values": [
+        "friends",
+        "casual",
+        "professional"
+      ]
+    },
+    "uiLang": {
+      "storage": "ui-lang",
+      "values": [
+        "en",
+        "ko"
+      ],
+      "raw": true
+    },
+    "recentSource": {
+      "storage": "nt.recentSource",
+      "values": [
+        null,
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh"
+      ]
+    },
+    "recentTarget": {
+      "storage": "nt.recentTarget",
+      "values": [
+        null,
+        "en",
+        "ko",
+        "ja",
+        "fr",
+        "es",
+        "zh"
+      ]
+    }
+  }
+}

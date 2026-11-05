@@ -1,7 +1,9 @@
+import meta from '../../shared/translation/meta.json'
 import type { Intent, Mode } from '../lib/types'
 
-// Bump when the response schema or prompt changes so stale entries miss.
-export const CACHE_VERSION = 'v17-korean-accuracy'
+// Bump `cacheVersion` in shared/translation/meta.json when the response
+// schema or prompt changes so stale entries miss.
+export const CACHE_VERSION = meta.cacheVersion
 
 export type CacheKeyInput = {
   intent: Intent

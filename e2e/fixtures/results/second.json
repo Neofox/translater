@@ -1,0 +1,54 @@
+{
+  "match": "[fx:second]",
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 20,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "다시 만나서 반가워요.",
+    "learningPhrases": [
+      {
+        "text": "다시",
+        "gloss": "again",
+        "sourceTexts": [
+          "again"
+        ],
+        "baseForm": "",
+        "literalMeaning": "",
+        "naturalMeaning": "",
+        "grammar": "",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "만나서 반가워요",
+        "gloss": "glad to see you",
+        "sourceTexts": [
+          "nice to see you"
+        ],
+        "baseForm": "반갑다",
+        "literalMeaning": "meeting (you), (I am) glad",
+        "naturalMeaning": "nice to see you",
+        "grammar": "만나서 links the reason with -아서; 반가워요 is the polite form of 반갑다.",
+        "omissions": "",
+        "grammarHighlights": [
+          "만나서"
+        ],
+        "usageNote": "",
+        "characters": []
+      }
+    ],
+    "rationale": "반가워요 is the warm, everyday way to say you are glad to see someone.",
+    "alternatives": [
+      {
+        "text": "다시 봐서 좋아요.",
+        "note": "Plainer wording that focuses on seeing the person again."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

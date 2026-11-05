@@ -1,0 +1,30 @@
+{
+  "url": "https://www.neofox.dev/",
+  "tool": "Chrome DevTools MCP performance trace, isolated context, cold-cache reload",
+  "emulation": { "viewport": "412x915@2.625,mobile,touch", "network": "Slow 4G", "cpu": 4 },
+  "pageLoad": {
+    "ttfbMs": 1689,
+    "fcpMs": 3388,
+    "lcpMs": 3388,
+    "lcpBreakdownMs": { "ttfb": 1689, "renderDelay": 1698 },
+    "cls": 0,
+    "domInteractiveMs": 3367,
+    "domContentLoadedMs": 3376,
+    "loadMs": 6908,
+    "documentTransferBytes": 5274,
+    "insights": [
+      "DocumentLatency (est. FCP/LCP saving 1588 ms)",
+      "LCPBreakdown",
+      "RenderBlocking (est. 0 ms)",
+      "NetworkDependencyTree",
+      "ThirdParties",
+      "Cache (4.1 kB)",
+      "LegacyJavaScript (10.4 kB)"
+    ]
+  },
+  "typeOneSentence": {
+    "billed": 1,
+    "lastKeyToCopyEnabledMs": 4294,
+    "note": "50-character sentence ending in '?', so the 400 ms debounce is included; Copy enables when the main string is complete"
+  }
+}

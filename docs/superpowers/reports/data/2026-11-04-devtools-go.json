@@ -1,0 +1,33 @@
+{
+  "url": "https://translater-go.vercel.app/",
+  "tool": "Chrome DevTools MCP performance trace, isolated context, cold-cache reload",
+  "emulation": { "viewport": "412x915@2.625,mobile,touch", "network": "Slow 4G", "cpu": 4 },
+  "pageLoad": {
+    "ttfbMs": 8,
+    "ttfbNote": "DevTools throttling did not delay this document (8 and 26 ms on two cold reloads, 8,353 B transferred); the harness proxy's throttled TTFB (1772 ms) is authoritative",
+    "fcpMs": 1852,
+    "lcpMs": 1849,
+    "lcpBreakdownMs": { "ttfb": 8, "renderDelay": 1842 },
+    "cls": 0,
+    "domInteractiveMs": 620,
+    "domContentLoadedMs": 1890,
+    "loadMs": 3658,
+    "secondReload": { "ttfbMs": 26, "fcpMs": 1772, "domContentLoadedMs": 1780, "loadMs": 3660 },
+    "documentTransferBytes": 8353,
+    "renderBlocking": [
+      { "url": "/static/css/app.e7401bd671.css", "queuedMs": 606, "doneMs": 1712, "estSavingMs": 0 }
+    ],
+    "insights": [
+      "LCPBreakdown",
+      "RenderBlocking (app.css only, est. 0 ms)",
+      "NetworkDependencyTree",
+      "ThirdParties (Vercel insights)",
+      "Viewport (pre-navigation insight set, est. INP 0 ms)"
+    ]
+  },
+  "typeOneSentence": {
+    "billed": 1,
+    "lastKeyToCopyEnabledMs": 2667,
+    "note": "same sentence and probe as TS"
+  }
+}

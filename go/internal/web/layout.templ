@@ -1,0 +1,55 @@
+package web
+
+// Page is the whole translator document (__root.tsx + TranslatorWorkspace).
+// The panels keep TS's server-rendered layout attributes for good: CSS
+// container queries choose the desktop workspace or the compact stack
+// (measured layouts, folds and keyboards are stage 7).
+templ Page(v View) {
+	<!DOCTYPE html>
+	<html lang={ v.Prefs.UILang } class="dark">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+			<meta name="robots" content="noindex, nofollow, noarchive, nosnippet"/>
+			<meta name="googlebot" content="noindex, nofollow"/>
+			<meta name="color-scheme" content="dark"/>
+			<meta name="theme-color" content="#171821"/>
+			<meta name="apple-mobile-web-app-capable" content="yes"/>
+			<meta name="apple-mobile-web-app-title" content="Translater"/>
+			<title>Translater</title>
+			<link rel="stylesheet" href={ v.Asset("css/app.css") }/>
+			<link rel="icon" type="image/svg+xml" href={ v.Asset("favicon.svg") }/>
+			@jsonScript(`type="importmap"`, v.Static.ImportMap())
+			for _, m := range v.Static.Modules() {
+				<link rel="modulepreload" href={ m.URL }/>
+			}
+			<script defer src={ v.Asset("vendor/htmx.min.js") }></script>
+			<script defer src={ v.Asset("vendor/hx-sse.min.js") }></script>
+			<script type="module" src={ v.Asset("js/app.js") }></script>
+			// Vercel Web Analytics (TS <Analytics/>, production script). Only a
+			// Vercel deployment serves the path, so it is rendered only there.
+			if v.VercelAnalytics {
+				<script defer src="/_vercel/insights/script.js"></script>
+			}
+		</head>
+		<body class="bg-bg text-ink font-sans antialiased">
+			<main class="app-shell" data-layout="stack">
+				@header(v)
+				<div class="workspace-viewport">
+					<div class="translator-panels" data-layout-pending="true" data-layout="stack" data-result-first="true">
+						@outputPanel(v)
+						@inputPanel(v)
+					</div>
+				</div>
+			</main>
+			@contextField(v)
+			@referencePanel(v)
+			@translateForm()
+			@prefsForm(v)
+			@langOption()
+			@jsonScript(`type="application/json" id="nt-data"`, v.Data)
+			// Last, like the TS FloatingPortal.
+			@settingsPopover(v)
+		</body>
+	</html>
+}

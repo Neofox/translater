@@ -1,3 +1,4 @@
+import sharedPreferences from '../../shared/translation/preferences.json'
 import type { LangCode } from './languages'
 import type { Mode } from './types'
 import type { UiLang } from './i18n'
@@ -14,8 +15,12 @@ export type PreferencesSnapshot = {
   preferences: Preferences
   hasCookie: boolean
 }
-export const PREFERENCES_COOKIE = 'nt.preferences'
-const MAX_AGE = 31536000
+// Cookie name, version, limits and per-field rules are shared with the Go app:
+// shared/translation/preferences.json. Rule order is the cookie field order.
+export const PREFERENCES_COOKIE = sharedPreferences.cookie
+const COOKIE_VERSION = sharedPreferences.version
+const MAX_AGE = sharedPreferences.maxAgeSeconds
+const MAX_COOKIE_LENGTH = sharedPreferences.maxCookieLength
 export const PREFERENCE_RULES: Record<
   keyof Preferences,
   {
@@ -23,26 +28,7 @@ export const PREFERENCE_RULES: Record<
     values: ReadonlyArray<string | null>
     raw?: boolean
   }
-> = {
-  source: {
-    storage: 'nt.source',
-    values: ['auto', 'en', 'ko', 'ja', 'fr', 'es', 'zh'],
-  },
-  target: {
-    storage: 'nt.target',
-    values: ['en', 'ko', 'ja', 'fr', 'es', 'zh'],
-  },
-  mode: { storage: 'nt.mode', values: ['friends', 'casual', 'professional'] },
-  uiLang: { storage: 'ui-lang', values: ['en', 'ko'], raw: true },
-  recentSource: {
-    storage: 'nt.recentSource',
-    values: [null, 'en', 'ko', 'ja', 'fr', 'es', 'zh'],
-  },
-  recentTarget: {
-    storage: 'nt.recentTarget',
-    values: [null, 'en', 'ko', 'ja', 'fr', 'es', 'zh'],
-  },
-}
+> = sharedPreferences.rules
 const keys = Object.keys(PREFERENCE_RULES) as Array<keyof Preferences>
 
 export function defaultPreferences(locale = 'en'): Preferences {
@@ -67,11 +53,11 @@ export function readPreferencesCookie(
     const value: unknown = JSON.parse(raw ?? '')
     if (
       raw &&
-      raw.length <= 1024 &&
+      raw.length <= MAX_COOKIE_LENGTH &&
       value &&
       typeof value === 'object' &&
       'version' in value &&
-      value.version === 1 &&
+      value.version === COOKIE_VERSION &&
       keys.every(
         (key) =>
           key in value &&
@@ -121,7 +107,7 @@ export function encodePreferencesCookie(
   secure: boolean,
 ) {
   const values = Object.fromEntries(keys.map((key) => [key, preferences[key]]))
-  return `${PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify({ version: 1, ...values }))}; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax${secure ? '; Secure' : ''}`
+  return `${PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify({ version: COOKIE_VERSION, ...values }))}; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax${secure ? '; Secure' : ''}`
 }
 
 export function persistPreferences(preferences: Preferences) {

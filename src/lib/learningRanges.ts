@@ -2,7 +2,7 @@ import { learningText, counterpartText } from './learningSide'
 import {
   LearningInput,
   LearningOutput,
-  LearningPhrase,
+  LegacyLearningPhrases,
 } from '../server/learningTypes'
 import type { LearningInputData, LearningResult } from '../server/learningTypes'
 
@@ -104,19 +104,7 @@ export function prepareLearningResult(
   value: unknown,
 ): LearningResult | null {
   // Page-memory compatibility only. The generated schema still requires every field.
-  const parsed = LearningPhrase.partial({
-    baseForm: true,
-    literalMeaning: true,
-    naturalMeaning: true,
-    grammar: true,
-    omissions: true,
-    grammarHighlights: true,
-    usageNote: true,
-    characters: true,
-  })
-    .array()
-    .max(64)
-    .safeParse(value)
+  const parsed = LegacyLearningPhrases.safeParse(value)
   const data = parsed.success
     ? parsed.data.map((p) => ({
         ...p,

@@ -1,0 +1,75 @@
+{
+  "match": "[fx:word-hanja]",
+  "intent": "word",
+  "chunk": 12,
+  "delayMs": 10,
+  "result": {
+    "sourceLang": "ko",
+    "targetLang": "en",
+    "headword": "학교",
+    "primaryTranslation": "school",
+    "primaryUsageNote": "",
+    "alternativeTranslations": [
+      {
+        "text": "schoolhouse",
+        "register": [
+          "formal"
+        ],
+        "note": "The building itself."
+      }
+    ],
+    "posList": [
+      {
+        "pos": "noun",
+        "senses": [
+          {
+            "definition": "A place where students learn.",
+            "register": [],
+            "examples": [
+              "학교에 가요. (I go to school.)"
+            ]
+          }
+        ]
+      }
+    ],
+    "synonyms": [
+      "학원"
+    ],
+    "etymology": "Sino-Korean: 學 (learn) + 校 (school).",
+    "notes": "",
+    "grammar": "",
+    "characters": [
+      {
+        "word": "학교",
+        "chars": [
+          {
+            "char": "學",
+            "meaning": "learn"
+          },
+          {
+            "char": "校",
+            "meaning": "school"
+          }
+        ]
+      },
+      {
+        "word": "사랑",
+        "chars": [
+          {
+            "char": "思",
+            "meaning": "think"
+          },
+          {
+            "char": "郞",
+            "meaning": "man"
+          },
+          {
+            "char": "亮",
+            "meaning": "bright"
+          }
+        ]
+      }
+    ]
+  },
+  "error": null
+}

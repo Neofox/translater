@@ -1,9 +1,11 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import type { JSONValue } from 'ai'
+import meta from '../../shared/translation/meta.json'
 
 // Chosen on 2026-10-30 evals: as fast as luna to the main translation (Fast
 // tier) with clearly better explanations; sol-low was better still but slower.
-export const DEFAULT_TRANSLATE_MODEL = 'gpt-6.1-terra'
+// Shared with the Go app: shared/translation/meta.json.
+export const DEFAULT_TRANSLATE_MODEL = meta.defaultModel
 
 export const SERVICE_TIERS = ['default', 'fast'] as const
 export type ServiceTier = (typeof SERVICE_TIERS)[number]

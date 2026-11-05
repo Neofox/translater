@@ -1,0 +1,16 @@
+{
+  "match": ["[fx:plain]", "[fx:refine-fail]"],
+  "intent": "sentence",
+  "result": null,
+  "error": {
+    "status": 500,
+    "body": {
+      "error": {
+        "message": "The server had an error while processing your request.",
+        "type": "server_error",
+        "param": null,
+        "code": null
+      }
+    }
+  }
+}

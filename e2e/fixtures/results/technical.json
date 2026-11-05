@@ -1,0 +1,16 @@
+{
+  "match": "[fx:technical]",
+  "intent": "sentence",
+  "chunk": 48,
+  "delayMs": 0,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "분할 로직은 api/src/utils/ 아래에 작은 헬퍼로 넣을게요.",
+    "learningPhrases": [],
+    "rationale": "The translation keeps the code path unchanged and renders “put … in a helper” as 넣다, a natural developer phrasing for implementing something as a helper function. 분할 로직 makes the implied programming object explicit without adding new technical detail.",
+    "alternatives": [],
+    "formalityNote": ""
+  },
+  "error": null
+}

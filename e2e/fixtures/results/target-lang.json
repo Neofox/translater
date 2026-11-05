@@ -1,0 +1,21 @@
+{
+  "match": "[fx:target-lang]",
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 0,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "fr",
+    "main": "Comment vas-tu aujourd'hui ?",
+    "learningPhrases": [],
+    "rationale": "Reports targetLang fr while the selected target is Korean: the result's language, register label and Listen language follow the report.",
+    "alternatives": [
+      {
+        "text": "Comment allez-vous aujourd'hui ?",
+        "note": "The polite French form."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

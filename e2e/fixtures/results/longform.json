@@ -1,0 +1,25 @@
+{
+  "match": "[fx:longform]",
+  "intent": "sentence",
+  "chunk": 24,
+  "delayMs": 0,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "안녕하세요.\n오늘 어떻게 지내요?",
+    "learningPhrases": [],
+    "rationale": "해요체 keeps both lines warm but polite.",
+    "alternatives": [
+      {
+        "text": "안녕.\n오늘 잘 지내?",
+        "note": "반말 for a close friend."
+      },
+      {
+        "text": "안녕하십니까.\n오늘 어떻게 지내십니까?",
+        "note": "하십시오체 for a formal setting."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

@@ -1,0 +1,61 @@
+{
+  "match": "[fx:learn-repeat]",
+  "intent": "sentence",
+  "chunk": 12,
+  "delayMs": 20,
+  "result": {
+    "sourceLang": "en",
+    "targetLang": "ko",
+    "main": "네, 네. 좋아요, 좋아요!",
+    "learningPhrases": [
+      {
+        "text": "네",
+        "gloss": "yes",
+        "sourceTexts": ["Yes"],
+        "baseForm": "네",
+        "literalMeaning": "yes",
+        "naturalMeaning": "yes",
+        "grammar": "",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "네",
+        "gloss": "yes",
+        "sourceTexts": ["yes"],
+        "baseForm": "네",
+        "literalMeaning": "yes",
+        "naturalMeaning": "yes",
+        "grammar": "",
+        "omissions": "",
+        "grammarHighlights": [],
+        "usageNote": "",
+        "characters": []
+      },
+      {
+        "text": "좋아요",
+        "gloss": "sounds good",
+        "sourceTexts": ["sounds good"],
+        "baseForm": "좋다",
+        "literalMeaning": "(it) is good",
+        "naturalMeaning": "sounds good",
+        "grammar": "좋아요 is the polite present form of 좋다.",
+        "omissions": "",
+        "grammarHighlights": ["좋아요"],
+        "usageNote": "",
+        "characters": []
+      }
+    ],
+    "rationale": "Repeats the reply the way Korean speakers do.",
+    "alternatives": [
+      {
+        "text": "네, 좋아요!",
+        "note": "Says it once; equally natural."
+      }
+    ],
+    "formalityNote": ""
+  },
+  "error": null
+}

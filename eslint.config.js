@@ -11,6 +11,8 @@ export default [
       '.tanstack/**',
       '.vitest/**',
       'test-results/**',
+      // The Go app (vendored htmx, generated contract copy) has its own toolchain.
+      'go/**',
     ],
   },
   ...tanstackConfig,
