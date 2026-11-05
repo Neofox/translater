@@ -10,6 +10,8 @@ on:
     paths-ignore:
       - docs/**
       - '**.md'
+      # translation-eval.yml runs (and typechecks) eval changes.
+      - evals/**
   workflow_dispatch:
     inputs:
       base:

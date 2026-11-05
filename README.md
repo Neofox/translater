@@ -15,7 +15,8 @@ Routes: `GET /` (page), `POST /translate` (one streaming run,
 
 ## Local development
 
-You need Go (the version in `go.mod`) and Node.js with npm. templ comes from
+You need Go (the version in `go.mod`) and Node.js 24 or newer with npm (the
+tooling's unit tests run TypeScript through Node's type stripping). templ comes from
 the `go.mod` tool directive; tailwindcss and lucide-static (icons) come from
 `npm ci`.
 

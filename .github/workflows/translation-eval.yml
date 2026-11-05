@@ -44,6 +44,9 @@ jobs:
 
       - run: npm ci
 
+      # ci.yml skips eval-only PRs, so the eval code is typechecked here.
+      - run: npm run typecheck
+
       # Translation and judge responses are cached by request, so unchanged
       # cases cost nothing on reruns.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
