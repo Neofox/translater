@@ -3313,3 +3313,28 @@ textarea:focus-visible {
   inset: auto;
   margin: 0;
 }
+
+/* Copy feedback on every layout (copy.js): a pressed state that also shows
+   on touch, then the violet check of a successful copy for 1.5 s. The main
+   Copy is filled with --color-action, so the confirmation switches it to
+   the tonal accent surface for the check to read. */
+.copy-button:not(:disabled):active {
+  background: var(--color-accent-soft);
+  transform: scale(0.94);
+}
+.copy-button[data-copied],
+.primary-result-actions .copy-button[data-copied] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-line);
+}
+.primary-result-actions .copy-button[data-copied] {
+  box-shadow: inset 0 0 0 1px var(--color-accent-line);
+}
+.copy-button[data-copied] > svg {
+  color: var(--color-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .copy-button:not(:disabled):active {
+    transform: none;
+  }
+}

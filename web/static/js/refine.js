@@ -6,6 +6,7 @@
 // markup is server-rendered once (refine.templ) and only updated here.
 
 import { initAdjust } from './adjust.js'
+import { showCopied } from './copy.js'
 
 export const MAX_UNDO = 10
 const MAX_REFINEMENTS = 3
@@ -225,10 +226,8 @@ export function initRefine(app, form, restore, relabel) {
     rows.replaceChildren(...snap.rows)
     // A Copy clicked before the refine was cloned while it said Copied.
     for (const node of snap.details)
-      for (const button of node.querySelectorAll?.('[data-testid="copy-button"]') ?? []) {
-        button.setAttribute('aria-label', app.t('copy'))
-        button.title = app.t('copy')
-      }
+      for (const button of node.querySelectorAll?.('[data-testid="copy-button"]') ?? [])
+        showCopied(button, false, app.t)
     fill()
     restore(snap.live, snap.details)
     return true

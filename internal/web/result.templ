@@ -56,7 +56,7 @@ templ AlternativeRow(index int, word bool, text, note string, registers []string
 				@ui.Pill(ui.PillProps{Class: "copy-button icon-action disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
 					"aria-label": copyLabel, "title": copyLabel, "data-testid": "copy-button", "disabled": true,
 				}}) {
-					@icons.Icon("copy", 14, nil)
+					@copyIcons()
 				}
 				@listenButton(listenLabel, false)
 			</div>
@@ -77,4 +77,11 @@ templ AlternativeRow(index int, word bool, text, note string, registers []string
 			<p class="alternative-note text-ink-soft">{ note }</p>
 		}
 	</li>
+}
+
+// copyIcons are a Copy button's icons: copy, and the check copy.js shows
+// in its place for 1.5 s after a successful copy (both stay mounted).
+templ copyIcons() {
+	@icons.Icon("copy", 14, nil)
+	@icons.Icon("check", 14, templ.Attributes{"hidden": true})
 }

@@ -110,7 +110,7 @@ func outputPanel(v View) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = icons.Icon("copy", 14, nil).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = copyIcons().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

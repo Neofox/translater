@@ -16,7 +16,51 @@ export function copyableMain(live, currentKey) {
   return (live.main ?? '').trim() || null
 }
 
-const COPIED_MS = 1200
+/** How long a Copy button confirms a copy. */
+export const COPIED_MS = 1500
+
+/** A Copy button's Copied state, on or off: its name, title and visible
+ * label, and `data-copied` with the check icon in place of the copy icon
+ * (base.css tints it violet). `t` looks up UI strings. */
+export function showCopied(button, on, t) {
+  const key = on ? 'copied' : 'copy'
+  button.setAttribute('aria-label', t(key))
+  button.setAttribute('title', t(key))
+  const label = button.querySelector('[data-t="copy"]')
+  if (label) label.textContent = t(key)
+  button.toggleAttribute('data-copied', on)
+  button.querySelector('.lucide-copy')?.toggleAttribute('hidden', on)
+  button.querySelector('.lucide-check')?.toggleAttribute('hidden', !on)
+}
+
+/** Confirm a copy on `button` for COPIED_MS; another copy restarts it. */
+export function flashCopied(button, t) {
+  showCopied(button, true, t)
+  clearTimeout(button._copied)
+  button._copied = setTimeout(() => showCopied(button, false, t), COPIED_MS)
+}
+
+/** A polite live region that says "Copied": screen readers do not
+ * reliably announce a focused button's new name (VoiceOver on iOS does
+ * not). Created on the first copy; its text is set a moment later so the
+ * new region is in the accessibility tree first. */
+let region = null
+let announced = 0
+function announce(text) {
+  if (!region) {
+    region = document.createElement('div')
+    region.className = 'sr-only'
+    region.setAttribute('role', 'status')
+    region.dataset.testid = 'copy-status'
+    document.body.append(region)
+  }
+  region.textContent = ''
+  clearTimeout(announced)
+  announced = setTimeout(() => {
+    region.textContent = text
+    announced = setTimeout(() => (region.textContent = ''), COPIED_MS)
+  }, 100)
+}
 
 async function copy(button, text, app) {
   try {
@@ -24,18 +68,14 @@ async function copy(button, text, app) {
   } catch {
     return
   }
-  const label = button.querySelector('[data-t="copy"]')
-  const set = (key) => {
-    button.setAttribute('aria-label', app.t(key))
-    button.title = app.t(key)
-    if (label) label.textContent = app.t(key)
-  }
-  set('copied')
-  clearTimeout(button._copied)
-  button._copied = setTimeout(() => set('copy'), COPIED_MS)
+  flashCopied(button, app.t)
+  announce(app.t('copied'))
 }
 
 export function initCopy(app) {
+  // iOS Safari applies :active (the pressed Copy state in base.css) to a
+  // touch only when the page listens for touchstart.
+  document.addEventListener('touchstart', () => {}, { passive: true })
   const toolbar = document.querySelector('[data-testid="output-toolbar"]')
   const mainCopy = toolbar.querySelector('[data-testid="copy-button"]')
   const mainListen = toolbar.querySelector('[data-testid="listen-button"]')

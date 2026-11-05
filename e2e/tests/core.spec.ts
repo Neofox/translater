@@ -91,6 +91,41 @@ test('copy enables at main-ready before done @core', async ({ page, fake }) => {
   await stopStream(page, fake, 0)
 })
 
+test('Copy confirms visibly with a violet check, then reverts @core', async ({
+  page,
+}) => {
+  const fx = fixture('plain')
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, fx.result.main!)
+  await waitForDone(page)
+  const accent = await page.evaluate(() =>
+    getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-accent')
+      .trim(),
+  )
+  const rgb = (hex: string) =>
+    `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`
+  for (const copy of [
+    copyButton(page),
+    page.getByTestId('alternative-item').first().getByTestId('copy-button'),
+  ]) {
+    const check = copy.locator('svg.lucide-check')
+    await expect(check).toBeHidden()
+    await copy.click()
+    // The icon becomes a violet check and the name says Copied.
+    await expect(check).toBeVisible()
+    await expect(copy.locator('svg.lucide-copy')).toBeHidden()
+    await expect(check).toHaveCSS('color', rgb(accent))
+    await expect(copy).toHaveAttribute('aria-label', STRINGS.en.copied)
+    // Announced politely, beyond the focused button's name.
+    await expect(page.getByRole('status').filter({ hasText: STRINGS.en.copied })).toHaveCount(1)
+    // Back to Copy after about 1.5 s.
+    await expect(check).toBeHidden({ timeout: 3_000 })
+    await expect(copy.locator('svg.lucide-copy')).toBeVisible()
+    await expect(copy).toHaveAttribute('aria-label', STRINGS.en.copy)
+  }
+})
+
 test('swap button shows the busy spinner while streaming @core', async ({
   page,
   fake,

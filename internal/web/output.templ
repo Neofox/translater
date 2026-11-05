@@ -27,7 +27,7 @@ templ outputPanel(v View) {
 					"aria-label": v.T("copy"), "title": v.T("copy"), "data-t-attr": "aria-label:copy title:copy",
 					"data-testid": "copy-button", "disabled": true,
 				}}) {
-					@icons.Icon("copy", 14, nil)
+					@copyIcons()
 					<span data-t="copy">{ v.T("copy") }</span>
 				}
 				@listenButton(v.T("listen"), true)
