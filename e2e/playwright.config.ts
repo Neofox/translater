@@ -22,6 +22,23 @@ const viewports = [
   { label: 'iphone-landscape', width: 844, height: 390 },
 ] as const
 
+// A plain run covers each layout once per engine: stacked phone in both
+// engines (WebKit with reduced motion), split landscape and the desktop
+// workspace in both engines. All 18 projects run with E2E_PROJECTS=all (CI:
+// Run workflow with "all projects"), for the visual suite, or when the
+// command names projects itself with --project.
+const DEFAULT_PROJECTS = new Set([
+  'chromium-portrait',
+  'webkit-portrait',
+  'chromium-landscape',
+  'chromium-macbook-14',
+  'webkit-macbook-14',
+])
+const ALL_PROJECTS =
+  process.env.E2E_PROJECTS === 'all' ||
+  Boolean(process.env.E2E_VISUAL) ||
+  process.argv.some((a) => a === '--project' || a.startsWith('--project='))
+
 // Environment for every app server: the app reads only the process
 // environment, so the local OpenAI key is never used. Empty Langfuse keys
 // keep telemetry off.
@@ -138,5 +155,9 @@ export default defineConfig({
     )
     // Each @prod test is billed: one project, so a run without --project
     // still makes exactly one translation and one speech request.
-    .filter(({ name }) => !PROD_URL || name === 'chromium-macbook-14'),
+    .filter(({ name }) =>
+      PROD_URL
+        ? name === 'chromium-macbook-14'
+        : ALL_PROJECTS || DEFAULT_PROJECTS.has(name),
+    ),
 })

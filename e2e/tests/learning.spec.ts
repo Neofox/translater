@@ -838,11 +838,14 @@ test('dragging from a source grammar underline selects native editor text @learn
   page,
 }) => {
   await readingResult(page)
-  const start = await grammarPosition(page)
+  // Hover relative to the editor: Playwright waits until it stops moving,
+  // so the press lands on the underline even while the panes still settle
+  // (absolute coordinates measured earlier missed it on loaded CI runners).
+  await source(page).hover({ position: await grammarPosition(page) })
   const box = (await source(page).boundingBox())!
+  const start = await grammarPosition(page)
   const x = box.x + start.x
   const y = box.y + start.y
-  await page.mouse.move(x, y)
   await page.mouse.down()
   await page.mouse.move(x + 50, y, { steps: 5 })
   await page.mouse.up()

@@ -17,6 +17,10 @@ on:
       base:
         description: Branch or commit whose app renders the visual baselines
         default: master
+      all-projects:
+        description: Run e2e on all 18 projects instead of the default five
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -84,8 +88,9 @@ jobs:
   e2e:
     name: E2E @${{ matrix.tag }}
     runs-on: macos-latest
-    # One worker runs about three times as long as the former three.
-    timeout-minutes: 180
+    # Five projects take about 15 minutes per tag with one worker; all 18
+    # take up to an hour.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -93,6 +98,7 @@ jobs:
     env:
       OPENAI_API_KEY: test
       E2E_WORKERS: 1
+      E2E_PROJECTS: ${{ inputs.all-projects && 'all' || 'default' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
