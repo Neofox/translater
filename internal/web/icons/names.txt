@@ -1,0 +1,20 @@
+# Lucide icons the UI uses: every icon the templates render via icons.Icon.
+# One icon per line: its lucide name, then the aliases lucide-react 1.61.0
+# adds as extra `lucide-<alias>` classes (from the icon module's `aliases`).
+# `go generate ./...` (cmd/syncicons) turns this into icons_gen.go from
+# lucide-static 1.61.0.
+arrow-right-left
+check
+chevron-down
+clipboard
+copy
+loader-circle loader-2
+plus
+reply
+rotate-ccw
+settings
+sliders-horizontal
+square
+triangle-alert alert-triangle
+volume-2
+x

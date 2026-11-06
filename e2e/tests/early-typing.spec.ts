@@ -1,13 +1,9 @@
-// Text typed before the client modules run (a slow first load). The Go
+// Text typed before the client modules run (a slow first load). The
 // textarea is plain server HTML, usable from first paint; app.js must give
 // text typed before it ran the debounced run that typing would have
 // scheduled. Text the browser restores on reload or back/forward (form
 // restoration) must never start a paid run.
-//
-// Go only: TS hydration resets the controlled textarea, so nothing typed
-// before hydration survives to be translated.
 import type { Page, Request, Route } from '@playwright/test'
-import { APP } from '../ports'
 import {
   expect,
   fixture,
@@ -18,8 +14,6 @@ import {
   waitForMain,
   waitForStats,
 } from './helpers'
-
-test.skip(APP === 'ts', 'TS hydration wipes text typed before it runs')
 
 const APP_MODULE = '**/static/js/app.*.js'
 
@@ -79,8 +73,7 @@ const navigationType = (page: Page) =>
     () =>
       (
         performance.getEntriesByType('navigation')[0] as
-          | PerformanceNavigationTiming
-          | undefined
+          PerformanceNavigationTiming | undefined
       )?.type ?? 'none',
   )
 
@@ -88,7 +81,7 @@ const navigationType = (page: Page) =>
 const modulesRan = (page: Page) =>
   expect(source(page)).toHaveAttribute('style', /height/, { timeout: 15_000 })
 
-test('text typed before the modules run is translated once @core', async ({
+test('text typed before the modules run is translated once @core @engine', async ({
   page,
   fake,
 }) => {
@@ -137,7 +130,7 @@ async function translate(page: Page, text: string) {
 for (const restorable of [false, true]) {
   const label = restorable ? ' (restoration allowed)' : ''
 
-  test(`reload does not translate the field's text${label} @core`, async ({
+  test(`reload does not translate the field's text${label} @core @engine`, async ({
     page,
     fake,
   }, testInfo) => {
@@ -161,7 +154,7 @@ for (const restorable of [false, true]) {
     expect(await fake.requests()).toBe(1)
   })
 
-  test(`back/forward does not translate the field's text${label} @core`, async ({
+  test(`back/forward does not translate the field's text${label} @core @engine`, async ({
     page,
     fake,
   }, testInfo) => {
@@ -184,7 +177,8 @@ for (const restorable of [false, true]) {
     // says 'navigate', but the modules do not run again.
     const type = await navigationType(page)
     const bfcache = await page.evaluate(
-      () => (window as unknown as { ntPersisted?: boolean }).ntPersisted === true,
+      () =>
+        (window as unknown as { ntPersisted?: boolean }).ntPersisted === true,
     )
     testInfo.annotations.push({
       type: 'back_forward',

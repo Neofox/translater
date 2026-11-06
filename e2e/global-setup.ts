@@ -1,5 +1,5 @@
 import { chromium } from '@playwright/test'
-import { APP, WORKERS, appUrl, fakeUrl } from './ports'
+import { WORKERS, appUrl, fakeUrl } from './ports'
 
 type Stats = { requests: number; aborted: number; lastBodies: string[] }
 
@@ -13,19 +13,19 @@ async function reset(index: number): Promise<void> {
 }
 
 // Proves, per app server, that translations reach that server's fake
-// upstream before any test runs. This also warms the dev server's module
-// graph so the first test does not pay for compilation.
+// upstream before any test runs. This also warms the app server, so the
+// first test does not pay for its cold start.
 async function checkPair(index: number): Promise<void> {
   const html = await fetch(appUrl(index)).then(
     (res) => res.text(),
     (error: unknown) => {
-      throw new Error(`${APP} app on ${appUrl(index)} is unreachable: ${error}`)
+      throw new Error(`App on ${appUrl(index)} is unreachable: ${error}`)
     },
   )
   if (!html.includes('data-testid="input-textarea"')) {
     throw new Error(
-      `${APP} app on ${appUrl(index)} does not serve the translator page yet ` +
-        '(no [data-testid="input-textarea"]); the parity suite cannot run.',
+      `App on ${appUrl(index)} does not serve the translator page yet ` +
+        '(no [data-testid="input-textarea"]); the e2e suite cannot run.',
     )
   }
 

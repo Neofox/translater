@@ -1,0 +1,34 @@
+package web
+
+// Header (app-header): brand, the Tone toggle, Adjust (refine.templ) and the
+// Settings trigger. Labels carry data-t keys so prefs.js relabels them on a
+// UI-language switch without a swap.
+templ header(v View) {
+	<header class="app-header">
+		<div class="app-brand">
+			<span class="brand-glyph" aria-hidden="true">가</span>
+			<h1>Translater</h1>
+		</div>
+		<div class="app-settings">
+			<div class="mode-segment" role="group" aria-label={ v.T("tone") } data-t-attr="aria-label:tone">
+				for _, m := range modes {
+					<button type="button" aria-pressed={ boolString(v.Prefs.Mode == m.Value) } data-t={ m.Key }>{ v.T(m.Key) }</button>
+				}
+			</div>
+			<select class="mode-select" aria-label={ v.T("tone") } data-t-attr="aria-label:tone">
+				for _, m := range modes {
+					<option value={ m.Value } selected?={ v.Prefs.Mode == m.Value } data-t={ m.Key }>{ v.T(m.Key) }</option>
+				}
+			</select>
+			@adjustTemplate(v)
+			@settingsTrigger(v)
+		</div>
+	</header>
+}
+
+func boolString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}

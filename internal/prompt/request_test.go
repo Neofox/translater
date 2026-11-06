@@ -1,0 +1,303 @@
+package prompt
+
+import (
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"os"
+	"regexp"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	"neotranslate/internal/config"
+	"neotranslate/internal/contract"
+)
+
+// shared/translation is the source of truth; the contract package embeds it.
+const sharedDir = "../../shared/translation/"
+
+type fixture struct {
+	Name    string         `json:"name"`
+	Variant string         `json:"variant"` // variants.json only
+	Input   TranslateInput `json:"input"`
+	Config  struct {
+		Model       string `json:"model"`
+		Reasoning   string `json:"reasoning"`
+		ServiceTier string `json:"serviceTier"`
+	} `json:"config"`
+	Body any `json:"body"`
+}
+
+func loadContract(t *testing.T) *contract.Contract {
+	t.Helper()
+	c, err := contract.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func loadFixtures(t *testing.T, file string) []fixture {
+	t.Helper()
+	b, err := os.ReadFile(sharedDir + "fixtures/" + file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fs []fixture
+	if err := json.Unmarshal(b, &fs); err != nil {
+		t.Fatal(err)
+	}
+	if len(fs) == 0 {
+		t.Fatal("no fixtures")
+	}
+	return fs
+}
+
+// The golden bodies as JSON values, independent of the fixture writer's
+// formatting (TestFixturesFresh compares the bytes).
+func TestBuildRequestMatchesFixtures(t *testing.T) {
+	c := loadContract(t)
+	fixtures := append(loadFixtures(t, "requests.json"), loadFixtures(t, "variants.json")...)
+	for _, f := range fixtures {
+		t.Run(f.Name, func(t *testing.T) {
+			if err := f.Input.Validate(c.Limits); err != nil {
+				t.Fatalf("fixture input invalid: %v", err)
+			}
+			cfg := config.Translate{Model: f.Config.Model, Reasoning: f.Config.Reasoning, ServiceTier: f.Config.ServiceTier}
+			variant := f.Variant
+			if variant == "" {
+				variant = Production
+			}
+			b, err := BuildVariant(c, f.Input, cfg, variant)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got any
+			if err := json.Unmarshal(b, &got); err != nil {
+				t.Fatalf("body is not JSON: %v", err)
+			}
+			if d := cmp.Diff(f.Body, got); d != "" {
+				t.Errorf("body mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+// rawSchema returns the request's text.format.schema exactly as encoded,
+// compacted: unlike the parsed comparison above, it keeps key order.
+func rawSchema(t *testing.T, body []byte) string {
+	t.Helper()
+	var b struct {
+		Text struct {
+			Format struct {
+				Schema jsontext.Value `json:"schema"`
+			} `json:"format"`
+		} `json:"text"`
+	}
+	if err := json.Unmarshal(body, &b, json.RejectUnknownMembers(false)); err != nil {
+		t.Fatal(err)
+	}
+	v := b.Text.Format.Schema.Clone()
+	if err := v.Compact(); err != nil {
+		t.Fatal(err)
+	}
+	return string(v)
+}
+
+// The model writes fields in schema key order, so property order is part of
+// the contract: main must stream before the learner details (a map-ordered,
+// alphabetical schema put main after alternatives and the languages last).
+// The parsed comparison in TestBuildRequestMatchesFixtures cannot see order.
+func TestBuildRequestKeepsSchemaKeyOrder(t *testing.T) {
+	c := loadContract(t)
+	b, err := os.ReadFile(sharedDir + "fixtures/requests.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw []struct {
+		Name string         `json:"name"`
+		Body jsontext.Value `json:"body"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for i, f := range loadFixtures(t, "requests.json") {
+		t.Run(f.Name, func(t *testing.T) {
+			cfg := config.Translate{Model: f.Config.Model, Reasoning: f.Config.Reasoning, ServiceTier: f.Config.ServiceTier}
+			body, err := BuildRequest(c, f.Input, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := rawSchema(t, body)
+			if want := rawSchema(t, raw[i].Body); got != want {
+				t.Errorf("schema bytes differ from the golden request (key order?)\n got: %.200s\nwant: %.200s", got, want)
+			}
+			shared := jsontext.Value(slices.Clone(c.Schemas[f.Input.Intent]))
+			if err := shared.Compact(); err != nil {
+				t.Fatal(err)
+			}
+			want := string(shared)
+			if f.Input.Intent == "sentence" && !IsLongForm(f.Input.Text) {
+				want = strings.Replace(want, `"alternatives":{`, `"alternatives":{"minItems":2,`, 1)
+			}
+			if got != want {
+				t.Errorf("schema bytes differ from shared/translation/schemas/%s", f.Input.Intent)
+			}
+		})
+	}
+}
+
+// The fixtures cover every flag combination the app sends; this guards the
+// view itself: a section name missing from the view would silently render
+// as false, so the key set must equal the README's variable table exactly.
+func TestViewKeysMatchReadme(t *testing.T) {
+	readme, err := os.ReadFile(sharedDir + "README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	section := string(readme)
+	section = section[strings.Index(section, "## Variables"):strings.Index(section, "## Templates")]
+	var want []string
+	for _, m := range regexp.MustCompile("(?m)^\\| `([A-Za-z]+)` \\|").FindAllStringSubmatch(section, -1) {
+		if m[1] == "leanCharacters" { // eval variants only
+			continue
+		}
+		want = append(want, m[1])
+	}
+	if len(want) < 20 {
+		t.Fatalf("parsed only %d README variables: %v", len(want), want)
+	}
+	slices.Sort(want)
+
+	c := loadContract(t)
+	for _, in := range []TranslateInput{
+		{Text: "x", Source: "en", Target: "ko", Mode: "casual", Intent: "sentence", UILang: "en"},
+		{Text: "x", Source: "auto", Target: "en", Mode: "friends", Intent: "word", UILang: "ko"},
+	} {
+		v, err := View(c, in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for k, val := range v {
+			got = append(got, k)
+			switch val.(type) {
+			case string, bool:
+			default:
+				t.Errorf("%s has type %T, want string or bool", k, val)
+			}
+		}
+		slices.Sort(got)
+		if d := cmp.Diff(want, got); d != "" {
+			t.Errorf("%s view keys (-README +view):\n%s", in.Intent, d)
+		}
+	}
+}
+
+func TestFlagsDefinitions(t *testing.T) {
+	f := Flags(TranslateInput{Source: "auto", Target: "ja", Mode: "professional", Intent: "word", UILang: "ko"})
+	want := map[string]any{
+		"source": "auto", "target": "ja", "uiLang": "ko",
+		"sourceName": "the auto-detected source language", "targetName": "Japanese", "uiLangName": "Korean",
+		"metaLang": "KOREAN", "uiKo": true, "isPolish": false, "kr": false, "autoSource": true,
+		"intentSentence": false, "modeFriends": false, "modeCasual": false, "modeProfessional": true,
+		"modeUpper": "PROFESSIONAL", "populateFormalityNote": false, "detailReminder": true,
+		"manyAlternatives": true,
+	}
+	if d := cmp.Diff(want, f); d != "" {
+		t.Errorf("flags (-want +got):\n%s", d)
+	}
+	// detailReminder: English-only pairs and polishing get no reminder.
+	for _, tc := range []struct {
+		source, target string
+		want           bool
+	}{{"auto", "en", false}, {"en", "en", false}, {"ko", "ko", false}, {"ko", "en", true}, {"en", "ko", true}} {
+		got := Flags(TranslateInput{Source: tc.source, Target: tc.target, Mode: "casual", Intent: "sentence", UILang: "en"})["detailReminder"]
+		if got != tc.want {
+			t.Errorf("detailReminder(%s→%s) = %v, want %v", tc.source, tc.target, got, tc.want)
+		}
+	}
+}
+
+func TestLanguageEnumsMatchContract(t *testing.T) {
+	c := loadContract(t)
+	var codes []string
+	for _, l := range c.Languages {
+		codes = append(codes, l.Code)
+		if promptNames[l.Code] != l.PromptName {
+			t.Errorf("promptName %s = %q, contract %q", l.Code, promptNames[l.Code], l.PromptName)
+		}
+	}
+	if d := cmp.Diff(codes, sourceLangs); d != "" {
+		t.Errorf("source languages (-contract +package):\n%s", d)
+	}
+	if d := cmp.Diff(slices.DeleteFunc(slices.Clone(codes), func(s string) bool { return s == "auto" }), targetLangs); d != "" {
+		t.Errorf("target languages (-contract +package):\n%s", d)
+	}
+	if len(promptNames) != len(c.Languages) {
+		t.Errorf("promptNames has %d entries, contract %d", len(promptNames), len(c.Languages))
+	}
+}
+
+// Variants replace only the sentence system message; word intent and the
+// production name keep BuildRequest's body, and unknown names fail.
+func TestBuildVariant(t *testing.T) {
+	c := loadContract(t)
+	cfg := config.Translate{Model: "m", Reasoning: "none", ServiceTier: "fast"}
+	s := TranslateInput{Text: "hi", Source: "en", Target: "ko", Mode: "casual", Intent: "sentence", UILang: "en"}
+	w := s
+	w.Intent = "word"
+	for _, in := range []TranslateInput{s, w} {
+		prod, err := BuildRequest(c, in, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range Variants {
+			got, err := BuildVariant(c, in, cfg, v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if same := string(got) == string(prod); same != (v == Production || in.Intent == "word") {
+				t.Errorf("%s %s: same as production = %v", in.Intent, v, same)
+			}
+		}
+	}
+	if _, err := BuildVariant(c, s, cfg, "nope"); err == nil {
+		t.Error("unknown variant accepted")
+	}
+}
+
+// Short sentences require two alternatives in the response format itself;
+// long-form input (whose alternatives the result hides) does not.
+func TestSchemaRequiresAlternativesForShortSentences(t *testing.T) {
+	c := loadContract(t)
+	cfg := config.Translate{Model: "gpt-6.1-terra", Reasoning: "none", ServiceTier: "fast"}
+	for _, tc := range []struct {
+		name, text string
+		want       any
+	}{
+		{"thanks", "고마워!", float64(2)},
+		{"greeting", "hey how are you?", float64(2)},
+		{"multiline", "first line\nsecond line", nil},
+		{"three sentences", "One. Two. Three.", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := TranslateInput{Text: tc.text, Source: "auto", Target: "en", Mode: "casual", Intent: "sentence", UILang: "en"}
+			body, err := BuildRequest(c, in, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var schema struct {
+				Properties map[string]map[string]any `json:"properties"`
+			}
+			if err := json.Unmarshal([]byte(rawSchema(t, body)), &schema); err != nil {
+				t.Fatal(err)
+			}
+			if got := schema.Properties["alternatives"]["minItems"]; got != tc.want {
+				t.Errorf("alternatives.minItems = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

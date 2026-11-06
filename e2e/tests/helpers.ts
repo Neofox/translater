@@ -132,8 +132,8 @@ export function sentence(name: string): string {
 }
 
 export async function openApp(page: Page): Promise<void> {
-  // Wait for hydration: text typed into the SSR textarea before React attaches
-  // is reset by the controlled component.
+  // Wait for the client modules, so typing starts from a fully wired page
+  // (early-typing.spec.ts covers text typed before they run).
   await page.goto('/', { waitUntil: 'networkidle' })
   await expect(source(page)).toBeVisible()
 }
@@ -229,7 +229,7 @@ export async function setUiLang(page: Page, lang: UiLang): Promise<void> {
   await expect(
     group.getByRole('button', { name: lang === 'ko' ? '한' : 'EN' }),
   ).toHaveAttribute('aria-pressed', 'true')
-  // Toggle closed; Escape would also clear the source text.
+  // Toggle closed.
   await settings.click()
   await expect(group).toBeHidden()
 }

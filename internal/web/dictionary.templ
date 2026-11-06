@@ -1,0 +1,382 @@
+package web
+
+import (
+	"strconv"
+	"strings"
+
+	"neotranslate/internal/learning"
+	"neotranslate/internal/web/ui"
+)
+
+// Dictionary content of a word result: the word dictionary and its character
+// notes, in the render order and with the class strings of the original
+// TypeScript components, which the visual baselines were taken from.
+// /translate re-renders WordMeta into #word-meta after every completed
+// posList item and top-level field (ValueEnd), so a section shows
+// once it is complete; while streaming, the first section not ready yet
+// for the active POS tab shows its skeleton. Empty comments keep "2.",
+// "(noun)" and the character
+// line as separate text nodes: text runs shape per node, and merged runs
+// move glyphs by subpixels (the visual baselines show it).
+
+// SenseView is one posList[i].senses item.
+type SenseView struct {
+	Definition string   `json:"definition"`
+	Register   []string `json:"register"`
+	Examples   []string `json:"examples"`
+}
+
+// POSView is one posList item.
+type POSView struct {
+	Pos    string      `json:"pos"`
+	Senses []SenseView `json:"senses"`
+}
+
+// WordMetaView is the word result's dictionary fields received so far. T is
+// the UI string lookup for the request's UI language.
+type WordMetaView struct {
+	T          func(key string) string
+	Streaming  bool
+	POS        []POSView
+	Etymology  string
+	Notes      string
+	Grammar    string
+	Characters []learning.CharacterNote
+	Synonyms   []string
+}
+
+// CharacterLabelKey is the STRINGS key naming a word's characters, checked
+// in this order: Hangul → hanja, kana → kanji, Han → hanzi.
+func CharacterLabelKey(word string) string {
+	has := func(lo, hi rune) bool {
+		return strings.ContainsFunc(word, func(r rune) bool { return r >= lo && r <= hi })
+	}
+	switch {
+	case has(0xAC00, 0xD7AF):
+		return "hanja"
+	case has(0x3040, 0x30FF):
+		return "kanji"
+	case has(0x4E00, 0x9FFF):
+		return "hanzi"
+	}
+	return "characters"
+}
+
+// posVariant is what the dictionary renders for one active POS index. The
+// server cannot know the client's active tab, so it renders one variant
+// per POS; all but the first are mounted `hidden` and dictionary.js shows
+// the active one (the variants are direct children of .word-source-meta).
+type posVariant struct {
+	Index        int
+	Pos          *POSView
+	Primary      *SenseView
+	Within       []SenseView
+	Groups       []POSView
+	ReadyPrimary bool
+	ReadyOther   bool
+}
+
+func (v WordMetaView) variants() []posVariant {
+	out := []posVariant{{}}
+	if len(v.POS) > 0 {
+		out = make([]posVariant, len(v.POS))
+	}
+	for i := range v.POS {
+		p := &v.POS[i]
+		pv := posVariant{Index: i, Pos: p}
+		if len(p.Senses) > 0 {
+			pv.Primary = &p.Senses[0]
+			pv.Within = p.Senses[1:]
+		}
+		for j, g := range v.POS {
+			if j != i {
+				pv.Groups = append(pv.Groups, g)
+			}
+		}
+		pv.ReadyPrimary = pv.Primary != nil && pv.Primary.Definition != ""
+		pv.ReadyOther = len(pv.Within) > 0 || len(pv.Groups) > 0
+		out[i] = pv
+	}
+	return out
+}
+
+// ready is the per-section readiness with the first POS active; the
+// sections after the POS blocks do not depend on it.
+func (v WordMetaView) ready() map[string]bool {
+	return v.readyFor(v.variants()[0])
+}
+
+// readyFor is the per-section readiness with POS variant pv active.
+func (v WordMetaView) readyFor(pv posVariant) map[string]bool {
+	return map[string]bool{
+		"primary":    pv.ReadyPrimary,
+		"other":      pv.ReadyOther,
+		"etymology":  v.Etymology != "",
+		"notes":      v.Notes != "",
+		"grammar":    v.Grammar != "",
+		"characters": len(v.Characters) > 0,
+		"synonyms":   len(v.Synonyms) > 0,
+	}
+}
+
+var metaSectionOrder = []string{"primary", "other", "etymology", "grammar", "notes", "characters", "synonyms"}
+
+// shown is false when nothing is known and nothing streams: the dictionary
+// then renders nothing.
+func (v WordMetaView) shown() bool {
+	if v.Streaming || len(v.POS) > 0 {
+		return true
+	}
+	for _, ok := range v.ready() {
+		if ok {
+			return true
+		}
+	}
+	return false
+}
+
+// streamingKeyFor is the first section not ready yet while streaming, with
+// POS variant pv active: each tab shows the skeleton of its own next section.
+func (v WordMetaView) streamingKeyFor(pv posVariant) string {
+	if !v.Streaming {
+		return ""
+	}
+	ready := v.readyFor(pv)
+	for _, k := range metaSectionOrder {
+		if !ready[k] {
+			return k
+		}
+	}
+	return ""
+}
+
+// skeletonFor says where the skeleton of a section after the POS blocks
+// renders: once for every variant (shared, unmarked, the common case), or
+// marked for each variant whose next section it is.
+func (v WordMetaView) skeletonFor(key string) (shared bool, variants []int) {
+	all := v.variants()
+	for _, pv := range all {
+		if v.streamingKeyFor(pv) == key {
+			variants = append(variants, pv.Index)
+		}
+	}
+	return len(variants) == len(all), variants
+}
+
+// validNotes are the notes that are real character origins.
+func (v WordMetaView) validNotes() []learning.CharacterNote {
+	var out []learning.CharacterNote
+	for _, n := range v.Characters {
+		if n.Word != "" && learning.IsCharacterOrigin(n.Word, n.Chars) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func charsLine(chars []learning.CharNote) string {
+	parts := make([]string, len(chars))
+	for i, c := range chars {
+		parts[i] = c.Char + " (" + c.Meaning + ")"
+	}
+	return strings.Join(parts, " · ")
+}
+
+// PosTabs' class strings. dictionary.js swaps the same two strings
+// (TestPosTabClassesMatchDictionaryJS).
+const (
+	posTabOn  = "cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-accent/60 bg-accent-soft text-ink"
+	posTabOff = "cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition border-border bg-panel text-ink-soft hover:text-ink"
+)
+
+func posTabClass(active bool) string {
+	if active {
+		return posTabOn
+	}
+	return posTabOff
+}
+
+// variantAttrs mark a variant's blocks (data-pos, dictionary.js's hook);
+// inactive ones start hidden.
+func variantAttrs(i int) templ.Attributes {
+	a := templ.Attributes{"data-pos": strconv.Itoa(i)}
+	if i != 0 {
+		a["hidden"] = true
+	}
+	return a
+}
+
+// WordMeta is the word dictionary for the result received so far.
+templ WordMeta(v WordMetaView) {
+	if v.shown() {
+		<div class="word-source-meta shrink-0 py-4 text-sm text-ink-soft">
+			if len(v.POS) > 1 {
+				<div class="animate-settle mb-4 flex flex-wrap gap-1.5">
+					for i, p := range v.POS {
+						<button type="button" { templ.Attributes{"class": posTabClass(i == 0)}... }>{ p.Pos }</button>
+					}
+				</div>
+			}
+			for _, pv := range v.variants() {
+				@posBlocks(v, pv)
+			}
+			if v.ready()["etymology"] {
+				@textBlock(v, "etymology", v.Etymology)
+			}
+			@sectionSkeleton(v, "etymology")
+			if v.ready()["grammar"] {
+				@textBlock(v, "grammar", v.Grammar)
+			}
+			@sectionSkeleton(v, "grammar")
+			if v.ready()["characters"] {
+				@CharacterNotes(v.T, v.Characters)
+			}
+			@sectionSkeleton(v, "characters")
+			if v.ready()["notes"] {
+				@textBlock(v, "notes", v.Notes)
+			}
+			@sectionSkeleton(v, "notes")
+			if v.ready()["synonyms"] {
+				<div class="animate-settle">
+					<p class="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide" data-t="synonyms">{ v.T("synonyms") }</p>
+					<div class="flex flex-wrap gap-1.5">
+						for _, s := range v.Synonyms {
+							<button type="button" class="cursor-pointer rounded-full border border-border bg-panel px-2.5 py-0.5 text-xs text-ink-soft transition hover:border-accent/60 hover:text-ink disabled:cursor-default">{ s }</button>
+						}
+					</div>
+				</div>
+			}
+			if shared, variants := v.skeletonFor("synonyms"); shared {
+				@synonymsSkeleton(nil)
+			} else {
+				for _, i := range variants {
+					@synonymsSkeleton(variantAttrs(i))
+				}
+			}
+		</div>
+	}
+}
+
+// sectionSkeleton is the skeleton of a section after the POS blocks, where
+// skeletonFor places it.
+templ sectionSkeleton(v WordMetaView, key string) {
+	if shared, variants := v.skeletonFor(key); shared {
+		@skeletonBlock(v, key)
+	} else {
+		for _, i := range variants {
+			@skeletonBlockAttrs(v, key, variantAttrs(i))
+		}
+	}
+}
+
+templ synonymsSkeleton(attrs templ.Attributes) {
+	<div class="mb-3" { attrs... }>
+		<div class="animate-pulse space-y-2">
+			<div class="h-3 w-16 rounded bg-ink-dim/10"></div>
+			<div class="flex gap-1.5">
+				<div class="h-5 w-14 rounded-full bg-ink-dim/10"></div>
+				<div class="h-5 w-12 rounded-full bg-ink-dim/10"></div>
+				<div class="h-5 w-16 rounded-full bg-ink-dim/10"></div>
+			</div>
+		</div>
+	</div>
+}
+
+// posBlocks are the blocks that follow the active POS: PosLabel,
+// PrimaryBlock and OtherBlock with their skeletons.
+templ posBlocks(v WordMetaView, pv posVariant) {
+	if pv.Pos != nil {
+		<div class="animate-settle mb-3 flex items-baseline gap-2" style="animation-delay:30ms" { variantAttrs(pv.Index)... }>
+			<span class="dictionary-label text-xs font-semibold uppercase tracking-wide" data-t="pos">{ v.T("pos") }</span>
+			<span class="italic text-ink">{ pv.Pos.Pos }</span>
+		</div>
+	}
+	if pv.ReadyPrimary {
+		<div class="animate-settle mb-3" style="animation-delay:60ms" { variantAttrs(pv.Index)... }>
+			<p class="mb-1 dictionary-label text-xs font-semibold uppercase tracking-wide" data-t="primaryMeaning">{ v.T("primaryMeaning") }</p>
+			<p class="text-ink">{ pv.Primary.Definition }</p>
+			if len(pv.Primary.Register) > 0 {
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					for _, r := range pv.Primary.Register {
+						@ui.Tag("neutral") {
+							{ r }
+						}
+					}
+				</div>
+			}
+			if len(pv.Primary.Examples) > 0 {
+				<ul class="mt-2 space-y-1 pl-4">
+					for _, ex := range pv.Primary.Examples {
+						<li class="text-ink-soft before:mr-2 before:text-ink-dim before:content-['•']">{ ex }</li>
+					}
+				</ul>
+			}
+		</div>
+	}
+	if v.streamingKeyFor(pv) == "primary" {
+		@skeletonBlockAttrs(v, "primaryMeaning", variantAttrs(pv.Index))
+	}
+	if pv.ReadyOther {
+		<div class="animate-settle mb-3" { variantAttrs(pv.Index)... }>
+			<p class="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide" data-t="otherMeanings">{ v.T("otherMeanings") }</p>
+			<ol class="space-y-2 pl-4">
+				for i, s := range pv.Within {
+					<li class="text-ink">
+						<span class="mr-2 text-ink-dim">{ strconv.Itoa(i + 2) }<!-- -->.</span>{ s.Definition }
+						if len(s.Examples) > 0 {
+							<ul class="mt-1 space-y-0.5 pl-4">
+								for _, ex := range s.Examples {
+									<li class="text-ink-soft text-[13px] before:mr-2 before:text-ink-dim before:content-['•']">{ ex }</li>
+								}
+							</ul>
+						}
+					</li>
+				}
+				for _, g := range pv.Groups {
+					for _, s := range g.Senses {
+						<li class="text-ink">
+							<span class="mr-2 text-ink-dim">(<!-- -->{ g.Pos }<!-- -->)</span>{ s.Definition }
+						</li>
+					}
+				}
+			</ol>
+		</div>
+	}
+	if v.streamingKeyFor(pv) == "other" {
+		@skeletonBlockAttrs(v, "otherMeanings", variantAttrs(pv.Index))
+	}
+}
+
+templ textBlock(v WordMetaView, key, text string) {
+	<div class="animate-settle mb-3">
+		<p class="mb-1 dictionary-label text-xs font-semibold uppercase tracking-wide" data-t={ key }>{ v.T(key) }</p>
+		<p class="text-ink">{ text }</p>
+	</div>
+}
+
+templ skeletonBlock(v WordMetaView, key string) {
+	@skeletonBlockAttrs(v, key, nil)
+}
+
+templ skeletonBlockAttrs(v WordMetaView, key string, attrs templ.Attributes) {
+	<div class="mb-3" { attrs... }>
+		<p class="mb-1.5 dictionary-label text-xs font-semibold uppercase tracking-wide" data-t={ key }>{ v.T(key) }</p>
+		<div class="animate-pulse space-y-2">
+			<div class="h-4 w-full rounded bg-ink-dim/10"></div>
+			<div class="h-3 w-3/4 rounded bg-ink-dim/10"></div>
+		</div>
+	</div>
+}
+
+// CharacterNotes lists character origins: only notes that validate as
+// real character origins, labelled by the first one's script.
+templ CharacterNotes(t func(string) string, characters []learning.CharacterNote) {
+	if notes := (WordMetaView{Characters: characters}).validNotes(); len(notes) > 0 {
+		<div class="character-notes">
+			<p class="dictionary-label" data-t={ CharacterLabelKey(notes[0].Word) }>{ t(CharacterLabelKey(notes[0].Word)) }</p>
+			for _, n := range notes {
+				<p><strong class="text-warm">{ n.Word }</strong>{ " " }<!-- -->{ charsLine(n.Chars) }</p>
+			}
+		</div>
+	}
+}

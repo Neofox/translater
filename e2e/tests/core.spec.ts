@@ -33,7 +33,6 @@ import {
 } from './helpers'
 import type { Fake, StringKey, UiLang } from './helpers'
 import type { Page } from '@playwright/test'
-import { APP } from '../ports'
 
 // A run that starts within this window after a paste / blur / Cmd+Enter was
 // not waiting for the 800ms debounce. Each timing test also checks the
@@ -51,7 +50,7 @@ async function stopStream(page: Page, fake: Fake, abortedBefore: number) {
   await waitForStats(fake, (s) => s.aborted > abortedBefore, 5_000)
 }
 
-test('streams main then details @core', async ({ page, fake }) => {
+test('streams main then details @core @engine', async ({ page, fake }) => {
   const fx = fixture('stream')
   const main = fx.result.main!
   await recordResult(page)
@@ -76,7 +75,10 @@ test('streams main then details @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('copy enables at main-ready before done @core', async ({ page, fake }) => {
+test('copy enables at main-ready before done @core @engine', async ({
+  page,
+  fake,
+}) => {
   const fx = fixture('slow')
   const main = fx.result.main!
   await fillSource(page, sentence('slow'))
@@ -92,12 +94,49 @@ test('copy enables at main-ready before done @core', async ({ page, fake }) => {
   await stopStream(page, fake, 0)
 })
 
+test('Copy confirms visibly with a violet check, then reverts @core', async ({
+  page,
+}) => {
+  const fx = fixture('plain')
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, fx.result.main!)
+  await waitForDone(page)
+  const accent = await page.evaluate(() =>
+    getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-accent')
+      .trim(),
+  )
+  const rgb = (hex: string) =>
+    `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`
+  for (const copy of [
+    copyButton(page),
+    page.getByTestId('alternative-item').first().getByTestId('copy-button'),
+  ]) {
+    const check = copy.locator('svg.lucide-check')
+    await expect(check).toBeHidden()
+    await copy.click()
+    // The icon becomes a violet check and the name says Copied.
+    await expect(check).toBeVisible()
+    await expect(copy.locator('svg.lucide-copy')).toBeHidden()
+    await expect(check).toHaveCSS('color', rgb(accent))
+    await expect(copy).toHaveAttribute('aria-label', STRINGS.en.copied)
+    // Announced politely, beyond the focused button's name.
+    await expect(
+      page.getByRole('status').filter({ hasText: STRINGS.en.copied }),
+    ).toHaveCount(1)
+    // Back to Copy after about 1.5 s.
+    await expect(check).toBeHidden({ timeout: 3_000 })
+    await expect(copy.locator('svg.lucide-copy')).toBeVisible()
+    await expect(copy).toHaveAttribute('aria-label', STRINGS.en.copy)
+  }
+})
+
 test('swap button shows the busy spinner while streaming @core', async ({
   page,
   fake,
 }) => {
   const swap = page.locator('.swap-button')
-  // TS renders one of the two icons; Go keeps both and hides one.
+  // Both icons stay mounted; the idle one is hidden.
   const icon = (name: 'swap' | 'busy') =>
     swap.locator(
       name === 'busy' ? '.lucide-loader-circle' : '.lucide-arrow-right-left',
@@ -140,14 +179,13 @@ test('streaming status names polishing for same-language input @core', async ({
   await stopStream(page, fake, 1)
 })
 
-test('stale result disables copy @core', async ({ page, fake }) => {
+test('stale result disables copy @core @engine', async ({ page, fake }) => {
   await fillSource(page, sentence('plain'))
   await waitForMain(page, fixture('plain').result.main!)
   await waitForDone(page)
   await expect(copyButton(page)).toBeEnabled()
 
   await recordResult(page)
-  const old = fixture('slow').result.main!
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
@@ -163,7 +201,7 @@ test('stale result disables copy @core', async ({ page, fake }) => {
     if (entry.copy) expect(entry.text).toBe(second)
 })
 
-test('paste runs immediately @core', async ({ page, fake }) => {
+test('paste runs immediately @core @engine', async ({ page, fake }) => {
   const text = sentence('plain')
   await source(page).click()
   await writeClipboard(page, text)
@@ -176,7 +214,7 @@ test('paste runs immediately @core', async ({ page, fake }) => {
   await waitForDone(page)
 })
 
-test('blur flushes @core', async ({ page, fake }) => {
+test('blur flushes @core @engine', async ({ page, fake }) => {
   await typeSource(page, sentence('plain'))
   const typedAt = Date.now()
   await page.waitForTimeout(150)
@@ -192,7 +230,7 @@ test('blur flushes @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('cmd+enter forces @core', async ({ page, fake }) => {
+test('cmd+enter forces @core @engine', async ({ page, fake }) => {
   const text = sentence('plain')
   await typeSource(page, text)
   await page.waitForTimeout(150)
@@ -206,15 +244,10 @@ test('cmd+enter forces @core', async ({ page, fake }) => {
   await waitForDone(page)
 })
 
-test('cmd+enter replaces the pending debounce @core', async ({
+test('cmd+enter replaces the pending debounce @core @engine', async ({
   page,
   fake,
 }) => {
-  test.fail(
-    APP === 'ts',
-    'TS app bug: the forced run leaves the 800ms debounce timer armed, which ' +
-      'then aborts the forced run and sends a second, paid request.',
-  )
   await typeSource(page, sentence('plain'))
   await page.keyboard.press('ControlOrMeta+Enter')
   await waitForStats(fake, (s) => s.requests >= 1, 5_000)
@@ -224,7 +257,7 @@ test('cmd+enter replaces the pending debounce @core', async ({
   expect(await fake.stats()).toMatchObject({ requests: 1, aborted: 0 })
 })
 
-test('enter inserts newline @core', async ({ page, fake }) => {
+test('enter inserts newline @core @engine', async ({ page, fake }) => {
   const first = sentence('plain')
   await typeSource(page, first)
   await page.keyboard.press('Enter')
@@ -241,7 +274,10 @@ test('enter inserts newline @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('editing mid-stream cancels upstream @core', async ({ page, fake }) => {
+test('editing mid-stream cancels upstream @core @engine', async ({
+  page,
+  fake,
+}) => {
   await fillSource(page, sentence('slow'))
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
   const before = await fake.stats()
@@ -257,7 +293,30 @@ test('editing mid-stream cancels upstream @core', async ({ page, fake }) => {
   expect(after.aborted).toBe(1)
 })
 
-test('repeat is served from cache @core', async ({ page, fake }) => {
+test('a run stopped mid-alternatives keeps its completed rows and drops the skeleton @core @engine', async ({
+  page,
+  fake,
+}) => {
+  // skeleton.json hangs inside alternatives[1].text.
+  await fillSource(page, sentence('skeleton'))
+  await expect(page.locator('.alternative-skeleton')).toHaveCount(1, {
+    timeout: 20_000,
+  })
+  await expect(page.getByTestId('alternative-item')).toHaveCount(1)
+  const before = await fake.stats()
+  // An edit stops the run at once; read the result before its debounced
+  // re-run replaces it.
+  await source(page).press('End')
+  await page.keyboard.type('x')
+  const shown = await page.evaluate(() => ({
+    skeletons: document.querySelectorAll('.alternative-skeleton').length,
+    rows: document.querySelectorAll('[data-testid="alternative-item"]').length,
+  }))
+  expect(shown).toEqual({ skeletons: 0, rows: 1 })
+  await stopStream(page, fake, before.aborted)
+})
+
+test('repeat is served from cache @core @engine', async ({ page, fake }) => {
   const text = sentence('plain')
   const main = fixture('plain').result.main!
   await fillSource(page, text)
@@ -299,7 +358,7 @@ async function expectLocalizedErrors(
   expect(await fake.requests()).toBe(kinds.length * 2)
 }
 
-test('provider error is localized and not retried @core', async ({
+test('provider error is localized and not retried @core @engine', async ({
   page,
   fake,
 }) => {
@@ -308,14 +367,7 @@ test('provider error is localized and not retried @core', async ({
   ])
 })
 
-test('error kinds are localized @core', async ({ page, fake }) => {
-  test.fail(
-    APP === 'ts',
-    'TS app bug: on the streaming path the AI SDK surfaces upstream HTTP ' +
-      'errors as NoOutputGeneratedError without a cause, so ' +
-      'classifyTranslationError returns "provider" and every kind shows ' +
-      '"Translation failed."',
-  )
+test('error kinds are localized @core @engine', async ({ page, fake }) => {
   await expectLocalizedErrors(page, fake, [
     ['error-budget', 'providerBudgetUnavailable'],
     ['error-rate', 'providerRateLimited'],
@@ -373,7 +425,7 @@ test('textarea survives streaming and UI language switch @core', async ({
   })
 })
 
-test('preferences persist @core', async ({ page, context }) => {
+test('preferences persist @core @engine', async ({ page, context }) => {
   await setTone(page, 'professional')
   await expectTone(page, 'professional')
   await pickLanguage(page, 'target', 'en')
@@ -423,7 +475,7 @@ test('more languages listbox @core', async ({ page }) => {
   await expectLanguage(page, 'target', 'fr')
 })
 
-test('markup renders as text @core', async ({ page }) => {
+test('markup renders as text @core @engine', async ({ page }) => {
   const dialogs: string[] = []
   page.on('dialog', (dialog) => {
     dialogs.push(dialog.message())
@@ -446,18 +498,12 @@ test('markup renders as text @core', async ({ page }) => {
   expect(dialogs).toEqual([])
 })
 
-test('IME composition is not interrupted @core', async ({
+test('IME composition is not interrupted @core @engine', async ({
   page,
   fake,
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'CDP IME emulation is Chromium-only')
-  test.fail(
-    APP === 'ts',
-    'TS app bug: every composition update changes the controlled value, so ' +
-      'the debounce fires a paid run on partial jamo while the user is ' +
-      'still composing.',
-  )
   const first = sentence('slow')
   await fillSource(page, first)
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
@@ -503,7 +549,7 @@ test('IME composition is not interrupted @core', async ({
   await stopStream(page, fake, (await fake.stats()).aborted)
 })
 
-test('late events from a superseded run are ignored @core', async ({
+test('late events from a superseded run are ignored @core @engine', async ({
   page,
   fake,
 }) => {
@@ -520,7 +566,6 @@ test('late events from a superseded run are ignored @core', async ({
         once: true,
       })
   })
-  const old = fixture('slow').result.main!
   const second = fixture('second').result.main!
   await fillSource(page, sentence('second'))
   await expect(copyButton(page)).toBeDisabled()
@@ -538,17 +583,9 @@ test('late events from a superseded run are ignored @core', async ({
   expect(start).toBeGreaterThanOrEqual(0)
   for (let i = 0; i < start; i++) {
     expect(log[i]!.copy).toBe(false)
-    if (APP === 'go') {
-      // Go freezes an aborted main.
-      if (i > 0)
-        expect(log[i]!.text!.length).toBeLessThanOrEqual(
-          log[i - 1]!.text!.length,
-        )
-    } else {
-      // TS reveals the already-received rest of the current interpolation
-      // burst on abort: growth is fine, but only with the old run's text.
-      expect(old.startsWith(log[i]!.text ?? '')).toBe(true)
-    }
+    // An aborted main freezes.
+    if (i > 0)
+      expect(log[i]!.text!.length).toBeLessThanOrEqual(log[i - 1]!.text!.length)
   }
   for (const entry of log.slice(start)) {
     expect(second.startsWith(entry.text ?? '')).toBe(true)
@@ -557,11 +594,10 @@ test('late events from a superseded run are ignored @core', async ({
   expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
 })
 
-test('stale events of a superseded run cannot touch the result @core', async ({
+test('stale events of a superseded run cannot touch the result @core @engine', async ({
   page,
   fake,
 }) => {
-  test.skip(APP === 'ts', "Dispatches the Go app's nt-* DOM events directly")
   const runInput = page.locator('#translate-form [name="run"]')
   await fillSource(page, sentence('slow'))
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
@@ -627,7 +663,7 @@ test('stale events of a superseded run cannot touch the result @core', async ({
   expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
 })
 
-test('word input uses word intent @core', async ({ page, fake }) => {
+test('word input uses word intent @core @engine', async ({ page, fake }) => {
   const fx = fixture('word')
   // `thanks` plus the fixture marker (the fake needs it to answer with a word
   // result) and a nonce glued on, so detectIntent still sees two tokens.
@@ -642,7 +678,10 @@ test('word input uses word intent @core', async ({ page, fake }) => {
   expect(userText(bodies[0]!)).toContain(text)
 })
 
-test('long-form input hides alternatives @core', async ({ page, fake }) => {
+test('long-form input hides alternatives @core @engine', async ({
+  page,
+  fake,
+}) => {
   const fx = fixture('longform')
   await fillSource(
     page,
@@ -652,8 +691,8 @@ test('long-form input hides alternatives @core', async ({ page, fake }) => {
   await waitForDone(page)
   await expect(page.locator('.alternative-item')).toHaveCount(0)
   await expect(page.locator('.detail-alternatives')).toBeHidden()
-  // TS unmounts the section; a mounted copy must sit under `hidden`, which
-  // the DOM snapshot treats as absent (not merely hidden by a CSS rule).
+  // The section stays mounted under `hidden`, which the DOM snapshot treats
+  // as absent (not merely hidden by a CSS rule).
   expect(
     await page.evaluate(
       () =>
@@ -665,7 +704,7 @@ test('long-form input hides alternatives @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('a short sentence without alternatives mounts no alternatives section @core', async ({
+test('a short sentence without alternatives mounts no alternatives section @core @engine', async ({
   page,
 }) => {
   // learn-long's reply has no alternatives; a short single sentence is not
@@ -691,7 +730,10 @@ test('a short sentence without alternatives mounts no alternatives section @core
   await expect(page.locator('.alternative-item')).toHaveCount(2)
 })
 
-test('retry re-runs a failed translation @core', async ({ page, fake }) => {
+test('retry re-runs a failed translation @core @engine', async ({
+  page,
+  fake,
+}) => {
   await fillSource(page, sentence('error-provider'))
   const alert = page.getByRole('alert')
   await expect(alert).toBeVisible({ timeout: 20_000 })
@@ -732,7 +774,9 @@ test('swap uses the translated text when the result is current @core', async ({
   if (bodies.length > 1) expect(userText(bodies[1]!)).toContain(main)
 })
 
-test('register label names the Korean speech level @core', async ({ page }) => {
+test('register label names the Korean speech level @core @engine', async ({
+  page,
+}) => {
   await pickLanguage(page, 'target', 'ko')
   await setTone(page, 'casual')
   await fillSource(page, sentence('plain'))
@@ -748,7 +792,7 @@ test('register label names the Korean speech level @core', async ({ page }) => {
   await expect(tag).toHaveText('반말', { timeout: 20_000 })
 })
 
-test('streaming deltas stay urgent and only completion starts a result transition @core', async ({
+test('streaming deltas stay urgent and only completion starts a result transition @core @engine', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -765,10 +809,10 @@ test('streaming deltas stay urgent and only completion starts a result transitio
     }
   })
   // The first half needs motion allowed whatever the project emulates
-  // (webkit-portrait runs with reduced motion, where Go starts none).
+  // (webkit-portrait runs with reduced motion, where none starts).
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openApp(page)
-  // React's hydration may start one transition of its own; count from here.
+  // Count from here.
   await page.evaluate(() => {
     ;(window as unknown as { __transitions: number }).__transitions = 0
   })
@@ -786,16 +830,62 @@ test('streaming deltas stay urgent and only completion starts a result transitio
   await waitForDone(page)
   await expect.poll(transitions).toBe(supported ? 1 : 0)
 
-  // Reduced motion: Go starts no transition. React still starts one and
-  // base.css cancels its animation; neither animates.
+  // Reduced motion: no transition starts.
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await fillSource(page, sentence('plain'))
   await waitForMain(page, fixture('plain').result.main!)
   await waitForDone(page)
-  expect(await transitions()).toBe(supported ? (APP === 'ts' ? 2 : 1) : 0)
+  expect(await transitions()).toBe(supported ? 1 : 0)
 })
 
-test('input over the limit shows a local error without a request @core', async ({
+/** Switch the UI language to Korean and read the result error at once,
+ * before the debounced re-run of the current text can replace it. */
+async function errorTextAfterKorean(page: Page): Promise<string> {
+  await page.getByTestId('settings-button').click()
+  const group = page.getByRole('group', { name: 'UI language' })
+  await expect(group).toBeVisible()
+  const text = await group.evaluate((el) => {
+    ;(el.querySelectorAll('button')[1] as HTMLButtonElement).click()
+    return document.getElementById('result-error')!.innerText
+  })
+  await page.getByTestId('settings-button').click()
+  return text
+}
+
+test('a shown error follows a UI language switch at once @core @engine', async ({
+  page,
+}) => {
+  await fillSource(
+    page,
+    `Please translate this sentence ${fixture('error-provider').match} ${nonce()}`,
+  )
+  const alert = translationResult(page).getByRole('alert')
+  await expect(alert).toContainText(STRINGS.en.translationFailed)
+  const server = await errorTextAfterKorean(page)
+  for (const key of [
+    'translationFailedTitle',
+    'translationFailed',
+    'errorEnvHint',
+    'retry',
+  ] as const)
+    expect(server).toContain(STRINGS.ko[key])
+
+  // A local input error keeps its counts.
+  await page.getByTestId('clear-input').click()
+  await setUiLang(page, 'en')
+  const text = 'How are you doing today? '.repeat(161).trim()
+  await fillSource(page, text)
+  await expect(alert).toContainText(STRINGS.en.inputTooLong)
+  const input = await errorTextAfterKorean(page)
+  expect(input).toContain(STRINGS.ko.inputTooLong)
+  expect(input).toContain(
+    STRINGS.ko.inputTooLongHint
+      .replace('{max}', '4000')
+      .replace('{count}', String(text.length)),
+  )
+})
+
+test('input over the limit shows a local error without a request @core @engine', async ({
   page,
   fake,
 }) => {

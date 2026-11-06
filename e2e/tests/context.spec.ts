@@ -1,7 +1,7 @@
-// Reply context (@context): ContextField.tsx's toggle and field, kept in
+// Reply context (@context): the context toggle and field, kept in
 // sessionStorage for the tab and sent with every run. Also the header's
-// Settings popover and the More… language menus (SettingsMenu.tsx,
-// Select.tsx and their floatingPanelBoundary placement).
+// Settings popover and the More… language listboxes, with their popup
+// placement inside segmented layouts (float.js).
 import type { Locator, Page } from '@playwright/test'
 import {
   expect,
@@ -14,21 +14,9 @@ import {
   waitForDone,
   waitForStats,
 } from './helpers'
-import { APP, TS_BUILD } from '../ports'
 
 const toggle = (page: Page) => page.getByTestId('context-toggle')
 const field = (page: Page) => page.getByTestId('context-textarea')
-
-/** Found here: under `vite dev` the TS app loses the reply context. A
- * typed context resets to empty (useStoredState's late storage read wins
- * over the edit) and is not reopened after a reload. Its production build
- * behaves, so the TS side of these tests needs E2E_TS_BUILD=prod. */
-function skipTsDev(): void {
-  test.skip(
-    APP === 'ts' && TS_BUILD === 'dev',
-    'TS dev server loses nt.context; use E2E_TS_BUILD=prod',
-  )
-}
 
 async function openContext(page: Page): Promise<void> {
   await toggle(page).click()
@@ -40,7 +28,7 @@ test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
 
-test('toggle opens the context textarea and typing persists to sessionStorage @context', async ({
+test('toggle opens the context textarea and typing persists to sessionStorage @context @engine', async ({
   page,
 }) => {
   await expect(field(page)).toBeHidden()
@@ -60,7 +48,7 @@ test('toggle opens the context textarea and typing persists to sessionStorage @c
   await expect(field(page)).toHaveValue('hi')
 })
 
-test('clear empties the context and keeps the field open @context', async ({
+test('clear empties the context and keeps the field open @context @engine', async ({
   page,
 }) => {
   await openContext(page)
@@ -74,7 +62,7 @@ test('clear empties the context and keeps the field open @context', async ({
   )
 })
 
-test('context is sent with the run and edits re-run @context', async ({
+test('context is sent with the run and edits re-run @context @engine', async ({
   page,
   fake,
 }) => {
@@ -98,10 +86,9 @@ test('context is sent with the run and edits re-run @context', async ({
   expect(body).toContain('Are you free for dinner tonight?')
 })
 
-test('context is restored after a reload in the same tab @context', async ({
+test('context is restored after a reload in the same tab @context @engine', async ({
   page,
 }) => {
-  skipTsDev()
   await openContext(page)
   await field(page).fill('See you at the station.')
   await page.reload({ waitUntil: 'networkidle' })
@@ -115,20 +102,11 @@ test('context is restored after a reload in the same tab @context', async ({
 test('Clear input preserves the context and focuses the source @context', async ({
   page,
 }) => {
-  skipTsDev()
-  // Intermittent on the TS production build too (6 of 18 projects in the
-  // Task 32 sign-off): the reply-context loss the user chose to leave in the
-  // TS app. test.fail would break whenever it happens to pass.
-  test.skip(
-    APP === 'ts',
-    'TS app bug: reply context is sometimes lost before Clear (kept by user decision)',
-  )
   // Source first: short split panes give the open context field the room.
   await fillSource(page, sentence('default'))
   await openContext(page)
   await field(page).fill('Thanks for yesterday.')
-  // The context state has settled (a Clear racing the edit lost it once on
-  // TS prod).
+  // The context state has settled before Clear.
   await expect
     .poll(() => page.evaluate(() => sessionStorage.getItem('nt.context')))
     .toBe('"Thanks for yesterday."')
@@ -209,7 +187,7 @@ test('makes UI language available in settings and persists an explicit choice @c
   await trigger.click()
   await expect(group).toBeVisible()
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  // While open, the trigger controls the dialog (useRole).
+  // While open, the trigger controls the dialog via aria-controls.
   const controls = await trigger.getAttribute('aria-controls')
   expect(controls).toBeTruthy()
   await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute(
@@ -320,7 +298,7 @@ async function checkPopups(page: Page): Promise<void> {
 }
 
 /** A listbox wider than the room right of its trigger must stay inside the
- * pane's padding box (Floating UI's clipping rect for the boundary) minus
+ * pane's padding box (the clipping rect of the boundary pane) minus
  * 8 px: flip tries the end alignment, shift clamps. Clipped by the
  * viewport alone it would overhang the pane. The
  * source pane is the left one in split and book layouts. */
@@ -507,7 +485,7 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
       all.map((o) => o.getAttribute('tabindex')).join(','),
     )
   /** Escape closes the list and focus returns to the trigger, also from a
-   * focused option (Floating UI's returnFocus). */
+   * focused option. */
   const close = async () => {
     await page.keyboard.press('Escape')
     await expect(trigger).toHaveAttribute('aria-expanded', 'false')
@@ -526,8 +504,7 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
     )
   // Enter, Space and ArrowDown on the trigger make the first option active
   // (focus stays on the list), ArrowUp the last; ArrowDown from the list
-  // then activates the first option. (TS leaves focus on the list when the
-  // first option is already active; Go focuses it.)
+  // then activates and focuses the first option.
   for (const [key, stops] of [
     ['Enter', '0,-1,-1,-1,-1'],
     [' ', '0,-1,-1,-1,-1'],
@@ -544,8 +521,7 @@ test('language menu keyboard: opening keys, Home/End, roving focus, hover, Tab o
       .toBe(
         stops.replaceAll('-1', 'x').replaceAll('0', '1').replaceAll('x', '0'),
       )
-    // Escape from a focused option (Go focuses it here; TS may keep the
-    // list focused when the first option is already active).
+    // Escape from a focused option.
     await page.keyboard.press('ArrowDown')
     await expect.poll(tabStops, key).toBe('0,-1,-1,-1,-1')
     await close()

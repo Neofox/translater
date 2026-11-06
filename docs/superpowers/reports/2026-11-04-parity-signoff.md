@@ -546,6 +546,8 @@ The suite marks these TS behaviours with `test.fail(APP === 'ts', …)` or a TS-
 
 These are not Go-vs-TS differences: both apps behave the same, and the user chose to keep them (2026-11-04) or they were reported as follow-up candidates for both apps.
 
+Resolved on 2026-11-05 in the Go app (branch `chore/remove-ts`, after the TS app was removed): Escape now clears the source only from the source or the page itself, and the mobile learning surface claims Escape wherever focus is; the Adjust panel is placed relative to its trigger in any containing block. The section 4 entries for an aborted run's alternative skeleton, error relabelling, whitespace-only edits and the dictionary skeleton were changed on the same branch; the remaining section 4 menu and motion behaviours are recorded as intended in `AGENTS.md`.
+
 - Escape clears the source when focus is outside an open Adjust panel or the mobile learning surface (TS `useTranslatorShortcuts` window listener). With touch, Escape first closes Adjust and then clears the source. On WebKit, a pointer tap does not focus Close or the rows, so a page-wide Escape clears the source while the mobile surface is open (iPad + hardware keyboard). (Tasks 21/26)
 - The Adjust floating panel is offset by the header's left edge on very wide screens (Floating UI containing block). (Task 26)
 - TS reply-context loss under `vite dev` (and about 1 in 12 in prod): a pre-existing TS bug, reported, not fixed. (Task 14b)

@@ -1,0 +1,278 @@
+// Translator page entry: state, routing and runs. Runs are htmx requests of
+// #translate-form (hx-trigger="nt-run", hx-sync="this:replace"); the form
+// holds only hidden inputs, so the textarea is never part of any swap.
+
+import {
+  detectIntent,
+  detectLanguage,
+  fallbackTargetFor,
+  initComposer,
+  resolveTarget,
+  routingDetected,
+  typedBeforeInit,
+} from './composer.js'
+import { initContext } from './context.js'
+import { initCopy, requestKey } from './copy.js'
+import { initDictionary } from './dictionary.js'
+import { initLayout } from './layout.js'
+import { initLearning } from './learning.js'
+import { initPrefs } from './prefs.js'
+import { initRefine } from './refine.js'
+import { initSpeech } from './speech.js'
+import { initStream } from './stream.js'
+
+const data = JSON.parse(document.getElementById('nt-data').textContent)
+const form = document.getElementById('translate-form')
+const ta = document.querySelector('[data-testid="input-textarea"]')
+const VALID_DETECTED = ['en', 'ko', 'ja', 'fr', 'es', 'zh']
+const REGISTER = { friends: '반말', casual: '해요체', professional: '존댓말' }
+
+let composer, stream, copy, prefs, dictionary, speech
+// The model's report for an exact input, kept while that input stays.
+let modelDetected = null
+// Input for which the done-time safety net already flipped the target.
+let flipGuard = null
+// Run analytics, sent to Langfuse only: a per-page id
+// (memory only, never a durable user id), the input revision, and the run a
+// new run replaces. Never part of the request key.
+const analyticsSessionId = crypto.randomUUID()
+let inputRevision = ta.value.trim() ? 1 : 0
+let revisedText = ta.value
+let supersededRun = null
+
+const app = {
+  prefs: data.prefs,
+  /** The current run: { run, key, detected (its routing language), text,
+   * input (the exact textarea value sent), intent, source, target, raw,
+   * main, mainReady, done, error, aborted, sourceLang, headword, rationale,
+   * formality, register, learning }. */
+  live: null,
+  pending: false,
+  t: (key) => data.strings[app.prefs.uiLang]?.[key] ?? data.strings.en[key] ?? key,
+  streaming: () => Boolean(app.pending && app.live && !app.live.done && !app.live.aborted),
+  /** The raw reply context (context.js). */
+  context: () => '',
+  refinements: () => [],
+
+  detected() {
+    if (app.prefs.source !== 'auto') return null
+    const trimmed = ta.value.trim()
+    if (!trimmed) return null
+    const live = app.live
+    if (live && live.text === trimmed && live.source === 'auto' && VALID_DETECTED.includes(live.sourceLang))
+      return live.sourceLang
+    if (modelDetected?.text === trimmed) return modelDetected.lang
+    return detectLanguage(trimmed)
+  },
+  routingDetected: () =>
+    routingDetected({ source: app.prefs.source, text: ta.value, live: app.live, model: modelDetected }),
+  translationTarget() {
+    const { source, target } = app.prefs
+    const detected = flipGuard === ta.value.trim() ? null : app.routingDetected()
+    return resolveTarget({ source, target, detected })
+  },
+  currentKey() {
+    const { source, mode, uiLang } = app.prefs
+    return requestKey({
+      text: ta.value, source, target: app.translationTarget(), mode,
+      context: app.context(), refinements: app.refinements(), uiLang,
+    })
+  },
+
+  /** Auto source: keep the target away from the detected language. */
+  autoSwap() {
+    if (!ta.value.trim() || app.prefs.source !== 'auto' || !app.routingDetected()) return
+    const target = app.translationTarget()
+    if (target !== app.prefs.target) prefs.set('target', target, { quiet: true })
+  },
+
+  /** Stop the in-flight run; its late events are ignored from now on. The
+   * next run reports that it supersedes it. */
+  abort() {
+    if (!app.pending) return
+    app.pending = false
+    if (app.live) supersededRun = app.live.run
+    if (app.live) app.live.aborted = true
+    htmx.trigger(form, 'htmx:abort')
+    stream.stop()
+  },
+
+  inputChanged() {
+    app.abort()
+    speech.reset()
+    app.refine.edited()
+    if (ta.value !== revisedText) {
+      revisedText = ta.value
+      inputRevision += 1
+    }
+    const trimmed = ta.value.trim()
+    if (flipGuard !== trimmed) flipGuard = null
+    if (!trimmed) {
+      supersededRun = null
+      app.live = null
+      stream.clear()
+    }
+    app.autoSwap()
+    prefs.syncDetected()
+    updateCount()
+    app.updateActions()
+  },
+
+  /** Tone, languages or UI language changed: abort and re-run debounced. A
+   * shown error follows the UI language at once. */
+  settingsChanged() {
+    app.abort()
+    stream.renderError()
+    speech.reset()
+    app.autoSwap()
+    updateCount()
+    app.updateActions()
+    composer.schedule()
+  },
+
+  /** Start a run now; `trigger` says why (debounce, paste, blur, force…). */
+  run(trigger = 'force') {
+    const text = ta.value
+    const trimmed = text.trim()
+    if (!trimmed) return
+    app.abort()
+    speech.reset()
+    composer.clearTimer()
+    const { source, mode, uiLang } = app.prefs
+    const target = app.translationTarget()
+    const intent = detectIntent(text)
+    const live = {
+      run: crypto.randomUUID(), key: app.currentKey(), detected: app.routingDetected(),
+      text: trimmed, input: text, intent, source, target,
+      raw: '', main: undefined, mainReady: false, done: false, error: null, aborted: false,
+      sourceLang: null, headword: '', rationale: '', formality: '',
+      // Set from the model's targetLang (nt-target-lang), not the selection.
+      mode, targetLang: null, register: '',
+    }
+    app.live = live
+    if (trimmed.length > data.limits.maxInputChars) {
+      stream.start(live)
+      stream.showError({
+        key: 'inputTooLong',
+        hint: { key: 'inputTooLongHint', vars: { max: data.limits.maxInputChars, count: trimmed.length } },
+      })
+      return
+    }
+    // The server trims the prompt text; learning ranges use the raw value.
+    const values = {
+      run: live.run, text, source, target, mode, intent, uiLang,
+      context: app.context(),
+      analyticsSessionId, supersedesRunId: supersededRun ?? '', inputRevision, trigger,
+    }
+    supersededRun = null
+    for (const [name, value] of Object.entries(values))
+      if (form.elements[name]) form.elements[name].value = value
+    app.refine.fill()
+    app.pending = true
+    stream.start(live)
+    htmx.trigger(form, 'nt-run')
+  },
+
+  /** The model named the output language of the current run: the output
+   * panel's register label needs a reported Korean sentence. */
+  targetReported(live) {
+    live.register = live.intent === 'sentence' && live.targetLang === 'ko' ? REGISTER[live.mode] : ''
+  },
+
+  /** The model named the source language of the current run. */
+  sourceReported(live) {
+    if (live.source !== 'auto' || !VALID_DETECTED.includes(live.sourceLang)) return
+    const same = modelDetected?.text === live.text && modelDetected.lang === live.sourceLang
+    if (!same) modelDetected = { text: live.text, lang: live.sourceLang }
+    prefs.syncDetected()
+  },
+
+  /** Safety net: the model says the source IS the target; flip once. */
+  sourceDone(live) {
+    if (live.source !== 'auto' || app.prefs.source !== 'auto' || live.text !== ta.value.trim()) return
+    const reported = live.sourceLang
+    if (!VALID_DETECTED.includes(reported) || reported !== app.prefs.target || flipGuard === live.text) return
+    flipGuard = live.text
+    prefs.set('target', fallbackTargetFor(reported))
+  },
+
+  updateActions() {
+    copy.updateActions()
+    speech?.sync()
+    app.learning?.sync()
+    dictionary?.sync()
+    app.refine?.sync()
+  },
+  copyMain: () => copy.copyMain(),
+  stopSpeech: () => speech.reset(),
+  warm: () => fetch('/warm', { method: 'POST' }).catch(() => {}),
+  setSwapBusy(busy) {
+    const button = document.querySelector('.swap-button')
+    if (!button) return
+    // The icons are <svg>: SVGElement has no `hidden` property.
+    button.querySelector('[data-icon="swap"]').toggleAttribute('hidden', busy)
+    button.querySelector('[data-icon="busy"]').toggleAttribute('hidden', !busy)
+  },
+}
+
+function updateCount() {
+  const length = ta.value.length
+  const max = data.limits.maxInputChars
+  const show = length >= max * data.limits.inputWarnFraction
+  const el = document.querySelector('.input-count')
+  el.textContent = app.t(show ? 'charCount' : 'inputCount').replace('{count}', length).replace('{max}', max)
+  el.classList.toggle('input-count-visible', show)
+  el.classList.toggle('text-red-400', length > max)
+  el.classList.toggle('text-ink-dim', length <= max)
+  if (show) el.setAttribute('aria-live', 'polite')
+  else el.removeAttribute('aria-live')
+}
+
+// Swap languages (output panel): a finished result becomes the new input.
+document.querySelector('.swap-button')?.addEventListener('click', () => {
+  const { source, target } = app.prefs
+  const from = source === 'auto' ? (app.detected() ?? 'en') : source
+  const live = app.live
+  const main = live?.done && !live.error && live.key === app.currentKey() ? live.main : null
+  if (main) {
+    composer.replaceText(main, false)
+    prefs.set('source', 'auto')
+    prefs.set('target', from)
+  } else {
+    prefs.set('source', target)
+    prefs.set('target', from)
+  }
+})
+
+// Retry a failed run with the current input at once (trigger 'force').
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element && event.target.closest('.retry-button'))) return
+  composer.clearTimer()
+  app.run('force')
+})
+
+// Measure first: the panels leave their pending first paint before the
+// composer sizes the textarea.
+app.layout = initLayout(document.querySelector('.translator-panels'))
+stream = initStream(app, form)
+copy = initCopy(app)
+speech = initSpeech(app, data.languages.map((l) => l.code))
+prefs = initPrefs(app, data)
+composer = initComposer(app, ta)
+app.refine = initRefine(app, form, stream.restore, (root) => prefs.applyStrings(root))
+app.learning = initLearning(app)
+dictionary = initDictionary(app, composer)
+// The source editor re-sizes whenever the layout changes.
+document.addEventListener('nt-layout', () => {
+  composer.resize()
+  app.learning.sync()
+  dictionary.sync()
+})
+initContext(app, () => composer.resize(), (root) => prefs.applyStrings(root))
+updateCount()
+copy.updateActions()
+if (matchMedia('(pointer: fine)').matches) ta.focus()
+// Text typed before this module ran gets the debounced run its input events
+// would have scheduled (auto-swap, count and actions included).
+const navigation = performance.getEntriesByType('navigation')[0]
+if (typedBeforeInit(ta.value, ta.defaultValue, navigation?.type)) composer.changed()

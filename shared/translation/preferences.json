@@ -5,7 +5,6 @@
   "maxCookieLength": 1024,
   "rules": {
     "source": {
-      "storage": "nt.source",
       "values": [
         "auto",
         "en",
@@ -17,7 +16,6 @@
       ]
     },
     "target": {
-      "storage": "nt.target",
       "values": [
         "en",
         "ko",
@@ -28,7 +26,6 @@
       ]
     },
     "mode": {
-      "storage": "nt.mode",
       "values": [
         "friends",
         "casual",
@@ -36,15 +33,12 @@
       ]
     },
     "uiLang": {
-      "storage": "ui-lang",
       "values": [
         "en",
         "ko"
-      ],
-      "raw": true
+      ]
     },
     "recentSource": {
-      "storage": "nt.recentSource",
       "values": [
         null,
         "en",
@@ -56,7 +50,6 @@
       ]
     },
     "recentTarget": {
-      "storage": "nt.recentTarget",
       "values": [
         null,
         "en",

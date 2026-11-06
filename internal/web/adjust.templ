@@ -1,0 +1,35 @@
+package web
+
+import (
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
+// adjustTemplate is the header Adjust menu around the single refine row, as
+// a template: the menu exists only for a sentence result, and base.css
+// selects on its presence (.app-settings:has(.adjust-menu)). adjust.js
+// clones it once and inserts or removes that node, so drafts survive, and
+// measures whether the chips fit in the header or float under the trigger.
+//
+// The trigger's label and aria-label carry the active summary, so they have
+// no data-t hooks: adjust.js writes them. Both icons stay mounted and only
+// one shows: sliders-horizontal for the icon-only trigger, else chevron-down.
+templ adjustTemplate(v View) {
+	<template id="adjust-template">
+		<div class="adjust-menu">
+			@ui.Pill(ui.PillProps{Size: "md", Class: "adjust-trigger", Attrs: templ.Attributes{
+				"aria-expanded": "false", "aria-controls": "adjust-content", "data-testid": "adjust-button",
+				"aria-label": v.T("adjust"), "data-active-class": ui.PillClass("active", "md", "adjust-trigger"),
+			}}) {
+				@icons.Icon("sliders-horizontal", 18, templ.Attributes{"hidden": true})
+				<span>{ v.T("adjust") }</span>
+				@icons.Icon("chevron-down", 14, nil)
+			}
+			<div id="adjust-content" class="adjust-content" role="group" aria-label={ v.T("adjust") } data-t-attr="aria-label:adjust" aria-hidden="true" inert>
+				<span class="adjust-inline-label" data-t="adjust">{ v.T("adjust") }</span>
+				@refineRow(v)
+			</div>
+			<p class="adjust-error" role="alert" hidden></p>
+		</div>
+	</template>
+}

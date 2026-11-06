@@ -1,0 +1,90 @@
+package web
+
+import (
+	"strconv"
+
+	"neotranslate/internal/learning"
+	"neotranslate/internal/prompt"
+)
+
+// LearningRowsView is one sentence result's phrase breakdown: the chunks
+// learning.Prepare resolved, in primary-text order.
+type LearningRowsView struct {
+	Run      string
+	Language string // lang of the analysed text
+	Chunks   []learning.Chunk
+	Partial  bool
+	T        func(string) string
+}
+
+// learningFact is one row of a phrase's facts list.
+type learningFact struct {
+	label, value, lang string
+}
+
+// facts are a phrase's learner facts in display order, non-blank only (JS
+// trim), with baseForm in the analysed language.
+func (v LearningRowsView) facts(c learning.Chunk) []learningFact {
+	all := []learningFact{
+		{"inThisSentence", c.Gloss, ""},
+		{"baseForm", c.BaseForm, v.Language},
+		{"literalMeaning", c.LiteralMeaning, ""},
+		{"naturalMeaning", c.NaturalMeaning, ""},
+		{"grammar", c.Grammar, ""},
+		{"notes", c.UsageNote, ""},
+		{"omissions", c.Omissions, ""},
+	}
+	var out []learningFact
+	for _, f := range all {
+		if prompt.JSTrim(f.value) != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func chunkGloss(c learning.Chunk) string {
+	if c.Gloss != "" {
+		return c.Gloss
+	}
+	return c.NaturalMeaning
+}
+
+// phraseID names a row's details region; i is the chunk index, kept when
+// punctuation-only rows are skipped (learning.js reads it back).
+func phraseID(run string, i int) string { return "lp-" + run + "-" + strconv.Itoa(i) }
+
+// LearningRows is the whole-sentence phrase breakdown (#learning-sentence
+// in the reference pane). Every row's details wait `hidden` and
+// learning.js shows the selected one.
+templ LearningRows(v LearningRowsView) {
+	<ul class="learning-chunks">
+		for i, c := range v.Chunks {
+			if learning.IsLearningText(c.Text) {
+				<li>
+					<button type="button" aria-label={ c.Text + " " + chunkGloss(c) } aria-expanded="false" aria-controls={ phraseID(v.Run, i) } data-testid="learning-chunk">
+						<span lang={ v.Language }>{ c.Text }</span><span aria-hidden="true">→</span><span>{ chunkGloss(c) }</span>
+					</button>
+					<div id={ phraseID(v.Run, i) } class="phrase-detail" role="region" aria-label={ c.Text } hidden>
+						<dl class="learning-facts">
+							for _, f := range v.facts(c) {
+								<div>
+									<dt>{ v.T(f.label) }</dt>
+									<dd
+										if f.lang != "" {
+											lang={ f.lang }
+										}
+									>{ f.value }</dd>
+								</div>
+							}
+						</dl>
+						@CharacterNotes(v.T, c.Characters)
+					</div>
+				</li>
+			}
+		}
+	</ul>
+	if v.Partial {
+		<p class="learning-status">{ v.T("learningPartial") }</p>
+	}
+}

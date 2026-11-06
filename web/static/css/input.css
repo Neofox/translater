@@ -1,0 +1,13 @@
+/* Tailwind v4 entry (`make css` → app.css). base.css holds the theme and
+   component rules, pretendard.css the pinned font faces. Only templ files
+   and client modules are scanned, so every class string lives in a .templ
+   or .js file. */
+@import './pretendard.css';
+@import 'tailwindcss' source(none);
+@source '../../../internal/web/**/*.templ';
+@source '../js/**/*.js';
+@source not '../js/**/*.test.js';
+/* `transform` is a style property float.js and adjust.js write, never a
+   class: keep the scanner from emitting an unused utility for it. */
+@source not inline('transform');
+@import './base.css';

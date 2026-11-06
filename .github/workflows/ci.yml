@@ -1,0 +1,189 @@
+name: CI
+
+# No secrets and no billed requests: e2e runs against the fake OpenAI upstream
+# (cmd/fakeopenai) with OPENAI_API_KEY=test.
+#
+# Toolchain: actions/setup-go reads go.mod; tailwindcss (`make css`) and
+# lucide-static come from npm ci, templ from the go.mod tool directive.
+on:
+  pull_request:
+    paths-ignore:
+      - docs/**
+      - '**.md'
+      # translation-eval.yml runs (and typechecks) eval changes.
+      - evals/**
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Branch or commit whose app renders the visual baselines
+        default: master
+      all-projects:
+        description: Run e2e on all 18 projects instead of the default five
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit, generated files, budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Go from go.mod's `go` line; setup-go caches modules and builds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Before the Go steps: go generate (syncicons) and TestIconsFresh read
+      # node_modules/lucide-static.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Go tests
+        run: go test ./...
+
+      # Regenerates icons, templ output and CSS, then fails when any
+      # committed copy differs.
+      - name: Generated files are fresh
+        run: make check
+
+      # A directory argument fails on newer Node; use the glob form.
+      - name: JS unit tests
+        run: node --test 'web/static/js/*.test.js'
+
+      - name: Tooling typecheck and tests (e2e, perf harness, evals)
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: JS and CSS size budget
+        run: make size
+
+  # Every e2e tag, all 18 projects (9 viewports × Chromium and WebKit),
+  # against the fake upstream. analytics/early-typing ride on @core and
+  # speechEndpoint on @speech; a test carrying two tags runs in both jobs.
+  # @visual runs in the visual job, @prod (billed) never runs here, and
+  # @review needs KEYBOARD_REVIEW, so it skips.
+  # macOS: geometry and tap-position tests depend on the system fonts
+  # (Korean glyph widths) and on the WebKit build; Linux shifts layouts by a
+  # few pixels. One worker: under parallel load the runner misses timing
+  # assertions (debounce and blur windows, settling geometry) that pass
+  # locally; retries (playwright.config.ts, CI only) report the rest as
+  # flaky.
+  e2e:
+    name: E2E @${{ matrix.tag }}
+    runs-on: macos-latest
+    # Five projects take about 15 minutes per tag with one worker; all 18
+    # take up to an hour.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [core, context, layout, learning, word, refine, speech]
+    env:
+      OPENAI_API_KEY: test
+      E2E_WORKERS: 1
+      E2E_PROJECTS: ${{ inputs.all-projects && 'all' || 'default' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Go from go.mod's `go` line; setup-go caches modules and builds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium webkit
+
+      # Playwright spawns `go run` at the root.
+      - name: E2E @${{ matrix.tag }}
+        run: npx playwright test -c e2e --grep @${{ matrix.tag }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.tag }}
+          path: |
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # On demand only (Actions → CI → Run workflow): the full visual run (every
+  # state, 18 projects) is long. The baselines come from the `base` input's
+  # app, rendered on this same runner by this checkout's tests, fixtures and
+  # fake; then this checkout's app is compared with them.
+  visual:
+    name: Visual regression against ${{ inputs.base }}
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      OPENAI_API_KEY: test
+      E2E_WORKERS: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Go from go.mod's `go` line; setup-go caches modules and builds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium webkit
+
+      # The base app's Go module: the repository root, or go/ for commits
+      # from before the app moved there.
+      - name: Check out the baseline app
+        id: base
+        env:
+          BASE: ${{ inputs.base }}
+        run: |
+          git fetch --no-tags --depth 1 origin "$BASE"
+          dir="$RUNNER_TEMP/base"
+          git worktree add --detach "$dir" FETCH_HEAD
+          [ -f "$dir/go.mod" ] || dir="$dir/go"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+      - name: Baselines from ${{ inputs.base }}
+        env:
+          E2E_APP_DIR: ${{ steps.base.outputs.dir }}
+        run: npm run e2e:visual:update
+
+      - name: Compare this checkout
+        run: npm run e2e:visual
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: playwright-report-visual
+          path: |
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,18 +1,13 @@
 package-lock.json
-pnpm-lock.yaml
-yarn.lock
 .superpowers/
 
 # Pinned generated font-face declarations
-src/styles/pretendard.css
+web/static/css/pretendard.css
 
-# Shared translation contract (byte-exact data, golden request bodies) and
-# its generated views: never reformat
+# Shared translation contract (byte-exact data, golden request bodies):
+# never reformat
 shared/
-go/internal/contract/data/
-src/server/promptTemplates.generated.json
-src/server/resultTypes.generated.ts
 docs/superpowers/reports/data/
 
-# Generated parity corpus (scripts/learning-corpus.ts)
-go/internal/learning/testdata/
+# Frozen learning regression corpus
+internal/learning/testdata/

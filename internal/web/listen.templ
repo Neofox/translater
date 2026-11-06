@@ -1,0 +1,38 @@
+package web
+
+import (
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
+// listenButton is a Listen control, idle and disabled until the whole current
+// result completes (copy.js). speech.js drives it: the Pill tone (neutral or
+// active), labels, aria-pressed/aria-busy, the error notice after the Pill
+// and the icon. One of its three icons shows at a time; speech.js flips
+// their hidden attributes (keyed by data-icon). The labelled variant is the
+// main toolbar's; alternatives use the compact icon-only one.
+templ listenButton(label string, labelled bool) {
+	<span class="relative inline-flex shrink-0">
+		@ui.Pill(listenPill(label, labelled)) {
+			@icons.Icon("loader-circle", 14, templ.Attributes{"class": "animate-spin motion-reduce:animate-none", "data-icon": "loading", "hidden": true})
+			@icons.Icon("square", 14, templ.Attributes{"data-icon": "stop", "hidden": true})
+			@icons.Icon("volume-2", 14, templ.Attributes{"data-icon": "listen"})
+			if labelled {
+				<span data-t="listen">{ label }</span>
+			}
+		}
+	</span>
+}
+
+func listenPill(label string, labelled bool) ui.PillProps {
+	attrs := templ.Attributes{
+		"disabled": true, "aria-label": label, "title": label,
+		"aria-pressed": "false", "aria-busy": "false", "data-testid": "listen-button",
+	}
+	if labelled {
+		// The page's own button follows UI-language switches (prefs.js).
+		attrs["data-t-attr"] = "aria-label:listen title:listen"
+		return ui.PillProps{Size: "md", Class: "listen-button disabled:cursor-not-allowed disabled:opacity-50", Attrs: attrs}
+	}
+	return ui.PillProps{Class: "listen-button icon-action disabled:cursor-not-allowed disabled:opacity-50", Attrs: attrs}
+}

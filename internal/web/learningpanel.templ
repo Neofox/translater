@@ -1,0 +1,26 @@
+package web
+
+import (
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
+// learningPanel is the mobile learning reading surface. It waits `hidden`
+// at the end of .output-panel, and learning.js sets data-expanded only
+// while it is open (base.css hides
+// the source and header when any .learning-panel[data-expanded] exists).
+// learning.js moves #learning-inspector into the body while it is open and
+// writes the heading.
+templ learningPanel(v View) {
+	<section class="learning-panel" data-testid="learning-panel" aria-label={ v.T("learn") } data-t-attr="aria-label:learn" hidden>
+		<div class="learning-panel-header">
+			<h2 data-t="learn">{ v.T("learn") }</h2>
+			@ui.Pill(ui.PillProps{Size: "md", Attrs: templ.Attributes{
+				"aria-label": v.T("closeLearning"), "data-t-attr": "aria-label:closeLearning",
+			}}) {
+				@icons.Icon("x", 18, nil)
+			}
+		</div>
+		<div class="learning-panel-body scrollbar-thin"></div>
+	</section>
+}

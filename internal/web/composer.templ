@@ -1,0 +1,66 @@
+package web
+
+import (
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
+// inputPanel is the source pane: language bar, editor, actions and reply
+// context. The textarea belongs to no form and sits
+// outside every swap target: runs copy its exact value into
+// #translate-form, so streaming and preference swaps never touch it.
+templ inputPanel(v View) {
+	<section class="input-panel" aria-label={ v.T("sourceText") } data-t-attr="aria-label:sourceText">
+		<div class="composer">
+			<div class="composer-header">
+				@LanguageBar(v, "source")
+			</div>
+			<div class="composer-field">
+				<div class="source-input-area">
+					<textarea rows="1" placeholder={ v.T("placeholder") } aria-label={ v.T("inputText") } data-t-attr="placeholder:placeholder aria-label:inputText" data-testid="input-textarea" class="translation-input scrollbar-thin" spellcheck="true" autocomplete="off" autocorrect="on"></textarea>
+				</div>
+				<div class="composer-actions">
+					@ui.Pill(ui.PillProps{Tone: "primary", Size: "md", Class: "paste-button", Attrs: templ.Attributes{
+						"aria-label": v.T("pasteClipboard"), "data-t-attr": "aria-label:pasteClipboard",
+						"data-testid": "paste-input", "data-input-action": "true",
+					}}) {
+						@icons.Icon("clipboard", 16, nil)
+						<span data-t="paste">{ v.T("paste") }</span>
+					}
+					@ui.Pill(ui.PillProps{Size: "md", Class: "clear-button", Attrs: templ.Attributes{
+						"title": v.T("clearInputTitle"), "aria-label": v.T("clearInput"),
+						"data-t-attr": "title:clearInputTitle aria-label:clearInput",
+						"data-testid": "clear-input", "data-input-action": "true",
+					}}) {
+						@icons.Icon("x", 16, nil)
+						<span data-t="clear">{ v.T("clear") }</span>
+					}
+				</div>
+				<div class="composer-meta">
+					@contextToggle(v)
+					<span class="input-count text-ink-dim">{ v.inputCount() }</span>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+// translateForm carries one run's fields; app.js fills them and triggers
+// nt-run. hx-sync replace aborts the previous run's request. The analytics
+// fields reach Langfuse metadata only, never the prompt or cache key.
+templ translateForm() {
+	<form id="translate-form" hx-post="/translate" hx-trigger="nt-run" hx-sync="this:replace" hx-swap="none" hidden>
+		for _, name := range []string{"run", "text", "source", "target", "mode", "intent", "uiLang", "context", "previousMain", "refinements", "analyticsSessionId", "supersedesRunId", "inputRevision", "trigger"} {
+			<input type="hidden" name={ name }/>
+		}
+	</form>
+}
+
+// prefsForm posts the preferences for the re-rendered chip bars.
+templ prefsForm(v View) {
+	<form id="prefs-form" hx-post="/prefs" hx-trigger="nt-prefs" hx-sync="this:replace" hx-swap="none" hidden>
+		for _, f := range v.Contract.Prefs.Fields {
+			<input type="hidden" name={ f.Key }/>
+		}
+	</form>
+}

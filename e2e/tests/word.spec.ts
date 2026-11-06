@@ -1,13 +1,12 @@
-// Word results (@word): WordView.tsx alternatives with register tags, the
-// word-details trigger as main text, and the dictionary (WordSourceMeta.tsx,
-// CharacterNotes.tsx) in the reference pane of workspace/split/book layouts.
-// Compact layouts show the dictionary only in the learning surface
-// (LearningPanel.tsx), which opens from the trigger of a finished result, so
-// the tests that read the dictionary while it streams skip there.
+// Word results (@word): word alternatives with register tags, the
+// word-details trigger as main text, and the word dictionary (with its
+// character notes) in the reference pane of workspace/split/book layouts.
+// Compact layouts show the dictionary only in the mobile learning surface,
+// which opens from the trigger of a finished result, so the tests that read
+// the dictionary while it streams skip there.
 //
-// Activation (OutputPanel.tsx's word onInspect, ReferencePanel.tsx): the
-// desktop workspace focuses the reference heading on every activation; every
-// other layout, split and book included (`desktop` is the workspace only),
+// Activation of the word-details trigger: the desktop workspace focuses the
+// reference heading on every activation; every other layout, split and book included (`desktop` is the workspace only),
 // opens the learning surface over an inert background.
 import type { Page } from '@playwright/test'
 import {
@@ -33,7 +32,7 @@ function wordInput(name: string, head: string): string {
 
 const meta = (page: Page) => page.locator('.reference-panel .word-source-meta')
 
-/** The layout shows the reference pane (ReferencePanel.tsx). */
+/** The layout shows the reference pane. */
 async function separateReference(page: Page): Promise<boolean> {
   const layout = await page
     .locator('.translator-panels')
@@ -48,7 +47,7 @@ async function skipWithoutReference(page: Page): Promise<void> {
   )
 }
 
-/** The desktop workspace (`desktop` in useWorkspaceLayout.ts). */
+/** The desktop workspace (`desktop` in layout.js). */
 async function isDesktop(page: Page): Promise<boolean> {
   return (
     (await page.locator('.translator-panels').getAttribute('data-desktop')) ===
@@ -70,7 +69,7 @@ test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
 
-test('word result shows primary translation, register tags and alternatives @word', async ({
+test('word result shows primary translation, register tags and alternatives @word @engine', async ({
   page,
 }) => {
   const fx = fixture('word')
@@ -105,7 +104,7 @@ test('dictionary streams POS, meanings and synonyms @word', async ({
   await waitForDone(page)
   const dictionary = await openDictionary(page)
   await expect(dictionary).toBeVisible()
-  // Go keeps the other POS tabs' blocks mounted but hidden.
+  // The other POS tabs' blocks stay mounted but hidden.
   const shown = (text: string) =>
     dictionary.getByText(text, { exact: true }).filter({ visible: true })
   await expect(
@@ -195,16 +194,15 @@ test('the chosen POS tab survives later dictionary updates @word', async ({
   ).toBeVisible()
 })
 
-// Compact layouts look up from the learning surface. TS then loses focus
-// (it focuses the source while the surface still makes it inert, a TS bug
-// Go does not replicate), so only the reference layouts check focus.
+// Compact layouts look up from the learning surface, so only the reference
+// layouts check focus.
 test('synonym starts a new lookup @word', async ({ page }) => {
   await fillSource(page, wordInput('word', 'thanks'))
   await waitForDone(page)
   const dictionary = await openDictionary(page)
   const synonym = (fixture('word').result.synonyms as string[])[0]!
-  // The app's own translation request (Go: form fields, TS: server
-  // function JSON), whatever the server cache holds. Warm-ups never carry
+  // The app's own translation request (form fields), whatever the server
+  // cache holds. Warm-ups never carry
   // the text.
   const encodings = [
     synonym,
@@ -336,7 +334,7 @@ test('compact word details open the learning view and restore the trigger @word'
   expect(await fake.requests()).toBe(requests)
 })
 
-test('word details trigger is disabled while streaming @word', async ({
+test('word details trigger is disabled while streaming @word @engine', async ({
   page,
 }) => {
   const fx = fixture('word-slow')

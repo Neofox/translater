@@ -1,10 +1,8 @@
-// Run analytics form fields (Task 29). The Go client sends the same
-// telemetry-only fields as TS useTranslate (analyticsSessionId, the run it
-// supersedes, the input revision and the trigger); the server puts them in
-// Langfuse metadata only. TS sends them inside a server-function payload, so
-// this checks the Go form posts.
+// Run analytics form fields. The client sends telemetry-only fields
+// (analyticsSessionId, the run it supersedes, the input revision and the
+// trigger) with every POST /translate; the server puts them in Langfuse
+// metadata only.
 import type { Page, Request } from '@playwright/test'
-import { APP } from '../ports'
 import {
   expect,
   fillSource,
@@ -21,7 +19,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function recordRuns(page: Page): Record<string, string>[] {
   const runs: Record<string, string>[] = []
   page.on('request', (request: Request) => {
-    if (request.method() !== 'POST' || !request.url().endsWith('/translate')) return
+    if (request.method() !== 'POST' || !request.url().endsWith('/translate'))
+      return
     const body = request.postData() ?? ''
     const type = request.headers()['content-type'] ?? ''
     if (type.startsWith('multipart/form-data')) {
@@ -36,8 +35,7 @@ function recordRuns(page: Page): Record<string, string>[] {
   return runs
 }
 
-test('runs send the analytics fields @core', async ({ page, fake }) => {
-  test.skip(APP === 'ts', 'TS sends them in a server-function payload')
+test('runs send the analytics fields @core @engine', async ({ page, fake }) => {
   const runs = recordRuns(page)
   await openApp(page)
 
@@ -50,7 +48,11 @@ test('runs send the analytics fields @core', async ({ page, fake }) => {
   await waitForDone(page)
 
   const [first, second] = runs
-  expect(first).toMatchObject({ trigger: 'debounce', inputRevision: '1', supersedesRunId: '' })
+  expect(first).toMatchObject({
+    trigger: 'debounce',
+    inputRevision: '1',
+    supersedesRunId: '',
+  })
   expect(first!.analyticsSessionId).toMatch(UUID)
   expect(second).toMatchObject({
     trigger: 'debounce',
@@ -63,6 +65,10 @@ test('runs send the analytics fields @core', async ({ page, fake }) => {
   await page.getByTestId('input-textarea').focus()
   await page.keyboard.press('ControlOrMeta+Enter')
   await expect.poll(() => runs.length).toBe(3)
-  expect(runs[2]).toMatchObject({ trigger: 'force', inputRevision: '2', supersedesRunId: '' })
+  expect(runs[2]).toMatchObject({
+    trigger: 'force',
+    inputRevision: '2',
+    supersedesRunId: '',
+  })
   await waitForDone(page)
 })

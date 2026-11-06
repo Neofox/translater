@@ -1,26 +1,33 @@
-// `npm run e2e:visual [-- <playwright args>]`: the TS production build
-// writes the baselines, then the Go app is compared with them. Every
-// argument applies to both runs, so they cover the same projects and
-// states. A --grep (-g) narrows @visual instead of replacing it: Playwright
-// ORs repeated --grep flags, so the patterns become one regular expression
-// that requires @visual and any of them. E2E_VISUAL=1 lets
-// playwright.config.ts include @visual tests, which plain e2e runs skip.
+// Visual regression runner for the @visual tests (tests/visual.spec.ts).
+//
+//   npm run e2e:visual:update [-- <playwright args>]   write the baselines
+//   npm run e2e:visual [-- <playwright args>]          compare with them
+//
+// Baselines are written only by the explicit update command; a plain run
+// never writes one, so a missing baseline fails. Take them from the commit
+// to compare against (e.g. master), then check out the change and compare.
+// A --grep (-g) narrows @visual instead of replacing it: Playwright ORs
+// repeated --grep flags, so the patterns become one regular expression that
+// requires @visual and any of them. E2E_VISUAL=1 lets playwright.config.ts
+// include @visual tests, which plain e2e runs skip.
 //
 //   npm run e2e:visual -- --project chromium-portrait --grep sentence-done
 import { spawnSync } from 'node:child_process'
 
 const greps = []
 const rest = []
+let update = false
 const args = process.argv.slice(2)
 for (let i = 0; i < args.length; i++) {
   const arg = args[i]
-  if (arg === '--grep' || arg === '-g') greps.push(args[++i])
+  if (arg === '--update') update = true
+  else if (arg === '--grep' || arg === '-g') greps.push(args[++i])
   else if (arg.startsWith('--grep=')) greps.push(arg.slice('--grep='.length))
   // -u also accepts an attached value (-uall, -u=…) and short-flag clusters (-xu).
   else if (/^-[^-]*u/.test(arg) || arg.startsWith('--update-snapshots')) {
-    // Only the TS run writes baselines; letting the Go run write them would
-    // make it compare against itself.
-    console.error(`e2e:visual: ${arg} is not allowed (the TS run writes the baselines).`)
+    console.error(
+      `e2e:visual: ${arg} is not allowed; write baselines with npm run e2e:visual:update.`,
+    )
     process.exit(2)
   } else rest.push(arg)
 }
@@ -28,20 +35,18 @@ const grep = greps.length
   ? `^(?=.*@visual)(?=.*(?:${greps.join('|')}))`
   : '@visual'
 
-function playwright(env, extra) {
-  const { status } = spawnSync(
-    'npx',
-    ['playwright', 'test', '-c', 'e2e', '--grep', grep, ...extra, ...rest],
-    { stdio: 'inherit', env: { ...process.env, E2E_VISUAL: '1', ...env } },
-  )
-  return status ?? 1
-}
-
-const ts = playwright({ APP: 'ts', E2E_TS_BUILD: 'prod' }, [
-  '--update-snapshots=all',
-])
-if (ts !== 0) {
-  console.error('e2e:visual: the TS baseline run failed; the Go run is skipped.')
-  process.exit(ts)
-}
-process.exit(playwright({ APP: 'go' }, []))
+const { status } = spawnSync(
+  'npx',
+  [
+    'playwright',
+    'test',
+    '-c',
+    'e2e',
+    '--grep',
+    grep,
+    ...(update ? ['--update-snapshots=all'] : []),
+    ...rest,
+  ],
+  { stdio: 'inherit', env: { ...process.env, E2E_VISUAL: '1' } },
+)
+process.exit(status ?? 1)

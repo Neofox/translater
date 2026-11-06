@@ -1,9 +1,9 @@
-// UI states the TS-vs-Go visual parity harness (tests/visual.spec.ts)
-// captures. `npm run e2e:visual` first records every state from the TS app's
-// production build as the baseline, then compares the Go app with it: the
-// same screenshot (within the spec's threshold) and the same ARIA snapshot.
+// UI states the visual regression suite (tests/visual.spec.ts) captures.
+// `npm run e2e:visual:update` records every state as the baseline;
+// `npm run e2e:visual` compares the app with it: the same screenshot (within
+// the spec's threshold), the same ARIA snapshot and the same DOM snapshot.
 //
-// Each UI task appends the states it adds. A state's setup starts from a
+// A UI change appends the states it adds. A state's setup starts from a
 // blank page (the spec blocks web fonts first) and must leave the page in a
 // deterministic, settled state: wait for the condition that ends the state,
 // never for a fixed time.
@@ -96,7 +96,7 @@ export const STATES: VisualState[] = [
   },
   {
     // Settings popover open (bottom-end below its trigger) with focus on the
-    // dialog itself, as Floating UI leaves it. No request.
+    // dialog itself, as settings.js leaves it. No request.
     name: 'settings-open',
     async setup(page, fake) {
       await openApp(page)
@@ -396,8 +396,8 @@ export const STATES: VisualState[] = [
     },
   },
   {
-    // Long-form input: no alternatives section at all (TS never mounts it;
-    // Go keeps it under `hidden`).
+    // Long-form input: no alternatives section at all (it stays mounted
+    // under `hidden`).
     name: 'longform-done',
     async setup(page) {
       await openApp(page)
@@ -467,7 +467,7 @@ export const STATES: VisualState[] = [
   },
   {
     // Split panes with a long turn, wrapped over several lines but under
-    // the long-form limit (past it the alternatives go, and Go keeps that
+    // the long-form limit (past it the alternatives go, and the app keeps that
     // empty section mounted under a CSS rule, which the DOM snapshot
     // reports): the source actions and Copy/Listen share the bottom dock.
     name: 'layout-split-long',

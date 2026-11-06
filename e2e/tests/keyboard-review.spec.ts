@@ -1,16 +1,16 @@
 // Keyboard review evidence (Task 28, step 5): screenshots and a video of
 // every documented keyboard behaviour on an iPhone (WebKit) and a Pixel
 // (Chromium) profile, for the user to accept or reject after the fact. Not
-// a parity test: it only runs with KEYBOARD_REVIEW=1, e.g.
+// a regression test: it only runs with KEYBOARD_REVIEW=1, e.g.
 //
-//   KEYBOARD_REVIEW=1 APP=go npx playwright test -c e2e keyboard-review \
+//   KEYBOARD_REVIEW=1 npx playwright test -c e2e keyboard-review \
 //     --project webkit-iphone-portrait --project chromium-portrait \
 //     --output test-results/keyboard-review
 //
 // The software keyboard is simulated as in layout.spec.ts (a stubbed
 // visualViewport); a grey band labelled "keyboard" is drawn under the
 // visible area so the screenshots show what the keyboard covers. Inputs
-// are fixed, so the Go and TS captures can be compared byte for byte.
+// are fixed, so two captures can be compared byte for byte.
 import { devices } from '@playwright/test'
 import type { Page, TestInfo } from '@playwright/test'
 import {
@@ -63,7 +63,7 @@ async function keyboard(
 
 let shot = 0
 /** Evidence only: lets a debounced re-run (800 ms) start and finish, then
- * waits for finite animations, so both apps are captured at rest. */
+ * waits for finite animations, so every capture is at rest. */
 async function capture(page: Page, testInfo: TestInfo, name: string) {
   shot += 1
   await page.waitForTimeout(1000)

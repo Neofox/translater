@@ -1,14 +1,13 @@
-// Learning in the initial response (@learning): LearningInspector.tsx's
-// whole-message rows, InspectableTranslation.tsx's grammar phrases and
-// selected mark, SourceHighlight.tsx's source mirror. Ports of
-// tests/browser/learning.browser.tsx.
+// Learning in the initial response (@learning): the learning inspector's
+// whole-message rows, the main text's grammar phrases and selected mark,
+// and the source highlight mirror under the editor.
 //
 // The rows show in the reference pane of the desktop workspace once the
 // result is done; every other layout shows them in the learning surface,
-// which a tap on the main text opens (openOverview, as in the TS test).
+// which a tap on the main text opens (openOverview).
 //
-// Inspection gestures (phrasePointer.ts, InspectableTranslation.tsx,
-// SourceHighlight.tsx): a short stationary tap inspects after a 400 ms
+// Inspection gestures (inspect.js, on the main text and the source
+// editor's grammar underlines): a short stationary tap inspects after a 400 ms
 // selection grace period; drag, long press and double-click keep native
 // selection and editing.
 import type { Page } from '@playwright/test'
@@ -36,7 +35,7 @@ import {
 const rows = (page: Page) => page.getByTestId('learning-chunk')
 const mirror = (page: Page) => page.getByTestId('source-highlight')
 
-/** The desktop workspace (`desktop` in useWorkspaceLayout.ts). */
+/** The desktop workspace (`desktop` in layout.js). */
 async function isDesktop(page: Page): Promise<boolean> {
   return (
     (await page.locator('.translator-panels').getAttribute('data-desktop')) ===
@@ -81,7 +80,7 @@ const panel = (page: Page) => page.getByTestId('learning-panel')
 const visibleDetails = (page: Page) =>
   page.locator('.phrase-detail').filter({ visible: true })
 
-/** The whole-message rows (TS openOverview): compact layouts open the
+/** The whole-message rows: compact layouts open the
  * learning surface with a tap on the main text, then any phrase the tap
  * selected collapses. */
 async function openOverview(page: Page) {
@@ -109,8 +108,7 @@ async function closeLearning(page: Page) {
   await expect(panel(page)).toBeHidden()
 }
 
-/** Centre of the `nth` source grammar underline, relative to the textarea
- * (sourceGrammarPosition in the TS test). */
+/** Centre of the `nth` source grammar underline, relative to the textarea. */
 async function grammarPosition(page: Page, nth = 0) {
   return page.evaluate((index) => {
     const grammar = document.querySelectorAll('[data-testid="source-grammar"]')[
@@ -169,6 +167,39 @@ async function editor(page: Page): Promise<Editor> {
   })
 }
 
+test('a whitespace-only source edit keeps learning in place @learning @engine', async ({
+  page,
+}) => {
+  // Learning the original source: its ranges are offsets into the raw text.
+  const input = await readKorean(
+    page,
+    'learn-reading',
+    '오늘 도와줘서 고마워요.',
+  )
+  const underlines = ['줘서', '고마워요']
+  await expect(page.getByTestId('source-grammar')).toHaveText(underlines)
+  // Read synchronously after each edit, before the debounced re-run.
+  const edit = (at: 'start' | 'end') =>
+    source(page).evaluate((el, end) => {
+      const ta = el as HTMLTextAreaElement
+      const i = end ? ta.value.length : 0
+      ta.focus()
+      ta.setSelectionRange(i, i)
+      document.execCommand('insertText', false, ' ')
+      return {
+        rows: !document.getElementById('learning-sentence')!.hidden,
+        grammar: [
+          ...document.querySelectorAll('[data-testid="source-grammar"]'),
+        ].map((g) => g.textContent),
+      }
+    }, at === 'end')
+  // A trailing space, then a leading one that shifts every source offset:
+  // the trimmed text is unchanged, so the breakdown and the underlines stay.
+  expect(await edit('end')).toEqual({ rows: true, grammar: underlines })
+  expect(await edit('start')).toEqual({ rows: true, grammar: underlines })
+  expect(await mirrorText(page)).toBe(` ${input} `)
+})
+
 /** The learn-reading result with the editor unfocused, like a page the
  * reader comes back to (fill focuses it). */
 async function readingResult(page: Page, text = '오늘 도와줘서 고마워요.') {
@@ -183,7 +214,7 @@ const settle = (page: Page) => page.waitForTimeout(450)
 
 /** Waits for finite animations, the completion View Transition included.
  * While a View Transition runs, its overlay takes every pointer event (the
- * target is <html>), so a tap measured and sent then is lost in both apps.
+ * target is <html>), so a tap measured and sent then is lost.
  * Infinite pulses are skipped. */
 async function transitionsDone(page: Page) {
   await page.evaluate(() =>
@@ -807,11 +838,14 @@ test('dragging from a source grammar underline selects native editor text @learn
   page,
 }) => {
   await readingResult(page)
-  const start = await grammarPosition(page)
+  // Hover relative to the editor: Playwright waits until it stops moving,
+  // so the press lands on the underline even while the panes still settle
+  // (absolute coordinates measured earlier missed it on loaded CI runners).
+  await source(page).hover({ position: await grammarPosition(page) })
   const box = (await source(page).boundingBox())!
+  const start = await grammarPosition(page)
   const x = box.x + start.x
   const y = box.y + start.y
-  await page.mouse.move(x, y)
   await page.mouse.down()
   await page.mouse.move(x + 50, y, { steps: 5 })
   await page.mouse.up()
@@ -1040,7 +1074,7 @@ test('mobile translation taps after an emoji map through counterpart quotations 
   }
 })
 
-// The mobile learning surface (LearningPanel.tsx): a full-size reading view
+// The mobile learning surface: a full-size reading view
 // with Close/Escape over the original Copy/Listen dock. The background is
 // inert, the reference pane hidden, and closing restores focus.
 
@@ -1054,7 +1088,7 @@ async function backgroundInert(page: Page): Promise<boolean[]> {
   )
 }
 
-/** The control lies inside the window (visibleRect in the TS test). */
+/** The control lies inside the window. */
 async function inViewport(page: Page, testid: string) {
   const box = await page.evaluate((id) => {
     const el =
@@ -1085,7 +1119,7 @@ test('mobile text opens a full learning view without a Breakdown button @learnin
   await waitForDone(page)
   await expect(page.getByTestId('breakdown-button')).toHaveCount(0)
   // Marks the source and action nodes, so later reads can tell they stayed
-  // mounted (TS keeps them; neither app replaces them).
+  // mounted (the app never replaces them).
   const KEPT = [
     '[data-testid="input-textarea"]',
     '[data-testid="output-toolbar"] [data-testid="copy-button"]',
@@ -1142,11 +1176,15 @@ test('mobile text opens a full learning view without a Breakdown button @learnin
       .locator('.learning-panel-body')
       .evaluate((el) => getComputedStyle(el).overflowY),
   ).toMatch(/auto|scroll/)
-  // Escape inside the surface closes it, like Close, and focus returns to
-  // the main text. (WebKit leaves a tapped row unfocused, and an Escape
-  // from the page clears the source in both apps.)
-  await rows(page).nth(1).focus()
+  // Escape while the surface is open closes it, like Close, and focus
+  // returns to the main text. It never clears the source, even when focus
+  // is on the page itself (WebKit leaves a tapped row unfocused).
+  const text = await source(page).inputValue()
+  await page.evaluate(() =>
+    (document.activeElement as HTMLElement | null)?.blur(),
+  )
   await page.keyboard.press('Escape')
+  await expect(source(page)).toHaveValue(text)
   await expect(panel(page)).toBeHidden()
   await expect(mainTranslation(page)).toBeVisible()
   await expect(mainTranslation(page)).toBeFocused()
@@ -1352,7 +1390,7 @@ test('context and learner details remain usable without a popup @learning @word'
   page,
 }) => {
   // The context field before the source, so no context edit re-runs a
-  // result while its trigger is tapped (the TS test's result never re-runs).
+  // result while its trigger is tapped.
   await page.getByTestId('context-toggle').click()
   await page
     .getByTestId('context-textarea')

@@ -1,0 +1,88 @@
+package web
+
+import (
+	"strconv"
+
+	"neotranslate/internal/web/icons"
+	"neotranslate/internal/web/ui"
+)
+
+// Result fragments streamed by /translate as <hx-partial> swaps. Markup,
+// class strings and data-testids are those of the original TypeScript
+// components (result sections, alternative items, Pill, Tag) so the
+// carried-over CSS styles them identically. templ escapes all model text.
+
+// ResultSkeleton is the content of #result-details at the start of a run:
+// the always-open alternatives section with an empty #alternatives list that
+// AlternativeRow partials are appended to. The section stays mounted while
+// empty (including for long-form input, which never gets an alternative)
+// under `hidden`, which stream.js lifts once it holds an alternative item.
+templ ResultSkeleton(title string) {
+	<section class="result-section detail-alternatives" aria-labelledby="alternatives-title" hidden>
+		<h3 id="alternatives-title" class="result-section-title"><span>{ title }</span></h3>
+		<div id="alternatives-body" class="result-section-body">
+			<ul id="alternatives" class="alternative-list"></ul>
+		</div>
+	</section>
+}
+
+// AlternativeSkeleton is the newest alternative while the run streams,
+// with real, disabled Copy and Listen. The id lets the settled
+// AlternativeRow replace it.
+templ AlternativeSkeleton(copyLabel, listenLabel string) {
+	<li id="alternative-skeleton" class="alternative-item alternative-skeleton" aria-hidden="true">
+		<div class="alternative-actions inline-flex items-center">
+			@ui.Pill(ui.PillProps{Class: "copy-button icon-action disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+				"aria-label": copyLabel, "title": copyLabel, "data-testid": "copy-button", "disabled": true,
+			}}) {
+				@icons.Icon("copy", 14, nil)
+			}
+			@listenButton(listenLabel, false)
+		</div>
+		<p class="alternative-text"><span class="animate-pulse"></span></p>
+		<p class="alternative-note"><span class="animate-pulse"></span></p>
+	</li>
+}
+
+// AlternativeRow is one completed alternative. Word rows always use the
+// wrapper with register tags, even with no registers (kept from the
+// original TypeScript app, where an empty tag list still counted as
+// present). Copy and Listen (compact) render disabled; the client enables
+// them once the whole current result has completed; speech.js plays
+// Listen, like the main one.
+templ AlternativeRow(index int, word bool, text, note string, registers []string, copyLabel, listenLabel string) {
+	<li data-testid="alternative-item" class="alternative-item detail-enter group flow-root rounded-lg border border-border bg-panel px-3 py-2" style={ templ.SafeCSS("animation-delay: " + strconv.Itoa(index*40) + "ms") }>
+		if text != "" {
+			<div class="alternative-actions float-right ml-2 inline-flex items-center gap-1.5">
+				@ui.Pill(ui.PillProps{Class: "copy-button icon-action disabled:cursor-not-allowed disabled:opacity-45", Attrs: templ.Attributes{
+					"aria-label": copyLabel, "title": copyLabel, "data-testid": "copy-button", "disabled": true,
+				}}) {
+					@copyIcons()
+				}
+				@listenButton(listenLabel, false)
+			</div>
+		}
+		if word {
+			<div class="flex flex-wrap items-baseline gap-2">
+				<p class="alternative-text min-w-0 break-words text-ink">{ text }</p>
+				for _, r := range registers {
+					@ui.Tag("neutral") {
+						{ r }
+					}
+				}
+			</div>
+		} else {
+			<p class="alternative-text whitespace-pre-wrap break-words text-ink">{ text }</p>
+		}
+		if note != "" {
+			<p class="alternative-note text-ink-soft">{ note }</p>
+		}
+	</li>
+}
+
+// copyIcons are a Copy button's icons: copy, and the check copy.js shows
+// in its place for 1.5 s after a successful copy (both stay mounted).
+templ copyIcons() {
+	@icons.Icon("copy", 14, nil)
+	@icons.Icon("check", 14, templ.Attributes{"hidden": true})
+}

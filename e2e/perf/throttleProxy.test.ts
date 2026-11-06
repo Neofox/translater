@@ -3,7 +3,8 @@
 // cost simulated round trips, and bandwidth is shared between connections.
 import { connect, createServer } from 'node:net'
 import type { AddressInfo, Server, Socket } from 'node:net'
-import { afterEach, describe, expect, it } from 'vitest'
+import assert from 'node:assert/strict'
+import { afterEach, describe, it } from 'node:test'
 import { createThrottleProxy } from './throttle-proxy.ts'
 
 const RTT = 200
@@ -86,11 +87,11 @@ describe('throttle proxy', () => {
     const { proxyPort } = await proxy({ target: true })
     const a = await open(proxyPort)
     const first = await roundTrip(a, 'one', 3)
-    expect(first).toBeGreaterThanOrEqual(2 * RTT - 5)
-    expect(first).toBeLessThan(2 * RTT + 80)
+    assert.ok(first >= 2 * RTT - 5, `first >= 2 * RTT - 5`)
+    assert.ok(first < 2 * RTT + 80, `first < 2 * RTT + 80`)
     const second = await roundTrip(a, 'two', 3)
-    expect(second).toBeGreaterThanOrEqual(RTT - 5)
-    expect(second).toBeLessThan(RTT + 80)
+    assert.ok(second >= RTT - 5, `second >= RTT - 5`)
+    assert.ok(second < RTT + 80, `second < RTT + 80`)
   })
 
   it('never delays an open connection while another one is handshaking', async () => {
@@ -107,8 +108,8 @@ describe('throttle proxy', () => {
     const timeB = roundTrip(b, 'from-b', 6)
     await new Promise((done) => setTimeout(done, 20))
     const timeA = await roundTrip(a, 'from-a', 6)
-    expect(timeA).toBeLessThan(RTT + 80)
-    expect(await timeB).toBeGreaterThanOrEqual(2 * RTT - 5)
+    assert.ok(timeA < RTT + 80, `timeA < RTT + 80`)
+    assert.ok((await timeB) >= 2 * RTT - 5, `await timeB >= 2 * RTT - 5`)
   })
 
   it('answers CONNECT directly and throttles only the tunnelled bytes', async () => {
@@ -117,7 +118,8 @@ describe('throttle proxy', () => {
     const established = await new Promise<number>((done) => {
       const t0 = performance.now()
       socket.once('data', (chunk: Buffer) => {
-        expect(chunk.toString()).toBe(
+        assert.equal(
+          chunk.toString(),
           'HTTP/1.1 200 Connection Established\r\n\r\n',
         )
         done(performance.now() - t0)
@@ -126,14 +128,14 @@ describe('throttle proxy', () => {
         `CONNECT 127.0.0.1:${targetPort} HTTP/1.1\r\nHost: 127.0.0.1:${targetPort}\r\n\r\n`,
       )
     })
-    expect(established).toBeLessThan(50)
+    assert.ok(established < 50, `established < 50`)
     // First tunnelled exchange: the rest of the handshake RTT + one RTT.
     const first = await roundTrip(socket, 'hello', 5)
-    expect(first).toBeLessThan(2 * RTT + 80)
-    expect(first).toBeGreaterThanOrEqual(2 * RTT - 60)
+    assert.ok(first < 2 * RTT + 80, `first < 2 * RTT + 80`)
+    assert.ok(first >= 2 * RTT - 60, `first >= 2 * RTT - 60`)
     const second = await roundTrip(socket, 'again', 5)
-    expect(second).toBeGreaterThanOrEqual(RTT - 5)
-    expect(second).toBeLessThan(RTT + 80)
+    assert.ok(second >= RTT - 5, `second >= RTT - 5`)
+    assert.ok(second < RTT + 80, `second < RTT + 80`)
   })
 
   it('shares downstream bandwidth between connections', async () => {
@@ -151,9 +153,9 @@ describe('throttle proxy', () => {
         roundTrip(b, 'big:10000', 10_000),
       ])),
     )
-    expect(alone - RTT).toBeGreaterThanOrEqual(90)
-    expect(alone - RTT).toBeLessThan(160)
-    expect(both - RTT).toBeGreaterThanOrEqual(190)
-    expect(both - RTT).toBeLessThan(270)
+    assert.ok(alone - RTT >= 90, `alone - RTT >= 90`)
+    assert.ok(alone - RTT < 160, `alone - RTT < 160`)
+    assert.ok(both - RTT >= 190, `both - RTT >= 190`)
+    assert.ok(both - RTT < 270, `both - RTT < 270`)
   })
 })

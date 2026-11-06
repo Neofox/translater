@@ -1,4 +1,4 @@
-import type { ServiceTier } from '../src/server/openai.ts'
+export type ServiceTier = 'default' | 'fast'
 
 // OpenAI list prices in USD per 1M tokens on the Standard tier
 // (developers.openai.com/api/docs/pricing, checked 2026-10-30). The Fast tier

@@ -1,0 +1,67 @@
+// Package ui holds the shared primitives: Pill and Tag.
+package ui
+
+import "strings"
+
+// PillProps configure a Pill. Tone is neutral (default), accent, warm,
+// active or primary; Size is sm (default) or md; Class is appended to the
+// pill's own classes; Attrs are the other button attributes.
+type PillProps struct {
+	Tone  string
+	Size  string
+	Class string
+	Attrs templ.Attributes
+}
+
+// Tone and size class tokens.
+var (
+	pillTone = map[string]string{
+		"primary": "border-transparent bg-accent text-bg hover:brightness-110",
+		"neutral": "border-border bg-panel hover:border-accent/60",
+		"accent":  "border-border bg-panel hover:border-accent/60 [&>svg]:text-accent",
+		"warm":    "border-border bg-panel hover:border-warm/60 [&>svg]:text-warm",
+		"active":  "border-accent/70 bg-accent-soft [&>svg]:text-accent",
+	}
+	pillSize = map[string]string{
+		"sm": "gap-1.5 px-2 py-1 text-xs min-h-11 min-w-11",
+		// Keep icon-only and labelled controls at the same 44px touch target.
+		"md": "gap-2 px-3 py-1.5 text-sm min-h-11 min-w-11",
+	}
+)
+
+// PillClass is the button's class: the base tokens, the tone, the size,
+// then the caller's classes.
+func PillClass(tone, size, class string) string {
+	if tone == "" {
+		tone = "neutral"
+	}
+	if size == "" {
+		size = "sm"
+	}
+	ink := ""
+	if tone != "primary" {
+		ink = "text-ink"
+	}
+	return strings.Join(strings.Fields("ui-pill inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border transition "+
+		ink+" "+pillTone[tone]+" "+pillSize[size]+" "+class), " ")
+}
+
+// Pill is the canonical button chip: a type="button" with the caller's
+// attributes and the class.
+templ Pill(p PillProps) {
+	<button type="button" { pillAttrs(p.Attrs)... } { templ.Attributes{"class": PillClass(p.Tone, p.Size, p.Class)}... }>
+		{ children... }
+	</button>
+}
+
+// pillAttrs rejects a class or type in attrs: either would be a second
+// attribute of that name, which an HTML parser drops. Pass the class as
+// PillProps.Class.
+func pillAttrs(attrs templ.Attributes) templ.Attributes {
+	for _, name := range []string{"class", "type"} {
+		if _, ok := attrs[name]; ok {
+			panic("ui.Pill: pass " + name + " outside Attrs")
+		}
+	}
+	return attrs
+}

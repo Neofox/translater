@@ -1,6 +1,6 @@
-// Listen (@speech): ListenButton.tsx / useSpeech.ts on both apps. Main and
+// Listen (@speech): the Listen buttons and web/static/js/speech.js. Main and
 // alternative buttons share one page-wide voice; speech streams from the
-// worker's fake upstream (Go: POST /speech, TS: the speak server function)
+// worker's fake upstream (POST /speech)
 // and plays through synthetic Web Audio (syntheticAudio.ts), so the test
 // decides when an unlock resolves and when scheduled audio ends. Never a paid
 // call: the fake counts every upstream speech request.
@@ -93,7 +93,7 @@ async function closedContexts(page: Page): Promise<boolean[]> {
   return (await audioState(page)).contexts.map((c) => c.closed)
 }
 
-test('listen never autoplays and is disabled until the result completes @speech', async ({
+test('listen never autoplays and is disabled until the result completes @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -119,7 +119,7 @@ test('listen never autoplays and is disabled until the result completes @speech'
   expect((await audioState(page)).contexts).toHaveLength(0)
 })
 
-test('listen stops explicitly, completes after audio ends, and replays without a new request @speech', async ({
+test('listen stops explicitly, completes after audio ends, and replays without a new request @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -135,7 +135,7 @@ test('listen stops explicitly, completes after audio ends, and replays without a
   await expectPlaying(listen)
   // Network done, scheduled audio still playing: Stop stays offered. (The
   // stopped first play may already have completed its download and been
-  // cached, as in TS: this play then made no request.)
+  // cached: this play then made no request.)
   await waitForStats(fake, (s) => s.active === 0)
   await expectPlaying(listen)
   await finishAudio(page)
@@ -153,7 +153,7 @@ test('listen stops explicitly, completes after audio ends, and replays without a
   )
 })
 
-test('starting another voice stops the current one @speech', async ({
+test('starting another voice stops the current one @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -175,7 +175,7 @@ test('starting another voice stops the current one @speech', async ({
   expect((await fake.stats()).speechRequests).toBe(2)
 })
 
-test('pronounces sentence alternatives without overlapping the main voice @speech', async ({
+test('pronounces sentence alternatives without overlapping the main voice @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -199,7 +199,7 @@ test('pronounces sentence alternatives without overlapping the main voice @speec
   expect(body.instructions).toContain('Korean')
 })
 
-test('pronounces word alternatives without overlapping the main voice @speech', async ({
+test('pronounces word alternatives without overlapping the main voice @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -224,7 +224,7 @@ test('pronounces word alternatives without overlapping the main voice @speech', 
   ])
 })
 
-test('another speaker aborts the connecting one @speech', async ({
+test('another speaker aborts the connecting one @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -247,7 +247,7 @@ test('another speaker aborts the connecting one @speech', async ({
   await waitForStats(fake, (s) => s.speechAborted === 2 && s.active === 0)
 })
 
-test('stop during slow unlock sends no request @speech', async ({
+test('stop during slow unlock sends no request @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -279,7 +279,7 @@ test('stop during slow unlock sends no request @speech', async ({
   ])
 })
 
-test('editing input cancels playback and switching sentence to word resets the result @speech', async ({
+test('editing input cancels playback and switching sentence to word resets the result @speech @engine', async ({
   page,
 }) => {
   await open(page)
@@ -307,7 +307,7 @@ test('editing input cancels playback and switching sentence to word resets the r
   await expect.poll(() => closedContexts(page)).toEqual([true, true])
 })
 
-test('changing the target language aborts a connecting speech request @speech', async ({
+test('changing the target language aborts a connecting speech request @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -323,7 +323,7 @@ test('changing the target language aborts a connecting speech request @speech', 
   expect(await closedContexts(page)).toEqual([true])
 })
 
-test('pagehide cancels playback @speech', async ({ page }) => {
+test('pagehide cancels playback @speech @engine', async ({ page }) => {
   await open(page)
   await translate(page, 'default')
   const listen = listenButton(page)
@@ -340,7 +340,7 @@ test('pagehide cancels playback @speech', async ({ page }) => {
   await expect(listen).toBeEnabled()
 })
 
-test('oversized text shows speechTooLong without unlocking or a request @speech', async ({
+test('oversized text shows speechTooLong without unlocking or a request @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -360,7 +360,7 @@ test('oversized text shows speechTooLong without unlocking or a request @speech'
 })
 
 for (const ui of ['en', 'ko'] as const) {
-  test(`speech failure shows a localized notice without provider text (${ui}) @speech`, async ({
+  test(`speech failure shows a localized notice without provider text (${ui}) @speech @engine`, async ({
     page,
     fake,
   }) => {
@@ -385,7 +385,10 @@ for (const ui of ['en', 'ko'] as const) {
   })
 }
 
-test('replay cache evicts beyond 3 entries @speech', async ({ page, fake }) => {
+test('replay cache evicts beyond 3 entries @speech @engine', async ({
+  page,
+  fake,
+}) => {
   await open(page)
   await translate(page, 'default')
   // Three completed entries: main, alternative 0, alternative 1.
@@ -409,7 +412,10 @@ test('replay cache evicts beyond 3 entries @speech', async ({ page, fake }) => {
   expect((await fake.stats()).speechRequests).toBe(5)
 })
 
-test('replay cache evicts beyond 4 MiB @speech', async ({ page, fake }) => {
+test('replay cache evicts beyond 4 MiB @speech @engine', async ({
+  page,
+  fake,
+}) => {
   await open(page)
   await translate(page, 'speech-big')
   // 2.5 MiB each: the second entry pushes the first out.
@@ -422,7 +428,7 @@ test('replay cache evicts beyond 4 MiB @speech', async ({ page, fake }) => {
   expect((await fake.stats()).speechRequests).toBe(3)
 })
 
-test('identical text in different languages is cached separately @speech', async ({
+test('identical text in different languages is cached separately @speech @engine', async ({
   page,
   fake,
 }) => {
@@ -442,7 +448,7 @@ test('identical text in different languages is cached separately @speech', async
 
 // The fallback to `auto` for a language outside the list is a unit test
 // (speech.test.js): no fixture can report one (the schema enum).
-test('sends the result language @speech', async ({ page, fake }) => {
+test('sends the result language @speech @engine', async ({ page, fake }) => {
   await open(page)
   await translate(page, 'default')
   await playThrough(page, listenButton(page))
@@ -457,10 +463,10 @@ test('sends the result language @speech', async ({ page, fake }) => {
   )
 })
 
-// OutputPanel.tsx: the model-reported targetLang, not the selected target,
+// The model-reported targetLang, not the selected target,
 // sets the main text's lang, the register label (Korean sentences only) and
 // the Listen language. target-lang.json reports French with Korean selected.
-test('the reported target language drives lang, register label and Listen @speech', async ({
+test('the reported target language drives lang, register label and Listen @speech @engine', async ({
   page,
   fake,
 }) => {

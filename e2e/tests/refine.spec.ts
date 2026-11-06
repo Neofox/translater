@@ -1,11 +1,9 @@
-// Refinements (@refine): RefineRow.tsx's chips and custom adjustment, and
-// TranslatorContext's refine rules (ports of RefineRow.test.tsx and
-// TranslatorContext.test.tsx): immediate re-runs carrying the previous main,
-// toggling back through the server LRU, caps, stale settings and the rollback
-// of a failed refine. AdjustMenu.tsx's header placement (ports of
-// AdjustMenu.test.tsx and the Adjust tests of learning.browser.tsx and
-// mobile.browser.tsx): measured in-line chips, the floating panel clear of
-// Copy/Listen, dismissal and the tight-keyboard Custom editor.
+// Refinements (@refine): the refine chips and custom adjustment, and the
+// refine rules: immediate re-runs carrying the previous main, toggling back
+// through the server LRU, caps, stale settings and the rollback of a failed
+// refine. The Adjust menu's header placement: measured in-line chips, the
+// floating panel clear of Copy/Listen, dismissal and the tight-keyboard
+// Custom editor.
 import type { Locator, Page } from '@playwright/test'
 import { installFakeVisualViewport } from '../perf/page-scripts'
 import type { PageGlobals } from '../perf/page-scripts'
@@ -31,7 +29,6 @@ import {
   waitForMain,
   waitForStats,
 } from './helpers'
-import { APP, TS_BUILD } from '../ports'
 
 const PLAIN = fixture('plain').result.main!
 const SOFTER = fixture('refine-softer').result.main!
@@ -133,14 +130,6 @@ async function translatePlain(page: Page): Promise<void> {
   await expect(chip(page, 'softer')).toBeEnabled()
 }
 
-/** The TS dev server loses the reply context (context.spec.ts). */
-function skipTsDev(): void {
-  test.skip(
-    APP === 'ts' && TS_BUILD === 'dev',
-    'TS dev server loses nt.context; use E2E_TS_BUILD=prod',
-  )
-}
-
 async function setContext(page: Page, text: string): Promise<void> {
   await page.getByTestId('context-toggle').click()
   await page.getByTestId('context-textarea').fill(text)
@@ -150,7 +139,10 @@ test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
 
-test('chips toggle and re-run immediately @refine', async ({ page, fake }) => {
+test('chips toggle and re-run immediately @refine @engine', async ({
+  page,
+  fake,
+}) => {
   await translatePlain(page)
   const before = await fake.requests()
   const softer = chip(page, 'softer')
@@ -205,14 +197,14 @@ test('free-text Enter replaces the input with a truncated custom button and clic
   await openAdjust(page)
   await custom(page).click()
   await expect(custom(page)).toBeHidden()
-  // The custom button leaves the DOM: in TS a floating Adjust treats that
+  // The custom button leaves the DOM: a floating Adjust must not treat that
   // click as outside and collapses, and the wider editor stops fitting inline.
   await openAdjust(page, freeform(page))
   await expect(freeform(page)).toBeVisible()
   await expect(freeform(page)).toHaveValue('')
 })
 
-test('caps at 3 adjustments @refine', async ({ page }) => {
+test('caps at 3 adjustments @refine @engine', async ({ page }) => {
   await translatePlain(page)
   for (const id of ['softer', 'direct', 'shorter']) {
     await openAdjust(page)
@@ -253,7 +245,7 @@ test('offers Apply and Close, preserving an unapplied draft @refine', async ({
   expect(userText((await fake.bodies()).at(-1)!)).toContain('- gentler please')
 })
 
-test('keeps static refinement controls disabled while a sentence is incomplete @refine', async ({
+test('keeps static refinement controls disabled while a sentence is incomplete @refine @engine', async ({
   page,
 }) => {
   await fillSource(page, sentence('slow'))
@@ -271,10 +263,9 @@ test('keeps static refinement controls disabled while a sentence is incomplete @
 })
 
 for (const setting of ['tone', 'target', 'context'] as const) {
-  test(`${setting} change disables chips until the new result @refine`, async ({
+  test(`${setting} change disables chips until the new result @refine @engine`, async ({
     page,
   }) => {
-    if (setting === 'context') skipTsDev()
     await translatePlain(page)
     // The open panel floats over the result's language bar.
     if (setting === 'target') await closeAdjust(page)
@@ -289,7 +280,7 @@ for (const setting of ['tone', 'target', 'context'] as const) {
   })
 }
 
-test('renders nothing without a completed sentence result @refine', async ({
+test('renders nothing without a completed sentence result @refine @engine', async ({
   page,
 }) => {
   await expect(page.getByTestId('adjust-button')).toHaveCount(0)
@@ -305,7 +296,7 @@ test('failed refine rolls back to the previous result with a compact notice @ref
 }) => {
   await translatePlain(page)
   const alternatives = await page.getByTestId('alternative-item').count()
-  // Phrase rows show in the reference pane (TS mounts them only there).
+  // Phrase rows show in the reference pane.
   const visibleRows = () =>
     page.getByTestId('learning-chunk').filter({ visible: true })
   const rows = await visibleRows().count()
@@ -366,7 +357,7 @@ test('failed refine rolls back to the previous result with a compact notice @ref
   expect(text).not.toContain('[fx:refine-fail]')
 })
 
-test('a failed refine restores idle Listen and Copy on its rows @refine', async ({
+test('a failed refine restores idle Listen and Copy on its rows @refine @engine', async ({
   page,
 }) => {
   await installSyntheticAudio(page)
@@ -394,8 +385,9 @@ test('a failed refine restores idle Listen and Copy on its rows @refine', async 
   await expect(copy).toHaveAttribute('title', STRINGS.en.copy)
 })
 
-test('a non-refine error does not roll back @refine', async ({ page }) => {
-  skipTsDev()
+test('a non-refine error does not roll back @refine @engine', async ({
+  page,
+}) => {
   await translatePlain(page)
   await chip(page, 'softer').click()
   await waitForMain(page, SOFTER)
@@ -416,7 +408,10 @@ test('a non-refine error does not roll back @refine', async ({ page }) => {
   await expect(page.getByTestId('main-translation')).toBeHidden()
 })
 
-test('editing the input clears refinements @refine', async ({ page, fake }) => {
+test('editing the input clears refinements @refine @engine', async ({
+  page,
+  fake,
+}) => {
   await translatePlain(page)
   await chip(page, 'softer').click()
   await waitForMain(page, SOFTER)
@@ -430,7 +425,7 @@ test('editing the input clears refinements @refine', async ({ page, fake }) => {
   expect(userText((await fake.bodies()).at(-1)!)).not.toContain('<adjustments>')
 })
 
-// ----- Adjust menu (AdjustMenu.tsx) -----------------------------------------
+// ----- Adjust menu -----------------------------------------------------------
 
 test('shows active adjustments while collapsed and retains a custom draft through collapse @refine', async ({
   page,
@@ -486,16 +481,38 @@ test('closes with Escape even when a touch activation leaves focus outside the m
   page,
 }) => {
   await translatePlain(page)
+  const text = await source(page).inputValue()
   await expect(openPanel(page)).toHaveCount(1)
   await page.evaluate(() =>
     (document.activeElement as HTMLElement | null)?.blur(),
   )
   await page.keyboard.press('Escape')
   await expect(openPanel(page)).toHaveCount(0)
-  // As in TS, that Escape then reaches the translator shortcut, which clears
-  // the source; the menu leaves with the sentence result.
+  // That Escape only closes the menu: focus returns to its trigger, and
+  // the source and its result stay.
+  await expect(trigger(page)).toBeFocused()
+  await expect(source(page)).toHaveValue(text)
+  expect(await mainText(page)).toBe(PLAIN)
+})
+
+test('Escape clears the source only from the source or the page itself @refine @engine', async ({
+  page,
+}) => {
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, PLAIN)
+  await waitForDone(page)
+  const text = await source(page).inputValue()
+  // Focus on another control (Settings, closed): kept.
+  await page.getByTestId('settings-button').focus()
+  await page.keyboard.press('Escape')
+  await expect(source(page)).toHaveValue(text)
+  // Focus on the page itself: cleared.
+  await page.evaluate(() =>
+    (document.activeElement as HTMLElement | null)?.blur(),
+  )
+  await page.keyboard.press('Escape')
   await expect(source(page)).toHaveValue('')
-  await expect(trigger(page)).toHaveCount(0)
+  await expect(source(page)).toBeFocused()
 })
 
 test('adjustments stay with tone in the header and expose chips when there is room @refine', async ({
@@ -574,6 +591,47 @@ test('adjustments stay with tone in the header and expose chips when there is ro
   }
 })
 
+/** The open panel sits under its trigger (bottom-start, offset 12),
+ * shifted inside the viewport and left of Copy/Listen when it would cover
+ * them: never offset by the header's own left edge, which the centred shell
+ * moves right on wide screens. */
+async function expectUnderTrigger(page: Page, width: number): Promise<void> {
+  const panel = await box(openPanel(page))
+  const anchor = await box(trigger(page))
+  const primary = await box(page.locator('.primary-result-actions'))
+  let x = Math.max(16, Math.min(anchor.x, width - 16 - panel.width))
+  if (
+    panel.y < primary.y + primary.height &&
+    panel.y + panel.height > primary.y
+  )
+    x = Math.max(16, Math.min(x, primary.x - panel.width - 12))
+  expect(Math.abs(panel.x - x), `panel x at ${width}px`).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(panel.y - (anchor.y + anchor.height + 12)),
+    `panel y at ${width}px`,
+  ).toBeLessThanOrEqual(1)
+}
+
+test('the Adjust panel stays under its trigger when the header contains fixed boxes @refine', async ({
+  page,
+}) => {
+  test.skip(page.viewportSize()!.width < 1100, 'desktop workspace only')
+  await page.setViewportSize({ width: 2048, height: 1117 })
+  await fillSource(page, sentence('plain'))
+  await waitForMain(page, PLAIN)
+  await waitForDone(page)
+  // Layout containment makes the header the containing block of the fixed
+  // panel (as engines that apply it with container-type do): the panel's
+  // coordinates then start at the header's left edge, 256 px in.
+  await page.locator('.app-header').evaluate((el: HTMLElement) => {
+    el.style.contain = 'layout'
+  })
+  expect((await box(page.locator('.app-header'))).x).toBe(256)
+  await trigger(page).click()
+  await expect(chip(page, 'softer')).toBeVisible()
+  await expectUnderTrigger(page, 2048)
+})
+
 test('desktop Adjust overlays without growing the header or covering primary actions @refine', async ({
   page,
 }) => {
@@ -606,6 +664,7 @@ test('desktop Adjust overlays without growing the header or covering primary act
       expect(await hits(action)).toBe(true)
     }
     const primary = await box(page.locator('.primary-result-actions'))
+    await expectUnderTrigger(page, width)
     const overlaps =
       panel.x < primary.x + primary.width &&
       primary.x < panel.x + panel.width &&
@@ -766,7 +825,6 @@ test('header custom adjustments keep keyboard focus and restore the source keybo
 test('adjustment width measurement reconnects after an error and same-sentence retry @refine', async ({
   page,
 }) => {
-  skipTsDev()
   await translatePlain(page)
   if (page.viewportSize()!.width >= 1100) {
     await makeRoom(page)
