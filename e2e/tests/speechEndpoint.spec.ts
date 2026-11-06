@@ -13,7 +13,7 @@ import {
   waitForMain,
 } from './helpers'
 
-test('POST /speech streams the fake tone as 24 kHz PCM @speech', async ({
+test('POST /speech streams the fake tone as 24 kHz PCM @speech @engine', async ({
   request,
   fake,
 }) => {
@@ -44,7 +44,7 @@ test('POST /speech streams the fake tone as 24 kHz PCM @speech', async ({
   ])
 })
 
-test('POST /speech errors are localized JSON without provider text @speech', async ({
+test('POST /speech errors are localized JSON without provider text @speech @engine', async ({
   request,
   fake,
 }) => {
@@ -67,7 +67,7 @@ test('POST /speech errors are localized JSON without provider text @speech', asy
   expect((await fake.stats()).speechRequests).toBe(2)
 })
 
-test('speech fixtures translate with their markers and never autoplay @speech', async ({
+test('speech fixtures translate with their markers and never autoplay @speech @engine', async ({
   page,
   fake,
 }) => {

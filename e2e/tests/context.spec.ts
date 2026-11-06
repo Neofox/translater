@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
 
-test('toggle opens the context textarea and typing persists to sessionStorage @context', async ({
+test('toggle opens the context textarea and typing persists to sessionStorage @context @engine', async ({
   page,
 }) => {
   await expect(field(page)).toBeHidden()
@@ -48,7 +48,7 @@ test('toggle opens the context textarea and typing persists to sessionStorage @c
   await expect(field(page)).toHaveValue('hi')
 })
 
-test('clear empties the context and keeps the field open @context', async ({
+test('clear empties the context and keeps the field open @context @engine', async ({
   page,
 }) => {
   await openContext(page)
@@ -62,7 +62,7 @@ test('clear empties the context and keeps the field open @context', async ({
   )
 })
 
-test('context is sent with the run and edits re-run @context', async ({
+test('context is sent with the run and edits re-run @context @engine', async ({
   page,
   fake,
 }) => {
@@ -86,7 +86,7 @@ test('context is sent with the run and edits re-run @context', async ({
   expect(body).toContain('Are you free for dinner tonight?')
 })
 
-test('context is restored after a reload in the same tab @context', async ({
+test('context is restored after a reload in the same tab @context @engine', async ({
   page,
 }) => {
   await openContext(page)

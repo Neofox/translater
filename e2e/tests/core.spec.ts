@@ -50,7 +50,7 @@ async function stopStream(page: Page, fake: Fake, abortedBefore: number) {
   await waitForStats(fake, (s) => s.aborted > abortedBefore, 5_000)
 }
 
-test('streams main then details @core', async ({ page, fake }) => {
+test('streams main then details @core @engine', async ({ page, fake }) => {
   const fx = fixture('stream')
   const main = fx.result.main!
   await recordResult(page)
@@ -75,7 +75,10 @@ test('streams main then details @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('copy enables at main-ready before done @core', async ({ page, fake }) => {
+test('copy enables at main-ready before done @core @engine', async ({
+  page,
+  fake,
+}) => {
   const fx = fixture('slow')
   const main = fx.result.main!
   await fillSource(page, sentence('slow'))
@@ -118,7 +121,9 @@ test('Copy confirms visibly with a violet check, then reverts @core', async ({
     await expect(check).toHaveCSS('color', rgb(accent))
     await expect(copy).toHaveAttribute('aria-label', STRINGS.en.copied)
     // Announced politely, beyond the focused button's name.
-    await expect(page.getByRole('status').filter({ hasText: STRINGS.en.copied })).toHaveCount(1)
+    await expect(
+      page.getByRole('status').filter({ hasText: STRINGS.en.copied }),
+    ).toHaveCount(1)
     // Back to Copy after about 1.5 s.
     await expect(check).toBeHidden({ timeout: 3_000 })
     await expect(copy.locator('svg.lucide-copy')).toBeVisible()
@@ -174,7 +179,7 @@ test('streaming status names polishing for same-language input @core', async ({
   await stopStream(page, fake, 1)
 })
 
-test('stale result disables copy @core', async ({ page, fake }) => {
+test('stale result disables copy @core @engine', async ({ page, fake }) => {
   await fillSource(page, sentence('plain'))
   await waitForMain(page, fixture('plain').result.main!)
   await waitForDone(page)
@@ -196,7 +201,7 @@ test('stale result disables copy @core', async ({ page, fake }) => {
     if (entry.copy) expect(entry.text).toBe(second)
 })
 
-test('paste runs immediately @core', async ({ page, fake }) => {
+test('paste runs immediately @core @engine', async ({ page, fake }) => {
   const text = sentence('plain')
   await source(page).click()
   await writeClipboard(page, text)
@@ -209,7 +214,7 @@ test('paste runs immediately @core', async ({ page, fake }) => {
   await waitForDone(page)
 })
 
-test('blur flushes @core', async ({ page, fake }) => {
+test('blur flushes @core @engine', async ({ page, fake }) => {
   await typeSource(page, sentence('plain'))
   const typedAt = Date.now()
   await page.waitForTimeout(150)
@@ -225,7 +230,7 @@ test('blur flushes @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('cmd+enter forces @core', async ({ page, fake }) => {
+test('cmd+enter forces @core @engine', async ({ page, fake }) => {
   const text = sentence('plain')
   await typeSource(page, text)
   await page.waitForTimeout(150)
@@ -239,7 +244,7 @@ test('cmd+enter forces @core', async ({ page, fake }) => {
   await waitForDone(page)
 })
 
-test('cmd+enter replaces the pending debounce @core', async ({
+test('cmd+enter replaces the pending debounce @core @engine', async ({
   page,
   fake,
 }) => {
@@ -252,7 +257,7 @@ test('cmd+enter replaces the pending debounce @core', async ({
   expect(await fake.stats()).toMatchObject({ requests: 1, aborted: 0 })
 })
 
-test('enter inserts newline @core', async ({ page, fake }) => {
+test('enter inserts newline @core @engine', async ({ page, fake }) => {
   const first = sentence('plain')
   await typeSource(page, first)
   await page.keyboard.press('Enter')
@@ -269,7 +274,10 @@ test('enter inserts newline @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('editing mid-stream cancels upstream @core', async ({ page, fake }) => {
+test('editing mid-stream cancels upstream @core @engine', async ({
+  page,
+  fake,
+}) => {
   await fillSource(page, sentence('slow'))
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
   const before = await fake.stats()
@@ -285,7 +293,7 @@ test('editing mid-stream cancels upstream @core', async ({ page, fake }) => {
   expect(after.aborted).toBe(1)
 })
 
-test('a run stopped mid-alternatives keeps its completed rows and drops the skeleton @core', async ({
+test('a run stopped mid-alternatives keeps its completed rows and drops the skeleton @core @engine', async ({
   page,
   fake,
 }) => {
@@ -308,7 +316,7 @@ test('a run stopped mid-alternatives keeps its completed rows and drops the skel
   await stopStream(page, fake, before.aborted)
 })
 
-test('repeat is served from cache @core', async ({ page, fake }) => {
+test('repeat is served from cache @core @engine', async ({ page, fake }) => {
   const text = sentence('plain')
   const main = fixture('plain').result.main!
   await fillSource(page, text)
@@ -350,7 +358,7 @@ async function expectLocalizedErrors(
   expect(await fake.requests()).toBe(kinds.length * 2)
 }
 
-test('provider error is localized and not retried @core', async ({
+test('provider error is localized and not retried @core @engine', async ({
   page,
   fake,
 }) => {
@@ -359,7 +367,7 @@ test('provider error is localized and not retried @core', async ({
   ])
 })
 
-test('error kinds are localized @core', async ({ page, fake }) => {
+test('error kinds are localized @core @engine', async ({ page, fake }) => {
   await expectLocalizedErrors(page, fake, [
     ['error-budget', 'providerBudgetUnavailable'],
     ['error-rate', 'providerRateLimited'],
@@ -417,7 +425,7 @@ test('textarea survives streaming and UI language switch @core', async ({
   })
 })
 
-test('preferences persist @core', async ({ page, context }) => {
+test('preferences persist @core @engine', async ({ page, context }) => {
   await setTone(page, 'professional')
   await expectTone(page, 'professional')
   await pickLanguage(page, 'target', 'en')
@@ -467,7 +475,7 @@ test('more languages listbox @core', async ({ page }) => {
   await expectLanguage(page, 'target', 'fr')
 })
 
-test('markup renders as text @core', async ({ page }) => {
+test('markup renders as text @core @engine', async ({ page }) => {
   const dialogs: string[] = []
   page.on('dialog', (dialog) => {
     dialogs.push(dialog.message())
@@ -490,7 +498,7 @@ test('markup renders as text @core', async ({ page }) => {
   expect(dialogs).toEqual([])
 })
 
-test('IME composition is not interrupted @core', async ({
+test('IME composition is not interrupted @core @engine', async ({
   page,
   fake,
   browserName,
@@ -541,7 +549,7 @@ test('IME composition is not interrupted @core', async ({
   await stopStream(page, fake, (await fake.stats()).aborted)
 })
 
-test('late events from a superseded run are ignored @core', async ({
+test('late events from a superseded run are ignored @core @engine', async ({
   page,
   fake,
 }) => {
@@ -577,9 +585,7 @@ test('late events from a superseded run are ignored @core', async ({
     expect(log[i]!.copy).toBe(false)
     // An aborted main freezes.
     if (i > 0)
-      expect(log[i]!.text!.length).toBeLessThanOrEqual(
-        log[i - 1]!.text!.length,
-      )
+      expect(log[i]!.text!.length).toBeLessThanOrEqual(log[i - 1]!.text!.length)
   }
   for (const entry of log.slice(start)) {
     expect(second.startsWith(entry.text ?? '')).toBe(true)
@@ -588,7 +594,7 @@ test('late events from a superseded run are ignored @core', async ({
   expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
 })
 
-test('stale events of a superseded run cannot touch the result @core', async ({
+test('stale events of a superseded run cannot touch the result @core @engine', async ({
   page,
   fake,
 }) => {
@@ -657,7 +663,7 @@ test('stale events of a superseded run cannot touch the result @core', async ({
   expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
 })
 
-test('word input uses word intent @core', async ({ page, fake }) => {
+test('word input uses word intent @core @engine', async ({ page, fake }) => {
   const fx = fixture('word')
   // `thanks` plus the fixture marker (the fake needs it to answer with a word
   // result) and a nonce glued on, so detectIntent still sees two tokens.
@@ -672,7 +678,10 @@ test('word input uses word intent @core', async ({ page, fake }) => {
   expect(userText(bodies[0]!)).toContain(text)
 })
 
-test('long-form input hides alternatives @core', async ({ page, fake }) => {
+test('long-form input hides alternatives @core @engine', async ({
+  page,
+  fake,
+}) => {
   const fx = fixture('longform')
   await fillSource(
     page,
@@ -695,7 +704,7 @@ test('long-form input hides alternatives @core', async ({ page, fake }) => {
   expect(await fake.requests()).toBe(1)
 })
 
-test('a short sentence without alternatives mounts no alternatives section @core', async ({
+test('a short sentence without alternatives mounts no alternatives section @core @engine', async ({
   page,
 }) => {
   // learn-long's reply has no alternatives; a short single sentence is not
@@ -721,7 +730,10 @@ test('a short sentence without alternatives mounts no alternatives section @core
   await expect(page.locator('.alternative-item')).toHaveCount(2)
 })
 
-test('retry re-runs a failed translation @core', async ({ page, fake }) => {
+test('retry re-runs a failed translation @core @engine', async ({
+  page,
+  fake,
+}) => {
   await fillSource(page, sentence('error-provider'))
   const alert = page.getByRole('alert')
   await expect(alert).toBeVisible({ timeout: 20_000 })
@@ -762,7 +774,9 @@ test('swap uses the translated text when the result is current @core', async ({
   if (bodies.length > 1) expect(userText(bodies[1]!)).toContain(main)
 })
 
-test('register label names the Korean speech level @core', async ({ page }) => {
+test('register label names the Korean speech level @core @engine', async ({
+  page,
+}) => {
   await pickLanguage(page, 'target', 'ko')
   await setTone(page, 'casual')
   await fillSource(page, sentence('plain'))
@@ -778,7 +792,7 @@ test('register label names the Korean speech level @core', async ({ page }) => {
   await expect(tag).toHaveText('반말', { timeout: 20_000 })
 })
 
-test('streaming deltas stay urgent and only completion starts a result transition @core', async ({
+test('streaming deltas stay urgent and only completion starts a result transition @core @engine', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -838,7 +852,7 @@ async function errorTextAfterKorean(page: Page): Promise<string> {
   return text
 }
 
-test('a shown error follows a UI language switch at once @core', async ({
+test('a shown error follows a UI language switch at once @core @engine', async ({
   page,
 }) => {
   await fillSource(
@@ -871,7 +885,7 @@ test('a shown error follows a UI language switch at once @core', async ({
   )
 })
 
-test('input over the limit shows a local error without a request @core', async ({
+test('input over the limit shows a local error without a request @core @engine', async ({
   page,
   fake,
 }) => {

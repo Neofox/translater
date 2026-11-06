@@ -69,7 +69,7 @@ test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
 
-test('word result shows primary translation, register tags and alternatives @word', async ({
+test('word result shows primary translation, register tags and alternatives @word @engine', async ({
   page,
 }) => {
   const fx = fixture('word')
@@ -334,7 +334,7 @@ test('compact word details open the learning view and restore the trigger @word'
   expect(await fake.requests()).toBe(requests)
 })
 
-test('word details trigger is disabled while streaming @word', async ({
+test('word details trigger is disabled while streaming @word @engine', async ({
   page,
 }) => {
   const fx = fixture('word-slow')

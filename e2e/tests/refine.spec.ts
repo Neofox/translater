@@ -139,7 +139,10 @@ test.beforeEach(async ({ page }) => {
   await openApp(page)
 })
 
-test('chips toggle and re-run immediately @refine', async ({ page, fake }) => {
+test('chips toggle and re-run immediately @refine @engine', async ({
+  page,
+  fake,
+}) => {
   await translatePlain(page)
   const before = await fake.requests()
   const softer = chip(page, 'softer')
@@ -201,7 +204,7 @@ test('free-text Enter replaces the input with a truncated custom button and clic
   await expect(freeform(page)).toHaveValue('')
 })
 
-test('caps at 3 adjustments @refine', async ({ page }) => {
+test('caps at 3 adjustments @refine @engine', async ({ page }) => {
   await translatePlain(page)
   for (const id of ['softer', 'direct', 'shorter']) {
     await openAdjust(page)
@@ -242,7 +245,7 @@ test('offers Apply and Close, preserving an unapplied draft @refine', async ({
   expect(userText((await fake.bodies()).at(-1)!)).toContain('- gentler please')
 })
 
-test('keeps static refinement controls disabled while a sentence is incomplete @refine', async ({
+test('keeps static refinement controls disabled while a sentence is incomplete @refine @engine', async ({
   page,
 }) => {
   await fillSource(page, sentence('slow'))
@@ -260,7 +263,7 @@ test('keeps static refinement controls disabled while a sentence is incomplete @
 })
 
 for (const setting of ['tone', 'target', 'context'] as const) {
-  test(`${setting} change disables chips until the new result @refine`, async ({
+  test(`${setting} change disables chips until the new result @refine @engine`, async ({
     page,
   }) => {
     await translatePlain(page)
@@ -277,7 +280,7 @@ for (const setting of ['tone', 'target', 'context'] as const) {
   })
 }
 
-test('renders nothing without a completed sentence result @refine', async ({
+test('renders nothing without a completed sentence result @refine @engine', async ({
   page,
 }) => {
   await expect(page.getByTestId('adjust-button')).toHaveCount(0)
@@ -354,7 +357,7 @@ test('failed refine rolls back to the previous result with a compact notice @ref
   expect(text).not.toContain('[fx:refine-fail]')
 })
 
-test('a failed refine restores idle Listen and Copy on its rows @refine', async ({
+test('a failed refine restores idle Listen and Copy on its rows @refine @engine', async ({
   page,
 }) => {
   await installSyntheticAudio(page)
@@ -382,7 +385,9 @@ test('a failed refine restores idle Listen and Copy on its rows @refine', async 
   await expect(copy).toHaveAttribute('title', STRINGS.en.copy)
 })
 
-test('a non-refine error does not roll back @refine', async ({ page }) => {
+test('a non-refine error does not roll back @refine @engine', async ({
+  page,
+}) => {
   await translatePlain(page)
   await chip(page, 'softer').click()
   await waitForMain(page, SOFTER)
@@ -403,7 +408,10 @@ test('a non-refine error does not roll back @refine', async ({ page }) => {
   await expect(page.getByTestId('main-translation')).toBeHidden()
 })
 
-test('editing the input clears refinements @refine', async ({ page, fake }) => {
+test('editing the input clears refinements @refine @engine', async ({
+  page,
+  fake,
+}) => {
   await translatePlain(page)
   await chip(page, 'softer').click()
   await waitForMain(page, SOFTER)
@@ -487,7 +495,7 @@ test('closes with Escape even when a touch activation leaves focus outside the m
   expect(await mainText(page)).toBe(PLAIN)
 })
 
-test('Escape clears the source only from the source or the page itself @refine', async ({
+test('Escape clears the source only from the source or the page itself @refine @engine', async ({
   page,
 }) => {
   await fillSource(page, sentence('plain'))
@@ -592,7 +600,10 @@ async function expectUnderTrigger(page: Page, width: number): Promise<void> {
   const anchor = await box(trigger(page))
   const primary = await box(page.locator('.primary-result-actions'))
   let x = Math.max(16, Math.min(anchor.x, width - 16 - panel.width))
-  if (panel.y < primary.y + primary.height && panel.y + panel.height > primary.y)
+  if (
+    panel.y < primary.y + primary.height &&
+    panel.y + panel.height > primary.y
+  )
     x = Math.max(16, Math.min(x, primary.x - panel.width - 12))
   expect(Math.abs(panel.x - x), `panel x at ${width}px`).toBeLessThanOrEqual(1)
   expect(

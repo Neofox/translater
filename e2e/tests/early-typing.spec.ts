@@ -73,8 +73,7 @@ const navigationType = (page: Page) =>
     () =>
       (
         performance.getEntriesByType('navigation')[0] as
-          | PerformanceNavigationTiming
-          | undefined
+          PerformanceNavigationTiming | undefined
       )?.type ?? 'none',
   )
 
@@ -82,7 +81,7 @@ const navigationType = (page: Page) =>
 const modulesRan = (page: Page) =>
   expect(source(page)).toHaveAttribute('style', /height/, { timeout: 15_000 })
 
-test('text typed before the modules run is translated once @core', async ({
+test('text typed before the modules run is translated once @core @engine', async ({
   page,
   fake,
 }) => {
@@ -131,7 +130,7 @@ async function translate(page: Page, text: string) {
 for (const restorable of [false, true]) {
   const label = restorable ? ' (restoration allowed)' : ''
 
-  test(`reload does not translate the field's text${label} @core`, async ({
+  test(`reload does not translate the field's text${label} @core @engine`, async ({
     page,
     fake,
   }, testInfo) => {
@@ -155,7 +154,7 @@ for (const restorable of [false, true]) {
     expect(await fake.requests()).toBe(1)
   })
 
-  test(`back/forward does not translate the field's text${label} @core`, async ({
+  test(`back/forward does not translate the field's text${label} @core @engine`, async ({
     page,
     fake,
   }, testInfo) => {
@@ -178,7 +177,8 @@ for (const restorable of [false, true]) {
     // says 'navigate', but the modules do not run again.
     const type = await navigationType(page)
     const bfcache = await page.evaluate(
-      () => (window as unknown as { ntPersisted?: boolean }).ntPersisted === true,
+      () =>
+        (window as unknown as { ntPersisted?: boolean }).ntPersisted === true,
     )
     testInfo.annotations.push({
       type: 'back_forward',

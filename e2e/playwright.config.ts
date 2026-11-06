@@ -34,6 +34,12 @@ const DEFAULT_PROJECTS = new Set([
   'chromium-macbook-14',
   'webkit-macbook-14',
 ])
+
+// Tests tagged @engine check behaviour that does not depend on the layout
+// (streaming, cache, errors, debounce, stale runs): they run on one project
+// per engine only.
+const ENGINE_PROJECTS = new Set(['chromium-macbook-14', 'webkit-portrait'])
+
 const ALL_PROJECTS =
   process.env.E2E_PROJECTS === 'all' ||
   Boolean(process.env.E2E_VISUAL) ||
@@ -94,6 +100,14 @@ for (let i = 0; i < WORKERS; i++) {
 // excludes @prod.
 const PROD_URL = process.env.PROD_URL?.replace(/\/+$/, '')
 
+// Excluded everywhere: @visual outside the visual scripts and @prod
+// without PROD_URL. A project's grepInvert replaces the config's, so each
+// project carries this list (plus @engine where it does not apply).
+const excluded = [
+  ...(process.env.E2E_VISUAL ? [] : [/@visual/]),
+  ...(PROD_URL ? [] : [/@prod/]),
+]
+
 export default defineConfig({
   testDir: './tests',
   outputDir: '../test-results/e2e',
@@ -109,10 +123,6 @@ export default defineConfig({
   // (e2e/visual/run.mjs sets E2E_VISUAL); plain e2e runs skip them. The
   // billed @prod smoke runs only with PROD_URL.
   grep: PROD_URL ? /@prod/ : undefined,
-  grepInvert: [
-    ...(process.env.E2E_VISUAL ? [] : [/@visual/]),
-    ...(PROD_URL ? [] : [/@prod/]),
-  ],
   fullyParallel: true,
   workers: PROD_URL ? 1 : WORKERS,
   // CI runners are loaded enough to miss timing assertions now and then; a
@@ -136,6 +146,9 @@ export default defineConfig({
     .flatMap((browserName) =>
       viewports.map(({ label, width, height }) => ({
         name: `${browserName}-${label}`,
+        grepInvert: ENGINE_PROJECTS.has(`${browserName}-${label}`)
+          ? excluded
+          : [...excluded, /@engine/],
         use: {
           browserName,
           viewport: { width, height },

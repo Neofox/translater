@@ -167,7 +167,7 @@ async function editor(page: Page): Promise<Editor> {
   })
 }
 
-test('a whitespace-only source edit keeps learning in place @learning', async ({
+test('a whitespace-only source edit keeps learning in place @learning @engine', async ({
   page,
 }) => {
   // Learning the original source: its ranges are offsets into the raw text.
