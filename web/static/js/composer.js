@@ -102,7 +102,6 @@ export function initComposer(app, ta) {
   }
   const schedule = () => {
     clearTimer()
-    if (composing) return
     const text = ta.value
     if (!text.trim()) {
       immediate = false
@@ -117,30 +116,34 @@ export function initComposer(app, ta) {
       app.run(trigger)
     }, delay)
   }
+  let seen = ta.value
   const changed = () => {
+    seen = ta.value
     resize()
     app.inputChanged()
     schedule()
   }
 
-  // Abort and mark stale on every edit, including composition updates, but
-  // schedule only once composition has ended.
+  // Composition updates are edits like any other: they abort, mark stale and
+  // reschedule. Korean IMEs (macOS, iOS) keep the last syllable composing
+  // until the next key, so waiting for compositionend would never run a
+  // text that ends in a finished syllable like 요. Committing without a
+  // change (Space, blur) must not abort or repeat the run for that text.
   ta.addEventListener('compositionstart', () => {
     composing = true
-    clearTimer()
   })
+  // The commit's own input events (Chromium repeats the text, WebKit removes
+  // and reinserts it) leave the value as it was.
+  const edited = () => {
+    if (ta.value !== seen) changed()
+  }
   ta.addEventListener('compositionend', () => {
     composing = false
-    changed()
+    edited()
   })
   ta.addEventListener('input', (event) => {
-    if (composing) {
-      clearTimer()
-      resize()
-      app.inputChanged()
-      return
-    }
-    changed()
+    if (event.inputType === 'deleteCompositionText') return
+    edited()
   })
   // The paste's own input event consumes the flag; a paste that changes
   // nothing must not make the next keystroke immediate.

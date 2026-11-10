@@ -498,7 +498,7 @@ test('markup renders as text @core @engine', async ({ page }) => {
   expect(dialogs).toEqual([])
 })
 
-test('IME composition is not interrupted @core @engine', async ({
+test('a held IME composition runs without interrupting it @core @engine', async ({
   page,
   fake,
   browserName,
@@ -509,8 +509,9 @@ test('IME composition is not interrupted @core @engine', async ({
   await expect.poll(() => mainText(page), { timeout: 15_000 }).toMatch(/\S/)
   expect(await fake.requests()).toBe(1)
 
-  // Compose 한글 at the end while the slow stream is still running, holding
-  // the last uncommitted step well past the 800ms debounce.
+  // Compose 한글 at the end while the slow stream is still running, then
+  // hold the last syllable uncommitted, as the macOS/iOS Korean IMEs do
+  // until the next key.
   await page.evaluate(() => {
     const ta = document.querySelector<HTMLTextAreaElement>(
       '[data-testid="input-textarea"]',
@@ -529,15 +530,19 @@ test('IME composition is not interrupted @core @engine', async ({
     await compose(step)
     await page.waitForTimeout(150)
   }
-  await page.waitForTimeout(1_200)
-  // Composition edits stop the stale stream but never start a run.
-  expect(await fake.stats()).toMatchObject({ requests: 1, aborted: 1 })
-  await cdp.send('Input.insertText', { text: '한글' })
-
+  // Composition steps abort the stale stream and only the held text runs,
+  // once, after the debounce.
   const expected = `${first}한글`
-  await expect(source(page)).toHaveValue(expected)
   await waitForStats(fake, (s) => s.requests >= 2, 5_000)
+  expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
+  expect(userText((await fake.bodies()).at(-1)!)).toContain(expected)
   await waitForMain(page, fixture('slow').result.main!)
+
+  // Committing the same text neither aborts nor repeats the run.
+  await cdp.send('Input.insertText', { text: '한글' })
+  await expect(source(page)).toHaveValue(expected)
+  await page.waitForTimeout(1_200)
+  expect(await fake.stats()).toMatchObject({ requests: 2, aborted: 1 })
   const caret = await page.evaluate(() => {
     const ta = document.querySelector<HTMLTextAreaElement>(
       '[data-testid="input-textarea"]',
@@ -545,7 +550,6 @@ test('IME composition is not interrupted @core @engine', async ({
     return [ta.value, ta.selectionStart, ta.selectionEnd]
   })
   expect(caret).toEqual([expected, expected.length, expected.length])
-  expect(userText((await fake.bodies()).at(-1)!)).toContain(expected)
   await stopStream(page, fake, (await fake.stats()).aborted)
 })
 
