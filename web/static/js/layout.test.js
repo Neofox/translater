@@ -40,7 +40,7 @@ test('measure writes --app-height before reading the panels height (useWorkspace
       addEventListener() {},
       removeEventListener() {},
     }
-    globalThis.document = Object.assign(new EventTarget(), { activeElement: null, body: {} })
+    globalThis.document = Object.assign(new EventTarget(), { activeElement: null, body: {}, documentElement: { clientHeight: 736 }, hidden: false })
     globalThis.HTMLElement = FakeElement
     globalThis.getComputedStyle = (el) => el.style
     globalThis.ResizeObserver = undefined
@@ -163,6 +163,18 @@ test('pinch zoom is ignored: the layout height stays the window height', () => {
   assert.equal(r.appTop, 0)
   assert.equal(r.layout.keyboard, false)
   assert.equal(r.layout.mode, 'stack')
+})
+
+test('iOS pinch zoom keeps the layout viewport height, not the zoomed innerHeight', () => {
+  const sim = simulate({ width: 390, innerWidth: 390, innerHeight: 844, visible: 844, touch: true })
+  sim.step({ editing: true })
+  // Safari reports innerHeight in zoomed CSS px, like visualViewport.height.
+  const r = sim.step({ scale: 4, innerHeight: 211, visible: 211, offsetTop: 300, layoutHeight: 844 })
+  assert.equal(r.appHeight, 844)
+  assert.equal(r.appTop, 0)
+  assert.deepEqual([r.layout.keyboard, r.layout.short, r.layout.tight], [false, false, false])
+  // Back at scale 1 the visible height applies again.
+  assert.equal(sim.step({ scale: 1, innerHeight: 844, visible: 844, offsetTop: 0 }).appHeight, 844)
 })
 
 test('fold postures win over width', () => {

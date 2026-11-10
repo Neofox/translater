@@ -19,15 +19,20 @@ export const initialLayoutState = (innerWidth, innerHeight) => ({
 
 /**
  * One measurement. `width` is the panels' outer width (0: the window's),
- * `visible`/`offsetTop`/`scale` come from visualViewport, `posture` is
+ * `visible`/`offsetTop`/`scale` come from visualViewport, `layoutHeight`
+ * is the layout viewport (documentElement.clientHeight), `posture` is
  * 'book', 'laptop' or null. `state` is the previous { natural, layout }:
  * the keyboard flag latches, and the natural (pre-keyboard) height is kept
  * while editing. Returns the next { layout, natural, appHeight, appTop };
  * an unchanged layout keeps its identity.
  */
 export function decideLayout(input, state) {
-  const { innerWidth, innerHeight, sideInsets = 0, editing = false, touch = false, posture = null } = input
+  const { innerWidth, sideInsets = 0, editing = false, touch = false, posture = null } = input
   const zoomed = Math.abs((input.scale || 1) - 1) > 0.01
+  // iOS Safari shrinks innerHeight with the pinch scale (it is the visual
+  // viewport there); the layout viewport keeps the unzoomed height, so a
+  // zoomed page must not collapse the shell to the zoomed-in height.
+  const innerHeight = zoomed && input.layoutHeight ? input.layoutHeight : input.innerHeight
   const visible = zoomed ? innerHeight : input.visible || innerHeight
   const outerWidth = input.width || innerWidth
   let natural = state.natural
@@ -152,6 +157,7 @@ export function initLayout(panels) {
           width: panels.clientWidth,
           innerWidth: window.innerWidth,
           innerHeight: window.innerHeight,
+          layoutHeight: document.documentElement.clientHeight,
           visible: viewport?.height,
           offsetTop: viewport?.offsetTop,
           scale: viewport?.scale,
@@ -197,6 +203,17 @@ export function initLayout(panels) {
   panels.addEventListener('focusout', measure)
   book.addEventListener('change', measure)
   laptop.addEventListener('change', measure)
+  // Returning to the tab (or a bfcache restore) may not fire a resize, and
+  // Safari settles its viewport only after the first frame: measure on
+  // both sides of it.
+  const resume = () => {
+    if (document.hidden) return
+    measure()
+    cancelAnimationFrame(frame)
+    frame = requestAnimationFrame(measure)
+  }
+  window.addEventListener('pageshow', resume)
+  document.addEventListener('visibilitychange', resume)
   measure()
   initFold(panels, laptop)
   return { layout: () => state.layout }
